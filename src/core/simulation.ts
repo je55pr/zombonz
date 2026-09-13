@@ -20,6 +20,7 @@ export interface SimulationMap {
   collisionBoxes: readonly CollisionBox[];
   walkSurfaces: readonly WalkSurface[];
   zombieSpawns: readonly Vec3[];
+  navigationGraph?: NavigationGraph;
 }
 
 export interface SimulationState {
@@ -107,6 +108,7 @@ export class GameSimulation {
     for (const zombie of this.zombies()) {
       updateZombiePursuit(
         zombie, players, deltaSeconds, this.map.collisionBoxes, this.map.walkSurfaces,
+        this.map.navigationGraph,
       );
       events.push(...tickZombieMelee(zombie, players));
     }

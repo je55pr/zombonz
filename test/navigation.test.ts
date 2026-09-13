@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  GameSimulation,
   ZOMBIE_MOVEMENT,
   createPlayerState,
   createZombieState,
@@ -46,6 +47,21 @@ describe('navigation graph', () => {
     }
     expect(zombie.position.x).toBeGreaterThan(2);
     expect(Math.hypot(zombie.position.x - 3, zombie.position.z)).toBeLessThan(1.5);
+  });
+
+  it('threads map navigation through GameSimulation pursuit', () => {
+    const wall = [{ min: { x: 1, y: 0, z: -1 }, max: { x: 2, y: 2, z: 1 } }];
+    const graph: NavigationGraph = { nodes: [
+      { id: 'left', position: { x: 0, y: 0, z: 2 }, neighbors: ['right'] },
+      { id: 'right', position: { x: 3, y: 0, z: 2 }, neighbors: ['left'] },
+    ] };
+    const simulation = new GameSimulation({
+      seed: 1, map: { collisionBoxes: wall, walkSurfaces: [], zombieSpawns: [{ x: 0, y: 0, z: 0 }], navigationGraph: graph },
+      playerSpawns: [{ x: 3, y: 0, z: 0 }], roundConfig: { initialWaitTicks: 1, intermissionTicks: 10 },
+      spawnConfig: { baseZombieCount: 1, additionalPerRound: 0, spawnIntervalTicks: 0, maxAlive: 1 },
+    });
+    for (let tick = 0; tick < 360; tick += 1) simulation.tick();
+    expect(simulation.zombies()[0]?.position.x).toBeGreaterThan(2);
   });
 
   it('keeps every Nacht navigation edge clear of static collision', () => {

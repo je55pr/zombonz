@@ -36,6 +36,7 @@ const simulation = new GameSimulation({
     collisionBoxes: greyboxCollisionBoxes(),
     walkSurfaces: NACHT_WALK_SURFACES,
     zombieSpawns: NACHT_ZOMBIE_SPAWNS,
+    navigationGraph: NACHT_NAVIGATION,
   },
   playerSpawns: [NACHT_PLAYER_SPAWN],
 });
