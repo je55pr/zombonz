@@ -46,7 +46,10 @@ describe('world state', () => {
   it('allocates stable ids and remains JSON serializable', () => {
     const world = createWorld(99);
     const id = allocateEntityId(world);
-    addEntity(world, { id, kind: 'player', alive: true, position: origin(), health: 100, points: 500 });
+    addEntity(world, {
+      id, kind: 'player', alive: true, position: origin(), velocity: origin(),
+      yaw: 0, pitch: 0, health: 100, points: 500,
+    });
     expect(id).toBe('e:1');
     expect(JSON.parse(JSON.stringify(world))).toEqual(world);
     expect(removeEntity(world, id)).toBe(true);
@@ -58,6 +61,8 @@ describe('input frames', () => {
   it('are transport-friendly serializable data', () => {
     const frame = createInputFrame(3);
     frame.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    frame.look.yaw = 0.12;
+    frame.look.pitch = -0.04;
     expect(JSON.parse(JSON.stringify(frame))).toEqual(frame);
   });
 });

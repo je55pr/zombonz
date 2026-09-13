@@ -14,6 +14,9 @@ export interface EntityBase {
 
 export interface PlayerState extends EntityBase {
   kind: 'player';
+  velocity: Vec3;
+  yaw: number;
+  pitch: number;
   health: number;
   points: number;
 }

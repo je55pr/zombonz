@@ -14,9 +14,15 @@ export interface ActionState {
   value: number;
 }
 
+export interface LookDelta {
+  yaw: number;
+  pitch: number;
+}
+
 export interface InputFrame {
   sequence: number;
   actions: Partial<Record<GameAction, ActionState>>;
+  look: LookDelta;
 }
 
 export function inactiveAction(): ActionState {
@@ -24,5 +30,5 @@ export function inactiveAction(): ActionState {
 }
 
 export function createInputFrame(sequence: number): InputFrame {
-  return { sequence, actions: {} };
+  return { sequence, actions: {}, look: { yaw: 0, pitch: 0 } };
 }
