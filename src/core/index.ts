@@ -11,3 +11,4 @@ export * from './spawning.ts';
 export * from './zombie.ts';
 export * from './simulation.ts';
 export * from './navigation.ts';
+export * from './weapon.ts';

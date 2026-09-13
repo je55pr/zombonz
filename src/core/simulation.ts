@@ -1,7 +1,7 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { livingEntityCount, livingPlayers, type DamageEvent } from './health.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
-import { createPlayerState, updatePlayerMovement } from './player.ts';
+import { PLAYER_MOVEMENT, createPlayerState, updatePlayerMovement } from './player.ts';
 import {
   createRoundState, updateRoundState, type RoundConfig, type RoundEvent, type RoundState,
 } from './rounds.ts';
@@ -15,6 +15,9 @@ import { addEntity, allocateEntityId, createWorld } from './world.ts';
 import {
   createZombieState, tickZombieMelee, updateZombiePursuit, type ZombieAttackEvent,
 } from './zombie.ts';
+import {
+  firePlayerWeapon, rayFromPlayer, tickWeaponCooldown, wantsToFire, type WeaponEvent,
+} from './weapon.ts';
 
 export interface SimulationMap {
   collisionBoxes: readonly CollisionBox[];
@@ -35,7 +38,7 @@ export interface ZombieSpawnedEvent {
   spawnIndex: number;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -81,9 +84,21 @@ export class GameSimulation {
     const events: SimulationEvent[] = [];
     const world = this.state.world;
 
+    const playerFrames = new Map<EntityId, InputFrame>();
     for (const player of livingPlayers(world)) {
       const frame = inputs[player.id] ?? createInputFrame(world.tick);
+      playerFrames.set(player.id, frame);
       updatePlayerMovement(player, frame, deltaSeconds, this.map.collisionBoxes, this.map.walkSurfaces);
+      tickWeaponCooldown(player.weapon);
+    }
+
+    for (const player of livingPlayers(world)) {
+      const frame = playerFrames.get(player.id)!;
+      const fire = frame.actions.fire;
+      if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
+      events.push(...firePlayerWeapon(
+        player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(), this.map.collisionBoxes,
+      ));
     }
 
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {

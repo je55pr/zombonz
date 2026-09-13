@@ -48,7 +48,7 @@ describe('world state', () => {
     const id = allocateEntityId(world);
     addEntity(world, {
       id, kind: 'player', alive: true, position: origin(), velocity: origin(),
-      yaw: 0, pitch: 0, health: 100, points: 500,
+      yaw: 0, pitch: 0, health: 100, points: 500, weapon: { weaponId: 'starter-pistol', cooldownTicks: 0 },
     });
     expect(id).toBe('e:1');
     expect(JSON.parse(JSON.stringify(world))).toEqual(world);

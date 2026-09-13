@@ -12,6 +12,11 @@ export interface EntityBase {
   alive: boolean;
 }
 
+export interface WeaponState {
+  weaponId: string;
+  cooldownTicks: number;
+}
+
 export interface PlayerState extends EntityBase {
   kind: 'player';
   velocity: Vec3;
@@ -19,6 +24,7 @@ export interface PlayerState extends EntityBase {
   pitch: number;
   health: number;
   points: number;
+  weapon: WeaponState;
 }
 
 export interface ZombieState extends EntityBase {

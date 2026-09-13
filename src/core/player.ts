@@ -2,6 +2,7 @@ import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, sampleWalkHeight } from './collision.ts';
 import type { InputFrame } from './input.ts';
 import type { EntityId, PlayerState, Vec3 } from './types.ts';
+import { createStarterWeaponState } from './weapon.ts';
 
 export const PLAYER_MOVEMENT = {
   maxSpeed: 4.2,
@@ -23,6 +24,7 @@ export function createPlayerState(id: EntityId, position: Vec3): PlayerState {
     pitch: 0,
     health: 100,
     points: 500,
+    weapon: createStarterWeaponState(),
     alive: true,
   };
 }
