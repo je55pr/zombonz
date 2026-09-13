@@ -1,0 +1,10 @@
+{
+  "name": "zombonz",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/main.js",
+    "test": "npm run check"
+  }
+}
