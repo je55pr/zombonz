@@ -5,3 +5,8 @@ export * from './player.ts';
 export * from './rng.ts';
 export * from './types.ts';
 export * from './world.ts';
+export * from './health.ts';
+export * from './rounds.ts';
+export * from './spawning.ts';
+export * from './zombie.ts';
+export * from './simulation.ts';

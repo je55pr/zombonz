@@ -61,10 +61,10 @@ export const NACHT_WALK_SURFACES: readonly WalkSurface[] = [
 ];
 
 export const NACHT_MARKERS: readonly MapMarker[] = [
-  { id: 'spawn-south-west', type: 'zombieSpawn', position: { x: -4.5, y: 0, z: 5.8 }, label: 'Starting Room south window' },
-  { id: 'spawn-west', type: 'zombieSpawn', position: { x: -6.8, y: 0, z: 0.5 }, label: 'Starting Room west window' },
-  { id: 'spawn-help-east', type: 'zombieSpawn', position: { x: 7.8, y: 0, z: 1.8 }, label: 'Help Room east window' },
-  { id: 'spawn-help-north', type: 'zombieSpawn', position: { x: 3.5, y: 0, z: -5.8 }, label: 'Help Room north window' },
+  { id: 'spawn-south-west', type: 'zombieSpawn', position: { x: -4.5, y: 0, z: 4.25 }, label: 'Starting Room south window' },
+  { id: 'spawn-west', type: 'zombieSpawn', position: { x: -5.35, y: 0, z: 0.5 }, label: 'Starting Room west window' },
+  { id: 'spawn-help-east', type: 'zombieSpawn', position: { x: 6.25, y: 0, z: 1.8 }, label: 'Help Room east window' },
+  { id: 'spawn-help-north', type: 'zombieSpawn', position: { x: 3.5, y: 0, z: -4.25 }, label: 'Help Room north window' },
   { id: 'door-help', type: 'door', position: { x: 0, y: 0, z: 0 }, label: 'Help Room door' },
   { id: 'wallbuy-start', type: 'wallBuy', position: { x: -5.5, y: 1.1, z: -2.2 }, label: 'Starting Room wall weapon' },
   { id: 'wallbuy-help', type: 'wallBuy', position: { x: 6.5, y: 1.1, z: 2.4 }, label: 'Help Room wall weapon' },
@@ -88,3 +88,7 @@ export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = NACHT_GREYB
       },
     }));
 }
+
+export const NACHT_ZOMBIE_SPAWNS: readonly Vec3[] = NACHT_MARKERS
+  .filter((marker) => marker.type === 'zombieSpawn')
+  .map((marker) => ({ ...marker.position }));

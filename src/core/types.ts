@@ -23,9 +23,12 @@ export interface PlayerState extends EntityBase {
 
 export interface ZombieState extends EntityBase {
   kind: 'zombie';
+  velocity: Vec3;
   health: number;
+  moveSpeed: number;
+  attackCooldownTicks: number;
+  targetId: EntityId | null;
 }
-
 export interface InteractableState extends EntityBase {
   kind: 'interactable';
   interactionType: string;
