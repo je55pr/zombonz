@@ -10,3 +10,4 @@ export * from './rounds.ts';
 export * from './spawning.ts';
 export * from './zombie.ts';
 export * from './simulation.ts';
+export * from './navigation.ts';

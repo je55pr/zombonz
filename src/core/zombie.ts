@@ -1,6 +1,7 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, sampleWalkHeight } from './collision.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
+import { navigationWaypoint, type NavigationGraph } from './navigation.ts';
 import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 
 export const ZOMBIE_MOVEMENT = {
@@ -56,6 +57,7 @@ export function updateZombiePursuit(
   deltaSeconds: number,
   collisionBoxes: readonly CollisionBox[],
   walkSurfaces: readonly WalkSurface[] = [],
+  navigationGraph?: NavigationGraph,
 ): void {
   if (!zombie.alive) return;
   const target = chooseZombieTarget(zombie, players);
@@ -63,20 +65,27 @@ export function updateZombiePursuit(
     zombie.velocity = { x: 0, y: 0, z: 0 };
     return;
   }
-  const dx = target.position.x - zombie.position.x;
-  const dz = target.position.z - zombie.position.z;
-  const planarDistance = Math.hypot(dx, dz);
-  if (planarDistance <= ZOMBIE_MOVEMENT.attackRange) {
+  const targetDx = target.position.x - zombie.position.x;
+  const targetDz = target.position.z - zombie.position.z;
+  if (Math.hypot(targetDx, targetDz) <= ZOMBIE_MOVEMENT.attackRange) {
     zombie.velocity.x = 0;
     zombie.velocity.z = 0;
     return;
   }
-
+  const waypoint = navigationWaypoint(
+    navigationGraph,
+    zombie.position,
+    target.position,
+    collisionBoxes,
+    ZOMBIE_MOVEMENT.radius,
+  );
+  const dx = waypoint.x - zombie.position.x;
+  const dz = waypoint.z - zombie.position.z;
+  const planarDistance = Math.hypot(dx, dz);
   const velocityX = planarDistance > 0 ? (dx / planarDistance) * zombie.moveSpeed : 0;
   const velocityZ = planarDistance > 0 ? (dz / planarDistance) * zombie.moveSpeed : 0;
   zombie.velocity.x = velocityX;
   zombie.velocity.z = velocityZ;
-
   const requested = { x: velocityX * deltaSeconds, y: 0, z: velocityZ * deltaSeconds };
   const next = moveWithCollision(
     zombie.position,

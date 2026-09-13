@@ -1,4 +1,5 @@
 import type { CollisionBox, WalkSurface } from '../core/collision.ts';
+import type { NavigationGraph } from '../core/navigation.ts';
 import type { Vec3 } from '../core/types.ts';
 
 export type GreyboxMaterial = 'wall' | 'floor' | 'upperFloor' | 'stair' | 'barrier';
@@ -92,3 +93,23 @@ export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = NACHT_GREYB
 export const NACHT_ZOMBIE_SPAWNS: readonly Vec3[] = NACHT_MARKERS
   .filter((marker) => marker.type === 'zombieSpawn')
   .map((marker) => ({ ...marker.position }));
+
+export const NACHT_NAVIGATION: NavigationGraph = {
+  nodes: [
+    { id: 'start-west', position: { x: -4.8, y: 0, z: 1.0 }, neighbors: ['start-center', 'stair-left-base'] },
+    { id: 'start-center', position: { x: -3.8, y: 0, z: 0 }, neighbors: ['start-west', 'start-door', 'start-north'] },
+    { id: 'start-north', position: { x: -4.6, y: 0, z: -3.0 }, neighbors: ['start-center'] },
+    { id: 'start-door', position: { x: -0.8, y: 0, z: 0 }, neighbors: ['start-center', 'help-door'] },
+    { id: 'help-door', position: { x: 0.8, y: 0, z: 0 }, neighbors: ['start-door', 'help-center'] },
+    { id: 'help-center', position: { x: 2.0, y: 0, z: 0 }, neighbors: ['help-door', 'help-east', 'stair-right-base'] },
+    { id: 'help-east', position: { x: 5.6, y: 0, z: 0 }, neighbors: ['help-center', 'help-south', 'stair-right-base'] },
+    { id: 'help-south', position: { x: 5.7, y: 0, z: 3.5 }, neighbors: ['help-east'] },
+    { id: 'stair-left-base', position: { x: -5.2, y: 0, z: 2.2 }, neighbors: ['start-west', 'stair-left-top'] },
+    { id: 'stair-left-top', position: { x: -3.4, y: 2.9, z: 2.2 }, neighbors: ['stair-left-base', 'upper-left'] },
+    { id: 'stair-right-base', position: { x: 3.7, y: 0, z: -2.1 }, neighbors: ['help-center', 'help-east', 'stair-right-top'] },
+    { id: 'stair-right-top', position: { x: 5.7, y: 2.9, z: -2.1 }, neighbors: ['stair-right-base', 'upper-right'] },
+    { id: 'upper-left', position: { x: -3.0, y: 2.9, z: 0 }, neighbors: ['stair-left-top', 'upper-center'] },
+    { id: 'upper-center', position: { x: 0.5, y: 2.9, z: 0 }, neighbors: ['upper-left', 'upper-right'] },
+    { id: 'upper-right', position: { x: 4.5, y: 2.9, z: -1.5 }, neighbors: ['upper-center', 'stair-right-top'] },
+  ],
+};

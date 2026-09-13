@@ -9,6 +9,7 @@ import {
   createSpawnDirector, remainingSpawns, tickSpawnDirector,
   type SpawnDirectorConfig, type SpawnDirectorState,
 } from './spawning.ts';
+import type { NavigationGraph } from './navigation.ts';
 import type { EntityId, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
 import { addEntity, allocateEntityId, createWorld } from './world.ts';
 import {

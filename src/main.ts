@@ -5,7 +5,7 @@ import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, type EntityId, type ZombieState,
 } from './core/index.ts';
 import {
-  NACHT_GREYBOX, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS,
+  NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS,
   greyboxCollisionBoxes,
 } from './maps/nacht.ts';
 
