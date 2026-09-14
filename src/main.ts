@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
 import { BrowserInput } from './client/input.ts';
+import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, type EntityId, type ZombieState,
 } from './core/index.ts';
@@ -16,6 +17,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.autoClear = false;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x151513);
@@ -92,6 +94,7 @@ function syncZombieViews(): void {
 
 const clock = new FixedStepClock({ tickRate: 60 });
 const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022 });
+const hud = new CanvasHud(renderer);
 let previousSeconds: number | undefined;
 
 function simulate(dt: number): void {
@@ -124,7 +127,10 @@ function frame(nowMs: number): void {
   syncCamera();
   syncZombieViews();
   helpDoorMesh.visible = !simulation.state.doors[0]?.open;
+  renderer.clear();
   renderer.render(scene, camera);
+  const hudSnapshot = buildHudSnapshot(simulation, playerId);
+  if (hudSnapshot) hud.render(hudSnapshot);
   requestAnimationFrame(frame);
 }
 

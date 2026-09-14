@@ -51,7 +51,9 @@ export class BrowserInput {
 
   private onKeyDown = (event: KeyboardEvent) => this.set(KEY_ACTIONS[event.code], true, event.repeat);
   private onKeyUp = (event: KeyboardEvent) => this.set(KEY_ACTIONS[event.code], false, false);
-  private onMouseDown = (event: MouseEvent) => event.button === 0 && this.set('fire', true, false);
+  private onMouseDown = (event: MouseEvent) => event.button === 0
+    && document.pointerLockElement === this.options.pointerElement
+    && this.set('fire', true, false);
   private onMouseUp = (event: MouseEvent) => event.button === 0 && this.set('fire', false, false);
 
   private set(action: GameAction | undefined, down: boolean, repeat: boolean): boolean {
