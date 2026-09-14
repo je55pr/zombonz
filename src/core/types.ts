@@ -41,6 +41,10 @@ export interface ZombieState extends EntityBase {
 export interface InteractableState extends EntityBase {
   kind: 'interactable';
   interactionType: string;
+  actionId: string;
+  prompt: string;
+  interactionRange: number;
+  minFacingDot: number;
   enabled: boolean;
 }
 

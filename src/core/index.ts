@@ -13,3 +13,4 @@ export * from './simulation.ts';
 export * from './navigation.ts';
 export * from './weapon.ts';
 export * from './economy.ts';
+export * from './interaction.ts';

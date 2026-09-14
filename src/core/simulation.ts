@@ -5,6 +5,10 @@ import {
 } from './economy.ts';
 import { livingEntityCount, livingPlayers, type DamageEvent } from './health.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
+import {
+  findInteractionCandidate, triggerInteraction,
+  type InteractionCandidate, type InteractionEvent,
+} from './interaction.ts';
 import { PLAYER_MOVEMENT, createPlayerState, updatePlayerMovement } from './player.ts';
 import {
   createRoundState, updateRoundState, type RoundConfig, type RoundEvent, type RoundState,
@@ -14,7 +18,7 @@ import {
   type SpawnDirectorConfig, type SpawnDirectorState,
 } from './spawning.ts';
 import type { NavigationGraph } from './navigation.ts';
-import type { EntityId, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
+import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
 import { addEntity, allocateEntityId, createWorld } from './world.ts';
 import {
   createZombieState, tickZombieMelee, updateZombiePursuit, type ZombieAttackEvent,
@@ -42,7 +46,7 @@ export interface ZombieSpawnedEvent {
   spawnIndex: number;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -87,6 +91,17 @@ export class GameSimulation {
     );
   }
 
+  interactables(): InteractableState[] {
+    return Object.values(this.state.world.entities).filter(
+      (entity): entity is InteractableState => entity.kind === 'interactable' && entity.alive,
+    );
+  }
+
+  interactionCandidate(playerId: EntityId): InteractionCandidate | null {
+    const player = this.getPlayer(playerId);
+    return player ? findInteractionCandidate(player, this.interactables()) : null;
+  }
+
   tick(inputs: PlayerInputFrames = {}, deltaSeconds = 1 / 60): SimulationEvent[] {
     const events: SimulationEvent[] = [];
     const world = this.state.world;
@@ -98,6 +113,9 @@ export class GameSimulation {
       updatePlayerMovement(player, frame, deltaSeconds, this.map.collisionBoxes, this.map.walkSurfaces);
       events.push(...tickWeaponState(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
+      if (frame.actions.interact?.pressed) {
+        events.push(...triggerInteraction(player, this.interactables(), true));
+      }
     }
 
     for (const player of livingPlayers(world)) {
