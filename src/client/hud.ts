@@ -10,6 +10,7 @@ export interface HudSnapshot {
   magazineAmmo: number;
   reserveAmmo: number;
   interactionPrompt: string | null;
+  gameOver: boolean;
 }
 
 export function buildHudSnapshot(
@@ -26,6 +27,7 @@ export function buildHudSnapshot(
     magazineAmmo: player.weapon.magazineAmmo,
     reserveAmmo: player.weapon.reserveAmmo,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
+    gameOver: simulation.state.round.phase === 'gameOver',
   };
 }
 function weaponLabel(id: string): string {
@@ -87,6 +89,13 @@ export class CanvasHud {
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');
     this.text(weaponLabel(snapshot.weapon), width - 48, height - 50, 26, 'right');
     this.text(`${snapshot.magazineAmmo} / ${snapshot.reserveAmmo}`, width - 48, height - 20, 30, 'right');
+
+    if (snapshot.gameOver) {
+      this.context.fillStyle = 'rgba(0,0,0,0.58)';
+      this.context.fillRect(0, 0, width, height);
+      this.text('GAME OVER', width / 2, height * 0.44, 72, 'center');
+      this.text('PRESS ENTER TO RESTART', width / 2, height * 0.54, 30, 'center');
+    }
 
     if (snapshot.interactionPrompt) {
       this.context.font = '700 30px Arial, sans-serif';

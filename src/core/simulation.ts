@@ -58,7 +58,17 @@ export interface ZombieSpawnedEvent {
   spawnIndex: number;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent;
+export interface MatchRestartedEvent {
+  type: 'matchRestarted';
+  previousSeed: number;
+  seed: number;
+}
+
+export function nextMatchSeed(seed: number): number {
+  return (seed + 0x9e3779b9) >>> 0;
+}
+
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MatchRestartedEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -71,37 +81,50 @@ export interface GameSimulationOptions {
 }
 
 export class GameSimulation {
-  readonly state: SimulationState;
+  state: SimulationState;
   readonly playerIds: EntityId[] = [];
   private readonly map: SimulationMap;
   private readonly roundConfig?: RoundConfig;
   private readonly spawnConfig?: SpawnDirectorConfig;
   private readonly economyConfig: EconomyConfig;
+  private readonly playerSpawns: readonly Vec3[];
 
   constructor(options: GameSimulationOptions) {
     this.map = options.map;
     this.roundConfig = options.roundConfig;
     this.spawnConfig = options.spawnConfig;
     this.economyConfig = options.economyConfig ?? DEFAULT_ECONOMY_CONFIG;
-    const world = createWorld(options.seed);
-    for (const spawn of options.playerSpawns) {
+    this.playerSpawns = options.playerSpawns.map((spawn) => ({ ...spawn }));
+    this.state = this.createMatchState(options.seed);
+  }
+
+  private createMatchState(seed: number): SimulationState {
+    const world = createWorld(seed);
+    this.playerIds.length = 0;
+    for (const spawn of this.playerSpawns) {
       const id = allocateEntityId(world);
       addEntity(world, createPlayerState(id, spawn, this.economyConfig.startingPoints));
       this.playerIds.push(id);
     }
     const doors: DoorState[] = [];
-    for (const definition of options.map.doors ?? []) {
+    for (const definition of this.map.doors ?? []) {
       const interactableId = allocateEntityId(world);
       addEntity(world, createDoorInteractable(interactableId, definition));
       doors.push(createDoorState(definition, interactableId));
     }
     const wallWeapons: WallWeaponState[] = [];
-    for (const definition of options.map.wallWeapons ?? []) {
+    for (const definition of this.map.wallWeapons ?? []) {
       const interactableId = allocateEntityId(world);
       addEntity(world, createWallWeaponInteractable(interactableId, definition));
       wallWeapons.push(createWallWeaponState(definition, interactableId));
     }
-    this.state = { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons };
+    return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons };
+  }
+
+  restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
+    const previousSeed = this.state.world.seed;
+    this.state = this.createMatchState(seed);
+    return { type: 'matchRestarted', previousSeed, seed: this.state.world.seed };
   }
 
   getPlayer(id: EntityId): PlayerState | null {
@@ -131,6 +154,10 @@ export class GameSimulation {
   }
 
   tick(inputs: PlayerInputFrames = {}, deltaSeconds = 1 / 60): SimulationEvent[] {
+    if (this.state.round.phase === 'gameOver') {
+      const restartRequested = Object.values(inputs).some((frame) => frame?.actions.restart?.pressed);
+      if (restartRequested) return [this.restart()];
+    }
     const events: SimulationEvent[] = [];
     const world = this.state.world;
 

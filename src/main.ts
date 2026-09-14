@@ -60,9 +60,7 @@ const simulation = new GameSimulation({
   playerSpawns: [NACHT_PLAYER_SPAWN],
 });
 const playerId = simulation.playerIds[0];
-const maybePlayer = simulation.getPlayer(playerId);
-if (!maybePlayer) throw new Error('Simulation failed to create local player.');
-const player = maybePlayer;
+if (!simulation.getPlayer(playerId)) throw new Error('Simulation failed to create local player.');
 
 const zombieViews = new Map<EntityId, THREE.Mesh>();
 const zombieMaterial = new THREE.MeshStandardMaterial({ color: 0x65704f, roughness: 0.9 });
@@ -101,6 +99,8 @@ function simulate(dt: number): void {
   simulation.tick({ [playerId]: input.consume() }, dt);
 }
 function syncCamera(): void {
+  const player = simulation.getPlayer(playerId);
+  if (!player) return;
   camera.position.set(
     player.position.x,
     player.position.y + PLAYER_MOVEMENT.eyeHeight,

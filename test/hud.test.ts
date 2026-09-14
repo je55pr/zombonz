@@ -34,6 +34,7 @@ describe('gameplay HUD snapshot', () => {
       magazineAmmo: 8,
       reserveAmmo: 32,
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
+      gameOver: false,
     });
   });
 
@@ -53,6 +54,13 @@ describe('gameplay HUD snapshot', () => {
       magazineAmmo: 3,
       reserveAmmo: 17,
     });
+  });
+
+  it('surfaces game over state for the canvas overlay', () => {
+    const sim = simulation();
+    const playerId = sim.playerIds[0];
+    sim.state.round.phase = 'gameOver';
+    expect(buildHudSnapshot(sim, playerId)?.gameOver).toBe(true);
   });
 
   it('drops the interaction prompt when the player is no longer facing the target', () => {

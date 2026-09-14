@@ -5,7 +5,8 @@ export type GameAction =
   | 'moveRight'
   | 'fire'
   | 'reload'
-  | 'interact';
+  | 'interact'
+  | 'restart';
 
 export interface ActionState {
   held: boolean;
