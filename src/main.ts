@@ -5,7 +5,7 @@ import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, type EntityId, type ZombieState,
 } from './core/index.ts';
 import {
-  NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS,
+  NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_WALL_WEAPONS,
   greyboxCollisionBoxes,
 } from './maps/nacht.ts';
 
@@ -37,6 +37,13 @@ helpDoorMesh.position.set(0, 1.5, 0);
 helpDoorMesh.castShadow = true;
 helpDoorMesh.receiveShadow = true;
 scene.add(helpDoorMesh);
+const wallWeaponMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.12, 0.8, 1.4),
+  new THREE.MeshStandardMaterial({ color: 0x26231d, roughness: 0.85, metalness: 0.2 }),
+);
+wallWeaponMesh.position.set(-5.38, 1.05, -2.2);
+wallWeaponMesh.castShadow = true;
+scene.add(wallWeaponMesh);
 
 const simulation = new GameSimulation({
   seed: 0x5a0b0a2,
@@ -46,6 +53,7 @@ const simulation = new GameSimulation({
     zombieSpawns: NACHT_ZOMBIE_SPAWNS,
     navigationGraph: NACHT_NAVIGATION,
     doors: NACHT_DOORS,
+    wallWeapons: NACHT_WALL_WEAPONS,
   },
   playerSpawns: [NACHT_PLAYER_SPAWN],
 });

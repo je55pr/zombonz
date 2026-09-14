@@ -14,24 +14,27 @@ export interface WeaponDefinition {
 
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   'starter-pistol': {
-    id: 'starter-pistol',
-    damage: 50,
-    range: 60,
-    fireIntervalTicks: 12,
-    trigger: 'semi',
-    magazineSize: 8,
-    startingReserveAmmo: 32,
-    reloadTicks: 90,
+    id: 'starter-pistol', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
+    magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90,
+  },
+  kar98k: {
+    id: 'kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
+    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120,
   },
 };
 
-export function createStarterWeaponState(): WeaponState {
-  const definition = WEAPON_DEFINITIONS['starter-pistol'];
+export function createWeaponState(weaponId: string): WeaponState {
+  const definition = WEAPON_DEFINITIONS[weaponId];
+  if (!definition) throw new Error(`Unknown weapon: ${weaponId}`);
   return {
     weaponId: definition.id, cooldownTicks: 0,
     magazineAmmo: definition.magazineSize, reserveAmmo: definition.startingReserveAmmo,
     reloadTicksRemaining: 0,
   };
+}
+
+export function createStarterWeaponState(): WeaponState {
+  return createWeaponState('starter-pistol');
 }
 export interface HitscanRay {
   origin: Vec3;

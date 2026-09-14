@@ -1,6 +1,7 @@
 import type { CollisionBox, WalkSurface } from '../core/collision.ts';
 import type { NavigationGraph } from '../core/navigation.ts';
 import type { DoorDefinition } from '../core/door.ts';
+import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
 import type { Vec3 } from '../core/types.ts';
 
 export type GreyboxMaterial = 'wall' | 'floor' | 'upperFloor' | 'stair' | 'barrier';
@@ -82,6 +83,17 @@ export const NACHT_DOORS: readonly DoorDefinition[] = [{
     min: { x: -0.18, y: 0, z: -1.5 },
     max: { x: 0.18, y: 3, z: 1.5 },
   },
+}];
+
+export const NACHT_WALL_WEAPONS: readonly WallWeaponDefinition[] = [{
+  id: 'start-kar98k',
+  position: { x: -5.35, y: 1.0, z: -2.2 },
+  weaponId: 'kar98k',
+  weaponCost: 200,
+  ammoCost: 100,
+  prompt: 'Press E: Kar98k [200] / Ammo [100]',
+  interactionRange: 2.5,
+  minFacingDot: 0.25,
 }];
 
 export const NACHT_PLAYER_SPAWN: Vec3 = { x: -2.8, y: 0, z: 1.2 };

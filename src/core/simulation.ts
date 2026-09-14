@@ -30,6 +30,10 @@ import {
 import {
   beginReload, firePlayerWeapon, rayFromPlayer, tickWeaponState, wantsToFire, type WeaponEvent,
 } from './weapon.ts';
+import {
+  createWallWeaponInteractable, createWallWeaponState, handleWallWeaponInteraction,
+  type WallWeaponDefinition, type WallWeaponEvent, type WallWeaponState,
+} from './wallWeapon.ts';
 
 export interface SimulationMap {
   collisionBoxes: readonly CollisionBox[];
@@ -37,6 +41,7 @@ export interface SimulationMap {
   zombieSpawns: readonly Vec3[];
   navigationGraph?: NavigationGraph;
   doors?: readonly DoorDefinition[];
+  wallWeapons?: readonly WallWeaponDefinition[];
 }
 
 export interface SimulationState {
@@ -44,6 +49,7 @@ export interface SimulationState {
   round: RoundState;
   spawnDirector: SpawnDirectorState | null;
   doors: DoorState[];
+  wallWeapons: WallWeaponState[];
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
@@ -52,7 +58,7 @@ export interface ZombieSpawnedEvent {
   spawnIndex: number;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -89,7 +95,13 @@ export class GameSimulation {
       addEntity(world, createDoorInteractable(interactableId, definition));
       doors.push(createDoorState(definition, interactableId));
     }
-    this.state = { world, round: createRoundState(), spawnDirector: null, doors };
+    const wallWeapons: WallWeaponState[] = [];
+    for (const definition of options.map.wallWeapons ?? []) {
+      const interactableId = allocateEntityId(world);
+      addEntity(world, createWallWeaponInteractable(interactableId, definition));
+      wallWeapons.push(createWallWeaponState(definition, interactableId));
+    }
+    this.state = { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons };
   }
 
   getPlayer(id: EntityId): PlayerState | null {
@@ -134,6 +146,7 @@ export class GameSimulation {
         events.push(...interactionEvents);
         for (const interaction of interactionEvents) {
           events.push(...handleDoorInteraction(player, interaction, this.state.doors, this.interactables()));
+          events.push(...handleWallWeaponInteraction(player, interaction, this.state.wallWeapons));
         }
       }
     }
