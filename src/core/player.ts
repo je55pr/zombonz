@@ -14,7 +14,7 @@ export const PLAYER_MOVEMENT = {
   maxPitch: Math.PI * 0.47,
 } as const;
 
-export function createPlayerState(id: EntityId, position: Vec3): PlayerState {
+export function createPlayerState(id: EntityId, position: Vec3, startingPoints = 500): PlayerState {
   return {
     id,
     kind: 'player',
@@ -23,7 +23,7 @@ export function createPlayerState(id: EntityId, position: Vec3): PlayerState {
     yaw: 0,
     pitch: 0,
     health: 100,
-    points: 500,
+    points: startingPoints,
     weapon: createStarterWeaponState(),
     alive: true,
   };

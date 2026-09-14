@@ -1,4 +1,8 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
+import {
+  DEFAULT_ECONOMY_CONFIG, awardCombatPoints,
+  type EconomyConfig, type EconomyEvent,
+} from './economy.ts';
 import { livingEntityCount, livingPlayers, type DamageEvent } from './health.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
 import { PLAYER_MOVEMENT, createPlayerState, updatePlayerMovement } from './player.ts';
@@ -38,7 +42,7 @@ export interface ZombieSpawnedEvent {
   spawnIndex: number;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -47,6 +51,7 @@ export interface GameSimulationOptions {
   playerSpawns: readonly Vec3[];
   roundConfig?: RoundConfig;
   spawnConfig?: SpawnDirectorConfig;
+  economyConfig?: EconomyConfig;
 }
 
 export class GameSimulation {
@@ -55,15 +60,17 @@ export class GameSimulation {
   private readonly map: SimulationMap;
   private readonly roundConfig?: RoundConfig;
   private readonly spawnConfig?: SpawnDirectorConfig;
+  private readonly economyConfig: EconomyConfig;
 
   constructor(options: GameSimulationOptions) {
     this.map = options.map;
     this.roundConfig = options.roundConfig;
     this.spawnConfig = options.spawnConfig;
+    this.economyConfig = options.economyConfig ?? DEFAULT_ECONOMY_CONFIG;
     const world = createWorld(options.seed);
     for (const spawn of options.playerSpawns) {
       const id = allocateEntityId(world);
-      addEntity(world, createPlayerState(id, spawn));
+      addEntity(world, createPlayerState(id, spawn, this.economyConfig.startingPoints));
       this.playerIds.push(id);
     }
     this.state = { world, round: createRoundState(), spawnDirector: null };
@@ -97,9 +104,11 @@ export class GameSimulation {
       const frame = playerFrames.get(player.id)!;
       const fire = frame.actions.fire;
       if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
-      events.push(...firePlayerWeapon(
+      const weaponEvents = firePlayerWeapon(
         player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(), this.map.collisionBoxes,
-      ));
+      );
+      events.push(...weaponEvents);
+      events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig));
     }
 
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {
