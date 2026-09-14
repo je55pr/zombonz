@@ -1,5 +1,9 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import {
+  closedDoorBlockers, createDoorInteractable, createDoorState, handleDoorInteraction,
+  type DoorDefinition, type DoorEvent, type DoorState,
+} from './door.ts';
+import {
   DEFAULT_ECONOMY_CONFIG, awardCombatPoints,
   type EconomyConfig, type EconomyEvent,
 } from './economy.ts';
@@ -32,12 +36,14 @@ export interface SimulationMap {
   walkSurfaces: readonly WalkSurface[];
   zombieSpawns: readonly Vec3[];
   navigationGraph?: NavigationGraph;
+  doors?: readonly DoorDefinition[];
 }
 
 export interface SimulationState {
   world: WorldState;
   round: RoundState;
   spawnDirector: SpawnDirectorState | null;
+  doors: DoorState[];
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
@@ -46,7 +52,7 @@ export interface ZombieSpawnedEvent {
   spawnIndex: number;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -77,12 +83,22 @@ export class GameSimulation {
       addEntity(world, createPlayerState(id, spawn, this.economyConfig.startingPoints));
       this.playerIds.push(id);
     }
-    this.state = { world, round: createRoundState(), spawnDirector: null };
+    const doors: DoorState[] = [];
+    for (const definition of options.map.doors ?? []) {
+      const interactableId = allocateEntityId(world);
+      addEntity(world, createDoorInteractable(interactableId, definition));
+      doors.push(createDoorState(definition, interactableId));
+    }
+    this.state = { world, round: createRoundState(), spawnDirector: null, doors };
   }
 
   getPlayer(id: EntityId): PlayerState | null {
     const entity = this.state.world.entities[id];
     return entity?.kind === 'player' ? entity : null;
+  }
+
+  collisionBoxes(): CollisionBox[] {
+    return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors)];
   }
 
   zombies(): ZombieState[] {
@@ -110,11 +126,15 @@ export class GameSimulation {
     for (const player of livingPlayers(world)) {
       const frame = inputs[player.id] ?? createInputFrame(world.tick);
       playerFrames.set(player.id, frame);
-      updatePlayerMovement(player, frame, deltaSeconds, this.map.collisionBoxes, this.map.walkSurfaces);
+      updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces);
       events.push(...tickWeaponState(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
       if (frame.actions.interact?.pressed) {
-        events.push(...triggerInteraction(player, this.interactables(), true));
+        const interactionEvents = triggerInteraction(player, this.interactables(), true);
+        events.push(...interactionEvents);
+        for (const interaction of interactionEvents) {
+          events.push(...handleDoorInteraction(player, interaction, this.state.doors, this.interactables()));
+        }
       }
     }
 
@@ -123,7 +143,7 @@ export class GameSimulation {
       const fire = frame.actions.fire;
       if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
       const weaponEvents = firePlayerWeapon(
-        player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(), this.map.collisionBoxes,
+        player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(), this.collisionBoxes(),
       );
       events.push(...weaponEvents);
       events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig));
@@ -150,7 +170,7 @@ export class GameSimulation {
     const players = livingPlayers(world);
     for (const zombie of this.zombies()) {
       updateZombiePursuit(
-        zombie, players, deltaSeconds, this.map.collisionBoxes, this.map.walkSurfaces,
+        zombie, players, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
         this.map.navigationGraph,
       );
       events.push(...tickZombieMelee(zombie, players));

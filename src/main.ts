@@ -5,7 +5,7 @@ import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, type EntityId, type ZombieState,
 } from './core/index.ts';
 import {
-  NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS,
+  NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS,
   greyboxCollisionBoxes,
 } from './maps/nacht.ts';
 
@@ -29,6 +29,14 @@ keyLight.position.set(-4, 9, 2);
 keyLight.castShadow = true;
 scene.add(keyLight);
 scene.add(buildGreybox(NACHT_GREYBOX));
+const helpDoorMesh = new THREE.Mesh(
+  new THREE.BoxGeometry(0.36, 3, 3),
+  new THREE.MeshStandardMaterial({ color: 0x4b4438, roughness: 0.95 }),
+);
+helpDoorMesh.position.set(0, 1.5, 0);
+helpDoorMesh.castShadow = true;
+helpDoorMesh.receiveShadow = true;
+scene.add(helpDoorMesh);
 
 const simulation = new GameSimulation({
   seed: 0x5a0b0a2,
@@ -37,6 +45,7 @@ const simulation = new GameSimulation({
     walkSurfaces: NACHT_WALK_SURFACES,
     zombieSpawns: NACHT_ZOMBIE_SPAWNS,
     navigationGraph: NACHT_NAVIGATION,
+    doors: NACHT_DOORS,
   },
   playerSpawns: [NACHT_PLAYER_SPAWN],
 });
@@ -106,6 +115,7 @@ function frame(nowMs: number): void {
   previousSeconds = nowSeconds;
   syncCamera();
   syncZombieViews();
+  helpDoorMesh.visible = !simulation.state.doors[0]?.open;
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }

@@ -1,5 +1,6 @@
 import type { CollisionBox, WalkSurface } from '../core/collision.ts';
 import type { NavigationGraph } from '../core/navigation.ts';
+import type { DoorDefinition } from '../core/door.ts';
 import type { Vec3 } from '../core/types.ts';
 
 export type GreyboxMaterial = 'wall' | 'floor' | 'upperFloor' | 'stair' | 'barrier';
@@ -71,6 +72,17 @@ export const NACHT_MARKERS: readonly MapMarker[] = [
   { id: 'wallbuy-help', type: 'wallBuy', position: { x: 6.5, y: 1.1, z: 2.4 }, label: 'Help Room wall weapon' },
   { id: 'box-help', type: 'mysteryBox', position: { x: 4.5, y: 0, z: 0 }, label: 'Help Room mystery box' },
 ];
+
+export const NACHT_DOORS: readonly DoorDefinition[] = [{
+  id: 'help-room',
+  position: { x: -0.7, y: 0, z: 0 },
+  cost: 1000,
+  prompt: 'Press E to open Help Room [1000]',
+  blocker: {
+    min: { x: -0.18, y: 0, z: -1.5 },
+    max: { x: 0.18, y: 3, z: 1.5 },
+  },
+}];
 
 export const NACHT_PLAYER_SPAWN: Vec3 = { x: -2.8, y: 0, z: 1.2 };
 export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = NACHT_GREYBOX): CollisionBox[] {
