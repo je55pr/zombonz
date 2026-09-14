@@ -15,6 +15,9 @@ export interface EntityBase {
 export interface WeaponState {
   weaponId: string;
   cooldownTicks: number;
+  magazineAmmo: number;
+  reserveAmmo: number;
+  reloadTicksRemaining: number;
 }
 
 export interface PlayerState extends EntityBase {

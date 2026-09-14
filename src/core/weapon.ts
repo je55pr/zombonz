@@ -7,6 +7,9 @@ export interface WeaponDefinition {
   range: number;
   fireIntervalTicks: number;
   trigger: 'semi' | 'auto';
+  magazineSize: number;
+  startingReserveAmmo: number;
+  reloadTicks: number;
 }
 
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
@@ -16,11 +19,19 @@ export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
     range: 60,
     fireIntervalTicks: 12,
     trigger: 'semi',
+    magazineSize: 8,
+    startingReserveAmmo: 32,
+    reloadTicks: 90,
   },
 };
 
 export function createStarterWeaponState(): WeaponState {
-  return { weaponId: 'starter-pistol', cooldownTicks: 0 };
+  const definition = WEAPON_DEFINITIONS['starter-pistol'];
+  return {
+    weaponId: definition.id, cooldownTicks: 0,
+    magazineAmmo: definition.magazineSize, reserveAmmo: definition.startingReserveAmmo,
+    reloadTicksRemaining: 0,
+  };
 }
 export interface HitscanRay {
   origin: Vec3;
@@ -34,6 +45,8 @@ export type HitscanTarget =
 
 export type WeaponEvent =
   | { type: 'weaponFired'; playerId: EntityId; weaponId: string }
+  | { type: 'weaponReloadStarted'; playerId: EntityId; weaponId: string; reloadTicks: number }
+  | { type: 'weaponReloadCompleted'; playerId: EntityId; weaponId: string; loaded: number; magazineAmmo: number; reserveAmmo: number }
   | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number }
   | { type: 'zombieDamaged'; zombieId: EntityId; playerId: EntityId; damage: number; health: number }
   | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId };
@@ -124,6 +137,35 @@ export function resolveHitscan(
   if (worldDistance !== null) return { kind: 'world', distance: worldDistance };
   return { kind: 'none', distance: range };
 }
+export function beginReload(player: PlayerState): WeaponEvent[] {
+  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  if (!definition || !player.alive) return [];
+  if (player.weapon.reloadTicksRemaining > 0) return [];
+  if (player.weapon.magazineAmmo >= definition.magazineSize || player.weapon.reserveAmmo <= 0) return [];
+  player.weapon.reloadTicksRemaining = definition.reloadTicks;
+  return [{ type: 'weaponReloadStarted', playerId: player.id, weaponId: definition.id, reloadTicks: definition.reloadTicks }];
+}
+
+function completeReload(player: PlayerState): WeaponEvent[] {
+  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  if (!definition) return [];
+  const missing = Math.max(0, definition.magazineSize - player.weapon.magazineAmmo);
+  const loaded = Math.min(missing, player.weapon.reserveAmmo);
+  player.weapon.magazineAmmo += loaded;
+  player.weapon.reserveAmmo -= loaded;
+  return [{ type: 'weaponReloadCompleted', playerId: player.id, weaponId: definition.id, loaded,
+    magazineAmmo: player.weapon.magazineAmmo, reserveAmmo: player.weapon.reserveAmmo }];
+}
+
+export function tickWeaponState(player: PlayerState): WeaponEvent[] {
+  const state = player.weapon;
+  if (state.cooldownTicks > 0) state.cooldownTicks -= 1;
+  if (state.reloadTicksRemaining <= 0) return [];
+  state.reloadTicksRemaining -= 1;
+  if (state.reloadTicksRemaining > 0) return [];
+  return completeReload(player);
+}
+
 export function tickWeaponCooldown(state: WeaponState): void {
   if (state.cooldownTicks > 0) state.cooldownTicks -= 1;
 }
@@ -142,6 +184,8 @@ export function firePlayerWeapon(
 ): WeaponEvent[] {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition || player.weapon.cooldownTicks > 0 || !player.alive) return [];
+  if (player.weapon.reloadTicksRemaining > 0 || player.weapon.magazineAmmo <= 0) return [];
+  player.weapon.magazineAmmo -= 1;
   player.weapon.cooldownTicks = definition.fireIntervalTicks;
   const events: WeaponEvent[] = [{ type: 'weaponFired', playerId: player.id, weaponId: definition.id }];
   const hit = resolveHitscan(ray, zombies, worldBoxes, definition.range);

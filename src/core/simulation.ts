@@ -16,7 +16,7 @@ import {
   createZombieState, tickZombieMelee, updateZombiePursuit, type ZombieAttackEvent,
 } from './zombie.ts';
 import {
-  firePlayerWeapon, rayFromPlayer, tickWeaponCooldown, wantsToFire, type WeaponEvent,
+  beginReload, firePlayerWeapon, rayFromPlayer, tickWeaponState, wantsToFire, type WeaponEvent,
 } from './weapon.ts';
 
 export interface SimulationMap {
@@ -89,7 +89,8 @@ export class GameSimulation {
       const frame = inputs[player.id] ?? createInputFrame(world.tick);
       playerFrames.set(player.id, frame);
       updatePlayerMovement(player, frame, deltaSeconds, this.map.collisionBoxes, this.map.walkSurfaces);
-      tickWeaponCooldown(player.weapon);
+      events.push(...tickWeaponState(player));
+      if (frame.actions.reload?.pressed) events.push(...beginReload(player));
     }
 
     for (const player of livingPlayers(world)) {
