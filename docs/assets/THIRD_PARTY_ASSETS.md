@@ -159,3 +159,55 @@ A future credits screen can be generated from this manifest rather than maintain
 ## Import policy
 
 Original archives live outside Git. Runtime derivatives may enter the repository only after their licence has been rechecked from the downloaded package and their texture/mesh budget has been evaluated. Prefer GLB for Three.js runtime delivery, with source FBX/BLEND archives retained only in the external asset cache.
+
+## Local intake received 2026-09-19
+
+Jess downloaded the selected source archives into `C:\ChatGPT\Downloads`. These ZIPs are being treated as the canonical untouched intake copies until they are unpacked and inspected.
+
+| Asset | Archive | Size (bytes) |
+|---|---|---:|
+| Peter_D Zombie Soldier | `zombie-soldier.zip` | 9,024,287 |
+| pxltiger Zombie | `zombie.zip` | 8,766,730 |
+| M1911 | `realistic-m1911-handgun-game-ready.zip` | 39,101,634 |
+| Kar98k | `kar98k.zip` | 58,663,229 |
+| MP40 | `mp-40-ww2-submachine-gun.zip` | 52,341,412 |
+| PPSh-41 | `ppsh-41.zip` | 100,685,372 |
+| M1 Garand | `m1-garand.zip` | 18,377,317 |
+| BAR M1918A2 | `bar-m1918-a2-game-ready-rigged.zip` | 70,863,822 |
+| MG42 | `mg42.zip` | 61,490,140 |
+| STG-44 | `stg-44.zip` | 25,251,290 |
+| Mosin Nagant M91 | `mosin-nagant-m91.zip` | 71,064,666 |
+| M1903 A3 Springfield | `m1903-a3-springfield.zip` | 69,119,044 |
+| Winchester Model 1897 | `winchester-model-1897.zip` | 82,184,606 |
+| Double-barrel shotgun | `double-barrel-shotgun.zip` | 24,119,011 |
+
+The Thompson M1A1 candidate was intentionally not downloaded because the available source was untextured. Keep it on the sourcing backlog rather than importing an art-quality mismatch.
+
+## Post-download verification 2026-09-19
+
+All 14 downloaded ZIP archives were copied byte-for-byte into the external cache under `C:\ChatGPT\Shared\Cache\ZombonzAssets\originals`. SHA-256 comparison against the originals in `C:\ChatGPT\Downloads` passed for every archive; see `SOURCE_HASHES.tsv`.
+
+Public Sketchfab API metadata for the 14 exact model IDs was snapshotted under `C:\ChatGPT\Shared\Cache\ZombonzAssets\licenses`. Each snapshot reports **Creative Commons Attribution (CC BY 4.0)** and that commercial use is allowed. The extracted download archives themselves did not contain standalone files named LICENSE, LICENCE, or README, so the source-page/API evidence must remain part of provenance.
+
+### Zombie runtime findings
+
+- **Peter_D Zombie Soldier** is the preferred primary runtime body. The prepared mesh has 7,176 faces, 4,223 vertices, 55 bones, one main PBR material, and 2K textures. Its walk/attack/death/etc. derivatives are animation-only GLBs, allowing one mesh to be reused with separate clips.
+- **pxltiger Zombie** remains a good secondary visual/horde variant at roughly 4.8k faces. Its converted animation files currently duplicate the skinned mesh, so it is less elegant as the main animation architecture.
+- Runtime derivatives are kept outside Git in `C:\ChatGPT\Shared\Scratch\ZombonzRuntimeAssets\zombies` until the game-facing integration chooses exactly what should ship.
+
+### Weapon runtime findings
+
+Runtime GLBs currently exist for M1911, Kar98k, MP40, PPSh-41, M1 Garand, BAR M1918A2, MG42, Mosin Nagant, M1903 Springfield, Winchester 1897, and the double-barrel shotgun.
+
+The BAR source contained embedded 4096x4096 textures and produced a 37.02 MB GLB. Its runtime copy was resized to 2048x2048 textures, reducing it to about 13.18 MB with **zero glTF validation errors**. The validator still warns that tangent space must be generated at runtime for its normal-mapped submeshes; an attempted explicit tangent-generation derivative produced invalid zero-length tangent vectors and was rejected.
+
+### STG-44 quarantine
+
+Do **not** ship the downloaded Observer3D STG-44 yet. Although the exact Sketchfab API record currently reports CC BY 4.0, the extracted source uses internal names such as `wpn_h1_asl_mp44` and reuses `m1014_foregrip_*` texture names. That is a provenance red flag and the uploader-selected licence alone is not sufficient evidence that the uploader owned every underlying component.
+
+A replacement should be sourced before STG-44 integration. One current candidate to review is ELIZION's downloadable CC Attribution STG-44:
+https://sketchfab.com/3d-models/stg-44-sturmgewehr-fa37bef729e141a6a29bb022a3e0be41
+
+### Thompson
+
+The previously shortlisted Thompson M1A1 was intentionally skipped because its downloadable package was untextured. Keep Thompson on the sourcing backlog rather than shipping a visual mismatch.

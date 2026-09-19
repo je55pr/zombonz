@@ -1,16 +1,16 @@
 kind	asset	creator	source	status
-zombie	Zombie Soldier	Peter_D	https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f	auth-required
-zombie	Zombie	pxltiger	https://sketchfab.com/3d-models/zombie-73ef58af341e46afba1da53366ed79cf	auth-required
-weapon	M1911	Quinn Kuslich	https://sketchfab.com/3d-models/realistic-m1911-handgun-game-ready-aa874a0e55224aeb99c5fef0aaf109a1	auth-required
-weapon	Kar98k	ARIA	https://sketchfab.com/3d-models/kar98k-c383b7ac23854314989773776e6c76ff	auth-required
-weapon	MP40	Moony_State	https://sketchfab.com/3d-models/mp-40-ww2-submachine-gun-7ec7e1f9656e4319b8edae0d785699ad	auth-required
-weapon	Thompson M1A1	calico16	https://sketchfab.com/3d-models/m1a1-thompson-199fe2c79a32458f9f420ffb708d4167	auth-required
-weapon	PPSh-41	Zillious	https://sketchfab.com/3d-models/ppsh-41-5c8a64490fa747389e9cfcaecc69c88a	auth-required
-weapon	M1 Garand	YieldingMist206	https://sketchfab.com/3d-models/m1-garand-ec368667c6a54f018c8cb4bacdebbb94	auth-required
-weapon	BAR M1918A2	Peanut_Butcher	https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732	auth-required
-weapon	MG42	AxelK	https://sketchfab.com/3d-models/mg42-f00a231e6fd046ecb4defb48c8dcd817	auth-required
-weapon	STG-44	Observer3D	https://sketchfab.com/3d-models/stg-44-c1fa5b79ab0c42a1949506b3e0137424	auth-required
-weapon	Mosin Nagant M91	Doink	https://sketchfab.com/3d-models/mosin-nagant-m91-55c00242c4024307a761a89167e39a7c	auth-required
-weapon	M1903 A3 Springfield	Gintoki1234	https://gintoki1234.itch.io/springfield-m1903-a3	creator-hosted-free
-weapon	Winchester Model 1897	buh	https://sketchfab.com/3d-models/winchester-model-1897-6194ecd23344442fb23f5820f895a0d8	auth-required
-weapon	Double Barrel Shotgun	Sebastian Kansik	https://sketchfab.com/3d-models/double-barrel-shotgun-04741a40f2224cffafc343b0236d5bbe	auth-required
+zombie	Zombie Soldier	Peter_D	https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f	downloaded-converted-primary
+zombie	Zombie	pxltiger	https://sketchfab.com/3d-models/zombie-73ef58af341e46afba1da53366ed79cf	downloaded-converted-secondary
+weapon	M1911	Quinn Kuslich	https://sketchfab.com/3d-models/realistic-m1911-handgun-game-ready-aa874a0e55224aeb99c5fef0aaf109a1	downloaded-converted
+weapon	Kar98k	ARIA	https://sketchfab.com/3d-models/kar98k-c383b7ac23854314989773776e6c76ff	downloaded-converted
+weapon	MP40	Moony_State	https://sketchfab.com/3d-models/mp-40-ww2-submachine-gun-7ec7e1f9656e4319b8edae0d785699ad	downloaded-converted
+weapon	Thompson M1A1	calico16	https://sketchfab.com/3d-models/m1a1-thompson-199fe2c79a32458f9f420ffb708d4167	skipped-untextured
+weapon	PPSh-41	Zillious	https://sketchfab.com/3d-models/ppsh-41-5c8a64490fa747389e9cfcaecc69c88a	downloaded-converted
+weapon	M1 Garand	YieldingMist206	https://sketchfab.com/3d-models/m1-garand-ec368667c6a54f018c8cb4bacdebbb94	downloaded-converted
+weapon	BAR M1918A2	Peanut_Butcher	https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732	downloaded-converted-2k
+weapon	MG42	AxelK	https://sketchfab.com/3d-models/mg42-f00a231e6fd046ecb4defb48c8dcd817	downloaded-converted
+weapon	STG-44	Observer3D	https://sketchfab.com/3d-models/stg-44-c1fa5b79ab0c42a1949506b3e0137424	downloaded-quarantined-provenance
+weapon	Mosin Nagant M91	Doink	https://sketchfab.com/3d-models/mosin-nagant-m91-55c00242c4024307a761a89167e39a7c	downloaded-converted
+weapon	M1903 A3 Springfield	Gintoki1234	https://gintoki1234.itch.io/springfield-m1903-a3	downloaded-converted
+weapon	Winchester Model 1897	buh	https://sketchfab.com/3d-models/winchester-model-1897-6194ecd23344442fb23f5820f895a0d8	downloaded-converted
+weapon	Double Barrel Shotgun	Sebastian Kansik	https://sketchfab.com/3d-models/double-barrel-shotgun-04741a40f2224cffafc343b0236d5bbe	downloaded-converted
