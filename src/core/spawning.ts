@@ -1,6 +1,8 @@
 import { SeededRng } from './rng.ts';
 import type { Vec3 } from './types.ts';
 
+export interface ZombieSpawnPoint extends Vec3 { barrierId?: string }
+
 export interface SpawnDirectorConfig {
   baseZombieCount: number;
   additionalPerRound: number;
@@ -55,7 +57,8 @@ export function tickSpawnDirector(
     return null;
   }
   const spawnIndex = chooseSpawnIndex(worldSeed, state.round, state.spawned, spawnPoints.length);
-  const request = { spawnIndex, position: { ...spawnPoints[spawnIndex] } };
+  const point = spawnPoints[spawnIndex];
+  const request = { spawnIndex, position: { x: point.x, y: point.y, z: point.z } };
   state.spawned += 1;
   state.ticksUntilNext = config.spawnIntervalTicks;
   return request;

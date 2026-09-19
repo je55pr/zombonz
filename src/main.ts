@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
 import { buildBunkerDetails } from './client/bunker.ts';
+import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import {
@@ -9,7 +10,7 @@ import {
 } from './core/index.ts';
 import {
   NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_WALL_WEAPONS, NACHT_MYSTERY_BOXES,
-  greyboxCollisionBoxes, NACHT_SHOT_BLOCKERS,
+  greyboxCollisionBoxes, NACHT_SHOT_BLOCKERS, NACHT_BARRIERS,
 } from './maps/nacht.ts';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
@@ -45,6 +46,7 @@ const previewViews = {
   start: { position: { x: -3, y: 0, z: 4 }, yaw: -0.25 },
   help: { position: { x: 3, y: 0, z: -3.1 }, yaw: 0.73 },
   upstairs: { position: { x: 3, y: 3.4, z: 4 }, yaw: 0.5 },
+  barrier: { position: { x: -5, y: 0, z: -4.9 }, yaw: 0 },
 };
 const previewName = new URLSearchParams(location.search).get('preview');
 const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
@@ -56,14 +58,15 @@ const simulation = new GameSimulation({
     collisionBoxes: greyboxCollisionBoxes(),
     shotBlockers: NACHT_SHOT_BLOCKERS,
     walkSurfaces: NACHT_WALK_SURFACES,
-    zombieSpawns: NACHT_ZOMBIE_SPAWNS,
+    zombieSpawns: preview && previewName === 'barrier' ? [NACHT_ZOMBIE_SPAWNS[0]] : NACHT_ZOMBIE_SPAWNS,
+    barriers: NACHT_BARRIERS,
     navigationGraph: NACHT_NAVIGATION,
     doors: NACHT_DOORS,
     wallWeapons: NACHT_WALL_WEAPONS,
     mysteryBoxes: NACHT_MYSTERY_BOXES,
   },
   playerSpawns: [preview?.position ?? NACHT_PLAYER_SPAWN],
-  ...(preview ? { roundConfig: { initialWaitTicks: 2147483647, intermissionTicks: 180 },
+  ...(preview ? { roundConfig: { initialWaitTicks: previewName === 'barrier' ? 120 : 2147483647, intermissionTicks: 180 },
     economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } } : {}),
 });
 const playerId = simulation.playerIds[0];
@@ -74,9 +77,7 @@ if (preview) {
   for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
 }
 
-const zombieViews = new Map<EntityId, THREE.Mesh>();
-const zombieMaterial = new THREE.MeshStandardMaterial({ color: 0x65704f, roughness: 0.9 });
-const zombieGeometry = new THREE.BoxGeometry(0.62, 1.72, 0.5);
+const zombieViews = new Map<EntityId, ZombieView>();
 
 function zombies(): ZombieState[] {
   return simulation.zombies();
@@ -85,19 +86,18 @@ function syncZombieViews(): void {
   const liveIds = new Set<EntityId>();
   for (const zombie of zombies()) {
     liveIds.add(zombie.id);
-    let mesh = zombieViews.get(zombie.id);
-    if (!mesh) {
-      mesh = new THREE.Mesh(zombieGeometry, zombieMaterial);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      zombieViews.set(zombie.id, mesh);
-      scene.add(mesh);
+    let view = zombieViews.get(zombie.id);
+    if (!view) {
+      view = createZombieView();
+      zombieViews.set(zombie.id, view);
+      scene.add(view.root);
     }
-    mesh.position.set(zombie.position.x, zombie.position.y + 0.86, zombie.position.z);
+    view.update(zombie, simulation.state.world.tick,
+      simulation.state.barriers.find(barrier => barrier.id === zombie.entry?.barrierId));
   }
-  for (const [id, mesh] of zombieViews) {
+  for (const [id, view] of zombieViews) {
     if (liveIds.has(id)) continue;
-    scene.remove(mesh);
+    scene.remove(view.root);
     zombieViews.delete(id);
   }
 }

@@ -1,3 +1,5 @@
+import type { ZombieEntryState } from './barrier.ts';
+
 export type EntityId = `e:${number}`;
 
 export interface Vec3 {
@@ -37,6 +39,7 @@ export interface ZombieState extends EntityBase {
   moveSpeed: number;
   attackCooldownTicks: number;
   targetId: EntityId | null;
+  entry: ZombieEntryState | null;
 }
 export interface InteractableState extends EntityBase {
   kind: 'interactable';

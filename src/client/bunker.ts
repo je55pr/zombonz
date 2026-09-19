@@ -32,6 +32,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     const mesh = writing(text, width, height, color); mesh.position.set(x, y, z); mesh.rotation.y = rotation; group.add(mesh);
   }
   // Broken wooden window boards, deep frames, and projecting stone sills.
+  const barrierViews = new Map<string, THREE.Mesh[]>();
   for (const opening of NACHT_WINDOWS) {
     const frame = new THREE.Group();
     frame.position.set(opening.x, opening.y, opening.z);
@@ -40,9 +41,12 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     box(frame, concrete, 0, 0.88, 0, 2.25, 0.15, 0.65);
     box(frame, iron, -1, 1.75, 0, 0.09, 1.75, 0.25);
     box(frame, iron, 1, 1.75, 0, 0.09, 1.75, 0.25);
+    const planks: THREE.Mesh[] = [];
+    barrierViews.set(opening.id, planks);
     for (let i = 0; i < 3; i++) {
       const plank = box(frame, wood, i === 1 ? -0.12 : 0.1, 1.16 + i * 0.46, 0.03, 1.9, 0.16, 0.09);
       plank.rotation.z = i === 1 ? -0.16 : 0.07;
+      planks.push(plank);
     }
   }
   // Overhead structure. Broken roof strips leave the upstairs open to the moon.
@@ -133,6 +137,21 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   const moon = new THREE.Mesh(new THREE.SphereGeometry(1.4, 20, 12), new THREE.MeshBasicMaterial({ color: 0xc9dad5, fog: false }));
   moon.position.set(-22, 30, -42); group.add(moon);
   return { update(state) {
+    for (const barrier of state.barriers) {
+      const planks = barrierViews.get(barrier.id);
+      if (!planks) continue;
+      for (let i = 0; i < planks.length; i++) {
+        const plank = planks[i];
+        const intact = i < barrier.boards;
+        // The newest torn plank tumbles out before disappearing; repairs restore it.
+        const elapsed = (state.world.tick - barrier.lastTornTick) / 60;
+        const falling = !intact && i === barrier.boards && barrier.lastTornTick >= 0 && elapsed < 0.8;
+        plank.visible = intact || falling;
+        plank.position.y = 1.16 + i * 0.46 - (falling ? elapsed * elapsed * 4 : 0);
+        plank.rotation.z = (i === 1 ? -0.16 : 0.07) + (falling ? elapsed * 2 : 0);
+        plank.rotation.x = falling ? elapsed * 1.5 : 0;
+      }
+    }
     for (const door of state.doors) { const view = doorViews.get(door.id); if (view) view.visible = !door.open; }
     const active = (state.mysteryBoxes[0]?.cooldownTicks ?? 0) > 0;
     lid.rotation.z = active ? 1.05 : 0;

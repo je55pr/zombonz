@@ -1,4 +1,6 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
+import { createBarrier, createZombieEntry, prepareBarriers, updateZombieEntry,
+  repairBarriers, syncBarrierInteractables, type BarrierDefinition, type BarrierState, type BarrierEvent } from './barrier.ts';
 import { createMysteryBox, tickMysteryBoxes, useMysteryBox,
   type MysteryBoxDefinition, type MysteryBoxState, type MysteryBoxEvent } from './mysteryBox.ts';
 import {
@@ -21,7 +23,7 @@ import {
 } from './rounds.ts';
 import {
   createSpawnDirector, remainingSpawns, tickSpawnDirector,
-  type SpawnDirectorConfig, type SpawnDirectorState,
+  type SpawnDirectorConfig, type SpawnDirectorState, type ZombieSpawnPoint,
 } from './spawning.ts';
 import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
@@ -41,7 +43,8 @@ export interface SimulationMap {
   collisionBoxes: readonly CollisionBox[];
   shotBlockers?: readonly CollisionBox[];
   walkSurfaces: readonly WalkSurface[];
-  zombieSpawns: readonly Vec3[];
+  zombieSpawns: readonly ZombieSpawnPoint[];
+  barriers?: readonly BarrierDefinition[];
   navigationGraph?: NavigationGraph;
   doors?: readonly DoorDefinition[];
   wallWeapons?: readonly WallWeaponDefinition[];
@@ -55,12 +58,14 @@ export interface SimulationState {
   doors: DoorState[];
   wallWeapons: WallWeaponState[];
   mysteryBoxes: MysteryBoxState[];
+  barriers: BarrierState[];
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
   zombieId: EntityId;
   round: number;
   spawnIndex: number;
+  barrierId?: string;
 }
 
 export interface MatchRestartedEvent {
@@ -73,7 +78,7 @@ export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | MatchRestartedEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | MatchRestartedEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -101,6 +106,11 @@ export class GameSimulation {
     this.spawnConfig = options.spawnConfig;
     this.economyConfig = options.economyConfig ?? DEFAULT_ECONOMY_CONFIG;
     this.playerSpawns = options.playerSpawns.map((spawn) => ({ ...spawn }));
+    for (const spawn of this.map.zombieSpawns) {
+      if (spawn.barrierId && !this.map.barriers?.some(barrier => barrier.id === spawn.barrierId)) {
+        throw new Error(`Spawn references unknown barrier: ${spawn.barrierId}`);
+      }
+    }
     this.state = this.createMatchState(options.seed);
   }
 
@@ -130,7 +140,14 @@ export class GameSimulation {
       addEntity(world, box.interactable);
       mysteryBoxes.push(box.state);
     }
-    return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes };
+    const barriers: BarrierState[] = [];
+    for (const definition of this.map.barriers ?? []) {
+      const barrier = createBarrier(definition, allocateEntityId(world));
+      barriers.push(barrier.state); addEntity(world, barrier.interactable);
+    }
+    syncBarrierInteractables(barriers, Object.values(world.entities).filter(
+      (entity): entity is InteractableState => entity.kind === 'interactable'));
+    return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -191,6 +208,7 @@ export class GameSimulation {
     const events: SimulationEvent[] = [];
     const world = this.state.world;
     tickMysteryBoxes(this.state.mysteryBoxes, this.interactables());
+    const repairers = new Map<string, EntityId>();
 
     const playerFrames = new Map<EntityId, InputFrame>();
     for (const player of livingPlayers(world)) {
@@ -199,6 +217,11 @@ export class GameSimulation {
       updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces);
       events.push(...tickWeaponState(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
+      if (frame.actions.interact?.held) {
+        const candidate = findInteractionCandidate(player, this.reachableInteractables(player));
+        const barrier = this.state.barriers.find(barrier => barrier.interactableId === candidate?.interactableId);
+        if (barrier && !repairers.has(barrier.id)) repairers.set(barrier.id, player.id);
+      }
       if (frame.actions.interact?.pressed) {
         const interactionEvents = triggerInteraction(player, this.reachableInteractables(player), true);
         events.push(...interactionEvents);
@@ -225,30 +248,42 @@ export class GameSimulation {
     const navigate = this.navigationQuery();
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {
       // Never strand a round's enemies behind unopened rooms or stair debris.
-      const availableSpawns = this.map.navigationGraph ? this.map.zombieSpawns.filter(spawn =>
-        livingPlayers(world).some(player => {
-          const waypoint = navigate(spawn, player.position);
-          return waypoint !== spawn;
-        })) : this.map.zombieSpawns;
+      const availableSpawns = this.map.zombieSpawns.map((spawn, index) => ({ spawn, index }))
+        .filter(({ spawn }) => {
+          const destination = spawn.barrierId
+            ? this.state.barriers.find(barrier => barrier.id === spawn.barrierId)!.insidePoint : spawn;
+          return !this.map.navigationGraph || livingPlayers(world).some(player => navigate(destination, player.position) !== destination);
+        });
       const request = tickSpawnDirector(
         this.state.spawnDirector,
         livingEntityCount(world, 'zombie'),
-        availableSpawns,
+        availableSpawns.map(({ spawn }) => spawn),
         world.seed,
         this.spawnConfig,
       );
       if (request) {
         const id = allocateEntityId(world);
-        addEntity(world, createZombieState(id, request.position, this.state.round.round));
+        const source = availableSpawns[request.spawnIndex];
+        const zombie = createZombieState(id, request.position, this.state.round.round);
+        if (source.spawn.barrierId) zombie.entry = createZombieEntry(source.spawn.barrierId, this.state.spawnDirector.spawned - 1);
+        addEntity(world, zombie);
         events.push({
           type: 'zombieSpawned', zombieId: id, round: this.state.round.round,
-          spawnIndex: request.spawnIndex,
+          spawnIndex: source.index,
+          ...(source.spawn.barrierId ? { barrierId: source.spawn.barrierId } : {}),
         });
       }
     }
 
     const players = livingPlayers(world);
-    for (const zombie of this.zombies()) {
+    const zombies = this.zombies();
+    prepareBarriers(this.state.barriers, zombies);
+    for (const zombie of zombies) {
+      if (zombie.entry) {
+        const barrier = this.state.barriers.find(barrier => barrier.id === zombie.entry!.barrierId)!;
+        events.push(...updateZombieEntry(zombie, barrier, zombies, deltaSeconds, this.collisionBoxes(), world.tick));
+        continue;
+      }
       updateZombiePursuit(
         zombie, players, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
         this.map.navigationGraph,
@@ -256,6 +291,9 @@ export class GameSimulation {
       );
       events.push(...tickZombieMelee(zombie, players, this.collisionBoxes()));
     }
+    // Repair resolves after entry decisions, so rebuilding cannot trap an active vault.
+    events.push(...repairBarriers(this.state.barriers, repairers));
+    syncBarrierInteractables(this.state.barriers, this.interactables());
 
     const roundEvents = updateRoundState(this.state.round, {
       livingPlayers: livingPlayers(world).length,

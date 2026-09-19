@@ -22,10 +22,27 @@ small; all current guns use the existing hitscan simulation.
 - Mystery box: 950 points, one immediate replacement weapon, 180-tick cooldown.
 
 `src/maps/nacht.ts` is the shared source for collision, walk surfaces, navigation,
-doors, wall purchases and box placement. `src/client/bunker.ts` adds presentation
-only. Decorative boards are not a repair system; spawns appear just inside windows.
-Spawn selection excludes rooms with no open route to a living player, preventing
-rounds from stalling behind an unopened door.
+doors, wall purchases, barriers and box placement. `src/client/bunker.ts` adds
+presentation only, including board visibility driven by the simulation.
+Spawn selection checks the window's inside landing, excluding rooms with no open
+route to a living player and preventing rounds from stalling behind an unopened door.
+
+Eight ground-level windows have exterior entry routes. Spawns are five metres
+outside the wall, with ordered exterior waypoints, three staging lanes, a shared
+75-tick board-tearing interval and a 90-tick climb. A reserved crossing slot prevents
+simultaneous vaults, releases when the occupant dies, and disallows rebuilding while
+occupied. The climb lifts the zombie above the sill before moving across the opening;
+only that explicit entry link bypasses normal wall collision. Its crouched presentation
+and hitbox fit the window. No melee damage occurs before a zombie lands inside.
+
+Holding E near a damaged window restores one board every 60 ticks; releasing E or
+leaving the interaction resets partial repair progress. Repairs are free and grant no
+points. Board damage persists between rounds and resets on a new match. Barrier state,
+entry phases, queue ownership and timers are serializable and deterministic.
+
+The upper windows remain decorative: exterior zombies reach the upstairs through
+opened stairs instead of spawning in mid-air. The north-east ground-floor window is
+also decorative because its inside landing would intersect the stair structure.
 
 The navigation graph is filtered against closed doors and actual walk surfaces.
 The compiled query is shared between enemies and rebuilt when a door changes.
@@ -39,6 +56,11 @@ Automated coverage includes walking up and down both stairs; closed routes; zomb
 pursuit through both stairs with HELP shut; graph clearance and support; accessible
 spawns; cross-floor melee/bullet occlusion; box price, cooldown, seeded replay,
 insufficient funds, wall occlusion and restart reset.
+Exterior-entry coverage additionally checks every active window through to player
+pursuit, individual board timing, group queues, shooting an outside attacker, death
+during a vault, locked-room spawn filtering, repair holds, and replay after restoring
+a snapshot mid-vault.
 
 Development-only inspection URLs (`?preview=start`, `help`, `upstairs`) allow visual
 checks without waves. The default URL retains normal starting points and closed routes.
+`?preview=barrier` places the camera facing the first window and runs a live wave there.

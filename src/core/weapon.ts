@@ -123,7 +123,7 @@ function nearestWorldDistance(
 
 function zombieHitDistance(ray: HitscanRay, zombie: ZombieState, maxDistance: number): number | null {
   const radius = 0.32;
-  const height = 1.72;
+  const height = zombie.entry?.phase === 'vaulting' ? 1.72 * 0.85 : 1.72;
   return rayAabbDistance(
     ray,
     { x: zombie.position.x - radius, y: zombie.position.y, z: zombie.position.z - radius },

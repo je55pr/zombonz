@@ -65,7 +65,7 @@ describe('deterministic smoke scenario', () => {
       weapon: { magazineAmmo: 5, reserveAmmo: 32 },
     });
     expect(state.round.phase).toBe('intermission');
-    // SimulationState now includes the serializable (empty here) mystery-box collection.
-    expect(fnv1a(JSON.stringify(state))).toBe('b2009362');
+    // Includes serializable barrier state and the zombie's (null here) entry state.
+    expect(fnv1a(JSON.stringify(state))).toBe('35941d6f');
   });
 });

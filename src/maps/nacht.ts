@@ -4,6 +4,8 @@ import type { DoorDefinition } from '../core/door.ts';
 import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
 import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
 import type { Vec3 } from '../core/types.ts';
+import type { BarrierDefinition } from '../core/barrier.ts';
+import type { ZombieSpawnPoint } from '../core/spawning.ts';
 
 // Original Nacht room connections, with approximate dimensions and original art.
 export const UPPER_HEIGHT = 3.4;
@@ -14,7 +16,7 @@ export interface GreyboxBox {
 export interface MapMarker {
   id: string; type: 'zombieSpawn' | 'door' | 'wallBuy' | 'mysteryBox'; position: Vec3; label: string;
 }
-export interface BunkerWindow { x: number; z: number; y: number; axis: 'x' | 'z'; width: number }
+export interface BunkerWindow { id: string; x: number; z: number; y: number; axis: 'x' | 'z'; width: number }
 const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number,
   material: GreyboxMaterial, collides = true): GreyboxBox => ({
   center: { x, y, z }, size: { x: sx, y: sy, z: sz }, material, collides,
@@ -34,7 +36,7 @@ function windowWall(axis: 'x' | 'z', fixed: number, from: number, to: number,
     segment(cursor, center - 1, base, 3.4);
     segment(center - 1, center + 1, base, 0.9);
     segment(center - 1, center + 1, base + 2.6, 0.8);
-    windows.push({ x: axis === 'x' ? center : fixed, z: axis === 'x' ? fixed : center,
+    windows.push({ id: `window-${windows.length}`, x: axis === 'x' ? center : fixed, z: axis === 'x' ? fixed : center,
       y: base, axis, width: 2 });
     cursor = center + 1;
   }
@@ -115,13 +117,26 @@ export const NACHT_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   weapons: ['kar98k', 'thompson', 'mp40', 'bar'],
 }];
 export const NACHT_PLAYER_SPAWN: Vec3 = { x: -4, y: 0, z: 3 };
-// Vaulting and repair are future systems: spawns are just inside the windows.
-export const NACHT_ZOMBIE_SPAWNS: readonly Vec3[] = [
-  { x: -5, y: 0, z: -6.1 }, { x: -2, y: 0, z: -6.1 },
-  { x: -7.1, y: 0, z: -3 }, { x: -3, y: 0, z: 6.1 },
-  { x: 3, y: 0, z: -6.1 }, { x: 7.1, y: 0, z: 2 },
-  { x: 3, y: UPPER_HEIGHT, z: 6.1 }, { x: -4, y: UPPER_HEIGHT, z: -6.1 },
-];
+// Ground-level approaches avoid airborne upstairs spawns. Enemies reach upstairs
+// through the same purchased stair routes as players. The north-east window opens
+// into the stair structure, not a supported landing, so it is not an entry link.
+export const NACHT_BARRIERS: readonly BarrierDefinition[] = NACHT_WINDOWS
+  .filter(window => window.y === 0 && !(window.axis === 'x' && window.z === -7 && window.x === 6))
+  .map(window => {
+    const outward = window.axis === 'x'
+      ? { x: 0, y: 0, z: Math.sign(window.z) } : { x: Math.sign(window.x), y: 0, z: 0 };
+    const point = (distance: number, sideways = 0): Vec3 => ({
+      x: window.x + outward.x * distance + outward.z * sideways,
+      y: window.y,
+      z: window.z + outward.z * distance - outward.x * sideways,
+    });
+    return { id: window.id, position: { x: window.x, y: window.y, z: window.z }, outward,
+      width: window.width, maxBoards: 3,
+      approachPath: [point(5, 0.6), point(2.4, 0.6), point(0.85)], insidePoint: point(-0.95) };
+  });
+export const NACHT_ZOMBIE_SPAWNS: readonly ZombieSpawnPoint[] = NACHT_BARRIERS.map(barrier => ({
+  ...barrier.approachPath[0], barrierId: barrier.id,
+}));
 export const NACHT_MARKERS: readonly MapMarker[] = [
   ...NACHT_ZOMBIE_SPAWNS.map((position, index) => ({ id: `window-${index}`,
     type: 'zombieSpawn' as const, position, label: 'Barricaded window' })),

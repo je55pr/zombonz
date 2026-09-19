@@ -5,11 +5,12 @@ import { GameSimulation, createInputFrame, createPlayerState, createZombieState,
 } from '../src/core/index.ts';
 import { NACHT_DOORS, NACHT_MYSTERY_BOXES, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN,
   NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_STAIRS, NACHT_SHOT_BLOCKERS,
-  UPPER_HEIGHT, greyboxCollisionBoxes } from '../src/maps/nacht.ts';
+  UPPER_HEIGHT, greyboxCollisionBoxes, NACHT_BARRIERS } from '../src/maps/nacht.ts';
 
 const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: NACHT_WALK_SURFACES,
   zombieSpawns: NACHT_ZOMBIE_SPAWNS, navigationGraph: NACHT_NAVIGATION,
-  doors: NACHT_DOORS, mysteryBoxes: NACHT_MYSTERY_BOXES, shotBlockers: NACHT_SHOT_BLOCKERS };
+  doors: NACHT_DOORS, mysteryBoxes: NACHT_MYSTERY_BOXES, shotBlockers: NACHT_SHOT_BLOCKERS,
+  barriers: NACHT_BARRIERS };
 function makeSimulation(points = 500, spawn = NACHT_PLAYER_SPAWN) {
   return new GameSimulation({ seed: 42, map, playerSpawns: [spawn],
     economyConfig: { startingPoints: points, hitReward: 10, killBonus: 50 },
@@ -76,7 +77,10 @@ describe('Nacht room routes', () => {
       spawnConfig: { baseZombieCount: 12, additionalPerRound: 0, maxAlive: 12, spawnIntervalTicks: 0 } });
     for (let i = 0; i < 15; i++) sim.tick();
     expect(sim.zombies()).toHaveLength(12);
-    expect(sim.zombies().every(zombie => zombie.position.x < 0 && zombie.position.y === 0)).toBe(true);
+    expect(sim.zombies().every(zombie => {
+      const barrier = sim.state.barriers.find(barrier => barrier.id === zombie.entry?.barrierId);
+      return barrier && barrier.insidePoint.x < 0 && zombie.position.y === 0;
+    })).toBe(true);
   });
   it('prevents melee and bullets through the upper floor', () => {
     const player = createPlayerState('e:1', { x: -3, y: UPPER_HEIGHT, z: 0 });

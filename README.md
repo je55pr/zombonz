@@ -49,10 +49,19 @@ offer a Kar98k in the starting room and a Thompson in the Help room.
 The bunker uses original procedural textures, boarded windows, overhead beams,
 stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
 Dimensions and props are an approximation, not a one-to-one recreation of the original game.
-Window repair/vaulting, a full box roulette/claim animation, original weapon behaviour,
-finished character/weapon models, audio and online co-op remain future work.
+Zombies spawn outside and follow eight ground-level window approaches. They tear out
+the three boards one at a time, climb through the sill, then pursue players through
+open rooms and stairs. Hold E near a damaged window to rebuild one board per second.
+Repairs are free and do not award points yet. Zombies can be shot outside, and only
+one zombie crosses a given window at a time. Upstairs is reached through the stairs;
+upper windows and the ground window behind the north-east stair remain scenery.
+
+A full box roulette/claim animation, original weapon behaviour, finished character/
+weapon art, audio and online co-op remain future work. Zombie figures currently use
+simple animated parts for walking, tearing and climbing.
 
 For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs`
 open inspection views with waves disabled, routes open and 10000 test points.
 These overrides are development-only; the normal URL starts the standard survival game.
+`/?preview=barrier` runs a live wave at the first window for entry-animation checks.
 See [map notes](docs/nacht-map.md) for layout and validation details.

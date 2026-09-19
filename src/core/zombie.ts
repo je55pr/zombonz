@@ -30,6 +30,7 @@ export function createZombieState(id: EntityId, position: Vec3, round: number): 
     moveSpeed: ZOMBIE_MOVEMENT.baseSpeed + Math.min(0.65, Math.max(0, round - 1) * 0.04),
     attackCooldownTicks: 0,
     targetId: null,
+    entry: null,
     alive: true,
   };
 }
@@ -106,7 +107,7 @@ export function tickZombieMelee(
   players: readonly PlayerState[],
   collisionBoxes: readonly CollisionBox[] = [],
 ): Array<ZombieAttackEvent | DamageEvent> {
-  if (!zombie.alive) return [];
+  if (!zombie.alive || zombie.entry) return [];
   if (zombie.attackCooldownTicks > 0) zombie.attackCooldownTicks -= 1;
   const target = players.find((player) => player.id === zombie.targetId && player.alive)
     ?? chooseZombieTarget(zombie, players);
