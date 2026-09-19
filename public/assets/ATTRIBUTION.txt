@@ -1,0 +1,31 @@
+Zombonz third-party runtime asset attribution
+Retrieved/verified: 2026-09-19
+Licence for each asset below: Creative Commons Attribution 4.0 International
+https://creativecommons.org/licenses/by/4.0/
+
+Zombie Soldier
+Creator: Peter_D (@better_peter)
+Source: https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f
+Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; animation clips separated for runtime use.
+
+Zombie
+Creator: pxltiger
+Source: https://sketchfab.com/3d-models/zombie-73ef58af341e46afba1da53366ed79cf
+Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; stale PSD reference removed; attack/idle/run/walk clips rebuilt as pruned animation-only GLBs.
+
+Realistic M1911 Handgun - Game Ready
+Creator: Quinn Kuslich
+Source: https://sketchfab.com/3d-models/realistic-m1911-handgun-game-ready-aa874a0e55224aeb99c5fef0aaf109a1
+Changes: converted to self-contained GLB; 2K PBR textures embedded; AO/roughness/metallic maps packed into glTF ORM textures.
+
+Kar98k
+Creator: ARIA
+Source: https://sketchfab.com/3d-models/kar98k-c383b7ac23854314989773776e6c76ff
+Changes: converted to self-contained GLB; source 4K textures reduced to 2K where needed; stale texture URI removed; PBR textures embedded; roughness/metallic packed into glTF ORM textures.
+
+B.A.R M1918 A2 - GAME READY & RIGGED
+Creator: Peanut_Butcher
+Source: https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732
+Changes: source GLB retained structurally; embedded 4K PBR textures reduced to 2K for browser runtime.
+
+Full provenance, SHA-256 hashes for the downloaded originals, and benchmark notes are in docs/assets/.
