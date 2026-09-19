@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "note": "Third-party presentation assets. Gameplay remains authoritative in game-core. See /docs/assets/THIRD_PARTY_ASSETS.md for provenance.",
+  "zombies": {
+    "peter_d": {
+      "role": "primary",
+      "model": "/assets/zombies/peter_d/model.glb",
+      "animations": {
+        "attack": "/assets/zombies/peter_d/attack.glb",
+        "death": "/assets/zombies/peter_d/death.glb",
+        "idle": "/assets/zombies/peter_d/idle.glb",
+        "run": "/assets/zombies/peter_d/run.glb",
+        "walk": "/assets/zombies/peter_d/walk.glb"
+      },
+      "creator": "Peter_D",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f"
+    },
+    "pxltiger": {
+      "role": "secondary",
+      "model": "/assets/zombies/pxltiger/model.glb",
+      "animations": {
+        "attack": "/assets/zombies/pxltiger/attack.glb",
+        "idle": "/assets/zombies/pxltiger/idle.glb",
+        "run": "/assets/zombies/pxltiger/run.glb",
+        "walk": "/assets/zombies/pxltiger/walk.glb"
+      },
+      "creator": "pxltiger",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/zombie-73ef58af341e46afba1da53366ed79cf"
+    }
+  },
+  "weapons": {
+    "m1911": {
+      "model": "/assets/weapons/m1911/model.glb",
+      "creator": "Quinn Kuslich",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/realistic-m1911-handgun-game-ready-aa874a0e55224aeb99c5fef0aaf109a1"
+    },
+    "kar98k": {
+      "model": "/assets/weapons/kar98k/model.glb",
+      "creator": "ARIA",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/kar98k-c383b7ac23854314989773776e6c76ff"
+    },
+    "bar": {
+      "model": "/assets/weapons/bar/model.glb",
+      "creator": "Peanut_Butcher",
+      "license": "CC BY 4.0",
+      "source": "https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732"
+    }
+  }
+}
