@@ -1,13 +1,15 @@
+/// <reference types="vite/client" />
 import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
+import { buildBunkerDetails } from './client/bunker.ts';
 import { BrowserInput } from './client/input.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, type EntityId, type ZombieState,
 } from './core/index.ts';
 import {
-  NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_WALL_WEAPONS,
-  greyboxCollisionBoxes,
+  NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_WALL_WEAPONS, NACHT_MYSTERY_BOXES,
+  greyboxCollisionBoxes, NACHT_SHOT_BLOCKERS,
 } from './maps/nacht.ts';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
@@ -18,49 +20,59 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.autoClear = false;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.35;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x151513);
-scene.fog = new THREE.Fog(0x151513, 12, 34);
+scene.background = new THREE.Color(0x1d2b30);
+scene.fog = new THREE.FogExp2(0x1d2b30, 0.027);
 
 const camera = new THREE.PerspectiveCamera(67, 1, 0.05, 80);
 camera.rotation.order = 'YXZ';
-scene.add(new THREE.HemisphereLight(0xb8c0c8, 0x17150f, 1.1));
-const keyLight = new THREE.DirectionalLight(0xe4d7b7, 2.2);
-keyLight.position.set(-4, 9, 2);
+scene.add(new THREE.HemisphereLight(0xaabfc9, 0x373026, 1.4));
+const keyLight = new THREE.DirectionalLight(0xb4ced7, 2.4);
+keyLight.position.set(-12, 22, -16);
 keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+Object.assign(keyLight.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, far: 65 });
+keyLight.shadow.bias = -0.0006;
 scene.add(keyLight);
 scene.add(buildGreybox(NACHT_GREYBOX));
-const helpDoorMesh = new THREE.Mesh(
-  new THREE.BoxGeometry(0.36, 3, 3),
-  new THREE.MeshStandardMaterial({ color: 0x4b4438, roughness: 0.95 }),
-);
-helpDoorMesh.position.set(0, 1.5, 0);
-helpDoorMesh.castShadow = true;
-helpDoorMesh.receiveShadow = true;
-scene.add(helpDoorMesh);
-const wallWeaponMesh = new THREE.Mesh(
-  new THREE.BoxGeometry(0.12, 0.8, 1.4),
-  new THREE.MeshStandardMaterial({ color: 0x26231d, roughness: 0.85, metalness: 0.2 }),
-);
-wallWeaponMesh.position.set(-5.38, 1.05, -2.2);
-wallWeaponMesh.castShadow = true;
-scene.add(wallWeaponMesh);
+const bunker = buildBunkerDetails(scene);
+
+// Development-only inspection views for iterating on the map without a running wave.
+const previewViews = {
+  start: { position: { x: -3, y: 0, z: 4 }, yaw: -0.25 },
+  help: { position: { x: 3, y: 0, z: -3.1 }, yaw: 0.73 },
+  upstairs: { position: { x: 3, y: 3.4, z: 4 }, yaw: 0.5 },
+};
+const previewName = new URLSearchParams(location.search).get('preview');
+const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
+  ? previewViews[previewName as keyof typeof previewViews] : null;
 
 const simulation = new GameSimulation({
   seed: 0x5a0b0a2,
   map: {
     collisionBoxes: greyboxCollisionBoxes(),
+    shotBlockers: NACHT_SHOT_BLOCKERS,
     walkSurfaces: NACHT_WALK_SURFACES,
     zombieSpawns: NACHT_ZOMBIE_SPAWNS,
     navigationGraph: NACHT_NAVIGATION,
     doors: NACHT_DOORS,
     wallWeapons: NACHT_WALL_WEAPONS,
+    mysteryBoxes: NACHT_MYSTERY_BOXES,
   },
-  playerSpawns: [NACHT_PLAYER_SPAWN],
+  playerSpawns: [preview?.position ?? NACHT_PLAYER_SPAWN],
+  ...(preview ? { roundConfig: { initialWaitTicks: 2147483647, intermissionTicks: 180 },
+    economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } } : {}),
 });
 const playerId = simulation.playerIds[0];
 if (!simulation.getPlayer(playerId)) throw new Error('Simulation failed to create local player.');
+if (preview) {
+  simulation.getPlayer(playerId)!.yaw = preview.yaw;
+  for (const door of simulation.state.doors) door.open = true;
+  for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
+}
 
 const zombieViews = new Map<EntityId, THREE.Mesh>();
 const zombieMaterial = new THREE.MeshStandardMaterial({ color: 0x65704f, roughness: 0.9 });
@@ -126,7 +138,7 @@ function frame(nowMs: number): void {
   previousSeconds = nowSeconds;
   syncCamera();
   syncZombieViews();
-  helpDoorMesh.visible = !simulation.state.doors[0]?.open;
+  bunker.update(simulation.state);
   renderer.clear();
   renderer.render(scene, camera);
   const hudSnapshot = buildHudSnapshot(simulation, playerId);

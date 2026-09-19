@@ -21,6 +21,18 @@ export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
     id: 'kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
     magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120,
   },
+  thompson: {
+    id: 'thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
+    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120,
+  },
+  mp40: {
+    id: 'mp40', damage: 75, range: 65, fireIntervalTicks: 8, trigger: 'auto',
+    magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138,
+  },
+  bar: {
+    id: 'bar', damage: 125, range: 80, fireIntervalTicks: 10, trigger: 'auto',
+    magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150,
+  },
 };
 
 export function createWeaponState(weaponId: string): WeaponState {

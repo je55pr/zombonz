@@ -84,6 +84,11 @@ export class CanvasHud {
   private draw(snapshot: HudSnapshot): void {
     const { width, height } = this.canvas;
     this.context.clearRect(0, 0, width, height);
+    this.text('NACHT DER UNTOTEN', width / 2, 38, 19, 'center');
+    if (!snapshot.gameOver) {
+      this.context.fillStyle = 'rgba(244,241,231,0.75)';
+      this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
+    }
     this.text(`ROUND ${snapshot.round}`, 48, 58, 42);
     this.text(`HP ${snapshot.health}`, 48, height - 54, 36);
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');

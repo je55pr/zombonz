@@ -32,10 +32,27 @@ The issue pool is organised into milestones: **M0 Bootstrap**, **M1 Solo Vertica
 
 The intended first milestone is deliberately structural: establish deterministic foundations and clean module contracts before broad gameplay implementation.
 
-## Current starter
+## Run the current prototype
 
-The local project currently contains a minimal zero-install Three.js scene as an initial smoke test.
+Use Node.js 22.12.0, then `npm ci` and `npm run dev`. Open the local address printed by Vite.
+Run `npm run check` for TypeScript validation, automated tests and a production build.
 
-- Open `index.html` through a local static web server to view the scene.
-- Run `npm run check` for the current syntax gate.
-- The starter uses a pinned Three.js browser module through an import map and does not yet represent the planned final project structure.
+Click the canvas to capture the mouse. Move with WASD, fire with the left mouse button,
+reload with R, interact with E, and restart after game over with Enter. Escape releases the mouse.
+
+The playable solo map follows Nacht's starting room / Help room / upstairs connections.
+The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
+box in the Help room costs 950 and immediately replaces your weapon with a loaded
+Kar98k, Thompson, MP40 or BAR, followed by a three-second cooldown. Wall purchases
+offer a Kar98k in the starting room and a Thompson in the Help room.
+
+The bunker uses original procedural textures, boarded windows, overhead beams,
+stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
+Dimensions and props are an approximation, not a one-to-one recreation of the original game.
+Window repair/vaulting, a full box roulette/claim animation, original weapon behaviour,
+finished character/weapon models, audio and online co-op remain future work.
+
+For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs`
+open inspection views with waves disabled, routes open and 10000 test points.
+These overrides are development-only; the normal URL starts the standard survival game.
+See [map notes](docs/nacht-map.md) for layout and validation details.
