@@ -211,3 +211,7 @@ https://sketchfab.com/3d-models/stg-44-sturmgewehr-fa37bef729e141a6a29bb022a3e0b
 ### Thompson
 
 The previously shortlisted Thompson M1A1 was intentionally skipped because its downloadable package was untextured. Keep Thompson on the sourcing backlog rather than shipping a visual mismatch.
+
+### Browser benchmark follow-up
+
+A standalone Three.js benchmark with 20 animated instances confirmed both zombie candidates load and animate without model errors after runtime cleanup. Peter_D renders the 20-zombie test in 20 draw calls from one shared geometry, while pxltiger requires 280 draw calls from its 14-mesh body. pxltiger's four runtime clips have now been converted to clean animation-only GLBs, removing the stale PSD texture reference and duplicated animation meshes. See `ZOMBIE_BENCHMARK.md`.
