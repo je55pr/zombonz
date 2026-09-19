@@ -30,6 +30,9 @@ export interface PlayerState extends EntityBase {
   health: number;
   points: number;
   weapon: WeaponState;
+  godMode: boolean;
+  noclip: boolean;
+  noclipAnchor: Vec3 | null;
 }
 
 export interface ZombieState extends EntityBase {

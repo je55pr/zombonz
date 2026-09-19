@@ -3,6 +3,7 @@ import type { ActionState, GameAction, InputFrame } from '../core/input.ts';
 const KEY_ACTIONS: Partial<Record<string, GameAction>> = {
   KeyW: 'moveForward', KeyS: 'moveBackward', KeyA: 'moveLeft', KeyD: 'moveRight',
   KeyR: 'reload', KeyE: 'interact', Enter: 'restart',
+  KeyG: 'toggleGodMode', KeyF: 'toggleNoclip', Space: 'flyUp', KeyC: 'flyDown',
 };
 
 export interface BrowserInputOptions {

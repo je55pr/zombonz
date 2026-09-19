@@ -214,7 +214,8 @@ export class GameSimulation {
     for (const player of livingPlayers(world)) {
       const frame = inputs[player.id] ?? createInputFrame(world.tick);
       playerFrames.set(player.id, frame);
-      updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces);
+      updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
+        [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
       events.push(...tickWeaponState(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
       if (frame.actions.interact?.held) {

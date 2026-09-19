@@ -65,7 +65,7 @@ describe('deterministic smoke scenario', () => {
       weapon: { magazineAmmo: 5, reserveAmmo: 32 },
     });
     expect(state.round.phase).toBe('intermission');
-    // Includes serializable barrier state and the zombie's (null here) entry state.
-    expect(fnv1a(JSON.stringify(state))).toBe('35941d6f');
+    // Includes default-off player debug modes and the null noclip return anchor.
+    expect(fnv1a(JSON.stringify(state))).toBe('9001cc44');
   });
 });

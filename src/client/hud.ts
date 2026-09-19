@@ -11,6 +11,8 @@ export interface HudSnapshot {
   reserveAmmo: number;
   interactionPrompt: string | null;
   gameOver: boolean;
+  godMode: boolean;
+  noclip: boolean;
 }
 
 export function buildHudSnapshot(
@@ -28,6 +30,8 @@ export function buildHudSnapshot(
     reserveAmmo: player.weapon.reserveAmmo,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
     gameOver: simulation.state.round.phase === 'gameOver',
+    godMode: player.godMode,
+    noclip: player.noclip,
   };
 }
 function weaponLabel(id: string): string {
@@ -90,6 +94,9 @@ export class CanvasHud {
       this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
     }
     this.text(`ROUND ${snapshot.round}`, 48, 58, 42);
+    const modes = [snapshot.godMode ? 'GOD MODE [G]' : '', snapshot.noclip ? 'NOCLIP [F]' : ''].filter(Boolean);
+    if (modes.length) this.text(modes.join('   /   '), 48, 105, 23);
+    if (snapshot.noclip) this.text('WASD fly · SPACE up · C down', 48, 140, 20);
     this.text(`HP ${snapshot.health}`, 48, height - 54, 36);
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');
     this.text(weaponLabel(snapshot.weapon), width - 48, height - 50, 26, 'right');

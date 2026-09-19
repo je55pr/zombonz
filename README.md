@@ -40,6 +40,11 @@ Run `npm run check` for TypeScript validation, automated tests and a production 
 Click the canvas to capture the mouse. Move with WASD, fire with the left mouse button,
 reload with R, interact with E, and restart after game over with Enter. Escape releases the mouse.
 
+G toggles god mode (restores health and prevents damage). F toggles noclip:
+WASD flies in the direction you look, Space rises and C descends. Active modes appear
+on the HUD. Turning noclip off lands you on a valid surface; if you are inside a wall
+or outside the map, it returns you to where you enabled noclip. Both modes reset on restart.
+
 The playable solo map follows Nacht's starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
 box in the Help room costs 950 and immediately replaces your weapon with a loaded
