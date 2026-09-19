@@ -22,8 +22,8 @@ That command typechecks, runs the full automated test suite, and creates a produ
 
 ## Scope and branches
 
-Work from current `main` unless an issue explicitly names another base. Use a dedicated branch and writable checkout for each concurrent task. Do not mix unrelated cleanup, refactors, or feature work into an issue branch.
-If several people or agents work in parallel, they must not share one writable checkout. Use separate clones/worktrees and reconcile through Git. Before committing, check branch, status, upstream, and current remote `main` so another valid checkpoint is not overwritten.
+Work from current `dev` unless an issue explicitly names another base. Use a dedicated branch and writable checkout for each concurrent task. Do not mix unrelated cleanup, refactors, or feature work into an issue branch.
+If several people or agents work in parallel, they must not share one writable checkout. Use separate clones/worktrees and reconcile through Git. Before committing, check branch, status, upstream, and current remote `dev` so another valid checkpoint is not overwritten.
 
 ## Deterministic gameplay rules
 
@@ -55,6 +55,6 @@ A task is done when all of the following are true:
 4. `npm run check` passes locally.
 5. Browser-visible changes receive an appropriate real-browser smoke check.
 6. The diff contains no unrelated generated files, lockfile noise, credentials, or other task spillover.
-7. The branch is based on or reconciled with current `main`, and the result is committed with a focused message.
+7. The branch is based on or reconciled with current `dev`, and the result is committed with a focused message.
 
-CI repeats install, typecheck, tests, and production build for pull requests and pushes to `main`.
+CI repeats install, typecheck, tests, and production build for pull requests and pushes to `dev`.
