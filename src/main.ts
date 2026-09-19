@@ -9,8 +9,12 @@ import { batchStaticMeshes } from './client/staticBatch.ts';
 import { ActorBatch } from './client/actorBatch.ts';
 import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
+import { loadZombieAsset, type ZombieAsset } from './client/runtimeAssets.ts';
+import { SkinnedZombieView } from './client/skinnedZombieView.ts';
+import { WeaponView } from './client/weaponView.ts';
 import {
-  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, type EntityId, type ZombieState, type Vec3,
+  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, createWeaponState, createZombieState, allocateEntityId, addEntity,
+  type EntityId, type ZombieState, type Vec3,
 } from './core/index.ts';
 import {
   NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_WALL_WEAPONS, NACHT_MYSTERY_BOXES,
@@ -24,6 +28,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPrefer
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false;
 renderer.autoClear = false;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.35;
@@ -53,6 +58,7 @@ const previewViews = {
   upstairs: { position: { x: 3, y: 3.4, z: 4 }, yaw: 0.5 },
   barrier: { position: { x: -5, y: 0, z: -4.9 }, yaw: 0 },
   stress: { position: { x: -3, y: 0, z: 4 }, yaw: -0.25 },
+  assets: { position: { x: -3, y: 0, z: 4 }, yaw: 0 },
 };
 const previewName = new URLSearchParams(location.search).get('preview');
 const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
@@ -85,16 +91,55 @@ if (preview) {
   if (previewName === 'stress') simulation.getPlayer(playerId)!.godMode = true;
   for (const door of simulation.state.doors) door.open = true;
   for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
+  const testWeapon = new URLSearchParams(location.search).get('weapon');
+  if (testWeapon && ['starter-pistol', 'kar98k', 'bar', 'thompson', 'mp40'].includes(testWeapon)) {
+    simulation.getPlayer(playerId)!.weapon = createWeaponState(testWeapon);
+  }
+  if (previewName === 'assets') {
+    const target = createZombieState(allocateEntityId(simulation.state.world), { x: -3, y: 0, z: 0 }, 1);
+    target.moveSpeed = 0; addEntity(simulation.state.world, target);
+  }
 }
 
 const zombieViews = new Map<EntityId, ZombieView>();
 const zombieBatch = new ActorBatch(scene);
 const previousPositions = new Map<EntityId, Vec3>();
+const skinnedViews = new Map<EntityId, SkinnedZombieView>();
+let zombieAsset: ZombieAsset | undefined;
+let zombieAssetNotice: string | null = 'Loading zombie model…';
+const zombieVariant = new URLSearchParams(location.search).get('zombie') === 'pxltiger' ? 'pxltiger' : 'peter_d';
+void loadZombieAsset(zombieVariant).then(asset => {
+  zombieAsset = asset; zombieAssetNotice = null;
+  zombieViews.clear(); zombieBatch.update([]);
+}).catch(error => {
+  zombieAssetNotice = 'Zombie asset failed to load; using low-poly fallback';
+  console.warn('Unable to load zombie asset', error);
+});
+const weaponView = new WeaponView();
 
 function zombies(): ZombieState[] {
   return simulation.zombies();
 }
 function syncZombieViews(alpha: number): void {
+  if (zombieAsset) {
+    const tick = simulation.state.world.tick - 1 + alpha;
+    for (const entity of Object.values(simulation.state.world.entities)) {
+      if (entity.kind !== 'zombie') continue;
+      let view = skinnedViews.get(entity.id);
+      if (!view) {
+        if (!entity.alive) continue;
+        view = new SkinnedZombieView(zombieAsset, Number(entity.id.slice(2)) * 0.37);
+        skinnedViews.set(entity.id, view); scene.add(view.root);
+      }
+      view.update(entity, tick, simulation.state.barriers.find(barrier => barrier.id === entity.entry?.barrierId),
+        previousPositions.get(entity.id), alpha);
+      if (view.expired(tick)) { view.dispose(); skinnedViews.delete(entity.id); }
+    }
+    // Corpse presentation must not accumulate unbounded skeleton work over a match.
+    const corpses = [...skinnedViews].filter(([id]) => !simulation.state.world.entities[id]?.alive);
+    for (const [id, view] of corpses.slice(0, Math.max(0, corpses.length - 8))) { view.dispose(); skinnedViews.delete(id); }
+    return;
+  }
   const liveIds = new Set<EntityId>();
   for (const zombie of zombies()) {
     liveIds.add(zombie.id);
@@ -114,11 +159,12 @@ function syncZombieViews(alpha: number): void {
 }
 
 const clock = new FixedStepClock({ tickRate: 60 });
-const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022 });
+const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022, previewFireKey: !!preview });
 const hud = new CanvasHud(renderer);
 const performanceOverlay = new PerformanceOverlay();
 renderer.info.autoReset = false;
 let previousSeconds: number | undefined;
+let lastShadowTick = -Infinity;
 
 function simulate(dt: number): void {
   previousPositions.clear();
@@ -128,8 +174,13 @@ function simulate(dt: number): void {
       previousPositions.set(entity.id, { ...entity.position });
     }
   }
-  simulation.tick({ [playerId]: input.consume() }, dt);
-  if (simulation.state.world !== world) previousPositions.clear();
+  const events = simulation.tick({ [playerId]: input.consume() }, dt);
+  weaponView.events(events, playerId, simulation.state.world.tick);
+  if (simulation.state.world !== world) {
+    previousPositions.clear();
+    for (const view of skinnedViews.values()) view.dispose();
+    skinnedViews.clear(); zombieViews.clear();
+  }
 }
 function syncCamera(alpha = 1): void {
   const player = simulation.getPlayer(playerId);
@@ -164,10 +215,17 @@ function frame(nowMs: number): void {
   bunker.update(simulation.state);
   renderer.clear();
   renderer.info.reset();
+  // The moon/camera are independent: expensive skinned shadow passes only need
+  // 15 Hz updates. Models and camera still render at the display's full rate.
+  if (simulation.state.world.tick - lastShadowTick >= 4 || simulation.state.world.tick < lastShadowTick) {
+    renderer.shadowMap.needsUpdate = true; lastShadowTick = simulation.state.world.tick;
+  }
   renderer.render(scene, camera);
+  const player = simulation.getPlayer(playerId);
+  if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha); weaponView.render(renderer, camera.aspect); }
   const hudStarted = performance.now();
   const hudSnapshot = buildHudSnapshot(simulation, playerId);
-  if (hudSnapshot) hud.render(hudSnapshot);
+  if (hudSnapshot) hud.render({ ...hudSnapshot, assetNotice: zombieAssetNotice ?? weaponView.notice });
   performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
     renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
   performanceOverlay.render(renderer);

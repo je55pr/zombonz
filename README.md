@@ -48,8 +48,8 @@ or outside the map, it returns you to where you enabled noclip. Both modes reset
 F3 toggles the performance panel (FPS, frame time, CPU time and draw calls).
 Rendering follows the display refresh rate, with interpolated movement and immediate
 mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
-1x pixel density, no MSAA, and 1024px shadows. Static scenery and zombie body parts
-are batched, and the HUD texture is redrawn only when its content changes.
+1x pixel density, no MSAA, and 1024px shadows refreshed at 15 Hz. Static scenery and fallback zombie body parts
+are batched where appropriate, and the HUD texture is redrawn only when its content changes.
 144 FPS requires a 144 Hz-or-faster active display and enough GPU/CPU headroom;
 the browser or OS may cap presentation to the current display refresh rate.
 
@@ -69,9 +69,24 @@ Repairs are free and do not award points yet. Zombies can be shot outside, and o
 one zombie crosses a given window at a time. Upstairs is reached through the stairs;
 upper windows and the ground window behind the north-east stair remain scenery.
 
-A full box roulette/claim animation, original weapon behaviour, finished character/
-weapon art, audio and online co-op remain future work. Zombie figures currently use
-simple animated parts for walking, tearing and climbing.
+The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
+attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a
+compressed locomotion pose (the pack has no dedicated vault animation). Corpses
+disappear after four seconds, with at most eight animated corpses retained.
+Identical vertices and constant animation tracks are removed in memory; all instances
+share model geometry/textures, with independent skeletons. Source GLBs stay untouched.
+Add `?zombie=pxltiger` to try the alternate rig; it has more draw calls and no death clip.
+
+The starter pistol uses the M1911 model; Kar98k purchases and BAR box rewards equip
+their matching first-person models. Recoil, muzzle flash and a basic reload pose
+follow authoritative shot/ammo/reload state. The models share textures and load on
+demand; loading failures leave a playable placeholder and a visible notice.
+Thompson/MP40 models and animated player hands are not in the asset pack: those guns
+use labelled procedural placeholders. Full hand/bolt/round-by-round reload animation,
+box roulette/claim animation, original weapon behaviour, audio and online co-op remain future work.
+
+Press F2 for asset credits. Full source links, licences and conversion notes are in
+[runtime attribution](public/assets/ATTRIBUTION.txt) and [asset provenance](docs/assets/THIRD_PARTY_ASSETS.md).
 
 For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs`
 open inspection views with waves disabled, routes open and 10000 test points.
@@ -80,4 +95,8 @@ These overrides are development-only; the normal URL starts the standard surviva
 `/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and
 god mode for repeatable performance checks. `npm run benchmark` measures a headless
 24-zombie stair-routing scenario (mean/p95 tick time); it does not measure GPU time or FPS.
+`/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
+Use `weapon=starter-pistol`, `kar98k`, `bar`, `thompson` or `mp40` on any preview URL
+to inspect that viewmodel. P fires in development previews only (useful in browsers
+without pointer lock); R reloads. Production and normal survival use mouse firing.
 See [map notes](docs/nacht-map.md) for layout and validation details.

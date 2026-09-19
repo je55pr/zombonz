@@ -188,7 +188,8 @@ export function tickWeaponCooldown(state: WeaponState): void {
 export function wantsToFire(player: PlayerState, pressed: boolean, held: boolean): boolean {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition) return false;
-  return definition.trigger === 'semi' ? pressed : held;
+  // A click shorter than one fixed tick still fires once on an automatic gun.
+  return definition.trigger === 'semi' ? pressed : held || pressed;
 }
 
 export function firePlayerWeapon(

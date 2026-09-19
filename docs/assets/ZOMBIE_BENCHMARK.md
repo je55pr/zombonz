@@ -29,3 +29,30 @@ pxltiger remains useful as a secondary visual variant. Its original animation GL
 | walk | 255.76 KB |
 
 All four cleaned clip files pass glTF validation with zero errors and zero warnings. The full-mesh originals and intermediate conversions are retained outside Git under `C:\ChatGPT\Shared\Scratch\ZombonzAssetStage\zombie\runtime-full-clips`.
+
+## In-game integration check (2026-09-19)
+
+The bunker integration uses Peter_D by default. Its full vertex records (including
+UVs/normals/skin weights) are deinterleaved and indexed once at load time: 21,528
+exported vertices become 4,217 unique vertices, without reducing triangles. Bind-pose
+constant animation tracks are removed; cloned rigs share geometry and textures.
+The directional shadow map refreshes at 15 Hz; camera, actors and weapon presentation
+still render at the display frame rate. Corpses last four seconds with an eight-corpse cap.
+
+In the 1280x720 embedded browser, `/?preview=stress&weapon=bar&perf=1` held about
+60 FPS after warm-up with 24 imported soldiers and the BAR viewmodel. An observed
+one-second sample showed 5.9 ms average CPU work, 16.6 ms average frame interval and
+17.1 ms p95 frame interval. This environment appears limited to 60 Hz; 144 FPS remains
+unverified. These are short local smoke measurements, not a cross-hardware guarantee.
+
+The M1911 damage/kill test awarded hit and kill points and removed the corpse; the BAR
+shot/reload test changed ammo from 20/140 to 19/140 then 20/139. The three real weapon
+models were visually checked for orientation/scale. Automated tests load the actual
+GLBs without textures to verify sizing, skeleton independence, clip binding, root
+motion, batching, and event-driven muzzle flash/reload behaviour.
+
+The alternate pxltiger rig was also visually checked. Its clip export bakes the FBX
+helper transforms into pelvis keys, but the base model retains those helper nodes;
+the runtime converts those keys back into local bone space and pins horizontal
+root motion. A posed-bounds regression test guards against the resulting sideways
+rig if that conversion is removed.

@@ -13,6 +13,7 @@ export interface HudSnapshot {
   gameOver: boolean;
   godMode: boolean;
   noclip: boolean;
+  assetNotice?: string | null;
 }
 
 export function buildHudSnapshot(
@@ -36,12 +37,16 @@ export function buildHudSnapshot(
 }
 function weaponLabel(id: string): string {
   if (id === 'kar98k') return 'KAR98K';
-  if (id === 'starter-pistol') return 'STARTER PISTOL';
+  if (id === 'starter-pistol') return 'M1911';
   return id.replace(/[-_]/g, ' ').toUpperCase();
 }
 
 export class CanvasHud {
   private previous: HudSnapshot | null = null;
+  private credits = false;
+  private readonly onKeyDown = (event: KeyboardEvent) => {
+    if (event.code === 'F2' && !event.repeat) { event.preventDefault(); this.credits = !this.credits; this.previous = null; }
+  };
   private readonly canvas = document.createElement('canvas');
   private readonly context: CanvasRenderingContext2D;
   private readonly texture: THREE.CanvasTexture;
@@ -50,6 +55,7 @@ export class CanvasHud {
   private readonly material: THREE.MeshBasicMaterial;
 
   constructor(private readonly renderer: THREE.WebGLRenderer) {
+    if (typeof window !== 'undefined') window.addEventListener('keydown', this.onKeyDown);
     this.canvas.width = 1600;
     this.canvas.height = 900;
     const context = this.canvas.getContext('2d');
@@ -92,6 +98,8 @@ export class CanvasHud {
     const { width, height } = this.canvas;
     this.context.clearRect(0, 0, width, height);
     this.text('NACHT DER UNTOTEN', width / 2, 38, 19, 'center');
+    this.text('F2 ASSET CREDITS', width / 2, 64, 13, 'center');
+    if (snapshot.assetNotice) this.text(snapshot.assetNotice, width / 2, height - 80, 19, 'center');
     if (!snapshot.gameOver) {
       this.context.fillStyle = 'rgba(244,241,231,0.75)';
       this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
@@ -121,6 +129,14 @@ export class CanvasHud {
       this.context.fillRect(x - promptWidth / 2, y - 29, promptWidth, 58);
       this.text(snapshot.interactionPrompt, x, y, 30, 'center');
     }
+    if (this.credits) {
+      this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(220, 160, 1160, 480);
+      const lines = ['THIRD-PARTY ASSET CREDITS', 'Zombie Soldier — Peter_D (@better_peter)',
+        'Zombie — pxltiger', 'M1911 — Quinn Kuslich', 'Kar98k — ARIA', 'BAR M1918 A2 — Peanut_Butcher',
+        'All models: CC BY 4.0 · converted, resized and adapted for this game',
+        'Source links and licence: /assets/ATTRIBUTION.txt', 'F2 TO CLOSE'];
+      lines.forEach((line, index) => this.text(line, width / 2, 210 + index * 46, index === 0 ? 30 : 23, 'center'));
+    }
     this.texture.needsUpdate = true;
   }
 
@@ -135,6 +151,7 @@ export class CanvasHud {
   }
 
   dispose(): void {
+    if (typeof window !== 'undefined') window.removeEventListener('keydown', this.onKeyDown);
     this.material.dispose();
     this.texture.dispose();
   }

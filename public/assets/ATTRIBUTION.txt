@@ -29,3 +29,8 @@ Source: https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e5
 Changes: source GLB retained structurally; embedded 4K PBR textures reduced to 2K for browser runtime.
 
 Full provenance, SHA-256 hashes for the downloaded originals, and benchmark notes are in docs/assets/.
+
+Additional in-game adaptations: character height normalization, in-place animation
+root motion, blended gameplay-driven poses and temporary corpse presentation;
+weapon rest-pose baking/batching, detached-magazine assembly, scale/orientation
+normalization, and procedural recoil/reload/muzzle flash. Source GLBs are unchanged.

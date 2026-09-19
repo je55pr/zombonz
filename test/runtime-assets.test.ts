@@ -1,0 +1,100 @@
+import { describe, expect, it, vi } from 'vitest';
+import * as THREE from 'three';
+import { readAssetGeometry } from '../scripts/inspect-assets.mjs';
+import { cloneZombieModel, inPlaceClip, WEAPON_ASSETS, type ZombieAsset } from '../src/client/runtimeAssets.ts';
+import { prepareWeapon, WeaponView } from '../src/client/weaponView.ts';
+import { SkinnedZombieView, zombieAnimation } from '../src/client/skinnedZombieView.ts';
+import { createPlayerState, createZombieState, createWeaponState } from '../src/core/index.ts';
+import { BrowserInput } from '../src/client/input.ts';
+
+describe('runtime GLB integration', () => {
+  it.each(['m1911', 'kar98k', 'bar'])('prepares %s as a compact, correctly scaled non-skinned viewmodel', async id => {
+    const asset = await readAssetGeometry(`public/assets/weapons/${id}/model.glb`);
+    const before = new THREE.Box3().setFromObject(asset.scene);
+    const weapon = prepareWeapon(asset.scene, id);
+    const box = new THREE.Box3().setFromObject(weapon.root), size = box.getSize(new THREE.Vector3());
+    expect(size.z).toBeCloseTo(id === 'm1911' ? 0.36 : id === 'kar98k' ? 0.95 : 1.05);
+    expect(size.x).toBeLessThan(0.12); // catches the detached-magazine exports
+    expect(box.max.z).toBeCloseTo(0);
+    let meshes = 0;
+    weapon.root.traverse(object => { if (object instanceof THREE.Mesh) { meshes++; expect(object).not.toBeInstanceOf(THREE.SkinnedMesh); } });
+    expect(meshes).toBeLessThanOrEqual(5);
+    expect(new THREE.Box3().setFromObject(asset.scene).equals(before)).toBe(true);
+  });
+
+  it.each(['peter_d', 'pxltiger'])('binds %s animations, clones independent skeletons and pins root motion', async id => {
+    const [model, walk] = await Promise.all([readAssetGeometry(`public/assets/zombies/${id}/model.glb`),
+      readAssetGeometry(`public/assets/zombies/${id}/walk.glb`)]);
+    const clip = inPlaceClip(walk.animations[0], model.scene);
+    expect(clip.tracks.length).toBeGreaterThan(30);
+    expect(clip.tracks.length).toBeLessThanOrEqual(walk.animations[0].tracks.length);
+    const asset: ZombieAsset = { model: model.scene, clips: { walk: clip } };
+    const first = cloneZombieModel(asset), second = cloneZombieModel(asset);
+    expect(new THREE.Box3().setFromObject(first.body).getSize(new THREE.Vector3()).y).toBeCloseTo(1.72);
+    const skin = (root: THREE.Object3D) => { let result!: THREE.SkinnedMesh; root.traverse(object => { if (object instanceof THREE.SkinnedMesh) result = object; }); return result; };
+    expect(skin(first.model).skeleton).not.toBe(skin(second.model).skeleton);
+    expect(skin(first.model).geometry).toBe(skin(second.model).geometry);
+    if (id === 'peter_d') expect(skin(first.model).geometry.getAttribute('position').count).toBeLessThan(10000);
+    const rootTrack = clip.tracks.find(track => track.name === 'Hips.position');
+    if (rootTrack) {
+      const hips = model.scene.getObjectByName('Hips')!;
+      for (let i = 0; i < rootTrack.values.length; i += 3) {
+        expect(rootTrack.values[i]).toBeCloseTo(hips.position.x);
+        expect(rootTrack.values[i + 1]).toBeCloseTo(hips.position.y);
+      }
+    }
+    const mixer = new THREE.AnimationMixer(first.model); mixer.clipAction(clip).play(); mixer.update(0.5);
+    first.body.updateMatrixWorld(true);
+    const animatedBounds = new THREE.Box3();
+    first.model.traverse(object => {
+      if (object instanceof THREE.SkinnedMesh) {
+        object.computeBoundingBox(); animatedBounds.union(object.boundingBox!.clone().applyMatrix4(object.matrixWorld));
+      }
+    });
+    const poseSize = animatedBounds.getSize(new THREE.Vector3());
+    expect(poseSize.y).toBeGreaterThan(1.2); // catches a double-applied pelvis helper rotation
+    expect(poseSize.z).toBeLessThan(1.2);
+  });
+
+  it('selects attack/walk/death from simulation state and expires corpses', () => {
+    const zombie = createZombieState('e:2', { x: 1, y: 0, z: 1 }, 1);
+    expect(zombieAnimation(zombie)).toBe('idle');
+    zombie.velocity.x = 1; expect(zombieAnimation(zombie)).toBe('walk');
+    zombie.attackCooldownTicks = 60; expect(zombieAnimation(zombie)).toBe('attack');
+    zombie.alive = false; expect(zombieAnimation(zombie)).toBe('death');
+    const model = new THREE.Group(); model.add(new THREE.Mesh(new THREE.BoxGeometry()));
+    const view = new SkinnedZombieView({ model, clips: {} }, 0);
+    view.update(zombie, 10); expect(view.expired(200)).toBe(false); expect(view.expired(251)).toBe(true);
+    expect(zombie.position).toEqual({ x: 1, y: 0, z: 1 }); view.dispose();
+  });
+
+  it('maps existing gameplay weapons to real assets without substituting unrelated guns', () => {
+    expect(WEAPON_ASSETS['starter-pistol']).toBe('m1911');
+    expect(WEAPON_ASSETS.thompson).toBeUndefined(); expect(WEAPON_ASSETS.mp40).toBeUndefined();
+  });
+
+  it('shows recoil/flash only after an authoritative shot, and lowers the gun during reload', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 }); player.weapon = createWeaponState('thompson');
+    const view = new WeaponView(), renderer = { clearDepth: vi.fn(), render: vi.fn() };
+    view.update(player, 60); view.render(renderer as unknown as THREE.WebGLRenderer, 16 / 9);
+    const scene = renderer.render.mock.calls[0][0] as THREE.Scene;
+    const pose = scene.getObjectByName('weapon-pose')!, flash = scene.getObjectByName('muzzle-flash')!;
+    const restY = pose.position.y, restZ = pose.position.z;
+    expect(flash.visible).toBe(false);
+    view.events([{ type: 'weaponFired', playerId: player.id, weaponId: 'thompson' }], player.id, 61);
+    view.update(player, 61); expect(flash.visible).toBe(true); expect(pose.position.z).toBeGreaterThan(restZ);
+    player.weapon.reloadTicksRemaining = 60; view.update(player, 120);
+    expect(pose.position.y).toBeLessThan(restY); expect(flash.visible).toBe(false);
+    view.events([{ type: 'matchRestarted', previousSeed: 1, seed: 2 }], player.id, 0);
+    view.update(player, 0); expect(flash.visible).toBe(false);
+  });
+
+  it('enables the keyboard firing harness only when explicitly configured for previews', () => {
+    for (const enabled of [true, false]) {
+      const target = new EventTarget(), pointer = new EventTarget();
+      const input = new BrowserInput({ pointerElement: pointer as HTMLElement, previewFireKey: enabled }, target as Window);
+      target.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyP', repeat: false }));
+      expect(!!input.consume().actions.fire?.pressed).toBe(enabled); input.dispose();
+    }
+  });
+});

@@ -9,6 +9,7 @@ const KEY_ACTIONS: Partial<Record<string, GameAction>> = {
 export interface BrowserInputOptions {
   pointerElement: HTMLElement;
   lookSensitivity?: number;
+  previewFireKey?: boolean;
 }
 
 export class BrowserInput {
@@ -50,8 +51,11 @@ export class BrowserInput {
     this.lookPitch -= event.movementY * this.lookSensitivity;
   };
 
-  private onKeyDown = (event: KeyboardEvent) => this.set(KEY_ACTIONS[event.code], true, event.repeat);
-  private onKeyUp = (event: KeyboardEvent) => this.set(KEY_ACTIONS[event.code], false, false);
+  private actionForKey(code: string): GameAction | undefined {
+    return code === 'KeyP' && this.options.previewFireKey ? 'fire' : KEY_ACTIONS[code];
+  }
+  private onKeyDown = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), true, event.repeat);
+  private onKeyUp = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), false, false);
   private onMouseDown = (event: MouseEvent) => event.button === 0
     && document.pointerLockElement === this.options.pointerElement
     && this.set('fire', true, false);

@@ -9,6 +9,8 @@ import {
   firePlayerWeapon,
   rayFromPlayer,
   resolveHitscan,
+  createWeaponState,
+  wantsToFire,
 } from '../src/core/index.ts';
 
 const ray = {
@@ -21,6 +23,13 @@ function zombie(id: `e:${number}`, z: number) {
 }
 
 describe('hitscan weapons', () => {
+  it('does not drop short automatic trigger presses between fixed ticks', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.weapon = createWeaponState('bar');
+    expect(wantsToFire(player, true, false)).toBe(true);
+    expect(wantsToFire(player, false, true)).toBe(true);
+    expect(wantsToFire(player, false, false)).toBe(false);
+  });
   it('uses data-driven starter weapon stats', () => {
     expect(WEAPON_DEFINITIONS['starter-pistol']).toMatchObject({
       damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
