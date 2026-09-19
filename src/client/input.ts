@@ -68,6 +68,10 @@ export class BrowserInput {
     return true;
   }
 
+  pendingLook(): InputFrame['look'] {
+    return { yaw: this.lookYaw, pitch: this.lookPitch };
+  }
+
   consume(): InputFrame {
     const actions: Partial<Record<GameAction, ActionState>> = {};
     const all = new Set([...this.held, ...this.pressed, ...this.released]);

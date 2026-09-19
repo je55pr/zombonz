@@ -22,7 +22,7 @@ import {
   createRoundState, updateRoundState, type RoundConfig, type RoundEvent, type RoundState,
 } from './rounds.ts';
 import {
-  createSpawnDirector, remainingSpawns, tickSpawnDirector,
+  createSpawnDirector, remainingSpawns, tickSpawnDirector, DEFAULT_SPAWN_CONFIG,
   type SpawnDirectorConfig, type SpawnDirectorState, type ZombieSpawnPoint,
 } from './spawning.ts';
 import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
@@ -194,6 +194,8 @@ export class GameSimulation {
   private reachableInteractables(player: PlayerState): InteractableState[] {
     const eye = { ...player.position, y: player.position.y + PLAYER_MOVEMENT.eyeHeight };
     return this.interactables().filter(item => {
+      if (!item.enabled || Math.hypot(item.position.x - player.position.x,
+        item.position.y - player.position.y, item.position.z - player.position.z) > item.interactionRange) return false;
       const blockers = [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors
         .filter(door => door.interactableId !== item.id)), ...(this.map.shotBlockers ?? [])];
       return hasClearNavigationLine(eye, item.position, blockers, 0, 0);
@@ -249,8 +251,13 @@ export class GameSimulation {
     const navigate = this.navigationQuery();
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {
       // Never strand a round's enemies behind unopened rooms or stair debris.
+      const director = this.state.spawnDirector;
+      const needsSpawn = director.spawned < director.total && director.ticksUntilNext <= 0
+        && livingEntityCount(world, 'zombie') < (this.spawnConfig?.maxAlive ?? DEFAULT_SPAWN_CONFIG.maxAlive);
+      // The director still ticks every fixed step. Only resolve routes when it can spawn.
       const availableSpawns = this.map.zombieSpawns.map((spawn, index) => ({ spawn, index }))
         .filter(({ spawn }) => {
+          if (!needsSpawn) return true;
           const destination = spawn.barrierId
             ? this.state.barriers.find(barrier => barrier.id === spawn.barrierId)!.insidePoint : spawn;
           return !this.map.navigationGraph || livingPlayers(world).some(player => navigate(destination, player.position) !== destination);

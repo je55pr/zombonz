@@ -86,11 +86,12 @@ function segmentHitsExpandedBox(
   const maxY = box.max.y - 1e-6;
   let near = 0;
   let far = 1;
-  for (const [origin, delta, min, max] of [
-    [start.x, dx, minX, maxX],
-    [start.y, dy, minY, maxY],
-    [start.z, dz, minZ, maxZ],
-  ] as const) {
+  // Avoid allocating four temporary arrays for every box/line test.
+  for (let axis = 0; axis < 3; axis++) {
+    const origin = axis === 0 ? start.x : axis === 1 ? start.y : start.z;
+    const delta = axis === 0 ? dx : axis === 1 ? dy : dz;
+    const min = axis === 0 ? minX : axis === 1 ? minY : minZ;
+    const max = axis === 0 ? maxX : axis === 1 ? maxY : maxZ;
     if (Math.abs(delta) < 1e-9) {
       if (origin < min || origin > max) return false;
       continue;
@@ -141,12 +142,27 @@ export function createNavigationQuery(
     && hasWalkableConnection(a, b, surfaces);
   const byId = graph ? nodeMap(graph) : new Map<string, NavigationNode>();
   let openGraph: NavigationGraph | undefined;
+  const paths = new Map<string, NavigationNode[]>();
+  const nearestCache = new Map<string, NavigationNode | undefined>();
+  const nearestReachable = (position: Vec3) => {
+    const key = `${position.x},${position.y},${position.z}`;
+    if (nearestCache.has(key)) return nearestCache.get(key);
+    let best: NavigationNode | undefined;
+    let bestDistance = Infinity;
+    for (const node of graph?.nodes ?? []) {
+      const distance = distanceSquared(node.position, position);
+      if ((distance < bestDistance || (distance === bestDistance && node.id.localeCompare(best!.id) < 0))
+        && traversable(position, node.position)) {
+        best = node; bestDistance = distance;
+      }
+    }
+    if (nearestCache.size >= 256) nearestCache.delete(nearestCache.keys().next().value!);
+    nearestCache.set(key, best);
+    return best;
+  };
   return (start, goal) => {
     if (traversable(start, goal)) return goal;
     if (!graph || graph.nodes.length === 0) return goal;
-    const nearestReachable = (position: Vec3) => [...graph.nodes]
-      .sort((a, b) => distanceSquared(a.position, position) - distanceSquared(b.position, position) || a.id.localeCompare(b.id))
-      .find(node => traversable(position, node.position));
     const startNode = nearestReachable(start);
     const goalNode = nearestReachable(goal);
     if (!startNode || !goalNode) return start;
@@ -156,7 +172,12 @@ export function createNavigationQuery(
         return next && traversable(node.position, next.position);
       }),
     })) };
-    const path = shortestNavigationPath(openGraph, startNode.id, goalNode.id);
+    const pathKey = JSON.stringify([startNode.id, goalNode.id]);
+    let path = paths.get(pathKey);
+    if (!path) {
+      path = shortestNavigationPath(openGraph, startNode.id, goalNode.id);
+      paths.set(pathKey, path);
+    }
     if (path.length === 0) return start;
     for (let index = path.length - 1; index >= 0; index -= 1) {
       const node = path[index];

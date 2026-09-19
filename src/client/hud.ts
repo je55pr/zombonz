@@ -41,6 +41,7 @@ function weaponLabel(id: string): string {
 }
 
 export class CanvasHud {
+  private previous: HudSnapshot | null = null;
   private readonly canvas = document.createElement('canvas');
   private readonly context: CanvasRenderingContext2D;
   private readonly texture: THREE.CanvasTexture;
@@ -57,6 +58,8 @@ export class CanvasHud {
     this.camera.position.z = 1;
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.texture.generateMipmaps = false;
+    this.texture.minFilter = THREE.LinearFilter;
     this.material = new THREE.MeshBasicMaterial({
       map: this.texture,
       transparent: true,
@@ -122,7 +125,11 @@ export class CanvasHud {
   }
 
   render(snapshot: HudSnapshot): void {
-    this.draw(snapshot);
+    if (!this.previous || (Object.keys(snapshot) as (keyof HudSnapshot)[])
+      .some(key => snapshot[key] !== this.previous![key])) {
+      this.draw(snapshot);
+      this.previous = { ...snapshot };
+    }
     this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);
   }

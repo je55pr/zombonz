@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "benchmark": "node --experimental-strip-types scripts/benchmark.ts"
   },
   "dependencies": {
     "three": "^0.180.0"

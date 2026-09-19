@@ -46,6 +46,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     for (let i = 0; i < 3; i++) {
       const plank = box(frame, wood, i === 1 ? -0.12 : 0.1, 1.16 + i * 0.46, 0.03, 1.9, 0.16, 0.09);
       plank.rotation.z = i === 1 ? -0.16 : 0.07;
+      plank.userData.dynamic = true;
       planks.push(plank);
     }
   }
@@ -61,6 +62,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   const doorViews = new Map<string, THREE.Group>();
   for (const door of NACHT_DOORS) {
     const view = new THREE.Group(); group.add(view); doorViews.set(door.id, view);
+    view.userData.dynamic = true;
     if (door.id === 'help-room') {
       for (let i = 0; i < 6; i++) box(view, wood, 0, 1.4, -1 + i * 0.4, 0.24, 2.8, 0.38);
       box(view, iron, -0.14, 0.65, 0, 0.06, 0.12, 2.3);
@@ -97,6 +99,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   // One fixed, iron-bound random box. Its authoritative state drives the lid.
   for (const z of [-5.2, -3.6]) box(group, iron, 1.1, 0.55, z, 1.01, 1.12, 0.12);
   const lid = new THREE.Group(); lid.position.set(0.61, 1.06, -4.4); group.add(lid);
+  lid.userData.dynamic = true;
   box(lid, wood, 0.49, 0, 0, 1.06, 0.13, 2.4);
   const question = writing('?  ?  ?', 1.9, 0.6, '#f6d893');
   question.position.set(0.5, 0.075, 0); question.rotation.x = -Math.PI / 2; question.rotation.z = Math.PI / 2; lid.add(question);

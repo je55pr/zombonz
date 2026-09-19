@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import type { BarrierState } from '../core/barrier.ts';
 import type { ZombieState } from '../core/types.ts';
+import type { Vec3 } from '../core/types.ts';
+import { interpolatePosition } from './interpolation.ts';
 
 // Shared low-poly parts; animation consumes simulation state and never changes it.
 const cloth = new THREE.MeshStandardMaterial({ color: 0x465144, roughness: 1 });
@@ -10,7 +12,7 @@ const eye = new THREE.MeshBasicMaterial({ color: 0xe6a640 });
 const cube = new THREE.BoxGeometry(1, 1, 1);
 export interface ZombieView {
   root: THREE.Group;
-  update(zombie: ZombieState, tick: number, barrier?: BarrierState): void;
+  update(zombie: ZombieState, tick: number, barrier?: BarrierState, previous?: Vec3, alpha?: number): void;
 }
 export function createZombieView(): ZombieView {
   const root = new THREE.Group();
@@ -33,8 +35,9 @@ export function createZombieView(): ZombieView {
     part(leg, cloth, 0, -0.32, 0, 0.19, 0.64, 0.22);
     part(leg, boots, 0, -0.73, 0.035, 0.2, 0.16, 0.29);
   }
-  return { root, update(zombie, tick, barrier) {
-    root.position.set(zombie.position.x, zombie.position.y, zombie.position.z);
+  return { root, update(zombie, tick, barrier, previous, alpha = 1) {
+    const position = interpolatePosition(previous, zombie.position, alpha);
+    root.position.set(position.x, position.y, position.z);
     const phase = zombie.entry?.phase;
     const moving = Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0.05;
     if (barrier && (phase === 'breaking' || phase === 'vaulting')) {

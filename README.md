@@ -45,6 +45,14 @@ WASD flies in the direction you look, Space rises and C descends. Active modes a
 on the HUD. Turning noclip off lands you on a valid surface; if you are inside a wall
 or outside the map, it returns you to where you enabled noclip. Both modes reset on restart.
 
+F3 toggles the performance panel (FPS, frame time, CPU time and draw calls).
+Rendering follows the display refresh rate, with interpolated movement and immediate
+mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
+1x pixel density, no MSAA, and 1024px shadows. Static scenery and zombie body parts
+are batched, and the HUD texture is redrawn only when its content changes.
+144 FPS requires a 144 Hz-or-faster active display and enough GPU/CPU headroom;
+the browser or OS may cap presentation to the current display refresh rate.
+
 The playable solo map follows Nacht's starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
 box in the Help room costs 950 and immediately replaces your weapon with a loaded
@@ -69,4 +77,7 @@ For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs
 open inspection views with waves disabled, routes open and 10000 test points.
 These overrides are development-only; the normal URL starts the standard survival game.
 `/?preview=barrier` runs a live wave at the first window for entry-animation checks.
+`/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and
+god mode for repeatable performance checks. `npm run benchmark` measures a headless
+24-zombie stair-routing scenario (mean/p95 tick time); it does not measure GPU time or FPS.
 See [map notes](docs/nacht-map.md) for layout and validation details.
