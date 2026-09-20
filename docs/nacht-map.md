@@ -1,66 +1,84 @@
-# Nacht bunker prototype
+# Nacht geometry blockout
 
-The reference is the original Nacht room connectivity: the starting room connects
-to the Help room through the HELP door, and each ground-floor room has a stairway
-to the upstairs. Both stairs can be cleared to reach the Help room without buying
-the HELP door. The upstairs has two wings connected through a broad central passage.
-There is exactly one fixed mystery box, beside the shared wall in the Help room.
+Target: the original **World at War** building, with three gameplay areas, three
+1000-point unlocks and one fixed 950-point mystery box. This is hand-built geometry
+from floor plans and screenshots, not extracted assets or a measured 1:1 recreation.
+Existing placeholder materials are unchanged; no new texture assets were created.
 
-References: [room layout](https://callofduty.fandom.com/wiki/Nacht_der_Untoten)
-and [fixed box location](https://callofduty.fandom.com/wiki/Mystery_Box/Spawn_Locations).
-This is original procedural geometry with approximate dimensions, not an extracted
-or metrically accurate reproduction of the source map. The weapon pool is deliberately
-small; all current guns use the existing hitscan simulation.
+## References
 
-## Coordinates and authority
+- [Downstairs floor plan](https://img.atwiki.jp/cod_blackops/attach/118/1579/Nacht_der_Untoten_-_DNST.jpg)
+- [Upstairs floor plan](https://static.wikia.nocookie.net/callofduty/images/a/a4/Nacht_der_Untoten_-_UPST.jpg)
+- [View from the HELP doorway](https://static.wikia.nocookie.net/callofduty/images/b/b5/Nacht_Der_Untoten_Ground_Floor.jpg)
+- [Building overview](https://static.wikia.nocookie.net/callofduty/images/f/fa/Nacht_der_Untoten_Overview.jpg)
+- [Room descriptions and gallery](https://callofduty.fandom.com/wiki/Nacht_der_Untoten)
 
-- Ground floor footprint: x = -8 to 8, z = -7 to 7.
-- Starting room: negative x. Help room: positive x.
-- Upstairs: y = 3.4, with real holes over the two stair runs.
-- Starting stairs: west side, climbing south. Help stairs: east side, climbing north.
-- HELP door, both stair barricades: 1000 points each.
-- Mystery box: 950 points, one immediate replacement weapon, 180-tick cooldown.
+The downstairs plan includes a later Mule Kick annotation; that prop is intentionally
+not included in this WaW-oriented blockout.
 
-`src/maps/nacht.ts` is the shared source for collision, walk surfaces, navigation,
-doors, wall purchases, barriers and box placement. `src/client/bunker.ts` adds
-presentation only, including board visibility driven by the simulation.
-Spawn selection checks the window's inside landing, excluding rooms with no open
-route to a living player and preventing rounds from stalling behind an unopened door.
+## Layout
 
-Eight ground-level windows have exterior entry routes. Spawns are five metres
-outside the wall, with ordered exterior waypoints, three staging lanes, a shared
-75-tick board-tearing interval and a 90-tick climb. A reserved crossing slot prevents
-simultaneous vaults, releases when the occupant dies, and disallows rebuilding while
-occupied. The climb lifts the zombie above the sill before moving across the opening;
-only that explicit entry link bypasses normal wall collision. Its crouched presentation
-and hitbox fit the window. No melee damage occurs before a zombie lands inside.
+- L-shaped footprint, replacing the old equal-room 16×14 rectangle.
+- HELP wing: x −6.2…0, z −11…7.8. Narrow, long, with a central column row.
+- Spawn wing: x 0…18.2, z −2.6…7.8, with a recessed south wall at x 10.4…13.8.
+- Six spawn-room columns in two rows, with concrete capitals and overhead beams.
+- HELP door at (0, 0, 0), offset along the shared wall rather than centred in it.
+- Main stair: a quarter-turn fan stair with a short westbound upper flight. Visible
+  treads and metal rails follow the same curve as the continuous collision support.
+- HELP stair: a compact south-climbing flight in the west annex, with a return landing.
+- Upper level at y 3.4: a long HELP wing and smaller eastern room, connected by an
+  open passage. It does not duplicate the full downstairs footprint. The main
+  stairwell has a bevelled floor cutout and low perimeter wall.
+- Surviving roof slabs, large sky openings, wall returns and a cabinet silhouette.
+- Mystery box near the south-east corner of HELP, beside the stair end of the room.
+- Five spawn-room window entries; two HELP windows plus a recessed cave breach.
+- Four upper windows. These remain decorative: zombies reach upstairs via open
+  stairs, not through exterior climbing routes.
 
-Holding E near a damaged window restores one board every 60 ticks; releasing E or
-leaving the interaction resets partial repair progress. Repairs are free and grant no
-points. Board damage persists between rounds and resets on a new match. Barrier state,
-entry phases, queue ownership and timers are serializable and deterministic.
+Lengths, ceiling height, some landing clearances, the north upper gallery and damaged
+roof edges remain approximations. The original complete wall-weapon catalogue,
+exterior vehicles and all small debris placements are outside this geometry pass.
 
-The upper windows remain decorative: exterior zombies reach the upstairs through
-opened stairs instead of spawning in mid-air. The north-east ground-floor window is
-also decorative because its inside landing would intersect the stair structure.
+## Shared geometry and gameplay
 
-The navigation graph is filtered against closed doors and actual walk surfaces.
-The compiled query is shared between enemies and rebuilt when a door changes.
-Floor slabs separately block shots; movement uses support surfaces for stepping onto
-landings. Melee respects vertical distance and walls. Interaction sight checks stop
-players buying the box or wall weapons through the shared room wall.
+`src/maps/nacht.ts` owns geometry, support surfaces, collision, navigation, windows,
+doors, purchases and spawn locations. `src/client/bunker.ts` only adds presentation,
+including authoritative barrier boards and door visibility. Polygon slabs and fan
+treads are rendered in `src/client/greybox.ts`.
 
-## Validation
+Support surfaces are serialized rectangles, polygons or quarter-turn ramps. A sparse
+navigation grid is filtered against collision and support in **both directions**,
+with sampled centre-lines along the stairs. Closed-door edges are filtered by the
+existing cached runtime query. Upper slabs separately occlude bullets.
 
-Automated coverage includes walking up and down both stairs; closed routes; zombie
-pursuit through both stairs with HELP shut; graph clearance and support; accessible
-spawns; cross-floor melee/bullet occlusion; box price, cooldown, seeded replay,
-insufficient funds, wall occlusion and restart reset.
-Exterior-entry coverage additionally checks every active window through to player
-pursuit, individual board timing, group queues, shooting an outside attacker, death
-during a vault, locked-room spawn filtering, repair holds, and replay after restoring
-a snapshot mid-vault.
+All eight ground entries retain exterior approach, individual board tearing,
+single-zombie vault reservation, indoor pursuit and hold-E repairs. Spawn selection
+excludes entries whose interior landing cannot reach a living player. G god mode,
+F noclip, imported zombies and first-person gun assets are unchanged.
 
-Development-only inspection URLs (`?preview=start`, `help`, `upstairs`) allow visual
-checks without waves. The default URL retains normal starting points and closed routes.
-`?preview=barrier` places the camera facing the first window and runs a live wave there.
+## Checks
+
+Automated tests cover the L footprint, front recess, real upper stair holes, entry
+counts, quarter-turn support, both-direction player stair traversal, both-sided
+door purchases, closed routes, zombie pursuit via both stairs with HELP shut,
+every entry through to pursuit, graph clearance/support, floor shot occlusion,
+box placement/purchase/cooldown and deterministic state.
+
+Development inspection URLs: `?preview=start`, `doorway`, `help`, `upstairs`, `overview`,
+`barrier`, `stress`, `assets`. Preview modes open the routes and are development-only.
+The normal URL starts with closed routes and the normal economy. F3 displays timings.
+
+## Texture wish list — not created
+
+1. Weathered cast concrete: walls, columns, capitals and ceiling beams.
+2. Cracked, dusty concrete floor tiles, plus bare concrete for stairs and landings.
+3. Broken plaster exposing brick/aggregate, with separate fractured-edge material.
+4. Rubble and dirt blend for collapsed corners, stair debris and cave walls.
+5. Splintered dark wood for window boards, HELP door, crates and mystery box.
+6. Rusted steel for stair rails, window frames, reinforcing bars and box bands.
+7. Torn, dirty sofa upholstery for the two stair barricades.
+8. Transparent grime, damp, soot, cracks and chalk/graffiti decals.
+
+Prefer seamless 1K/2K base-colour, normal and roughness maps; metalness only for
+metal surfaces, and alpha for decals. Consistent real-world scale matters more
+than high resolution for this testing map.

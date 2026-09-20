@@ -22,7 +22,7 @@ describe('exterior entry routes', () => {
     sim.tick(); const events = sim.tick();
     const zombie = sim.zombies()[0];
     expect(events.find(event => event.type === 'zombieSpawned')).toMatchObject({ spawnIndex: 0, barrierId: NACHT_BARRIERS[0].id });
-    expect(zombie.position.z).toBeLessThan(-10);
+    expect(zombie.position.z).toBeLessThan(NACHT_BARRIERS[0].position.z - 4);
     expect(zombie.entry?.phase).toBe('approach');
     expect(sim.state.barriers[0].boards).toBe(3);
     let firstTear = -1, vaultStarted = -1, entered = -1;
@@ -38,7 +38,7 @@ describe('exterior entry routes', () => {
       // The entry is continuous, not a jump from the exterior to the room.
       expect(Math.hypot(zombie.position.x - previous.x, zombie.position.y - previous.y,
         zombie.position.z - previous.z)).toBeLessThan(0.08);
-      if (sim.state.barriers[0].boards > 0) expect(zombie.position.z).toBeLessThan(-7.5);
+      if (sim.state.barriers[0].boards > 0) expect(zombie.position.z).toBeLessThan(NACHT_BARRIERS[0].position.z - 0.5);
       if (entered >= 0) break;
     }
     expect(tears).toEqual([2, 1, 0]);
@@ -101,7 +101,7 @@ describe('exterior entry routes', () => {
     const victim = sim.zombies().find(zombie => zombie.id === sim.state.barriers[0].vaultingZombieId)!;
     expect(victim).toBeDefined();
     const target = { x: victim.position.x, y: victim.position.y + 1.25, z: victim.position.z };
-    const eye = { x: victim.position.x, y: 1.62, z: -5.5 };
+    const eye = { x: victim.position.x, y: 1.62, z: NACHT_BARRIERS[0].position.z + 1.5 };
     const direction = { x: target.x - eye.x, y: target.y - eye.y, z: target.z - eye.z };
     const length = Math.hypot(direction.x, direction.y, direction.z);
     direction.x /= length; direction.y /= length; direction.z /= length;
@@ -128,7 +128,7 @@ describe('exterior entry routes', () => {
     expect(spawns).toHaveLength(12);
     for (const event of spawns) {
       expect(event.barrierId).toBe(NACHT_ZOMBIE_SPAWNS[event.spawnIndex].barrierId);
-      expect(NACHT_BARRIERS.find(barrier => barrier.id === event.barrierId)!.insidePoint.x).toBeLessThan(0);
+      expect(NACHT_BARRIERS.find(barrier => barrier.id === event.barrierId)!.insidePoint.x).toBeGreaterThan(0);
     }
   });
 });
@@ -137,7 +137,7 @@ describe('barrier persistence and rebuilding', () => {
   it('requires holding E, resets progress on release, and rebuilds one board per second', () => {
     const sim = makeSimulation(0, 1, 9999);
     const player = sim.getPlayer(sim.playerIds[0])!;
-    player.position = { x: -5, y: 0, z: -5.5 }; player.yaw = 0;
+    player.position = { ...NACHT_BARRIERS[0].insidePoint }; player.yaw = 0;
     const barrier = sim.state.barriers[0]; barrier.boards = 0;
     syncBarrierInteractables(sim.state.barriers, sim.interactables());
     const hold = createInputFrame(0);
@@ -159,7 +159,7 @@ describe('barrier persistence and rebuilding', () => {
     const sim = makeSimulation();
     const player = sim.getPlayer(sim.playerIds[0])!; player.health = 100000;
     for (let i = 0; i < 700 && sim.state.barriers[0].vaultingZombieId === null; i++) sim.tick();
-    player.position = { x: -5, y: 0, z: -5.5 }; player.yaw = 0;
+    player.position = { ...NACHT_BARRIERS[0].insidePoint }; player.yaw = 0;
     const hold = createInputFrame(0);
     hold.actions.interact = { pressed: true, held: true, released: false, value: 1 };
     for (let i = 0; i < 65; i++) sim.tick({ [player.id]: hold });

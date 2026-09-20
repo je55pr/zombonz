@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { GreyboxBox, GreyboxMaterial } from '../maps/nacht.ts';
+import type { GreyboxBox, GreyboxMaterial, GreyboxPrism } from '../maps/nacht.ts';
 
 const COLORS: Record<GreyboxMaterial, number> = {
   wall: 0x55534d,
@@ -70,12 +70,13 @@ export function bunkerMaterial(kind: GreyboxMaterial): THREE.MeshStandardMateria
   });
 }
 
-export function buildGreybox(boxes: readonly GreyboxBox[]): THREE.Group {
+export function buildGreybox(boxes: readonly GreyboxBox[], prisms: readonly GreyboxPrism[] = []): THREE.Group {
   const group = new THREE.Group();
   group.name = 'nacht-greybox';
   const materials = new Map<GreyboxMaterial, THREE.MeshStandardMaterial>();
 
   for (const entry of boxes) {
+    if (entry.visible === false) continue;
     const geometry = new THREE.BoxGeometry(entry.size.x, entry.size.y, entry.size.z);
     const positions = geometry.attributes.position;
     const normals = geometry.attributes.normal;
@@ -97,5 +98,17 @@ export function buildGreybox(boxes: readonly GreyboxBox[]): THREE.Group {
     group.add(mesh);
   }
 
+  for (const entry of prisms) {
+    const shape = new THREE.Shape(entry.points.map(([x, z]) => new THREE.Vector2(x, -z)));
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: entry.top - entry.bottom, bevelEnabled: false, steps: 1 });
+    geometry.rotateX(-Math.PI / 2); geometry.translate(0, entry.bottom, 0);
+    const position = geometry.attributes.position, normal = geometry.attributes.normal, uv = geometry.attributes.uv;
+    for (let i = 0; i < position.count; i++) uv.setXY(i,
+      (Math.abs(normal.getX(i)) > 0.5 ? position.getZ(i) : position.getX(i)) / 3,
+      (Math.abs(normal.getY(i)) > 0.5 ? position.getZ(i) : position.getY(i)) / 3);
+    if (!materials.has(entry.material)) materials.set(entry.material, bunkerMaterial(entry.material));
+    const mesh = new THREE.Mesh(geometry, materials.get(entry.material));
+    mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
+  }
   return group;
 }

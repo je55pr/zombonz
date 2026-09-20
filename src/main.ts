@@ -18,7 +18,7 @@ import {
 } from './core/index.ts';
 import {
   NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_WALL_WEAPONS, NACHT_MYSTERY_BOXES,
-  greyboxCollisionBoxes, NACHT_SHOT_BLOCKERS, NACHT_BARRIERS,
+  greyboxCollisionBoxes, NACHT_SHOT_BLOCKERS, NACHT_BARRIERS, NACHT_PRISMS,
 } from './maps/nacht.ts';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
@@ -47,18 +47,20 @@ keyLight.shadow.mapSize.set(1024, 1024);
 Object.assign(keyLight.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, far: 65 });
 keyLight.shadow.bias = -0.0006;
 scene.add(keyLight);
-scene.add(buildGreybox(NACHT_GREYBOX));
+scene.add(buildGreybox(NACHT_GREYBOX, NACHT_PRISMS));
 const bunker = buildBunkerDetails(scene);
 batchStaticMeshes(scene);
 
 // Development-only inspection views for iterating on the map without a running wave.
 const previewViews = {
-  start: { position: { x: -3, y: 0, z: 4 }, yaw: -0.25 },
-  help: { position: { x: 3, y: 0, z: -3.1 }, yaw: 0.73 },
-  upstairs: { position: { x: 3, y: 3.4, z: 4 }, yaw: 0.5 },
-  barrier: { position: { x: -5, y: 0, z: -4.9 }, yaw: 0 },
-  stress: { position: { x: -3, y: 0, z: 4 }, yaw: -0.25 },
-  assets: { position: { x: -3, y: 0, z: 4 }, yaw: 0 },
+  start: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
+  help: { position: { x: -1.8, y: 0, z: -7.8 }, yaw: Math.PI - 0.12 },
+  upstairs: { position: { x: 2, y: 3.4, z: 3.8 }, yaw: -0.5 },
+  barrier: { position: { x: 12, y: 0, z: -0.8 }, yaw: 0 },
+  stress: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
+  assets: { position: NACHT_PLAYER_SPAWN, yaw: 0 },
+  overview: { position: { x: 23, y: 25, z: 28 }, yaw: 0.65 },
+  doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
 };
 const previewName = new URLSearchParams(location.search).get('preview');
 const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
@@ -88,6 +90,10 @@ const playerId = simulation.playerIds[0];
 if (!simulation.getPlayer(playerId)) throw new Error('Simulation failed to create local player.');
 if (preview) {
   simulation.getPlayer(playerId)!.yaw = preview.yaw;
+  if (previewName === 'overview') {
+    simulation.getPlayer(playerId)!.noclip = true;
+    simulation.getPlayer(playerId)!.pitch = -0.85;
+  }
   if (previewName === 'stress') simulation.getPlayer(playerId)!.godMode = true;
   for (const door of simulation.state.doors) door.open = true;
   for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
@@ -96,7 +102,7 @@ if (preview) {
     simulation.getPlayer(playerId)!.weapon = createWeaponState(testWeapon);
   }
   if (previewName === 'assets') {
-    const target = createZombieState(allocateEntityId(simulation.state.world), { x: -3, y: 0, z: 0 }, 1);
+    const target = createZombieState(allocateEntityId(simulation.state.world), { x: 5.2, y: 0, z: 0 }, 1);
     target.moveSpeed = 0; addEntity(simulation.state.world, target);
   }
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
-import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, UPPER_HEIGHT } from '../maps/nacht.ts';
+import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_BOX_CENTER, NACHT_RAILS, UPPER_HEIGHT } from '../maps/nacht.ts';
 import type { SimulationState } from '../core/simulation.ts';
 
 export function buildBunkerDetails(scene: THREE.Scene): { update(state: SimulationState): void } {
@@ -38,26 +38,30 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     frame.position.set(opening.x, opening.y, opening.z);
     if (opening.axis === 'z') frame.rotation.y = Math.PI / 2;
     group.add(frame);
-    box(frame, concrete, 0, 0.88, 0, 2.25, 0.15, 0.65);
-    box(frame, iron, -1, 1.75, 0, 0.09, 1.75, 0.25);
-    box(frame, iron, 1, 1.75, 0, 0.09, 1.75, 0.25);
+    box(frame, concrete, 0, 0.83, 0, opening.width + 0.25, 0.15, 0.65);
+    box(frame, iron, -opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
+    box(frame, iron, opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
     const planks: THREE.Mesh[] = [];
     barrierViews.set(opening.id, planks);
     for (let i = 0; i < 3; i++) {
-      const plank = box(frame, wood, i === 1 ? -0.12 : 0.1, 1.16 + i * 0.46, 0.03, 1.9, 0.16, 0.09);
+      const plank = box(frame, wood, 0, 1.16 + i * 0.46, 0.03, opening.width + 0.1, 0.16, 0.09);
       plank.rotation.z = i === 1 ? -0.16 : 0.07;
       plank.userData.dynamic = true;
       planks.push(plank);
     }
   }
-  // Overhead structure. Broken roof strips leave the upstairs open to the moon.
-  for (const y of [3.05, 6.65]) {
-    for (const z of [-5.9, -2.4, 1.3, 5.8]) box(group, iron, 0, y, z, 15.6, 0.25, 0.18);
-  }
-  for (const x of [-6.4, -2.3, 3.8, 6.8]) box(group, dark, x, 6.85, 0, 1.5, 0.12, 13.7);
-  // Exposed wall bases and structural columns emphasize the room proportions.
-  for (const x of [-7.74, 7.74]) {
-    for (const z of [-6.7, -0.2, 6.7]) box(group, concrete, x, 3.3, z, 0.34, 6.6, 0.4);
+  // Architecture lives in shared map data, so the visuals and collision agree.
+  // Short exposed reinforcing bars hang across the surviving roof edges.
+  for (let i = 0; i < 12; i++) box(group, iron, -4.7 + i * 0.34, 6.66, -9.2, 0.025, 0.035, 1.5);
+  for (const rail of NACHT_RAILS) {
+    const a = new THREE.Vector3(rail.from.x, rail.from.y, rail.from.z);
+    const b = new THREE.Vector3(rail.to.x, rail.to.y, rail.to.z);
+    const direction = b.clone().sub(a);
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, direction.length(), 6), iron);
+    tube.position.copy(a).add(b).multiplyScalar(0.5);
+    tube.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    group.add(tube);
+    box(group, iron, a.x, a.y - 0.44, a.z, 0.035, 0.88, 0.035);
   }
   const doorViews = new Map<string, THREE.Group>();
   for (const door of NACHT_DOORS) {
@@ -68,25 +72,26 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
       box(view, iron, -0.14, 0.65, 0, 0.06, 0.12, 2.3);
       box(view, iron, -0.14, 2.05, 0, 0.06, 0.12, 2.3);
       const help = writing('HELP', 1.7, 0.62, '#d9d0ba');
-      help.rotation.y = -Math.PI / 2; help.position.set(-0.17, 1.5, 0); view.add(help);
+      help.rotation.y = Math.PI / 2; help.position.set(0.17, 1.5, 0); view.add(help);
     } else {
-      const { x, z } = door.position;
+      const { x, y, z } = door.position;
+      view.position.set(x, y, z);
+      if (door.id === 'start-stairs') view.rotation.y = Math.PI / 2;
       // A sofa and stacked crates, matching the silhouette of Nacht's debris.
-      box(view, wood, x, 2.05, z, 2.1, 0.55, 0.95);
-      box(view, dark, x, 2.55, z + 0.3, 2.1, 0.7, 0.25);
-      box(view, wood, x - 0.78, 2.5, z, 0.3, 0.65, 0.95);
-      box(view, wood, x + 0.78, 2.5, z, 0.3, 0.65, 0.95);
-      const crate = box(view, wood, x + 0.2, 3.1, z, 0.9, 0.7, 0.8); crate.rotation.y = 0.23;
+      const width = door.id === 'start-stairs' ? 1.85 : 1.45;
+      box(view, wood, 0, 0.35, 0, width, 0.55, 0.75);
+      box(view, dark, 0, 0.85, 0.3, width, 0.7, 0.25);
+      for (const side of [-1, 1]) box(view, wood, side * (width / 2 - 0.12), 0.8, 0, 0.24, 0.65, 0.75);
+      const crate = box(view, wood, 0.2, 1.4, 0, 0.8, 0.7, 0.7); crate.rotation.y = 0.23;
     }
   }
-  label('HELP  →', -0.215, 2.35, -2.5, -Math.PI / 2, 1.7, 0.45);
-  label('YOU MUST ASCEND', -5.08, 2.65, 2.7, Math.PI / 2, 2.7, 0.38);
-  label('FROM DARKNESS', -5.08, 2.25, 2.7, Math.PI / 2, 2.5, 0.38);
-  label('DIE TOTEN', 0.2, 5.1, -4.7, Math.PI / 2, 2.3, 0.5, '#8e5140');
+  label('HELP', 0.215, 2.3, 2.2, Math.PI / 2, 1.6, 0.45);
+  label('YOU MUST ASCEND', 5.6, 2.4, -2.385, 0, 2.7, 0.38);
+  label('FROM DARKNESS', 5.6, 2, -2.385, 0, 2.5, 0.38);
   for (const weapon of NACHT_WALL_WEAPONS) {
     const sign = new THREE.Group();
     sign.position.set(weapon.position.x, 1.4, weapon.position.z);
-    sign.rotation.y = weapon.position.x < 0 ? Math.PI / 2 : -Math.PI / 2;
+    sign.rotation.y = weapon.position.x < 0 ? Math.PI / 2 : Math.PI;
     group.add(sign);
     // Chalk outline with a simple wall-mounted rifle silhouette.
     const chalk = new THREE.MeshBasicMaterial({ color: 0xc9c7a7 });
@@ -97,17 +102,19 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     name.position.set(0, -0.38, 0.03); sign.add(name);
   }
   // One fixed, iron-bound random box. Its authoritative state drives the lid.
-  for (const z of [-5.2, -3.6]) box(group, iron, 1.1, 0.55, z, 1.01, 1.12, 0.12);
-  const lid = new THREE.Group(); lid.position.set(0.61, 1.06, -4.4); group.add(lid);
+  const chest = new THREE.Group(); chest.position.set(NACHT_BOX_CENTER.x, 0, NACHT_BOX_CENTER.z);
+  chest.rotation.y = Math.PI / 2; group.add(chest);
+  for (const z of [-0.8, 0.8]) box(chest, iron, 0, 0.55, z, 1.01, 1.12, 0.12);
+  const lid = new THREE.Group(); lid.position.set(-0.49, 1.06, 0); chest.add(lid);
   lid.userData.dynamic = true;
   box(lid, wood, 0.49, 0, 0, 1.06, 0.13, 2.4);
   const question = writing('?  ?  ?', 1.9, 0.6, '#f6d893');
   question.position.set(0.5, 0.075, 0); question.rotation.x = -Math.PI / 2; question.rotation.z = Math.PI / 2; lid.add(question);
-  const glow = new THREE.PointLight(0xffbf57, 4, 6, 2); glow.position.set(1.2, 1.3, -4.4); group.add(glow);
+  const glow = new THREE.PointLight(0xffbf57, 4, 6, 2); glow.position.set(0, 1.3, 0); chest.add(glow);
   const rewardLabel = writing('MYSTERY BOX', 2, 0.3, '#f6d893');
-  rewardLabel.position.set(0.24, 1.8, -4.4); rewardLabel.rotation.y = Math.PI / 2; group.add(rewardLabel);
+  rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2; chest.add(rewardLabel);
   // Warm practical lights against cold exterior moonlight.
-  for (const [x, y, z] of [[-3, 2.8, -1], [3, 2.8, 2], [-3, 6.1, 1]] as const) {
+  for (const [x, y, z] of [[-2, 2.8, 1], [5, 2.8, 2], [-3, 6.1, 1]] as const) {
     box(group, iron, x, y + 0.05, z, 0.3, 0.16, 0.3);
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd398 }));
     bulb.position.set(x, y - 0.07, z); group.add(bulb);
@@ -117,7 +124,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   let seed = 753;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   for (let i = 0; i < 100; i++) {
-    const x = -7 + random() * 14, z = (i % 2 ? -1 : 1) * (5.8 + random() * 0.8);
+    const x = -5.7 + random() * 4.8, z = -10.5 + random() * 15;
     const y = i % 3 === 0 ? UPPER_HEIGHT : 0;
     const rubble = box(group, i % 3 ? concrete : wood, x, y + 0.045, z, 0.12 + random() * 0.3, 0.09, 0.1 + random() * 0.25);
     rubble.rotation.y = random() * Math.PI;
@@ -126,7 +133,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   box(group, dark, 0, -0.25, 0, 160, 0.1, 160);
   const bark = new THREE.MeshStandardMaterial({ color: 0x1d2422, roughness: 1 });
   for (let i = 0; i < 55; i++) {
-    const angle = random() * Math.PI * 2, radius = 15 + random() * 35;
+    const angle = random() * Math.PI * 2, radius = 27 + random() * 25;
     const tree = new THREE.Group(); tree.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.27, 7 + random() * 6, 5), bark);
     trunk.position.y = 4; tree.add(trunk);

@@ -6,7 +6,7 @@ const sim = new GameSimulation({ seed: 1, map: {
   collisionBoxes: greyboxCollisionBoxes(), shotBlockers: NACHT_SHOT_BLOCKERS,
   walkSurfaces: NACHT_WALK_SURFACES, navigationGraph: NACHT_NAVIGATION,
   barriers: NACHT_BARRIERS, zombieSpawns: NACHT_ZOMBIE_SPAWNS, doors: NACHT_DOORS,
-}, playerSpawns: [{ x: 4, y: 0, z: -3 }],
+}, playerSpawns: [{ x: 5.2, y: 0, z: 4.2 }],
 roundConfig: { initialWaitTicks: 999999, intermissionTicks: 999999 } });
 sim.getPlayer(sim.playerIds[0])!.godMode = true;
 sim.state.doors.filter(door => door.id !== 'help-room').forEach(door => { door.open = true; });

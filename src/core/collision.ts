@@ -57,6 +57,36 @@ export interface WalkSurface {
   startHeight: number;
   endHeight: number;
   slopeAxis?: 'x' | 'z';
+  /** Optional planar footprint, in x/z coordinates. */
+  polygon?: readonly (readonly [number, number])[];
+  /** Clockwise quarter-turn ramp, from east to north around its centre. */
+  quarterTurn?: { x: number; z: number; innerRadius: number; outerRadius: number };
+}
+
+export function walkSurfaceHeight(surface: WalkSurface, x: number, z: number): number | undefined {
+  if (x < surface.minX - 1e-7 || x > surface.maxX + 1e-7 || z < surface.minZ - 1e-7 || z > surface.maxZ + 1e-7) return;
+  if (surface.polygon) {
+    let inside = false;
+    const points = surface.polygon;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+      const [ax, az] = points[j], [bx, bz] = points[i];
+      const cross = (x - ax) * (bz - az) - (z - az) * (bx - ax);
+      if (Math.abs(cross) < 1e-7 && x >= Math.min(ax, bx) - 1e-7 && x <= Math.max(ax, bx) + 1e-7
+        && z >= Math.min(az, bz) - 1e-7 && z <= Math.max(az, bz) + 1e-7) { inside = true; break; }
+      if ((az > z) !== (bz > z) && x < (bx - ax) * (z - az) / (bz - az) + ax) inside = !inside;
+    }
+    if (!inside) return;
+  }
+  let t = 0;
+  if (surface.slopeAxis === 'x') t = (x - surface.minX) / (surface.maxX - surface.minX);
+  if (surface.slopeAxis === 'z') t = (z - surface.minZ) / (surface.maxZ - surface.minZ);
+  if (surface.quarterTurn) {
+    const turn = surface.quarterTurn, dx = x - turn.x, dz = z - turn.z;
+    const radius = Math.hypot(dx, dz);
+    if (radius < turn.innerRadius || radius > turn.outerRadius || dx < -1e-7 || dz > 1e-7) return;
+    t = Math.max(0, Math.min(1, -Math.atan2(dz, dx) / (Math.PI / 2)));
+  }
+  return surface.startHeight + (surface.endHeight - surface.startHeight) * t;
 }
 
 export function sampleWalkHeight(
@@ -68,11 +98,8 @@ export function sampleWalkHeight(
 ): number {
   let best = Number.NEGATIVE_INFINITY;
   for (const surface of surfaces) {
-    if (x < surface.minX || x > surface.maxX || z < surface.minZ || z > surface.maxZ) continue;
-    let t = 0;
-    if (surface.slopeAxis === 'x') t = (x - surface.minX) / (surface.maxX - surface.minX);
-    if (surface.slopeAxis === 'z') t = (z - surface.minZ) / (surface.maxZ - surface.minZ);
-    const height = surface.startHeight + (surface.endHeight - surface.startHeight) * t;
+    const height = walkSurfaceHeight(surface, x, z);
+    if (height === undefined) continue;
     if (height <= currentHeight + maxStepUp && height > best) best = height;
   }
   return Number.isFinite(best) ? best : currentHeight;
