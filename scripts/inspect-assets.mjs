@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Box3, Vector3 } from 'three';
+export function readAssetJson(path) { return JSON.parse(readFileSync(path, 'utf8')); }
+export function assetExists(path) { return existsSync(path); }
 
 // Geometry/rig inspection without decoding textures or requiring a GPU.
 globalThis.ProgressEvent ??= class { constructor(type, properties) { Object.assign(this, { type }, properties); } };

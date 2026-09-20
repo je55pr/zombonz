@@ -12,6 +12,8 @@ import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import { loadZombieAsset, type ZombieAsset } from './client/runtimeAssets.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView } from './client/weaponView.ts';
+import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
+import { buildEnvironmentProps, buildEnvironmentDecals } from './client/environmentProps.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, createWeaponState, createZombieState, allocateEntityId, addEntity,
   type EntityId, type ZombieState, type Vec3,
@@ -50,6 +52,17 @@ scene.add(keyLight);
 scene.add(buildGreybox(NACHT_GREYBOX, NACHT_PRISMS));
 const bunker = buildBunkerDetails(scene);
 batchStaticMeshes(scene);
+let environmentNotice: string | null = 'Loading bunker materials and props…';
+void (async () => {
+  // Prop proxies/collision must stay visible even when the texture manifest fails.
+  const props = buildEnvironmentProps(scene);
+  const surfaces = readEnvironmentManifest().then(manifest =>
+    Promise.all([loadEnvironmentMaterials(manifest), buildEnvironmentDecals(scene, manifest)]))
+    .catch(error => { console.warn('Environment manifest unavailable', error); return [1]; });
+  const [propFailures, surfaceFailures] = await Promise.all([props, surfaces]);
+  environmentNotice = propFailures > 0 || surfaceFailures.some(n => n > 0) ? 'Some environment assets failed to load; check console' : null;
+  renderer.shadowMap.needsUpdate = true;
+})().catch(error => { environmentNotice = 'Environment pack unavailable; using plain fallback'; console.warn(error); });
 
 // Development-only inspection views for iterating on the map without a running wave.
 const previewViews = {
@@ -61,6 +74,7 @@ const previewViews = {
   assets: { position: NACHT_PLAYER_SPAWN, yaw: 0 },
   overview: { position: { x: 23, y: 25, z: 28 }, yaw: 0.65 },
   doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
+  props: { position: { x: -2, y: 0, z: 4.3 }, yaw: Math.PI + 0.15 },
 };
 const previewName = new URLSearchParams(location.search).get('preview');
 const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
@@ -231,7 +245,7 @@ function frame(nowMs: number): void {
   if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha); weaponView.render(renderer, camera.aspect); }
   const hudStarted = performance.now();
   const hudSnapshot = buildHudSnapshot(simulation, playerId);
-  if (hudSnapshot) hud.render({ ...hudSnapshot, assetNotice: zombieAssetNotice ?? weaponView.notice });
+  if (hudSnapshot) hud.render({ ...hudSnapshot, assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice });
   performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
     renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
   performanceOverlay.render(renderer);

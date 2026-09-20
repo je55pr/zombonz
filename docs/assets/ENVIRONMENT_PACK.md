@@ -56,3 +56,39 @@ Untouched source packages, API metadata and checksums remain outside Git under:
 - `C:\ChatGPT\Shared\Cache\ZombonzAssets\props`
 
 Do not copy those source caches into the repository.
+
+## In-game integration
+
+The Nacht map uses all ten material sets: plaster/brick wall panels, concrete
+structure, damaged floors, concrete steps, wood boards/box, rusted rails, cave rock,
+ground dirt, rubble, and leather on the two stair barricades. World-scaled UVs keep
+the tile size consistent. Base colour uses sRGB, and normal/ARM use linear data;
+the same ARM image feeds AO (R), roughness (G), and metalness (B), using UV channel 0.
+
+`environmentMaterials.ts` shares materials and textures across the level. Images
+are decoded at 1024 square before GPU upload, preserving the 2K repository originals.
+This bounds texture memory and avoids uploading all the 2K maps during gameplay.
+Grime/leak overlays use their opacity maps, do not write depth, and have polygon
+offset to avoid flickering against the walls. The modern graffiti atlas is left out.
+
+`nachtProps.ts` places 31 props across spawn, HELP, upstairs and the exterior:
+workbenches, radio, ammunition, shelves, crates, fuel containers, stove, tools,
+ladder, cart, bags, lamps, a jeep and a tank. Vehicles stay in the background.
+Props are scenery, not new pickups/explosive gameplay objects. Existing barriers,
+box logic, doors, weapons and zombie state are unchanged.
+
+Models are uniformly fitted into authored metre-scale envelopes, floor-aligned,
+cloned without modifying the source, then spatially batched with compatible vertex
+layouts. Solid indoor props use renderer-independent collision boxes from those
+same envelopes. Small clutter is deliberately non-blocking. Downloading/failed
+solid props have visible box proxies so their collision never becomes invisible.
+
+The load status is shown in the HUD. Failures leave usable materials/proxies and
+report a warning; F2 includes CC0 environment credits alongside the existing CC BY
+character/weapon credits. Source asset files remain unmodified.
+
+Validation includes every selected GLB's transformed bounds and floor anchoring,
+manifest/file coverage, packed material maps, UV scale, compatible static batching,
+clear stair/entry landings and the full deterministic gameplay suite. Development
+preview `?preview=props` inspects the radio/box corner; `?preview=stress&weapon=bar`
+checks 24 imported zombies with the dressed map (F3 for frame timings).

@@ -6,6 +6,7 @@ import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
+import { NACHT_PROPS, propCollisionBox } from './nachtProps.ts';
 
 // Hand-built from WaW floor plans. Scale is estimated, not extracted game data.
 // HELP wing west (negative x), spawn east, box at the south end of HELP.
@@ -212,10 +213,12 @@ export const NACHT_MARKERS: readonly MapMarker[] = [
   { id: 'box-help', type: 'mysteryBox', position: NACHT_MYSTERY_BOXES[0].position, label: 'Mystery Box [950]' },
 ];
 export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = NACHT_GREYBOX): CollisionBox[] {
-  return boxes.filter(b => b.collides).map(b => ({
+  const result = boxes.filter(b => b.collides).map(b => ({
     min: { x: b.center.x - b.size.x / 2, y: b.center.y - b.size.y / 2, z: b.center.z - b.size.z / 2 },
     max: { x: b.center.x + b.size.x / 2, y: b.center.y + b.size.y / 2, z: b.center.z + b.size.z / 2 },
   }));
+  if (boxes === NACHT_GREYBOX) result.push(...NACHT_PROPS.filter(p => p.solid).map(propCollisionBox));
+  return result;
 }
 // Rectangular slabs stay single blockers; only the bevelled floor needs narrow strips.
 const slabBlockers: CollisionBox[] = [];

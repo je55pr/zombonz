@@ -3,7 +3,8 @@
 Target: the original **World at War** building, with three gameplay areas, three
 1000-point unlocks and one fixed 950-point mystery box. This is hand-built geometry
 from floor plans and screenshots, not extracted assets or a measured 1:1 recreation.
-Existing placeholder materials are unchanged; no new texture assets were created.
+The environment pack from `dev` now supplies the PBR materials and prop dressing.
+No new source textures were generated. See [environment integration](assets/ENVIRONMENT_PACK.md).
 
 ## References
 
@@ -64,11 +65,11 @@ door purchases, closed routes, zombie pursuit via both stairs with HELP shut,
 every entry through to pursuit, graph clearance/support, floor shot occlusion,
 box placement/purchase/cooldown and deterministic state.
 
-Development inspection URLs: `?preview=start`, `doorway`, `help`, `upstairs`, `overview`,
+Development inspection URLs: `?preview=start`, `doorway`, `props`, `help`, `upstairs`, `overview`,
 `barrier`, `stress`, `assets`. Preview modes open the routes and are development-only.
 The normal URL starts with closed routes and the normal economy. F3 displays timings.
 
-## Texture wish list — not created
+## Texture wish list — now supplied by the environment pack
 
 1. Weathered cast concrete: walls, columns, capitals and ceiling beams.
 2. Cracked, dusty concrete floor tiles, plus bare concrete for stairs and landings.
@@ -79,6 +80,6 @@ The normal URL starts with closed routes and the normal economy. F3 displays tim
 7. Torn, dirty sofa upholstery for the two stair barricades.
 8. Transparent grime, damp, soot, cracks and chalk/graffiti decals.
 
-Prefer seamless 1K/2K base-colour, normal and roughness maps; metalness only for
-metal surfaces, and alpha for decals. Consistent real-world scale matters more
-than high resolution for this testing map.
+The checked-in pack supplies these surface categories. Runtime decoding caps the
+2K source textures at 1K; base colour is sRGB and normal/packed ARM maps are linear.
+The modern graffiti atlas is intentionally unused to preserve the period setting.

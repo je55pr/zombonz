@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
+import { environmentMaterial, projectWorldUvs } from './environmentMaterials.ts';
 import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_BOX_CENTER, NACHT_RAILS, UPPER_HEIGHT } from '../maps/nacht.ts';
 import type { SimulationState } from '../core/simulation.ts';
 
@@ -10,10 +11,13 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   const wood = bunkerMaterial('barrier');
   const concrete = bunkerMaterial('wall');
   const iron = bunkerMaterial('metal');
-  const dark = new THREE.MeshStandardMaterial({ color: 0x25251f, roughness: 1 });
+  const upholstery = environmentMaterial('sofa-upholstery');
+  const debris = environmentMaterial('concrete-rubble');
   const box = (parent: THREE.Object3D, material: THREE.Material, x: number, y: number, z: number,
     sx: number, sy: number, sz: number) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), material);
+    const geometry = new THREE.BoxGeometry(sx, sy, sz);
+    if (material.name) projectWorldUvs(geometry, new THREE.Vector3(x, y, z));
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true;
     parent.add(mesh); return mesh;
   };
@@ -79,9 +83,9 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
       if (door.id === 'start-stairs') view.rotation.y = Math.PI / 2;
       // A sofa and stacked crates, matching the silhouette of Nacht's debris.
       const width = door.id === 'start-stairs' ? 1.85 : 1.45;
-      box(view, wood, 0, 0.35, 0, width, 0.55, 0.75);
-      box(view, dark, 0, 0.85, 0.3, width, 0.7, 0.25);
-      for (const side of [-1, 1]) box(view, wood, side * (width / 2 - 0.12), 0.8, 0, 0.24, 0.65, 0.75);
+      box(view, upholstery, 0, 0.35, 0, width, 0.55, 0.75);
+      box(view, upholstery, 0, 0.85, 0.3, width, 0.7, 0.25);
+      for (const side of [-1, 1]) box(view, upholstery, side * (width / 2 - 0.12), 0.8, 0, 0.24, 0.65, 0.75);
       const crate = box(view, wood, 0.2, 1.4, 0, 0.8, 0.7, 0.7); crate.rotation.y = 0.23;
     }
   }
@@ -114,11 +118,8 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   const rewardLabel = writing('MYSTERY BOX', 2, 0.3, '#f6d893');
   rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2; chest.add(rewardLabel);
   // Warm practical lights against cold exterior moonlight.
-  for (const [x, y, z] of [[-2, 2.8, 1], [5, 2.8, 2], [-3, 6.1, 1]] as const) {
-    box(group, iron, x, y + 0.05, z, 0.3, 0.16, 0.3);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffd398 }));
-    bulb.position.set(x, y - 0.07, z); group.add(bulb);
-    const light = new THREE.PointLight(0xffb66d, 13, 10, 1.6); light.position.set(x, y - 0.15, z); group.add(light);
+  for (const [x, y, z] of [[-0.7, 2.35, -2], [5, 2.65, 2], [-0.7, 5.75, 2.5]] as const) {
+    const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(x, y, z); group.add(light);
   }
   // Low rubble stays below the collision step height and out of navigation lanes.
   let seed = 753;
@@ -126,11 +127,11 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   for (let i = 0; i < 100; i++) {
     const x = -5.7 + random() * 4.8, z = -10.5 + random() * 15;
     const y = i % 3 === 0 ? UPPER_HEIGHT : 0;
-    const rubble = box(group, i % 3 ? concrete : wood, x, y + 0.045, z, 0.12 + random() * 0.3, 0.09, 0.1 + random() * 0.25);
+    const rubble = box(group, i % 3 ? debris : wood, x, y + 0.045, z, 0.12 + random() * 0.3, 0.09, 0.1 + random() * 0.25);
     rubble.rotation.y = random() * Math.PI;
   }
   // A foggy treeline is visible through every opening, with no external assets.
-  box(group, dark, 0, -0.25, 0, 160, 0.1, 160);
+  box(group, environmentMaterial('dirt'), 0, -0.25, 0, 160, 0.1, 160);
   const bark = new THREE.MeshStandardMaterial({ color: 0x1d2422, roughness: 1 });
   for (let i = 0; i < 55; i++) {
     const angle = random() * Math.PI * 2, radius = 27 + random() * 25;

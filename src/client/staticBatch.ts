@@ -16,7 +16,11 @@ export function batchStaticMeshes(root: THREE.Object3D): void {
     }
     object.getWorldPosition(position);
     const cell = [position.x, position.y, position.z].map(value => Math.floor(value / 12)).join(',');
-    const key = `${object.material.uuid}:${object.castShadow}:${object.receiveShadow}:${cell}`;
+    // Shared environment materials now span indexed boxes, non-indexed slabs and
+    // imported GLBs. Only merge compatible vertex layouts; never drop tangents/UVs.
+    const attributes = Object.entries((object.geometry as THREE.BufferGeometry).attributes).sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, attribute]) => `${name}:${attribute.itemSize}:${attribute.normalized}:${attribute.array.constructor.name}`).join('|');
+    const key = `${object.material.uuid}:${object.castShadow}:${object.receiveShadow}:${cell}:${!!object.geometry.index}:${attributes}`;
     const bucket = buckets.get(key) ?? []; bucket.push(object); buckets.set(key, bucket);
   });
   for (const meshes of buckets.values()) {

@@ -130,12 +130,13 @@ export class CanvasHud {
       this.text(snapshot.interactionPrompt, x, y, 30, 'center');
     }
     if (this.credits) {
-      this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(220, 160, 1160, 480);
+      this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(180, 115, 1240, 540);
       const lines = ['THIRD-PARTY ASSET CREDITS', 'Zombie Soldier — Peter_D (@better_peter)',
         'Zombie — pxltiger', 'M1911 — Quinn Kuslich', 'Kar98k — ARIA', 'BAR M1918 A2 — Peanut_Butcher',
-        'All models: CC BY 4.0 · converted, resized and adapted for this game',
+        'Characters / weapons: CC BY 4.0 · converted and adapted',
+        'Environment / props: Poly Haven, ambientCG, OpenGameArt · CC0',
         'Source links and licence: /assets/ATTRIBUTION.txt', 'F2 TO CLOSE'];
-      lines.forEach((line, index) => this.text(line, width / 2, 210 + index * 46, index === 0 ? 30 : 23, 'center'));
+      lines.forEach((line, index) => this.text(line, width / 2, 160 + index * 46, index === 0 ? 30 : 23, 'center'));
     }
     this.texture.needsUpdate = true;
   }
