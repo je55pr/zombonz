@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "license": "CC0",
+  "materials": {
+    "weathered-concrete-a": {
+      "purpose": "Weathered concrete wall/columns",
+      "basecolor": "/assets/environment/materials/weathered-concrete-a/basecolor.webp",
+      "normal": "/assets/environment/materials/weathered-concrete-a/normal.webp",
+      "arm": "/assets/environment/materials/weathered-concrete-a/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/concrete_wall_006",
+      "sourceId": "concrete_wall_006",
+      "license": "CC0"
+    },
+    "weathered-concrete-b": {
+      "purpose": "Alternate weathered concrete wall",
+      "basecolor": "/assets/environment/materials/weathered-concrete-b/basecolor.webp",
+      "normal": "/assets/environment/materials/weathered-concrete-b/normal.webp",
+      "arm": "/assets/environment/materials/weathered-concrete-b/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/concrete_wall_008",
+      "sourceId": "concrete_wall_008",
+      "license": "CC0"
+    },
+    "cracked-concrete-floor": {
+      "purpose": "Cracked/damaged concrete floor",
+      "basecolor": "/assets/environment/materials/cracked-concrete-floor/basecolor.webp",
+      "normal": "/assets/environment/materials/cracked-concrete-floor/normal.webp",
+      "arm": "/assets/environment/materials/cracked-concrete-floor/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/concrete_floor_damaged_01",
+      "sourceId": "concrete_floor_damaged_01",
+      "license": "CC0"
+    },
+    "broken-plaster-brick": {
+      "purpose": "Broken plaster with exposed brick",
+      "basecolor": "/assets/environment/materials/broken-plaster-brick/basecolor.webp",
+      "normal": "/assets/environment/materials/broken-plaster-brick/normal.webp",
+      "arm": "/assets/environment/materials/broken-plaster-brick/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/plaster_brick_01",
+      "sourceId": "plaster_brick_01",
+      "license": "CC0"
+    },
+    "concrete-rubble": {
+      "purpose": "Concrete/plaster/brick rubble",
+      "basecolor": "/assets/environment/materials/concrete-rubble/basecolor.webp",
+      "normal": "/assets/environment/materials/concrete-rubble/normal.webp",
+      "arm": "/assets/environment/materials/concrete-rubble/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/concrete_debris",
+      "sourceId": "concrete_debris",
+      "license": "CC0"
+    },
+    "cave-rock": {
+      "purpose": "Dark fractured cave rock",
+      "basecolor": "/assets/environment/materials/cave-rock/basecolor.webp",
+      "normal": "/assets/environment/materials/cave-rock/normal.webp",
+      "arm": "/assets/environment/materials/cave-rock/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/dark_rock",
+      "sourceId": "dark_rock",
+      "license": "CC0"
+    },
+    "dirt": {
+      "purpose": "Dusty dirt/ground",
+      "basecolor": "/assets/environment/materials/dirt/basecolor.webp",
+      "normal": "/assets/environment/materials/dirt/normal.webp",
+      "arm": "/assets/environment/materials/dirt/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/dirt",
+      "sourceId": "dirt",
+      "license": "CC0"
+    },
+    "splintered-wood": {
+      "purpose": "Weathered/splintered wooden planks",
+      "basecolor": "/assets/environment/materials/splintered-wood/basecolor.webp",
+      "normal": "/assets/environment/materials/splintered-wood/normal.webp",
+      "arm": "/assets/environment/materials/splintered-wood/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/worn_planks",
+      "sourceId": "worn_planks",
+      "license": "CC0"
+    },
+    "rusted-metal": {
+      "purpose": "Rusted metal rails/frames material",
+      "basecolor": "/assets/environment/materials/rusted-metal/basecolor.webp",
+      "normal": "/assets/environment/materials/rusted-metal/normal.webp",
+      "arm": "/assets/environment/materials/rusted-metal/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/rusty_metal_sheet",
+      "sourceId": "rusty_metal_sheet",
+      "license": "CC0"
+    },
+    "sofa-upholstery": {
+      "purpose": "Aged leather couch/seat upholstery",
+      "basecolor": "/assets/environment/materials/sofa-upholstery/basecolor.webp",
+      "normal": "/assets/environment/materials/sofa-upholstery/normal.webp",
+      "arm": "/assets/environment/materials/sofa-upholstery/arm.jpg",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/fabric_leather_01",
+      "sourceId": "fabric_leather_01",
+      "license": "CC0"
+    }
+  },
+  "decals": {
+    "graffiti": {
+      "purpose": "Graffiti decal atlas",
+      "maps": {
+        "basecolor": "/assets/environment/decals/graffiti/basecolor.webp",
+        "normal": "/assets/environment/decals/graffiti/normal.webp",
+        "opacity": "/assets/environment/decals/graffiti/opacity.jpg",
+        "roughness": "/assets/environment/decals/graffiti/roughness.jpg"
+      },
+      "source": "https://ambientcg.com/a/GraffitiSet001",
+      "sourceId": "GraffitiSet001",
+      "license": "CC0"
+    },
+    "surface-imperfections": {
+      "purpose": "Dirt/grime surface overlay",
+      "maps": {
+        "basecolor": "/assets/environment/decals/surface-imperfections/basecolor.webp",
+        "normal": "/assets/environment/decals/surface-imperfections/normal.webp",
+        "opacity": "/assets/environment/decals/surface-imperfections/opacity.jpg",
+        "roughness": "/assets/environment/decals/surface-imperfections/roughness.jpg"
+      },
+      "source": "https://ambientcg.com/a/SurfaceImperfections017",
+      "sourceId": "SurfaceImperfections017",
+      "license": "CC0"
+    },
+    "leaking-grime": {
+      "purpose": "Vertical leak/grime decal",
+      "maps": {
+        "basecolor": "/assets/environment/decals/leaking-grime/basecolor.webp",
+        "normal": "/assets/environment/decals/leaking-grime/normal.webp",
+        "opacity": "/assets/environment/decals/leaking-grime/opacity.jpg",
+        "roughness": "/assets/environment/decals/leaking-grime/roughness.jpg"
+      },
+      "source": "https://ambientcg.com/a/Leaking006",
+      "sourceId": "Leaking006",
+      "license": "CC0"
+    },
+    "rust-decal": {
+      "purpose": "Rust patch decal",
+      "maps": {
+        "basecolor": "/assets/environment/decals/rust-decal/basecolor.webp",
+        "normal": "/assets/environment/decals/rust-decal/normal.webp",
+        "opacity": "/assets/environment/decals/rust-decal/opacity.jpg",
+        "roughness": "/assets/environment/decals/rust-decal/roughness.jpg",
+        "ao": "/assets/environment/decals/rust-decal/ao.jpg"
+      },
+      "source": "https://ambientcg.com/a/Rust001",
+      "sourceId": "Rust001",
+      "license": "CC0"
+    },
+    "smear-grime": {
+      "purpose": "Smear/soot-style grime decal",
+      "maps": {
+        "basecolor": "/assets/environment/decals/smear-grime/basecolor.webp",
+        "normal": "/assets/environment/decals/smear-grime/normal.webp",
+        "opacity": "/assets/environment/decals/smear-grime/opacity.jpg"
+      },
+      "source": "https://ambientcg.com/a/Smear005",
+      "sourceId": "Smear005",
+      "license": "CC0"
+    }
+  },
+  "collected": "2026-09-20",
+  "mapConventions": {
+    "normal": "OpenGL tangent-space normal map",
+    "arm": "R=ambient occlusion, G=roughness, B=metallic",
+    "colorSpace": {
+      "basecolor": "sRGB",
+      "normal": "linear",
+      "arm": "linear",
+      "opacity": "linear",
+      "roughness": "linear",
+      "ao": "linear"
+    }
+  }
+}

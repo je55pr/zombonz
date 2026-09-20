@@ -215,3 +215,9 @@ The previously shortlisted Thompson M1A1 was intentionally skipped because its d
 ### Browser benchmark follow-up
 
 A standalone Three.js benchmark with 20 animated instances confirmed both zombie candidates load and animate without model errors after runtime cleanup. Peter_D renders the 20-zombie test in 20 draw calls from one shared geometry, while pxltiger requires 280 draw calls from its 14-mesh body. pxltiger's four runtime clips have now been converted to clean animation-only GLBs, removing the stale PSD texture reference and duplicated animation meshes. See `ZOMBIE_BENCHMARK.md`.
+
+## CC0 environment and prop pack
+
+A browser-ready CC0 environment/prop pack was added on 2026-09-20. It contains 10 tileable PBR environment materials, 5 decal/overlay sets, 18 general props, and 3 lower-fidelity background military vehicles.
+
+Runtime paths, map conventions and vehicle usage notes are documented in `ENVIRONMENT_PACK.md`. Exact CC0 source URLs are carried in the runtime manifests and `public/assets/ATTRIBUTION.txt`. Untouched source archives and metadata remain outside Git in the shared asset cache.

@@ -1,0 +1,8 @@
+CC0 environment asset pack
+
+The third-party source materials represented in this runtime directory are released under CC0 1.0 Universal by Poly Haven and ambientCG.
+Exact source pages are recorded in manifest.json.
+
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Project-created packaging, map conversion and naming do not add additional restrictions.

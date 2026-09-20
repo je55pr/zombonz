@@ -1,6 +1,8 @@
-Zombonz third-party runtime asset attribution
-Retrieved/verified: 2026-09-19
-Licence for each asset below: Creative Commons Attribution 4.0 International
+Zombonz third-party runtime asset attribution and provenance
+
+## CC BY 4.0 assets
+
+The following assets are redistributed under Creative Commons Attribution 4.0 International:
 https://creativecommons.org/licenses/by/4.0/
 
 Zombie Soldier
@@ -28,4 +30,39 @@ Creator: Peanut_Butcher
 Source: https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732
 Changes: source GLB retained structurally; embedded 4K PBR textures reduced to 2K for browser runtime.
 
-Full provenance, SHA-256 hashes for the downloaded originals, and benchmark notes are in docs/assets/.
+## CC0 environment textures
+
+The environment materials and decal sets in /assets/environment are CC0. Attribution is not required, but source pages are preserved here and in /assets/environment/manifest.json.
+
+Poly Haven:
+- weathered-concrete-a: https://polyhaven.com/a/concrete_wall_006
+- weathered-concrete-b: https://polyhaven.com/a/concrete_wall_008
+- cracked-concrete-floor: https://polyhaven.com/a/concrete_floor_damaged_01
+- broken-plaster-brick: https://polyhaven.com/a/plaster_brick_01
+- concrete-rubble: https://polyhaven.com/a/concrete_debris
+- cave-rock: https://polyhaven.com/a/dark_rock
+- dirt: https://polyhaven.com/a/dirt
+- splintered-wood: https://polyhaven.com/a/worn_planks
+- rusted-metal: https://polyhaven.com/a/rusty_metal_sheet
+- sofa-upholstery: https://polyhaven.com/a/fabric_leather_01
+
+ambientCG:
+- graffiti: https://ambientcg.com/a/GraffitiSet001
+- surface-imperfections: https://ambientcg.com/a/SurfaceImperfections017
+- leaking-grime: https://ambientcg.com/a/Leaking006
+- rust-decal: https://ambientcg.com/a/Rust001
+- smear-grime: https://ambientcg.com/a/Smear005
+
+## CC0 props
+
+The primary prop models in /assets/props are CC0 Poly Haven derivatives. Exact source pages for every prop are recorded in /assets/props/manifest.json.
+
+The wooden-plank geometry was created for Zombonz and uses the CC0 Poly Haven worn_planks material:
+https://polyhaven.com/a/worn_planks
+
+Background vehicle conversions are CC0 OpenGameArt assets:
+- GAZ-67: https://opengameart.org/content/lowpoly-soviet-jeep
+- Soviet military off-road vehicle: https://opengameart.org/content/soviet-military-off-road-vehicle
+- T-12 Soviet light tank: https://opengameart.org/content/t-12-soviet-light-tank-lowpoly
+
+Full intake hashes, API snapshots, source archives and conversion notes are kept outside the repository under C:\ChatGPT\Shared\Cache\ZombonzAssets. Repo documentation under docs/assets records the runtime selection and processing state.

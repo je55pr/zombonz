@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "collected": "2026-09-20",
+  "source": "Poly Haven",
+  "license": "CC0",
+  "props": {
+    "explosive-barrel": {
+      "model": "/assets/props/explosive-barrel/model.glb",
+      "purpose": "Explosive/fuel barrel",
+      "source": "https://polyhaven.com/a/Barrel_01",
+      "license": "CC0",
+      "bytes": 692004
+    },
+    "incandescent-bulb": {
+      "model": "/assets/props/incandescent-bulb/model.glb",
+      "purpose": "Bare incandescent light bulb",
+      "source": "https://polyhaven.com/a/lightbulb_01",
+      "license": "CC0",
+      "bytes": 1939764
+    },
+    "metal-jerrycan": {
+      "model": "/assets/props/metal-jerrycan/model.glb",
+      "purpose": "Weathered military/industrial fuel can",
+      "source": "https://polyhaven.com/a/metal_jerrycan",
+      "license": "CC0",
+      "bytes": 3033532
+    },
+    "barrel-stove": {
+      "model": "/assets/props/barrel-stove/model.glb",
+      "purpose": "Rusted barrel stove/heater",
+      "source": "https://polyhaven.com/a/barrel_stove",
+      "license": "CC0",
+      "bytes": 2145888
+    },
+    "wooden-crate": {
+      "model": "/assets/props/wooden-crate/model.glb",
+      "purpose": "Weathered wooden crate",
+      "source": "https://polyhaven.com/a/CheeseBox_01",
+      "license": "CC0",
+      "bytes": 492280
+    },
+    "ammo-box": {
+      "model": "/assets/props/ammo-box/model.glb",
+      "purpose": "Olive drab metal ammo box",
+      "source": "https://polyhaven.com/a/ammo_box",
+      "license": "CC0",
+      "bytes": 1468700
+    },
+    "shelf": {
+      "model": "/assets/props/shelf/model.glb",
+      "purpose": "Weathered wooden shelving",
+      "source": "https://polyhaven.com/a/Shelf_01",
+      "license": "CC0",
+      "bytes": 604540
+    },
+    "wooden-table": {
+      "model": "/assets/props/wooden-table/model.glb",
+      "purpose": "Old worn wooden table",
+      "source": "https://polyhaven.com/a/WoodenTable_01",
+      "license": "CC0",
+      "bytes": 553416
+    },
+    "wooden-ladder": {
+      "model": "/assets/props/wooden-ladder/model.glb",
+      "purpose": "Worn wooden ladder",
+      "source": "https://polyhaven.com/a/wooden_ladder",
+      "license": "CC0",
+      "bytes": 2591444
+    },
+    "field-radio": {
+      "model": "/assets/props/field-radio/model.glb",
+      "purpose": "Vintage military field radio",
+      "source": "https://polyhaven.com/a/vintage_radio_transceiver",
+      "license": "CC0",
+      "bytes": 6289768
+    },
+    "hand-truck": {
+      "model": "/assets/props/hand-truck/model.glb",
+      "purpose": "Weathered industrial hand truck",
+      "source": "https://polyhaven.com/a/hand_truck",
+      "license": "CC0",
+      "bytes": 3178340
+    },
+    "crowbar": {
+      "model": "/assets/props/crowbar/model.glb",
+      "purpose": "Rusty crowbar/tool clutter",
+      "source": "https://polyhaven.com/a/crowbar_01",
+      "license": "CC0",
+      "bytes": 1587316
+    },
+    "wall-lamp": {
+      "model": "/assets/props/wall-lamp/model.glb",
+      "purpose": "Rusted caged bunker wall lamp",
+      "source": "https://polyhaven.com/a/industrial_wall_lamp",
+      "license": "CC0",
+      "bytes": 3776052
+    },
+    "caged-ceiling-light": {
+      "model": "/assets/props/caged-ceiling-light/model.glb",
+      "purpose": "Industrial hanging caged light",
+      "source": "https://polyhaven.com/a/caged_hanging_light",
+      "license": "CC0",
+      "bytes": 3065384
+    },
+    "cement-bag": {
+      "model": "/assets/props/cement-bag/model.glb",
+      "purpose": "Worn construction bag/sack clutter",
+      "source": "https://polyhaven.com/a/cement_bag",
+      "license": "CC0",
+      "bytes": 1447032
+    },
+    "cardboard-box": {
+      "model": "/assets/props/cardboard-box/model.glb",
+      "purpose": "Damaged old cardboard box",
+      "source": "https://polyhaven.com/a/cardboard_box_01",
+      "license": "CC0",
+      "bytes": 2167352
+    },
+    "bench-vice": {
+      "model": "/assets/props/bench-vice/model.glb",
+      "purpose": "Rusty workshop bench vice",
+      "source": "https://polyhaven.com/a/bench_vice_01",
+      "license": "CC0",
+      "bytes": 2433068
+    },
+    "wooden-plank": {
+      "model": "/assets/props/wooden-plank/model.glb",
+      "purpose": "Reusable boarded-window / debris plank",
+      "source": "https://polyhaven.com/a/worn_planks",
+      "license": "CC0",
+      "derived": true,
+      "geometry": "Zombonz simple cuboid, 1.8m x 0.18m x 0.035m",
+      "textureSource": "Poly Haven worn_planks",
+      "bytes": 887060
+    }
+  },
+  "vehicles": {
+    "gaz-67": {
+      "model": "/assets/props/vehicles/gaz-67/model.glb",
+      "purpose": "Background WWII military jeep",
+      "source": "https://opengameart.org/content/lowpoly-soviet-jeep",
+      "license": "CC0",
+      "tier": "background",
+      "bytes": 2201472
+    },
+    "soviet-offroad": {
+      "model": "/assets/props/vehicles/soviet-offroad/model.glb",
+      "purpose": "Background military off-road vehicle",
+      "source": "https://opengameart.org/content/soviet-military-off-road-vehicle",
+      "license": "CC0",
+      "tier": "background",
+      "bytes": 638808
+    },
+    "t-12": {
+      "model": "/assets/props/vehicles/t-12/model.glb",
+      "purpose": "Background light tank silhouette",
+      "source": "https://opengameart.org/content/t-12-soviet-light-tank-lowpoly",
+      "license": "CC0",
+      "tier": "background",
+      "bytes": 2594816
+    }
+  },
+  "notes": [
+    "General props use realistic CC0 Poly Haven source models packed as self-contained 1K GLBs.",
+    "Vehicles are CC0 OpenGameArt conversions and are tagged background because their art fidelity is lower than the primary prop set.",
+    "The wooden plank geometry is project-created and uses the CC0 Poly Haven worn_planks material."
+  ]
+}
