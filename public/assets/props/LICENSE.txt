@@ -1,0 +1,8 @@
+CC0 prop asset pack
+
+Third-party source assets in this runtime directory are released under CC0 1.0 Universal by their listed sources.
+Exact source pages are recorded in manifest.json.
+
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The project-created wooden plank geometry is also released with the Zombonz project without additional asset restrictions.

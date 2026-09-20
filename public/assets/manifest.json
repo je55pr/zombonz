@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "note": "Third-party presentation assets. Gameplay remains authoritative in game-core. See /docs/assets/THIRD_PARTY_ASSETS.md for provenance.",
   "zombies": {
     "peter_d": {
@@ -49,5 +49,19 @@
       "license": "CC BY 4.0",
       "source": "https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732"
     }
+  },
+  "environment": {
+    "manifest": "/assets/environment/manifest.json",
+    "license": "CC0",
+    "materials": 10,
+    "decalSets": 5,
+    "note": "2K runtime PBR materials and transparent grime/graffiti overlays."
+  },
+  "props": {
+    "manifest": "/assets/props/manifest.json",
+    "license": "CC0",
+    "generalProps": 18,
+    "backgroundVehicles": 3,
+    "note": "Self-contained GLBs. Vehicles are lower-fidelity background dressing."
   }
 }
