@@ -39,7 +39,8 @@ Run `npm run check` for TypeScript validation, automated tests and a production 
 
 Click the canvas to capture the mouse. Move with WASD, hold Shift while moving forward to sprint,
 hold the right mouse button to aim down sights, and fire with the left mouse button.
-Sprinting stops when firing, aiming, reloading or changing weapons; aiming slows movement
+Sprint lasts about four seconds, then recharges after a short pause; once exhausted you
+need a second of stamina back before sprinting again. Sprinting also stops when firing, aiming, reloading or changing weapons; aiming slows movement
 and narrows the view. ADS also reduces weapon-specific hip-fire spread by 90%; shot
 variation is seeded in the game core for repeatable results. The handling is
 prototype tuning, not a frame-exact recreation.

@@ -16,6 +16,14 @@ export const PLAYER_MOVEMENT = {
   maxPitch: Math.PI * 0.47,
 } as const;
 
+/** WaW/BO1 sprint: about four seconds, a short pause, then recharge; an exhausted player needs one second back. */
+export const SPRINT_RULES = {
+  maxTicks: 240,
+  rechargeDelayTicks: 30,
+  rechargePerTick: 1,
+  minStartTicks: 60,
+} as const;
+
 export function createPlayerState(id: EntityId, position: Vec3, startingPoints = 500): PlayerState {
   return {
     id,
@@ -25,6 +33,8 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     yaw: 0,
     pitch: 0,
     sprinting: false,
+    sprintTicks: SPRINT_RULES.maxTicks,
+    sprintRechargeDelayTicks: 0,
     aiming: false,
     health: 100,
     recoveryDelayTicks: 0,
@@ -53,6 +63,17 @@ function moveToward(current: number, target: number, maxDelta: number): number {
 
 function held(frame: InputFrame, action: keyof InputFrame['actions']): number {
   return frame.actions[action]?.held ? 1 : 0;
+}
+
+function tickSprintStamina(player: PlayerState): void {
+  if (player.sprinting) {
+    player.sprintTicks -= 1;
+    player.sprintRechargeDelayTicks = SPRINT_RULES.rechargeDelayTicks;
+  } else if (player.sprintRechargeDelayTicks > 0) {
+    player.sprintRechargeDelayTicks -= 1;
+  } else {
+    player.sprintTicks = Math.min(SPRINT_RULES.maxTicks, player.sprintTicks + SPRINT_RULES.rechargePerTick);
+  }
 }
 
 function exitNoclip(player: PlayerState, boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[]): void {
@@ -108,7 +129,9 @@ export function updatePlayerMovement(
     && !frame.actions.reload?.pressed && !frame.actions.switchWeapon?.pressed
     && !frame.actions.melee?.pressed && !frame.actions.throwGrenade?.pressed
     && player.weapon.reloadTicksRemaining === 0
-    && player.switchTicksRemaining === 0 && player.meleeCooldownTicks === 0;
+    && player.switchTicksRemaining === 0 && player.meleeCooldownTicks === 0
+    && player.sprintTicks >= (player.sprinting ? 1 : SPRINT_RULES.minStartTicks);
+  tickSprintStamina(player);
   if (player.noclip) {
     const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
     const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);

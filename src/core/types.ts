@@ -28,6 +28,9 @@ export interface PlayerState extends EntityBase {
   yaw: number;
   pitch: number;
   sprinting: boolean;
+  /** Remaining sprint stamina, in ticks. */
+  sprintTicks: number;
+  sprintRechargeDelayTicks: number;
   aiming: boolean;
   health: number;
   recoveryDelayTicks: number;
