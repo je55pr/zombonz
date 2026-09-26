@@ -36,6 +36,7 @@ function smokeSimulation() {
 function runSmokeScenario() {
   const simulation = smokeSimulation();
   const playerId = simulation.playerIds[0];
+  simulation.getPlayer(playerId)!.pitch = -0.1;
   const fireTicks = new Set([2, 14, 26]);
   runHeadlessTicks(simulation, 40, (tick) => {
     const frame = createInputFrame(tick);
@@ -62,10 +63,12 @@ describe('deterministic smoke scenario', () => {
       alive: true,
       health: 100,
       points: 580,
+      kills: 1,
+      headshots: 0,
       weapon: { magazineAmmo: 5, reserveAmmo: 32 },
     });
     expect(state.round.phase).toBe('intermission');
-    // Includes default-off player debug modes and the null noclip return anchor.
-    expect(fnv1a(JSON.stringify(state))).toBe('9001cc44');
+    // Includes movement stance, survival timers/reward tracking and an aimed body-shot kill.
+    expect(fnv1a(JSON.stringify(state))).toBe('9b188632');
   });
 });

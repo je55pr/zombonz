@@ -10,7 +10,7 @@ import {
 
 const id = 'e:1' as const;
 
-function heldMove(action: 'moveForward' | 'moveRight') {
+function heldMove(action: 'moveForward' | 'moveRight' | 'sprint' | 'aim') {
   const frame = createInputFrame(1);
   frame.actions[action] = { held: true, pressed: true, released: false, value: 1 };
   return frame;
@@ -30,6 +30,50 @@ describe('player movement', () => {
     frame.look.pitch = 99;
     updatePlayerMovement(player, frame, 1 / 60, []);
     expect(player.pitch).toBe(PLAYER_MOVEMENT.maxPitch);
+  });
+
+  it('sprints forward faster and returns to walking speed when released', () => {
+    const walk = createPlayerState(id, { x: 0, y: 0, z: 0 });
+    const run = createPlayerState(id, { x: 0, y: 0, z: 0 });
+    const frame = heldMove('moveForward');
+    frame.actions.sprint = { held: true, pressed: true, released: false, value: 1 };
+    for (let i = 0; i < 60; i++) {
+      updatePlayerMovement(walk, heldMove('moveForward'), 1 / 60, []);
+      updatePlayerMovement(run, frame, 1 / 60, []);
+    }
+    expect(run.sprinting).toBe(true);
+    expect(run.position.z).toBeLessThan(walk.position.z * 1.4);
+    updatePlayerMovement(run, heldMove('moveForward'), 1 / 60, []);
+    expect(run.sprinting).toBe(false);
+  });
+
+  it('aiming slows movement and wins over sprint; firing cancels sprint', () => {
+    const player = createPlayerState(id, { x: 0, y: 0, z: 0 });
+    const frame = heldMove('moveForward');
+    frame.actions.aim = { held: true, pressed: true, released: false, value: 1 };
+    frame.actions.sprint = { held: true, pressed: true, released: false, value: 1 };
+    for (let i = 0; i < 60; i++) updatePlayerMovement(player, frame, 1 / 60, []);
+    expect(player.aiming).toBe(true);
+    expect(player.sprinting).toBe(false);
+    expect(Math.abs(player.position.z)).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.7);
+    frame.actions.aim.held = false;
+    frame.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    updatePlayerMovement(player, frame, 1 / 60, []);
+    expect(player.sprinting).toBe(false);
+    frame.actions.fire.held = false;
+    frame.actions.fire.pressed = false;
+    updatePlayerMovement(player, frame, 1 / 60, []);
+    expect(player.sprinting).toBe(true);
+    frame.actions.aim.held = true;
+    frame.actions.sprint.held = false;
+    player.weapon.reloadTicksRemaining = 10;
+    updatePlayerMovement(player, frame, 1 / 60, []);
+    expect(player.aiming).toBe(false);
+    player.weapon.reloadTicksRemaining = 0;
+    frame.actions.toggleNoclip = { held: true, pressed: true, released: false, value: 1 };
+    updatePlayerMovement(player, frame, 1 / 60, []);
+    expect(player.aiming).toBe(false);
+    expect(player.sprinting).toBe(false);
   });
 
   it('stops at collision boxes instead of passing through them', () => {

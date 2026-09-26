@@ -4,18 +4,24 @@ import { buildGreybox } from './client/greybox.ts';
 import { buildBunkerDetails } from './client/bunker.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
+import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
 import { ActorBatch } from './client/actorBatch.ts';
 import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
+import { HudFeedback } from './client/feedback.ts';
+import { GameAudio } from './client/audio.ts';
 import { loadZombieAsset, type ZombieAsset } from './client/runtimeAssets.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView } from './client/weaponView.ts';
+import { PowerupView } from './client/powerupView.ts';
+import { GrenadeView } from './client/grenadeView.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals } from './client/environmentProps.ts';
 import {
-  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, createWeaponState, createZombieState, allocateEntityId, addEntity,
+  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
+  createWeaponState, createZombieState, allocateEntityId, addEntity,
   type EntityId, type ZombieState, type Vec3,
 } from './core/index.ts';
 import {
@@ -72,11 +78,13 @@ const previewViews = {
   barrier: { position: { x: 12, y: 0, z: -0.8 }, yaw: 0 },
   stress: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
   assets: { position: NACHT_PLAYER_SPAWN, yaw: 0 },
+  gameOver: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
   overview: { position: { x: 23, y: 25, z: 28 }, yaw: 0.65 },
   doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
   props: { position: { x: -2, y: 0, z: 4.3 }, yaw: Math.PI + 0.15 },
 };
 const previewName = new URLSearchParams(location.search).get('preview');
+const previewPowerup = new URLSearchParams(location.search).get('powerup');
 const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
   ? previewViews[previewName as keyof typeof previewViews] : null;
 
@@ -97,6 +105,12 @@ const simulation = new GameSimulation({
   ...(previewName === 'stress' && preview ? { spawnConfig: {
     baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
   } } : {}),
+  ...(previewName === 'assets' && preview ? { powerupConfig: {
+    ...DEFAULT_POWERUP_CONFIG, dropChanceDenominator: 1, minimumTicksBetweenDrops: 0,
+    kinds: [previewPowerup === 'doublePoints' ? 'doublePoints'
+      : previewPowerup === 'instaKill' ? 'instaKill'
+        : previewPowerup === 'nuke' ? 'nuke' : 'maxAmmo'] as const,
+  } } : {}),
   ...(preview ? { roundConfig: { initialWaitTicks: previewName === 'barrier' || previewName === 'stress' ? 120 : 2147483647, intermissionTicks: 180 },
     economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } } : {}),
 });
@@ -109,6 +123,10 @@ if (preview) {
     simulation.getPlayer(playerId)!.pitch = -0.85;
   }
   if (previewName === 'stress') simulation.getPlayer(playerId)!.godMode = true;
+  if (previewName === 'gameOver') {
+    Object.assign(simulation.getPlayer(playerId)!, { points: 12345, kills: 42, headshots: 13 });
+    Object.assign(simulation.state.round, { round: 9, phase: 'gameOver' });
+  }
   for (const door of simulation.state.doors) door.open = true;
   for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
   const testWeapon = new URLSearchParams(location.search).get('weapon');
@@ -136,6 +154,8 @@ void loadZombieAsset(zombieVariant).then(asset => {
   console.warn('Unable to load zombie asset', error);
 });
 const weaponView = new WeaponView();
+const powerupView = new PowerupView(scene);
+const grenadeView = new GrenadeView(scene);
 
 function zombies(): ZombieState[] {
   return simulation.zombies();
@@ -143,6 +163,9 @@ function zombies(): ZombieState[] {
 function syncZombieViews(alpha: number): void {
   if (zombieAsset) {
     const tick = simulation.state.world.tick - 1 + alpha;
+    for (const [id, view] of skinnedViews) if (!simulation.state.world.entities[id]) {
+      view.dispose(); skinnedViews.delete(id);
+    }
     for (const entity of Object.values(simulation.state.world.entities)) {
       if (entity.kind !== 'zombie') continue;
       let view = skinnedViews.get(entity.id);
@@ -180,7 +203,14 @@ function syncZombieViews(alpha: number): void {
 
 const clock = new FixedStepClock({ tickRate: 60 });
 const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022, previewFireKey: !!preview });
+const audio = new GameAudio(canvas);
+const pause = new SoloPauseController(canvas, window, document, paused => {
+  clock.reset(); previousPositions.clear();
+  if (paused) input.clear();
+  audio.setPaused(paused);
+}, !preview, () => simulation.state.round.phase !== 'gameOver');
 const hud = new CanvasHud(renderer);
+const feedback = new HudFeedback();
 const performanceOverlay = new PerformanceOverlay();
 renderer.info.autoReset = false;
 let previousSeconds: number | undefined;
@@ -196,6 +226,9 @@ function simulate(dt: number): void {
   }
   const events = simulation.tick({ [playerId]: input.consume() }, dt);
   weaponView.events(events, playerId, simulation.state.world.tick);
+  grenadeView.events(events, simulation.state.world.tick);
+  feedback.consume(events, playerId, simulation.state.world.tick);
+  audio.consume(events, playerId);
   if (simulation.state.world !== world) {
     previousPositions.clear();
     for (const view of skinnedViews.values()) view.dispose();
@@ -226,12 +259,20 @@ function frame(nowMs: number): void {
   const nowSeconds = nowMs / 1000;
   if (previousSeconds === undefined) previousSeconds = nowSeconds;
   const interval = (nowSeconds - previousSeconds) * 1000;
-  clock.advance(nowSeconds - previousSeconds, simulate);
+  if (pause.paused) { input.clear(); clock.reset(); }
+  else clock.advance(nowSeconds - previousSeconds, simulate);
   const simulationMs = performance.now() - started;
   previousSeconds = nowSeconds;
   const alpha = clock.interpolationAlpha();
   syncCamera(alpha);
+  const playerForCamera = simulation.getPlayer(playerId);
+  const targetFov = playerForCamera?.aiming ? 54 : playerForCamera?.sprinting ? 71 : 67;
+  const fovBlend = 1 - Math.exp(-12 * Math.min(0.1, Math.max(0, interval / 1000)));
+  const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
+  if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
   syncZombieViews(alpha);
+  powerupView.update(simulation.state.powerups.drops, simulation.state.world.tick - 1 + alpha);
+  grenadeView.update(simulation.state.grenades.active, simulation.state.world.tick - 1 + alpha);
   bunker.update(simulation.state);
   renderer.clear();
   renderer.info.reset();
@@ -242,10 +283,12 @@ function frame(nowMs: number): void {
   }
   renderer.render(scene, camera);
   const player = simulation.getPlayer(playerId);
-  if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha); weaponView.render(renderer, camera.aspect); }
+  if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha, interval / 1000); weaponView.render(renderer, camera.aspect); }
   const hudStarted = performance.now();
   const hudSnapshot = buildHudSnapshot(simulation, playerId);
-  if (hudSnapshot) hud.render({ ...hudSnapshot, assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice });
+  if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused,
+    feedback: feedback.snapshot(simulation.state.world.tick),
+    assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice });
   performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
     renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
   performanceOverlay.render(renderer);

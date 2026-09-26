@@ -1,19 +1,33 @@
 import * as THREE from 'three';
 import type { EntityId } from '../core/types.ts';
 import type { GameSimulation } from '../core/simulation.ts';
+import type { FeedbackSnapshot } from './feedback.ts';
 
 export interface HudSnapshot {
   health: number;
   points: number;
+  kills: number;
+  headshots: number;
   round: number;
   weapon: string;
   magazineAmmo: number;
   reserveAmmo: number;
+  holsteredWeapon: string | null;
+  reloadTicksRemaining: number;
+  grenadeCharges: number;
+  roundPhase: string;
   interactionPrompt: string | null;
+  nearbyPowerup: string | null;
+  bonusStatus: string | null;
+  instaKillStatus: string | null;
   gameOver: boolean;
+  paused: boolean;
   godMode: boolean;
   noclip: boolean;
+  sprinting: boolean;
+  aiming: boolean;
   assetNotice?: string | null;
+  feedback?: FeedbackSnapshot;
 }
 
 export function buildHudSnapshot(
@@ -22,17 +36,36 @@ export function buildHudSnapshot(
 ): HudSnapshot | null {
   const player = simulation.getPlayer(playerId);
   if (!player) return null;
+  const nearbyDrop = simulation.state.powerups.drops.find(drop => Math.hypot(
+    drop.position.x - player.position.x, drop.position.z - player.position.z) < 4
+    && Math.abs(drop.position.y - player.position.y) < 2);
   return {
     health: player.health,
     points: player.points,
+    kills: player.kills,
+    headshots: player.headshots,
     round: Math.max(1, simulation.state.round.round),
     weapon: player.weapon.weaponId,
     magazineAmmo: player.weapon.magazineAmmo,
     reserveAmmo: player.weapon.reserveAmmo,
+    holsteredWeapon: player.holsteredWeapon?.weaponId ?? null,
+    reloadTicksRemaining: player.weapon.reloadTicksRemaining,
+    grenadeCharges: player.grenadeCharges,
+    roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
+    nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO'
+      : nearbyDrop.kind === 'doublePoints' ? 'DOUBLE POINTS'
+        : nearbyDrop.kind === 'instaKill' ? 'INSTA-KILL' : 'NUKE' : null,
+    bonusStatus: simulation.state.powerups.doublePointsTicksRemaining > 0
+      ? `2X POINTS  ${Math.ceil(simulation.state.powerups.doublePointsTicksRemaining / 60)}s` : null,
+    instaKillStatus: simulation.state.powerups.instaKillTicksRemaining > 0
+      ? `INSTA-KILL  ${Math.ceil(simulation.state.powerups.instaKillTicksRemaining / 60)}s` : null,
     gameOver: simulation.state.round.phase === 'gameOver',
+    paused: false,
     godMode: player.godMode,
     noclip: player.noclip,
+    sprinting: player.sprinting,
+    aiming: player.aiming,
   };
 }
 function weaponLabel(id: string): string {
@@ -97,29 +130,60 @@ export class CanvasHud {
   private draw(snapshot: HudSnapshot): void {
     const { width, height } = this.canvas;
     this.context.clearRect(0, 0, width, height);
+    if (snapshot.feedback?.damageVignette || snapshot.health <= 50) {
+      const edge = this.context.createRadialGradient(width / 2, height / 2, height * 0.24,
+        width / 2, height / 2, width * 0.67);
+      edge.addColorStop(0, 'rgba(80,0,0,0)');
+      edge.addColorStop(1, snapshot.feedback?.damageVignette ? 'rgba(150,0,0,0.67)' : 'rgba(100,0,0,0.32)');
+      this.context.fillStyle = edge; this.context.fillRect(0, 0, width, height);
+    }
     this.text('NACHT DER UNTOTEN', width / 2, 38, 19, 'center');
     this.text('F2 ASSET CREDITS', width / 2, 64, 13, 'center');
     if (snapshot.assetNotice) this.text(snapshot.assetNotice, width / 2, height - 80, 19, 'center');
     if (!snapshot.gameOver) {
-      this.context.fillStyle = 'rgba(244,241,231,0.75)';
-      this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
+      const mark = snapshot.feedback?.hitMarker;
+      if (mark) {
+        const x = width / 2, y = height / 2;
+        this.context.strokeStyle = mark === 'head' ? '#e6c36d' : mark === 'kill' ? '#df604a' : '#e5e5dd';
+        this.context.lineWidth = mark === 'kill' ? 5 : 3;
+        this.context.beginPath();
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          this.context.moveTo(x + dx * 8, y + dy * 8);
+          this.context.lineTo(x + dx * 19, y + dy * 19);
+        }
+        this.context.stroke();
+      } else if (!snapshot.aiming) {
+        this.context.fillStyle = 'rgba(244,241,231,0.75)';
+        this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
+      }
     }
     this.text(`ROUND ${snapshot.round}`, 48, 58, 42);
+    if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 48, 100, 22);
     const modes = [snapshot.godMode ? 'GOD MODE [G]' : '', snapshot.noclip ? 'NOCLIP [F]' : ''].filter(Boolean);
     if (modes.length) this.text(modes.join('   /   '), 48, 105, 23);
     if (snapshot.noclip) this.text('WASD fly · SPACE up · C down', 48, 140, 20);
     this.text(`HP ${snapshot.health}`, 48, height - 54, 36);
+    this.text(`T  GRENADES ${snapshot.grenadeCharges}`, 48, height - 95, 20);
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');
+    if (snapshot.bonusStatus) this.text(snapshot.bonusStatus, width - 48, height - 226, 23, 'right');
+    if (snapshot.instaKillStatus) this.text(snapshot.instaKillStatus, width - 48, height - 256, 23, 'right');
     this.text(weaponLabel(snapshot.weapon), width - 48, height - 50, 26, 'right');
     this.text(`${snapshot.magazineAmmo} / ${snapshot.reserveAmmo}`, width - 48, height - 20, 30, 'right');
+    if (snapshot.holsteredWeapon) this.text(`Q  ${weaponLabel(snapshot.holsteredWeapon)}`, width - 48, height - 130, 20, 'right');
+    if (snapshot.reloadTicksRemaining > 0) this.text('RELOADING', width - 48, height - 169, 18, 'right');
+    else if (snapshot.magazineAmmo === 0) this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', width - 48, height - 169, 18, 'right');
+    if (snapshot.feedback?.message && !snapshot.gameOver) this.text(snapshot.feedback.message, width / 2, height * 0.60, 27, 'center');
+    this.text('WASD MOVE   •   SHIFT SPRINT   •   RMB AIM   •   V KNIFE   •   T GRENADE   •   R RELOAD   •   Q SWITCH   •   M MUTE', width / 2, height - 22, 15, 'center');
 
     if (snapshot.gameOver) {
       this.context.fillStyle = 'rgba(0,0,0,0.58)';
       this.context.fillRect(0, 0, width, height);
       this.text('GAME OVER', width / 2, height * 0.44, 72, 'center');
-      this.text('PRESS ENTER TO RESTART', width / 2, height * 0.54, 30, 'center');
+      this.text(`ROUND ${snapshot.round}   •   ${snapshot.kills} KILLS   •   ${snapshot.headshots} HEADSHOTS`,
+        width / 2, height * 0.54, 26, 'center');
+      this.text(`${snapshot.points} POINTS`, width / 2, height * 0.60, 27, 'center');
+      this.text('PRESS ENTER TO RESTART', width / 2, height * 0.68, 30, 'center');
     }
-
     if (snapshot.interactionPrompt) {
       this.context.font = '700 30px Arial, sans-serif';
       const promptWidth = this.context.measureText(snapshot.interactionPrompt).width + 44;
@@ -128,6 +192,14 @@ export class CanvasHud {
       this.context.fillStyle = 'rgba(0,0,0,0.58)';
       this.context.fillRect(x - promptWidth / 2, y - 29, promptWidth, 58);
       this.text(snapshot.interactionPrompt, x, y, 30, 'center');
+    }
+    if (snapshot.nearbyPowerup && !snapshot.gameOver) this.text(snapshot.nearbyPowerup,
+      width / 2, height * 0.65, 28, 'center');
+    if (snapshot.paused && !snapshot.gameOver) {
+      this.context.fillStyle = 'rgba(0,0,0,0.62)';
+      this.context.fillRect(0, 0, width, height);
+      this.text('PAUSED', width / 2, height * 0.44, 68, 'center');
+      this.text('CLICK TO RESUME', width / 2, height * 0.53, 30, 'center');
     }
     if (this.credits) {
       this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(180, 115, 1240, 540);
@@ -143,9 +215,13 @@ export class CanvasHud {
 
   render(snapshot: HudSnapshot): void {
     if (!this.previous || (Object.keys(snapshot) as (keyof HudSnapshot)[])
-      .some(key => snapshot[key] !== this.previous![key])) {
+      .some(key => key === 'feedback'
+        ? snapshot.feedback?.message !== this.previous!.feedback?.message
+          || snapshot.feedback?.hitMarker !== this.previous!.feedback?.hitMarker
+          || snapshot.feedback?.damageVignette !== this.previous!.feedback?.damageVignette
+        : snapshot[key] !== this.previous![key])) {
       this.draw(snapshot);
-      this.previous = { ...snapshot };
+      this.previous = { ...snapshot, feedback: snapshot.feedback && { ...snapshot.feedback } };
     }
     this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);

@@ -102,17 +102,21 @@ describe('Nacht room routes', () => {
 });
 describe('single fixed mystery box', () => {
   const front = { x: -1.45, y: 0, z: 5.5 };
-  it('charges 950 once, gives a loaded weapon, and respects its cooldown', () => {
+  it('charges 950 once, rolls before claiming, and respects its cooldown', () => {
     const sim = makeSimulation(3000, front);
     const player = sim.getPlayer(sim.playerIds[0])!; player.yaw = Math.PI;
     expect(sim.state.mysteryBoxes).toHaveLength(1);
     expect(interact(sim).some(event => event.type === 'mysteryBoxUsed')).toBe(true);
     expect(player.points).toBe(2050);
+    expect(player.weapon.weaponId).toBe('starter-pistol');
+    expect(interact(sim).some(event => event.type === 'mysteryBoxUsed')).toBe(false);
+    for (let i = 0; i < 180; i++) sim.tick();
+    expect(interact(sim).some(event => event.type === 'mysteryBoxClaimed')).toBe(true);
     expect(player.weapon.magazineAmmo).toBeGreaterThan(0);
     expect(NACHT_MYSTERY_BOXES[0].weapons).toContain(player.weapon.weaponId);
     expect(interact(sim).some(event => event.type === 'mysteryBoxUsed')).toBe(false);
     expect(player.points).toBe(2050);
-    for (let i = 0; i < 180; i++) sim.tick();
+    for (let i = 0; i < 120; i++) sim.tick();
     expect(interact(sim).some(event => event.type === 'mysteryBoxUsed')).toBe(true);
     expect(player.points).toBe(1100);
   });

@@ -27,9 +27,20 @@ export interface PlayerState extends EntityBase {
   velocity: Vec3;
   yaw: number;
   pitch: number;
+  sprinting: boolean;
+  aiming: boolean;
   health: number;
+  recoveryDelayTicks: number;
+  meleeCooldownTicks: number;
+  grenadeCharges: number;
+  repairRewardRound: number;
+  repairPointsEarned: number;
   points: number;
+  kills: number;
+  headshots: number;
   weapon: WeaponState;
+  holsteredWeapon: WeaponState | null;
+  switchTicksRemaining: number;
   godMode: boolean;
   noclip: boolean;
   noclipAnchor: Vec3 | null;
@@ -43,6 +54,7 @@ export interface ZombieState extends EntityBase {
   attackCooldownTicks: number;
   targetId: EntityId | null;
   entry: ZombieEntryState | null;
+  deadTicks: number;
 }
 export interface InteractableState extends EntityBase {
   kind: 'interactable';

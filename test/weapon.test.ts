@@ -9,6 +9,7 @@ import {
   firePlayerWeapon,
   rayFromPlayer,
   resolveHitscan,
+  spreadHitscanRay,
   createWeaponState,
   wantsToFire,
 } from '../src/core/index.ts';
@@ -36,6 +37,20 @@ describe('hitscan weapons', () => {
     });
   });
 
+  it('makes ADS ten times steadier than hip-fire with repeatable shot spread', () => {
+    const target = zombie('e:2', -50);
+    const hip = Array.from({ length: 20 }, (_, seed) =>
+      resolveHitscan(spreadHitscanRay(ray, WEAPON_DEFINITIONS.bar.hipSpreadRadians, seed + 1),
+        [target], [], 80).kind === 'zombie');
+    const aimed = Array.from({ length: 20 }, (_, seed) =>
+      resolveHitscan(spreadHitscanRay(ray, WEAPON_DEFINITIONS.bar.hipSpreadRadians * 0.1, seed + 1),
+        [target], [], 80).kind === 'zombie');
+    expect(aimed.filter(Boolean).length).toBe(20);
+    expect(hip.filter(Boolean).length).toBeLessThan(10);
+    expect(spreadHitscanRay(ray, 0.035, 42)).toEqual(spreadHitscanRay(ray, 0.035, 42));
+    expect(spreadHitscanRay(ray, 0.035, 42)).not.toEqual(spreadHitscanRay(ray, 0.035, 43));
+  });
+
   it('hits the nearest zombie before a farther zombie', () => {
     const near = zombie('e:2', -5);
     const far = zombie('e:3', -10);
@@ -60,6 +75,7 @@ describe('hitscan weapons', () => {
   it('applies damage exactly once and enforces fire cadence', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     const target = zombie('e:2', -5);
+    player.pitch = -0.1; // Body shot: eye-level shots now correctly hit the head.
     const first = firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
     expect(target.health).toBe(100);
     expect(first.filter((event) => event.type === 'weaponHit')).toHaveLength(1);
@@ -67,6 +83,20 @@ describe('hitscan weapons', () => {
     const blockedByCooldown = firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
     expect(blockedByCooldown).toEqual([]);
     expect(target.health).toBe(100);
+  });
+
+  it('starts a reload on the last shot only when reserve ammo remains', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.weapon.magazineAmmo = 1;
+    const events = firePlayerWeapon(player, ray, [], []);
+    expect(events.map((event) => event.type)).toEqual(['weaponFired', 'weaponReloadStarted']);
+    expect(player.weapon.reloadTicksRemaining).toBe(WEAPON_DEFINITIONS['starter-pistol'].reloadTicks);
+
+    const dry = createPlayerState('e:2', { x: 0, y: 0, z: 0 });
+    dry.weapon.magazineAmmo = 1;
+    dry.weapon.reserveAmmo = 0;
+    expect(firePlayerWeapon(dry, ray, [], []).map((event) => event.type)).toEqual(['weaponFired']);
+    expect(dry.weapon.reloadTicksRemaining).toBe(0);
   });
 
   it('fires through GameSimulation from authoritative input', () => {
@@ -77,6 +107,7 @@ describe('hitscan weapons', () => {
       roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 },
     });
     const playerId = simulation.playerIds[0];
+    simulation.getPlayer(playerId)!.pitch = -0.1;
     const target = zombie('e:99', -5);
     addEntity(simulation.state.world, target);
     const frame = createInputFrame(0);

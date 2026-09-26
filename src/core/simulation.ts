@@ -1,18 +1,22 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { createBarrier, createZombieEntry, prepareBarriers, updateZombieEntry,
   repairBarriers, syncBarrierInteractables, type BarrierDefinition, type BarrierState, type BarrierEvent } from './barrier.ts';
-import { createMysteryBox, tickMysteryBoxes, useMysteryBox,
+import { createMysteryBox, tickMysteryBoxes, useMysteryBox, mysteryBoxPrompt,
   type MysteryBoxDefinition, type MysteryBoxState, type MysteryBoxEvent } from './mysteryBox.ts';
 import {
   closedDoorBlockers, createDoorInteractable, createDoorState, handleDoorInteraction,
   type DoorDefinition, type DoorEvent, type DoorState,
 } from './door.ts';
 import {
-  DEFAULT_ECONOMY_CONFIG, awardCombatPoints,
+  DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints, awardNukePoints,
   type EconomyConfig, type EconomyEvent,
 } from './economy.ts';
-import { livingEntityCount, livingPlayers, type DamageEvent } from './health.ts';
+import { livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
+import { GRENADE_RULES, createGrenadePool, tickGrenades, throwGrenade,
+  type GrenadeEvent, type GrenadePool } from './grenade.ts';
+import { collectPowerups, createPowerupState, tickPowerupLifetime, tryDropPowerup,
+  DEFAULT_POWERUP_CONFIG, type PowerupConfig, type PowerupEvent, type PowerupState } from './powerups.ts';
 import {
   findInteractionCandidate, triggerInteraction,
   type InteractionCandidate, type InteractionEvent,
@@ -27,12 +31,12 @@ import {
 } from './spawning.ts';
 import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
-import { addEntity, allocateEntityId, createWorld } from './world.ts';
+import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
 import {
   createZombieState, tickZombieMelee, updateZombiePursuit, type ZombieAttackEvent,
 } from './zombie.ts';
 import {
-  beginReload, firePlayerWeapon, rayFromPlayer, tickWeaponState, wantsToFire, type WeaponEvent,
+  beginReload, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon, type WeaponEvent,
 } from './weapon.ts';
 import {
   createWallWeaponInteractable, createWallWeaponState, handleWallWeaponInteraction,
@@ -59,6 +63,8 @@ export interface SimulationState {
   wallWeapons: WallWeaponState[];
   mysteryBoxes: MysteryBoxState[];
   barriers: BarrierState[];
+  powerups: PowerupState;
+  grenades: GrenadePool;
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
@@ -78,7 +84,7 @@ export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | MatchRestartedEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -88,6 +94,7 @@ export interface GameSimulationOptions {
   roundConfig?: RoundConfig;
   spawnConfig?: SpawnDirectorConfig;
   economyConfig?: EconomyConfig;
+  powerupConfig?: PowerupConfig;
 }
 
 export class GameSimulation {
@@ -97,6 +104,7 @@ export class GameSimulation {
   private readonly roundConfig?: RoundConfig;
   private readonly spawnConfig?: SpawnDirectorConfig;
   private readonly economyConfig: EconomyConfig;
+  private readonly powerupConfig: PowerupConfig;
   private readonly playerSpawns: readonly Vec3[];
   private navigationCache?: { doors: string; query: NavigationQuery };
 
@@ -105,6 +113,7 @@ export class GameSimulation {
     this.roundConfig = options.roundConfig;
     this.spawnConfig = options.spawnConfig;
     this.economyConfig = options.economyConfig ?? DEFAULT_ECONOMY_CONFIG;
+    this.powerupConfig = options.powerupConfig ?? DEFAULT_POWERUP_CONFIG;
     this.playerSpawns = options.playerSpawns.map((spawn) => ({ ...spawn }));
     for (const spawn of this.map.zombieSpawns) {
       if (spawn.barrierId && !this.map.barriers?.some(barrier => barrier.id === spawn.barrierId)) {
@@ -147,7 +156,8 @@ export class GameSimulation {
     }
     syncBarrierInteractables(barriers, Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable'));
-    return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers };
+    return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
+      powerups: createPowerupState(), grenades: createGrenadePool() };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -179,7 +189,9 @@ export class GameSimulation {
 
   interactionCandidate(playerId: EntityId): InteractionCandidate | null {
     const player = this.getPlayer(playerId);
-    return player ? findInteractionCandidate(player, this.reachableInteractables(player)) : null;
+    const candidate = player ? findInteractionCandidate(player, this.reachableInteractables(player)) : null;
+    const box = this.state.mysteryBoxes.find(box => box.interactableId === candidate?.interactableId);
+    return candidate && box ? { ...candidate, prompt: mysteryBoxPrompt(box, playerId) } : candidate;
   }
 
   private navigationQuery(): NavigationQuery {
@@ -206,20 +218,26 @@ export class GameSimulation {
     if (this.state.round.phase === 'gameOver') {
       const restartRequested = Object.values(inputs).some((frame) => frame?.actions.restart?.pressed);
       if (restartRequested) return [this.restart()];
+      return [];
     }
     const events: SimulationEvent[] = [];
     const world = this.state.world;
-    tickMysteryBoxes(this.state.mysteryBoxes, this.interactables());
+    events.push(...tickPowerupLifetime(this.state.powerups));
+    tickMysteryBoxes(this.state.mysteryBoxes, this.interactables(), livingPlayers(world));
     const repairers = new Map<string, EntityId>();
 
     const playerFrames = new Map<EntityId, InputFrame>();
     for (const player of livingPlayers(world)) {
+      events.push(...tickPlayerRecovery(player));
+      if (player.meleeCooldownTicks > 0) player.meleeCooldownTicks -= 1;
       const frame = inputs[player.id] ?? createInputFrame(world.tick);
       playerFrames.set(player.id, frame);
       updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
       events.push(...tickWeaponState(player));
+      if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
+      if (frame.actions.throwGrenade?.pressed) events.push(...throwGrenade(this.state.grenades, player));
       if (frame.actions.interact?.held) {
         const candidate = findInteractionCandidate(player, this.reachableInteractables(player));
         const barrier = this.state.barriers.find(barrier => barrier.interactableId === candidate?.interactableId);
@@ -238,14 +256,48 @@ export class GameSimulation {
 
     for (const player of livingPlayers(world)) {
       const frame = playerFrames.get(player.id)!;
+      if (frame.actions.melee?.pressed) {
+        const meleeEvents = meleeAttack(player, this.zombies(), [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
+          this.state.powerups.instaKillTicksRemaining > 0);
+        events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig,
+          this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
+      }
       const fire = frame.actions.fire;
       if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
       const weaponEvents = firePlayerWeapon(
         player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(),
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
+        this.state.powerups.instaKillTicksRemaining > 0,
+        world.seed ^ world.tick,
       );
       events.push(...weaponEvents);
-      events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig));
+      events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig,
+        this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
+    }
+
+    if (this.state.grenades.active.length) {
+      const grenadeEvents = tickGrenades(this.state.grenades, this.zombies(), livingPlayers(world),
+        [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])], this.map.walkSurfaces, deltaSeconds,
+        this.state.powerups.instaKillTicksRemaining > 0);
+      events.push(...grenadeEvents);
+      const grenadeCombat = grenadeEvents.filter((event): event is WeaponEvent =>
+        event.type === 'grenadeHit' || event.type === 'zombieDamaged' || event.type === 'zombieDied');
+      if (grenadeCombat.length) for (const player of livingPlayers(world)) events.push(...awardCombatPoints(player,
+        grenadeCombat, this.economyConfig, this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
+    }
+
+    for (const event of events) if (event.type === 'zombieDied') {
+      const zombie = world.entities[event.zombieId];
+      if (zombie?.kind === 'zombie') events.push(...tryDropPowerup(this.state.powerups, zombie,
+        this.state.barriers, world.seed, world.tick, this.powerupConfig));
+    }
+    if (this.state.powerups.drops.length) {
+      const pickupEvents = collectPowerups(this.state.powerups, livingPlayers(world), this.collisionBoxes(),
+        this.powerupConfig, this.zombies());
+      events.push(...pickupEvents);
+      if (pickupEvents.some(event => event.type === 'nukeDetonated')) for (const player of livingPlayers(world)) {
+        events.push(...awardNukePoints(player));
+      }
     }
 
     const navigate = this.navigationQuery();
@@ -300,7 +352,13 @@ export class GameSimulation {
       events.push(...tickZombieMelee(zombie, players, this.collisionBoxes()));
     }
     // Repair resolves after entry decisions, so rebuilding cannot trap an active vault.
-    events.push(...repairBarriers(this.state.barriers, repairers));
+    const repairEvents = repairBarriers(this.state.barriers, repairers);
+    events.push(...repairEvents);
+    for (const event of repairEvents) if (event.type === 'barrierBoardRepaired') {
+      const player = this.getPlayer(event.playerId);
+      if (player) events.push(...awardRepairPoints(player, this.state.round.round,
+        this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
+    }
     syncBarrierInteractables(this.state.barriers, this.interactables());
 
     const roundEvents = updateRoundState(this.state.round, {
@@ -313,7 +371,19 @@ export class GameSimulation {
     for (const event of roundEvents) {
       if (event.to === 'spawning') {
         this.state.spawnDirector = createSpawnDirector(event.round, this.spawnConfig);
+        for (const player of livingPlayers(world)) player.grenadeCharges = GRENADE_RULES.maximum;
       }
+    }
+    for (const event of events) if (event.type === 'zombieDied') {
+      const killer = this.getPlayer(event.playerId);
+      if (!killer) continue;
+      killer.kills += 1;
+      if (event.method === 'head') killer.headshots += 1;
+    }
+    // Keep the body through its death animation, then reclaim authoritative state.
+    for (const entity of Object.values(world.entities)) if (entity.kind === 'zombie' && !entity.alive) {
+      entity.deadTicks += 1;
+      if (entity.deadTicks >= 300) removeEntity(world, entity.id);
     }
     world.tick += 1;
     return events;

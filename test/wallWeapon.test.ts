@@ -73,6 +73,6 @@ describe('wall weapon purchases', () => {
     const events = sim.tick({ [playerId]: interactFrame(1) });
     expect(events.some((event) => event.type === 'wallWeaponAmmoPurchased')).toBe(true);
     expect(player.points).toBe(200);
-    expect(player.weapon).toMatchObject({ weaponId: 'kar98k', magazineAmmo: 5, reserveAmmo: 50 });
+    expect(player.weapon).toMatchObject({ weaponId: 'kar98k', magazineAmmo: 1, reserveAmmo: 50 });
   });
 });

@@ -29,14 +29,26 @@ describe('gameplay HUD snapshot', () => {
     expect(buildHudSnapshot(sim, playerId)).toEqual({
       health: 100,
       points: 500,
+      kills: 0,
+      headshots: 0,
       round: 1,
       weapon: 'starter-pistol',
       magazineAmmo: 8,
       reserveAmmo: 32,
+      holsteredWeapon: null,
+      reloadTicksRemaining: 0,
+      grenadeCharges: 2,
+      roundPhase: 'waiting',
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
+      nearbyPowerup: null,
+      bonusStatus: null,
+      instaKillStatus: null,
       gameOver: false,
+      paused: false,
       godMode: false,
       noclip: false,
+      sprinting: false,
+      aiming: false,
     });
   });
 
@@ -46,12 +58,16 @@ describe('gameplay HUD snapshot', () => {
     const player = sim.getPlayer(playerId)!;
     player.health = 65;
     player.points = 730;
+    player.kills = 7;
+    player.headshots = 3;
     player.weapon.magazineAmmo = 3;
     player.weapon.reserveAmmo = 17;
     sim.state.round.round = 4;
     expect(buildHudSnapshot(sim, playerId)).toMatchObject({
       health: 65,
       points: 730,
+      kills: 7,
+      headshots: 3,
       round: 4,
       magazineAmmo: 3,
       reserveAmmo: 17,
@@ -70,5 +86,19 @@ describe('gameplay HUD snapshot', () => {
     const playerId = sim.playerIds[0];
     sim.getPlayer(playerId)!.yaw = Math.PI;
     expect(buildHudSnapshot(sim, playerId)?.interactionPrompt).toBeNull();
+  });
+
+  it('shows nearby drops and updates Double Points at one-second resolution', () => {
+    const sim = simulation(), playerId = sim.playerIds[0];
+    sim.state.powerups.drops.push({ id: 'p:1', kind: 'doublePoints',
+      position: { x: 0, y: 0, z: -3 }, ticksRemaining: 900 });
+    sim.state.powerups.doublePointsTicksRemaining = 1799;
+    expect(buildHudSnapshot(sim, playerId)).toMatchObject({
+      nearbyPowerup: 'DOUBLE POINTS', bonusStatus: '2X POINTS  30s',
+    });
+    sim.state.powerups.doublePointsTicksRemaining = 1740;
+    expect(buildHudSnapshot(sim, playerId)?.bonusStatus).toBe('2X POINTS  29s');
+    sim.state.powerups.drops = [];
+    expect(buildHudSnapshot(sim, playerId)?.nearbyPowerup).toBeNull();
   });
 });

@@ -6,6 +6,8 @@ import { createStarterWeaponState } from './weapon.ts';
 
 export const PLAYER_MOVEMENT = {
   maxSpeed: 4.2,
+  sprintMultiplier: 1.5,
+  aimMultiplier: 0.65,
   acceleration: 22,
   deceleration: 28,
   radius: 0.34,
@@ -22,9 +24,20 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     velocity: { x: 0, y: 0, z: 0 },
     yaw: 0,
     pitch: 0,
+    sprinting: false,
+    aiming: false,
     health: 100,
+    recoveryDelayTicks: 0,
+    meleeCooldownTicks: 0,
+    grenadeCharges: 2,
+    repairRewardRound: 0,
+    repairPointsEarned: 0,
     points: startingPoints,
+    kills: 0,
+    headshots: 0,
     weapon: createStarterWeaponState(),
+    holsteredWeapon: null,
+    switchTicksRemaining: 0,
     godMode: false,
     noclip: false,
     noclipAnchor: null,
@@ -35,7 +48,7 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
 function moveToward(current: number, target: number, maxDelta: number): number {
   if (current < target) return Math.min(current + maxDelta, target);
   if (current > target) return Math.max(current - maxDelta, target);
-  return target;
+  return target || 0; // Canonical zero survives JSON snapshots without a -0 distinction.
 }
 
 function held(frame: InputFrame, action: keyof InputFrame['actions']): number {
@@ -85,6 +98,17 @@ export function updatePlayerMovement(
 
   const forwardInput = held(frame, 'moveForward') - held(frame, 'moveBackward');
   const rightInput = held(frame, 'moveRight') - held(frame, 'moveLeft');
+  player.aiming = !player.noclip && held(frame, 'aim') > 0
+    && player.weapon.reloadTicksRemaining === 0 && player.switchTicksRemaining === 0
+    && player.meleeCooldownTicks === 0 && !frame.actions.reload?.pressed
+    && !frame.actions.switchWeapon?.pressed && !frame.actions.melee?.pressed
+    && !frame.actions.throwGrenade?.pressed;
+  player.sprinting = !player.noclip && held(frame, 'sprint') > 0 && forwardInput > 0
+    && !player.aiming && !frame.actions.fire?.held && !frame.actions.fire?.pressed
+    && !frame.actions.reload?.pressed && !frame.actions.switchWeapon?.pressed
+    && !frame.actions.melee?.pressed && !frame.actions.throwGrenade?.pressed
+    && player.weapon.reloadTicksRemaining === 0
+    && player.switchTicksRemaining === 0 && player.meleeCooldownTicks === 0;
   if (player.noclip) {
     const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
     const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
@@ -106,8 +130,10 @@ export function updatePlayerMovement(
 
   const sin = Math.sin(player.yaw);
   const cos = Math.cos(player.yaw);
-  const desiredX = (-sin * normalizedForward + cos * normalizedRight) * PLAYER_MOVEMENT.maxSpeed;
-  const desiredZ = (-cos * normalizedForward - sin * normalizedRight) * PLAYER_MOVEMENT.maxSpeed;
+  const speed = PLAYER_MOVEMENT.maxSpeed * (player.sprinting
+    ? PLAYER_MOVEMENT.sprintMultiplier : player.aiming ? PLAYER_MOVEMENT.aimMultiplier : 1);
+  const desiredX = (-sin * normalizedForward + cos * normalizedRight) * speed;
+  const desiredZ = (-cos * normalizedForward - sin * normalizedRight) * speed;
   const moving = magnitude > 0;
   const rate = (moving ? PLAYER_MOVEMENT.acceleration : PLAYER_MOVEMENT.deceleration) * deltaSeconds;
   player.velocity.x = moveToward(player.velocity.x, desiredX, rate);

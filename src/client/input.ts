@@ -2,7 +2,8 @@ import type { ActionState, GameAction, InputFrame } from '../core/input.ts';
 
 const KEY_ACTIONS: Partial<Record<string, GameAction>> = {
   KeyW: 'moveForward', KeyS: 'moveBackward', KeyA: 'moveLeft', KeyD: 'moveRight',
-  KeyR: 'reload', KeyE: 'interact', Enter: 'restart',
+  ShiftLeft: 'sprint', ShiftRight: 'sprint',
+  KeyR: 'reload', KeyE: 'interact', KeyV: 'melee', KeyT: 'throwGrenade', KeyQ: 'switchWeapon', Enter: 'restart',
   KeyG: 'toggleGodMode', KeyF: 'toggleNoclip', Space: 'flyUp', KeyC: 'flyDown',
 };
 
@@ -31,7 +32,13 @@ export class BrowserInput {
     target.addEventListener('mousedown', this.onMouseDown);
     target.addEventListener('mouseup', this.onMouseUp);
     target.addEventListener('mousemove', this.onMouseMove);
+    target.addEventListener('blur', this.onBlur);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+      document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    }
     options.pointerElement.addEventListener('click', this.onPointerClick);
+    options.pointerElement.addEventListener('contextmenu', this.onContextMenu);
   }
 
   setSensitivity(value: number): void {
@@ -41,9 +48,25 @@ export class BrowserInput {
 
   private onPointerClick = () => {
     if (document.pointerLockElement !== this.options.pointerElement) {
-      void this.options.pointerElement.requestPointerLock();
+      void this.options.pointerElement.requestPointerLock().catch(() => { /* Embedded previews may deny pointer lock. */ });
     }
   };
+  private onContextMenu = (event: Event) => event.preventDefault();
+
+  private releaseHeld(): void {
+    for (const action of this.held) this.released.add(action);
+    this.held.clear(); this.pressed.clear();
+    this.lookYaw = 0; this.lookPitch = 0;
+  }
+
+  clear(): void {
+    this.held.clear(); this.pressed.clear(); this.released.clear();
+    this.lookYaw = 0; this.lookPitch = 0;
+  }
+
+  private onBlur = () => this.releaseHeld();
+  private onVisibilityChange = () => { if (document.hidden) this.releaseHeld(); };
+  private onPointerLockChange = () => { if (document.pointerLockElement !== this.options.pointerElement) this.releaseHeld(); };
 
   private onMouseMove = (event: MouseEvent) => {
     if (document.pointerLockElement !== this.options.pointerElement) return;
@@ -56,10 +79,17 @@ export class BrowserInput {
   }
   private onKeyDown = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), true, event.repeat);
   private onKeyUp = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), false, false);
-  private onMouseDown = (event: MouseEvent) => event.button === 0
-    && document.pointerLockElement === this.options.pointerElement
-    && this.set('fire', true, false);
-  private onMouseUp = (event: MouseEvent) => event.button === 0 && this.set('fire', false, false);
+  private onMouseDown = (event: MouseEvent) => {
+    if (document.pointerLockElement !== this.options.pointerElement) return;
+    if (event.button === 0) this.set('fire', true, false);
+    if (event.button === 2) this.set('aim', true, false);
+    if (event.button === 1) this.set('throwGrenade', true, false);
+  };
+  private onMouseUp = (event: MouseEvent) => {
+    if (event.button === 0) this.set('fire', false, false);
+    if (event.button === 2) this.set('aim', false, false);
+    if (event.button === 1) this.set('throwGrenade', false, false);
+  };
 
   private set(action: GameAction | undefined, down: boolean, repeat: boolean): boolean {
     if (!action) return false;
@@ -96,6 +126,12 @@ export class BrowserInput {
     this.target.removeEventListener('mousedown', this.onMouseDown);
     this.target.removeEventListener('mouseup', this.onMouseUp);
     this.target.removeEventListener('mousemove', this.onMouseMove);
+    this.target.removeEventListener('blur', this.onBlur);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+      document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    }
     this.options.pointerElement.removeEventListener('click', this.onPointerClick);
+    this.options.pointerElement.removeEventListener('contextmenu', this.onContextMenu);
   }
 }

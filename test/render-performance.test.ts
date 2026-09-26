@@ -75,18 +75,28 @@ describe('render performance contracts', () => {
 
   it('redraws and uploads the HUD only when its displayed state changes', () => {
     const context = { clearRect: vi.fn(), strokeText: vi.fn(), fillText: vi.fn(), fillRect: vi.fn(),
+      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(),
       measureText: () => ({ width: 100 }) };
     vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => context }) });
     const renderer = { clearDepth: vi.fn(), render: vi.fn() };
     const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
-    const state: HudSnapshot = { health: 100, points: 500, round: 1, weapon: 'starter-pistol',
-      magazineAmmo: 8, reserveAmmo: 32, interactionPrompt: null, gameOver: false, godMode: false, noclip: false };
-    for (let i = 0; i < 144; i++) hud.render({ ...state });
+    const state: HudSnapshot = { health: 100, points: 500, kills: 0, headshots: 0,
+      round: 1, weapon: 'starter-pistol',
+      magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloadTicksRemaining: 0,
+      grenadeCharges: 2,
+      roundPhase: 'waiting', interactionPrompt: null, nearbyPowerup: null, bonusStatus: null, instaKillStatus: null,
+      gameOver: false, paused: false, godMode: false, noclip: false,
+      sprinting: false, aiming: false };
+    for (let i = 0; i < 144; i++) hud.render({ ...state,
+      feedback: { message: null, hitMarker: null, damageVignette: false } });
     expect(context.clearRect).toHaveBeenCalledTimes(1);
     expect(renderer.render).toHaveBeenCalledTimes(144);
     hud.render({ ...state, godMode: true });
     hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair' });
     expect(context.clearRect).toHaveBeenCalledTimes(3);
+    hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair',
+      feedback: { message: 'HEADSHOT', hitMarker: 'kill', damageVignette: false } });
+    expect(context.clearRect).toHaveBeenCalledTimes(4);
     hud.dispose();
   });
 });

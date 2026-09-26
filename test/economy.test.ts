@@ -3,6 +3,7 @@ import {
   GameSimulation,
   addEntity,
   awardCombatPoints,
+  awardRepairPoints,
   createInputFrame,
   createPlayerState,
   createZombieState,
@@ -43,6 +44,15 @@ describe('points economy', () => {
     expect(player.points).toBe(200);
   });
 
+  it('doubles repair rewards without consuming the board-repair cap twice', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    expect(awardRepairPoints(player, 1, 2)).toMatchObject([{ amount: 20, balance: 520 }]);
+    expect(player.repairPointsEarned).toBe(10);
+    for (let i = 0; i < 3; i++) awardRepairPoints(player, 1, 2);
+    expect(player.points).toBe(580);
+    expect(awardRepairPoints(player, 1, 2)).toEqual([]);
+  });
+
   it('emits combat economy events from the authoritative simulation tick', () => {
     const simulation = new GameSimulation({
       seed: 2,
@@ -51,6 +61,7 @@ describe('points economy', () => {
       roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 },
     });
     const playerId = simulation.playerIds[0];
+    simulation.getPlayer(playerId)!.pitch = -0.1;
     const target = createZombieState('e:99', { x: 0, y: 0, z: -5 }, 1);
     target.health = 50;
     addEntity(simulation.state.world, target);

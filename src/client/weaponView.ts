@@ -84,6 +84,8 @@ export class WeaponView {
   private id = '';
   private firedTick = -100;
   private active = true;
+  private aimBlend = 0;
+  private sprintBlend = 0;
   private generation = 0;
   notice: string | null = null;
 
@@ -117,7 +119,7 @@ export class WeaponView {
     if (events.some(event => event.type === 'matchRestarted')) this.firedTick = -100;
     for (const event of events) if (event.type === 'weaponFired' && event.playerId === playerId) this.firedTick = tick;
   }
-  update(player: PlayerState, tick: number): void {
+  update(player: PlayerState, tick: number, deltaSeconds = 1 / 60): void {
     if (player.weapon.weaponId !== this.id) this.equip(player.weapon.weaponId);
     this.active = player.alive;
     if (!this.current) return;
@@ -126,10 +128,17 @@ export class WeaponView {
     const definition = WEAPON_DEFINITIONS[this.id];
     const progress = player.weapon.reloadTicksRemaining > 0 ? 1 - player.weapon.reloadTicksRemaining / definition.reloadTicks : 0;
     const reload = Math.sin(progress * Math.PI);
+    const blend = 1 - Math.exp(-13 * Math.min(0.1, Math.max(0, deltaSeconds)));
+    this.aimBlend += ((player.aiming ? 1 : 0) - this.aimBlend) * blend;
+    this.sprintBlend += ((player.sprinting ? 1 : 0) - this.sprintBlend) * blend;
     const moving = Math.min(1, Math.hypot(player.velocity.x, player.velocity.z) / 3);
-    const bob = Math.sin(tick * 0.13) * moving * 0.006;
-    this.pose.position.set(0.19 + bob, (this.id === 'starter-pistol' ? -0.10 : -0.15) - reload * 0.32 + Math.abs(bob), -0.24 + kick * 0.045);
-    this.pose.rotation.set(kick * 0.10 + reload * 0.35, 0.12, -reload * 0.45);
+    const bob = Math.sin(tick * (player.sprinting ? 0.22 : 0.13)) * moving
+      * (player.sprinting ? 0.014 : 0.006) * (1 - this.aimBlend * 0.85);
+    this.pose.position.set(0.19 * (1 - this.aimBlend) + bob,
+      (this.id === 'starter-pistol' ? -0.10 : -0.15) + this.aimBlend * 0.065 - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob),
+      -0.24 - this.aimBlend * 0.075 + kick * 0.045);
+    this.pose.rotation.set(kick * 0.10 + reload * 0.35 - this.sprintBlend * 0.22,
+      0.12 * (1 - this.aimBlend), -reload * 0.45 + this.sprintBlend * 0.12);
     this.current.magazine.position.y = -reload * 0.18;
     this.flash.position.copy(this.current.muzzle); this.flash.position.z -= 0.04;
     this.flash.scale.set(0.025, 0.025, 0.065);

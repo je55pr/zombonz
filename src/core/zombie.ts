@@ -26,13 +26,21 @@ export function createZombieState(id: EntityId, position: Vec3, round: number): 
     kind: 'zombie',
     position: { ...position },
     velocity: { x: 0, y: 0, z: 0 },
-    health: 150,
+    health: zombieHealthForRound(round),
     moveSpeed: ZOMBIE_MOVEMENT.baseSpeed + Math.min(0.65, Math.max(0, round - 1) * 0.04),
     attackCooldownTicks: 0,
     targetId: null,
     entry: null,
+    deadTicks: 0,
     alive: true,
   };
+}
+
+export function zombieHealthForRound(round: number): number {
+  const level = Math.max(1, Math.floor(round));
+  // Classic early-round ramp, then exponential scaling; bounded for long test runs.
+  return Math.min(1_000_000_000, Math.round((150 + 100 * Math.min(8, level - 1))
+    * 1.1 ** Math.min(200, Math.max(0, level - 9))));
 }
 function distanceSquared(a: Vec3, b: Vec3): number {
   const dx = a.x - b.x;
