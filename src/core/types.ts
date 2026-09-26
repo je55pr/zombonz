@@ -46,10 +46,13 @@ export interface PlayerState extends EntityBase {
   noclipAnchor: Vec3 | null;
 }
 
+export type ZombieGait = 'walk' | 'run' | 'sprint';
+
 export interface ZombieState extends EntityBase {
   kind: 'zombie';
   velocity: Vec3;
   health: number;
+  gait: ZombieGait;
   moveSpeed: number;
   attackCooldownTicks: number;
   targetId: EntityId | null;

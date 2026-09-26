@@ -2,12 +2,12 @@ import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, sampleWalkHeight } from './collision.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
 import { hasClearNavigationLine, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
-import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
+import type { SeededRng } from './rng.ts';
+import type { EntityId, PlayerState, Vec3, ZombieGait, ZombieState } from './types.ts';
 
 export const ZOMBIE_MOVEMENT = {
   radius: 0.32,
   height: 1.72,
-  baseSpeed: 1.35,
   attackRange: 1.05,
   attackDamage: 50,
   attackCooldownTicks: 60,
@@ -20,14 +20,29 @@ export interface ZombieAttackEvent {
   damage: number;
 }
 
-export function createZombieState(id: EntityId, position: Vec3, round: number): ZombieState {
+/** Sprinters sit just under the player's 4.2 m/s walk, so only sprinting opens a gap. */
+export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 1.35, run: 2.9, sprint: 4.1 };
+
+/** WaW/BO1 set_run_speed: roll [speed, speed + 35); up to 35 walks, up to 70 runs, beyond sprints. */
+export const ZOMBIE_GAIT_RULES = { speedPerRound: 8, rollRange: 35, walkMax: 35, runMax: 70 } as const;
+
+export function zombieGaitForRound(round: number, rng: SeededRng): ZombieGait {
+  const level = Math.max(1, Math.floor(round));
+  // Round one keeps the classic initial move speed of 1, so every zombie walks.
+  const speed = level === 1 ? 1 : level * ZOMBIE_GAIT_RULES.speedPerRound;
+  const roll = speed + rng.int(0, ZOMBIE_GAIT_RULES.rollRange);
+  return roll <= ZOMBIE_GAIT_RULES.walkMax ? 'walk' : roll <= ZOMBIE_GAIT_RULES.runMax ? 'run' : 'sprint';
+}
+
+export function createZombieState(id: EntityId, position: Vec3, round: number, gait: ZombieGait = 'walk'): ZombieState {
   return {
     id,
     kind: 'zombie',
     position: { ...position },
     velocity: { x: 0, y: 0, z: 0 },
     health: zombieHealthForRound(round),
-    moveSpeed: ZOMBIE_MOVEMENT.baseSpeed + Math.min(0.65, Math.max(0, round - 1) * 0.04),
+    gait,
+    moveSpeed: ZOMBIE_GAIT_SPEEDS[gait],
     attackCooldownTicks: 0,
     targetId: null,
     entry: null,

@@ -83,6 +83,11 @@ open rooms and stairs. Hold E near a damaged window to rebuild one board per sec
 Repairs are free and award 10 points per board up to a per-round cap. Zombies can be shot outside, and only
 one zombie crosses a given window at a time. Upstairs is reached through the stairs;
 upper windows and the ground window behind the north-east stair remain scenery.
+Rounds follow the classic WaW/BO1 curves: solo rounds hold 6, 8, 13, 18 and 24 zombies,
+then grow faster from round 10, with more per extra co-op player and at most 24 alive at once.
+Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
+sprint gait when it spawns: round 1 is all walkers, runners join from round 2, sprinters from
+round 5, and from round 9 everything sprints. Sprinters nearly match a walking player.
 Zombie health rises with each round. Headshots deal triple damage, knife swings
 hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
@@ -127,7 +132,8 @@ open inspection views with waves disabled, routes open and 10000 test points.
 These overrides are development-only; the normal URL starts the standard survival game.
 `/?preview=barrier` runs a live wave at the first window for entry-animation checks.
 `/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and
-god mode for repeatable performance checks. `npm run benchmark` measures a headless
+god mode for repeatable performance checks. Add `&round=N` to any preview URL to start its wave at
+round N, for example `/?preview=start&round=9` to face a round of sprinters. `npm run benchmark` measures a headless
 24-zombie stair-routing scenario (mean/p95 tick time); it does not measure GPU time or FPS.
 `/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
 That preview guarantees a Max Ammo drop when the target dies; add
