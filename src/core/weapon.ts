@@ -21,6 +21,18 @@ export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
     id: 'kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
     magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120,
   },
+  thompson: {
+    id: 'thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
+    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120,
+  },
+  mp40: {
+    id: 'mp40', damage: 75, range: 65, fireIntervalTicks: 8, trigger: 'auto',
+    magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138,
+  },
+  bar: {
+    id: 'bar', damage: 125, range: 80, fireIntervalTicks: 10, trigger: 'auto',
+    magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150,
+  },
 };
 
 export function createWeaponState(weaponId: string): WeaponState {
@@ -111,7 +123,7 @@ function nearestWorldDistance(
 
 function zombieHitDistance(ray: HitscanRay, zombie: ZombieState, maxDistance: number): number | null {
   const radius = 0.32;
-  const height = 1.72;
+  const height = zombie.entry?.phase === 'vaulting' ? 1.72 * 0.85 : 1.72;
   return rayAabbDistance(
     ray,
     { x: zombie.position.x - radius, y: zombie.position.y, z: zombie.position.z - radius },
@@ -176,7 +188,8 @@ export function tickWeaponCooldown(state: WeaponState): void {
 export function wantsToFire(player: PlayerState, pressed: boolean, held: boolean): boolean {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition) return false;
-  return definition.trigger === 'semi' ? pressed : held;
+  // A click shorter than one fixed tick still fires once on an automatic gun.
+  return definition.trigger === 'semi' ? pressed : held || pressed;
 }
 
 export function firePlayerWeapon(

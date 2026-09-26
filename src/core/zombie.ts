@@ -1,7 +1,7 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, sampleWalkHeight } from './collision.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
-import { navigationWaypoint, type NavigationGraph } from './navigation.ts';
+import { hasClearNavigationLine, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 
 export const ZOMBIE_MOVEMENT = {
@@ -30,6 +30,7 @@ export function createZombieState(id: EntityId, position: Vec3, round: number): 
     moveSpeed: ZOMBIE_MOVEMENT.baseSpeed + Math.min(0.65, Math.max(0, round - 1) * 0.04),
     attackCooldownTicks: 0,
     targetId: null,
+    entry: null,
     alive: true,
   };
 }
@@ -58,6 +59,7 @@ export function updateZombiePursuit(
   collisionBoxes: readonly CollisionBox[],
   walkSurfaces: readonly WalkSurface[] = [],
   navigationGraph?: NavigationGraph,
+  navigationQuery?: NavigationQuery,
 ): void {
   if (!zombie.alive) return;
   const target = chooseZombieTarget(zombie, players);
@@ -67,17 +69,19 @@ export function updateZombiePursuit(
   }
   const targetDx = target.position.x - zombie.position.x;
   const targetDz = target.position.z - zombie.position.z;
-  if (Math.hypot(targetDx, targetDz) <= ZOMBIE_MOVEMENT.attackRange) {
+  if (Math.hypot(targetDx, targetDz, target.position.y - zombie.position.y) <= ZOMBIE_MOVEMENT.attackRange
+    && hasClearNavigationLine(zombie.position, target.position, collisionBoxes)) {
     zombie.velocity.x = 0;
     zombie.velocity.z = 0;
     return;
   }
-  const waypoint = navigationWaypoint(
+  const waypoint = navigationQuery ? navigationQuery(zombie.position, target.position) : navigationWaypoint(
     navigationGraph,
     zombie.position,
     target.position,
     collisionBoxes,
     ZOMBIE_MOVEMENT.radius,
+    walkSurfaces,
   );
   const dx = waypoint.x - zombie.position.x;
   const dz = waypoint.z - zombie.position.z;
@@ -101,15 +105,17 @@ export function updateZombiePursuit(
 export function tickZombieMelee(
   zombie: ZombieState,
   players: readonly PlayerState[],
+  collisionBoxes: readonly CollisionBox[] = [],
 ): Array<ZombieAttackEvent | DamageEvent> {
-  if (!zombie.alive) return [];
+  if (!zombie.alive || zombie.entry) return [];
   if (zombie.attackCooldownTicks > 0) zombie.attackCooldownTicks -= 1;
   const target = players.find((player) => player.id === zombie.targetId && player.alive)
     ?? chooseZombieTarget(zombie, players);
   if (!target || zombie.attackCooldownTicks > 0) return [];
   const dx = target.position.x - zombie.position.x;
   const dz = target.position.z - zombie.position.z;
-  if (Math.hypot(dx, dz) > ZOMBIE_MOVEMENT.attackRange) return [];
+  if (Math.hypot(dx, dz, target.position.y - zombie.position.y) > ZOMBIE_MOVEMENT.attackRange
+    || !hasClearNavigationLine(zombie.position, target.position, collisionBoxes)) return [];
 
   zombie.attackCooldownTicks = ZOMBIE_MOVEMENT.attackCooldownTicks;
   const events: Array<ZombieAttackEvent | DamageEvent> = [{

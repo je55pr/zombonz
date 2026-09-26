@@ -6,6 +6,10 @@ export type GameAction =
   | 'fire'
   | 'reload'
   | 'interact'
+  | 'toggleGodMode'
+  | 'toggleNoclip'
+  | 'flyUp'
+  | 'flyDown'
   | 'restart';
 
 export interface ActionState {

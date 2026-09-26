@@ -32,10 +32,71 @@ The issue pool is organised into milestones: **M0 Bootstrap**, **M1 Solo Vertica
 
 The intended first milestone is deliberately structural: establish deterministic foundations and clean module contracts before broad gameplay implementation.
 
-## Current starter
+## Run the current prototype
 
-The local project currently contains a minimal zero-install Three.js scene as an initial smoke test.
+Use Node.js 22.12.0, then `npm ci` and `npm run dev`. Open the local address printed by Vite.
+Run `npm run check` for TypeScript validation, automated tests and a production build.
 
-- Open `index.html` through a local static web server to view the scene.
-- Run `npm run check` for the current syntax gate.
-- The starter uses a pinned Three.js browser module through an import map and does not yet represent the planned final project structure.
+Click the canvas to capture the mouse. Move with WASD, fire with the left mouse button,
+reload with R, interact with E, and restart after game over with Enter. Escape releases the mouse.
+
+G toggles god mode (restores health and prevents damage). F toggles noclip:
+WASD flies in the direction you look, Space rises and C descends. Active modes appear
+on the HUD. Turning noclip off lands you on a valid surface; if you are inside a wall
+or outside the map, it returns you to where you enabled noclip. Both modes reset on restart.
+
+F3 toggles the performance panel (FPS, frame time, CPU time and draw calls).
+Rendering follows the display refresh rate, with interpolated movement and immediate
+mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
+1x pixel density, no MSAA, and 1024px shadows refreshed at 15 Hz. Static scenery and fallback zombie body parts
+are batched where appropriate, and the HUD texture is redrawn only when its content changes.
+144 FPS requires a 144 Hz-or-faster active display and enough GPU/CPU headroom;
+the browser or OS may cap presentation to the current display refresh rate.
+
+The playable solo map follows Nacht's starting room / Help room / upstairs connections.
+The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
+box in the Help room costs 950 and immediately replaces your weapon with a loaded
+Kar98k, Thompson, MP40 or BAR, followed by a three-second cooldown. Wall purchases
+offer a Kar98k in the starting room and a Thompson in the Help room.
+
+The bunker uses original procedural textures, boarded windows, overhead beams,
+stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
+Dimensions and props are an approximation, not a one-to-one recreation of the original game.
+Zombies spawn outside and follow eight ground-level window approaches. They tear out
+the three boards one at a time, climb through the sill, then pursue players through
+open rooms and stairs. Hold E near a damaged window to rebuild one board per second.
+Repairs are free and do not award points yet. Zombies can be shot outside, and only
+one zombie crosses a given window at a time. Upstairs is reached through the stairs;
+upper windows and the ground window behind the north-east stair remain scenery.
+
+The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
+attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a
+compressed locomotion pose (the pack has no dedicated vault animation). Corpses
+disappear after four seconds, with at most eight animated corpses retained.
+Identical vertices and constant animation tracks are removed in memory; all instances
+share model geometry/textures, with independent skeletons. Source GLBs stay untouched.
+Add `?zombie=pxltiger` to try the alternate rig; it has more draw calls and no death clip.
+
+The starter pistol uses the M1911 model; Kar98k purchases and BAR box rewards equip
+their matching first-person models. Recoil, muzzle flash and a basic reload pose
+follow authoritative shot/ammo/reload state. The models share textures and load on
+demand; loading failures leave a playable placeholder and a visible notice.
+Thompson/MP40 models and animated player hands are not in the asset pack: those guns
+use labelled procedural placeholders. Full hand/bolt/round-by-round reload animation,
+box roulette/claim animation, original weapon behaviour, audio and online co-op remain future work.
+
+Press F2 for asset credits. Full source links, licences and conversion notes are in
+[runtime attribution](public/assets/ATTRIBUTION.txt) and [asset provenance](docs/assets/THIRD_PARTY_ASSETS.md).
+
+For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs`
+open inspection views with waves disabled, routes open and 10000 test points.
+These overrides are development-only; the normal URL starts the standard survival game.
+`/?preview=barrier` runs a live wave at the first window for entry-animation checks.
+`/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and
+god mode for repeatable performance checks. `npm run benchmark` measures a headless
+24-zombie stair-routing scenario (mean/p95 tick time); it does not measure GPU time or FPS.
+`/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
+Use `weapon=starter-pistol`, `kar98k`, `bar`, `thompson` or `mp40` on any preview URL
+to inspect that viewmodel. P fires in development previews only (useful in browsers
+without pointer lock); R reloads. Production and normal survival use mouse firing.
+See [map notes](docs/nacht-map.md) for layout and validation details.

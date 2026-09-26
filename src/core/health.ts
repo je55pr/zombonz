@@ -8,7 +8,7 @@ export interface DamageEvent {
 }
 
 export function damagePlayer(player: PlayerState, amount: number): DamageEvent[] {
-  if (!player.alive || amount <= 0) return [];
+  if (!player.alive || player.godMode || amount <= 0) return [];
   const nextHealth = Math.max(0, player.health - amount);
   const applied = player.health - nextHealth;
   player.health = nextHealth;

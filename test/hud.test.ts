@@ -35,6 +35,8 @@ describe('gameplay HUD snapshot', () => {
       reserveAmmo: 32,
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
       gameOver: false,
+      godMode: false,
+      noclip: false,
     });
   });
 

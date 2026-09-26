@@ -25,6 +25,9 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     health: 100,
     points: startingPoints,
     weapon: createStarterWeaponState(),
+    godMode: false,
+    noclip: false,
+    noclipAnchor: null,
     alive: true,
   };
 }
@@ -39,13 +42,41 @@ function held(frame: InputFrame, action: keyof InputFrame['actions']): number {
   return frame.actions[action]?.held ? 1 : 0;
 }
 
+function exitNoclip(player: PlayerState, boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[]): void {
+  const candidate = { ...player.position };
+  candidate.y = sampleWalkHeight(candidate.x, candidate.z, candidate.y, surfaces);
+  const supported = surfaces.length === 0 || surfaces.some(surface =>
+    candidate.x >= surface.minX && candidate.x <= surface.maxX
+    && candidate.z >= surface.minZ && candidate.z <= surface.maxZ
+    && Math.abs(sampleWalkHeight(candidate.x, candidate.z, Number.POSITIVE_INFINITY, [surface]) - candidate.y) < 1e-5);
+  const blocked = boxes.some(box => candidate.x + PLAYER_MOVEMENT.radius > box.min.x
+    && candidate.x - PLAYER_MOVEMENT.radius < box.max.x
+    && candidate.z + PLAYER_MOVEMENT.radius > box.min.z && candidate.z - PLAYER_MOVEMENT.radius < box.max.z
+    && candidate.y < box.max.y && candidate.y + PLAYER_MOVEMENT.height > box.min.y);
+  player.position = supported && !blocked ? candidate : { ...(player.noclipAnchor ?? candidate) };
+  player.noclip = false; player.noclipAnchor = null;
+  player.velocity = { x: 0, y: 0, z: 0 };
+}
+
 export function updatePlayerMovement(
   player: PlayerState,
   frame: InputFrame,
   deltaSeconds: number,
   collisionBoxes: readonly CollisionBox[],
   walkSurfaces: readonly WalkSurface[] = [],
+  exitBlockers: readonly CollisionBox[] = collisionBoxes,
 ): void {
+  if (frame.actions.toggleGodMode?.pressed) {
+    player.godMode = !player.godMode;
+    if (player.godMode) player.health = 100;
+  }
+  if (frame.actions.toggleNoclip?.pressed) {
+    if (player.noclip) exitNoclip(player, exitBlockers, walkSurfaces);
+    else {
+      player.noclip = true; player.noclipAnchor = { ...player.position };
+      player.velocity = { x: 0, y: 0, z: 0 };
+    }
+  }
   player.yaw += frame.look.yaw;
   player.pitch = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(
     PLAYER_MOVEMENT.maxPitch,
@@ -54,6 +85,21 @@ export function updatePlayerMovement(
 
   const forwardInput = held(frame, 'moveForward') - held(frame, 'moveBackward');
   const rightInput = held(frame, 'moveRight') - held(frame, 'moveLeft');
+  if (player.noclip) {
+    const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);
+    const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+    const direction = {
+      x: -sy * cp * forwardInput + cy * rightInput,
+      y: sp * forwardInput + held(frame, 'flyUp') - held(frame, 'flyDown'),
+      z: -cy * cp * forwardInput - sy * rightInput,
+    };
+    const scale = 6 / Math.max(1, Math.hypot(direction.x, direction.y, direction.z));
+    player.velocity = { x: direction.x * scale, y: direction.y * scale, z: direction.z * scale };
+    player.position = { x: player.position.x + player.velocity.x * deltaSeconds,
+      y: player.position.y + player.velocity.y * deltaSeconds,
+      z: player.position.z + player.velocity.z * deltaSeconds };
+    return;
+  }
   const magnitude = Math.hypot(forwardInput, rightInput);
   const normalizedForward = magnitude > 1 ? forwardInput / magnitude : forwardInput;
   const normalizedRight = magnitude > 1 ? rightInput / magnitude : rightInput;
