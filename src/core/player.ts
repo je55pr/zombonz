@@ -33,6 +33,8 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     repairRewardRound: 0,
     repairPointsEarned: 0,
     points: startingPoints,
+    kills: 0,
+    headshots: 0,
     weapon: createStarterWeaponState(),
     holsteredWeapon: null,
     switchTicksRemaining: 0,

@@ -29,6 +29,8 @@ describe('gameplay HUD snapshot', () => {
     expect(buildHudSnapshot(sim, playerId)).toEqual({
       health: 100,
       points: 500,
+      kills: 0,
+      headshots: 0,
       round: 1,
       weapon: 'starter-pistol',
       magazineAmmo: 8,
@@ -56,12 +58,16 @@ describe('gameplay HUD snapshot', () => {
     const player = sim.getPlayer(playerId)!;
     player.health = 65;
     player.points = 730;
+    player.kills = 7;
+    player.headshots = 3;
     player.weapon.magazineAmmo = 3;
     player.weapon.reserveAmmo = 17;
     sim.state.round.round = 4;
     expect(buildHudSnapshot(sim, playerId)).toMatchObject({
       health: 65,
       points: 730,
+      kills: 7,
+      headshots: 3,
       round: 4,
       magazineAmmo: 3,
       reserveAmmo: 17,

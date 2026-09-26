@@ -78,6 +78,7 @@ const previewViews = {
   barrier: { position: { x: 12, y: 0, z: -0.8 }, yaw: 0 },
   stress: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
   assets: { position: NACHT_PLAYER_SPAWN, yaw: 0 },
+  gameOver: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
   overview: { position: { x: 23, y: 25, z: 28 }, yaw: 0.65 },
   doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
   props: { position: { x: -2, y: 0, z: 4.3 }, yaw: Math.PI + 0.15 },
@@ -122,6 +123,10 @@ if (preview) {
     simulation.getPlayer(playerId)!.pitch = -0.85;
   }
   if (previewName === 'stress') simulation.getPlayer(playerId)!.godMode = true;
+  if (previewName === 'gameOver') {
+    Object.assign(simulation.getPlayer(playerId)!, { points: 12345, kills: 42, headshots: 13 });
+    Object.assign(simulation.state.round, { round: 9, phase: 'gameOver' });
+  }
   for (const door of simulation.state.doors) door.open = true;
   for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
   const testWeapon = new URLSearchParams(location.search).get('weapon');

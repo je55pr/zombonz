@@ -6,6 +6,8 @@ import type { FeedbackSnapshot } from './feedback.ts';
 export interface HudSnapshot {
   health: number;
   points: number;
+  kills: number;
+  headshots: number;
   round: number;
   weapon: string;
   magazineAmmo: number;
@@ -40,6 +42,8 @@ export function buildHudSnapshot(
   return {
     health: player.health,
     points: player.points,
+    kills: player.kills,
+    headshots: player.headshots,
     round: Math.max(1, simulation.state.round.round),
     weapon: player.weapon.weaponId,
     magazineAmmo: player.weapon.magazineAmmo,
@@ -175,7 +179,10 @@ export class CanvasHud {
       this.context.fillStyle = 'rgba(0,0,0,0.58)';
       this.context.fillRect(0, 0, width, height);
       this.text('GAME OVER', width / 2, height * 0.44, 72, 'center');
-      this.text('PRESS ENTER TO RESTART', width / 2, height * 0.54, 30, 'center');
+      this.text(`ROUND ${snapshot.round}   •   ${snapshot.kills} KILLS   •   ${snapshot.headshots} HEADSHOTS`,
+        width / 2, height * 0.54, 26, 'center');
+      this.text(`${snapshot.points} POINTS`, width / 2, height * 0.60, 27, 'center');
+      this.text('PRESS ENTER TO RESTART', width / 2, height * 0.68, 30, 'center');
     }
     if (snapshot.interactionPrompt) {
       this.context.font = '700 30px Arial, sans-serif';

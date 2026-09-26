@@ -36,6 +36,8 @@ export interface PlayerState extends EntityBase {
   repairRewardRound: number;
   repairPointsEarned: number;
   points: number;
+  kills: number;
+  headshots: number;
   weapon: WeaponState;
   holsteredWeapon: WeaponState | null;
   switchTicksRemaining: number;

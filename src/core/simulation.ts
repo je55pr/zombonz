@@ -374,6 +374,12 @@ export class GameSimulation {
         for (const player of livingPlayers(world)) player.grenadeCharges = GRENADE_RULES.maximum;
       }
     }
+    for (const event of events) if (event.type === 'zombieDied') {
+      const killer = this.getPlayer(event.playerId);
+      if (!killer) continue;
+      killer.kills += 1;
+      if (event.method === 'head') killer.headshots += 1;
+    }
     // Keep the body through its death animation, then reclaim authoritative state.
     for (const entity of Object.values(world.entities)) if (entity.kind === 'zombie' && !entity.alive) {
       entity.deadTicks += 1;
