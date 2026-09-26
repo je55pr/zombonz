@@ -73,6 +73,9 @@ function weaponLabel(id: string): string {
   return weaponName(id).toUpperCase();
 }
 
+/** The deployed commit (set by the Pages workflow), so players can report which build they are on. */
+const BUILD_ID: string = (import.meta.env.VITE_BUILD_ID as string | undefined)?.slice(0, 7) ?? 'local';
+
 /** Every CC BY model shown in game, with its creator (full details in ATTRIBUTION.txt). */
 export const MODEL_CREDITS: readonly string[] = [
   'Zombie Soldier — Peter_D (@better_peter)', 'Zombie — pxltiger', 'M1911 — Quinn Kuslich', 'Kar98k — ARIA',
@@ -226,7 +229,7 @@ export class CanvasHud {
       lines.forEach((line, index) => this.text(line, width / 2, 205 + index * 28, 18, 'center'));
       const footer = ['Characters / weapons: CC BY 4.0 · converted and adapted',
         'Environment / props: Poly Haven, ambientCG, OpenGameArt · CC0',
-        'Source links and licence: /assets/ATTRIBUTION.txt', 'F2 TO CLOSE'];
+        'Source links and licence: assets/ATTRIBUTION.txt', `F2 TO CLOSE  ·  BUILD ${BUILD_ID}`];
       footer.forEach((line, index) => this.text(line, width / 2, 215 + lines.length * 28 + index * 34, 21, 'center'));
     }
     this.texture.needsUpdate = true;

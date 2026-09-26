@@ -2,6 +2,8 @@
 
 Browser-based, round-driven co-op zombie survival game built with Three.js.
 
+**Play it: https://je55pr.github.io/zombonz/** (the latest `dev` build).
+
 ## Product direction
 
 - Strongly target the grounded, weighty **World at War / Black Ops 1 Zombies** feel rather than modern movement-heavy FPS design.
@@ -31,6 +33,15 @@ Networking should be transport-independent at the gameplay boundary. The planned
 The issue pool is organised into milestones: **M0 Bootstrap**, **M1 Solo Vertical Slice**, **M2 Networked Co-op**, **M3 Core Zombies Loop**, **M4 Content & Polish**, and **R&D Later**. Issues carry area, priority, type, dependencies and acceptance criteria.
 
 The intended first milestone is deliberately structural: establish deterministic foundations and clean module contracts before broad gameplay implementation.
+
+## Deployment
+
+Every push to `dev` runs `.github/workflows/pages.yml`: it installs from the lockfile, typechecks,
+runs the tests, builds with `npm run build:pages` (the same build, served under `/zombonz/`) and
+publishes `dist/` to GitHub Pages. No secrets are involved. The F2 credits screen shows the live
+build's commit (`BUILD abc1234`). To roll back, open that workflow in the Actions tab and re-run it
+for an earlier `dev` commit. To check a Pages build locally, run `npm run build:pages` and then
+`npx vite preview --base=/zombonz/` and open `/zombonz/`.
 
 ## Run the current prototype
 
