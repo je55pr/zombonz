@@ -43,7 +43,8 @@ Sprinting stops when firing, aiming, reloading or changing weapons; aiming slows
 and narrows the view. ADS also reduces weapon-specific hip-fire spread by 90%; shot
 variation is seeded in the game core for repeatable results. The handling is
 prototype tuning, not a frame-exact recreation.
-Reload with R, knife with V, throw a grenade with T or middle mouse, switch weapons
+Reload early with R (or automatically when the magazine empties), knife with V,
+throw a grenade with T or middle mouse, switch weapons
 with Q, interact with E, and restart after game over with Enter.
 M mutes synthesized game audio. Escape releases the mouse and pauses solo play;
 click the canvas to resume. Losing focus or hiding the tab also pauses the game,

@@ -85,6 +85,20 @@ describe('hitscan weapons', () => {
     expect(target.health).toBe(100);
   });
 
+  it('starts a reload on the last shot only when reserve ammo remains', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.weapon.magazineAmmo = 1;
+    const events = firePlayerWeapon(player, ray, [], []);
+    expect(events.map((event) => event.type)).toEqual(['weaponFired', 'weaponReloadStarted']);
+    expect(player.weapon.reloadTicksRemaining).toBe(WEAPON_DEFINITIONS['starter-pistol'].reloadTicks);
+
+    const dry = createPlayerState('e:2', { x: 0, y: 0, z: 0 });
+    dry.weapon.magazineAmmo = 1;
+    dry.weapon.reserveAmmo = 0;
+    expect(firePlayerWeapon(dry, ray, [], []).map((event) => event.type)).toEqual(['weaponFired']);
+    expect(dry.weapon.reloadTicksRemaining).toBe(0);
+  });
+
   it('fires through GameSimulation from authoritative input', () => {
     const simulation = new GameSimulation({
       seed: 99,

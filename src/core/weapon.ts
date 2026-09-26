@@ -256,6 +256,7 @@ export function firePlayerWeapon(
   player.weapon.magazineAmmo -= 1;
   player.weapon.cooldownTicks = definition.fireIntervalTicks;
   const events: WeaponEvent[] = [{ type: 'weaponFired', playerId: player.id, weaponId: definition.id }];
+  if (player.weapon.magazineAmmo === 0) events.push(...beginReload(player));
   const seed = spreadSeed ^ Math.imul(Number(player.id.slice(2)), 0x9e3779b9);
   const shotRay = spreadHitscanRay(ray, definition.hipSpreadRadians * (player.aiming ? 0.1 : 1), seed);
   const hit = resolveHitscan(shotRay, zombies, worldBoxes, definition.range);
