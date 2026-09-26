@@ -1,3 +1,9 @@
+### STG-44 quarantine
+
+Do **not** ship the downloaded Observer3D STG-44 (the same upload now lists 3danalyst as its owner). Although the Sketchfab API record reports CC BY 4.0, the extracted source uses internal names such as `wpn_h1_asl_mp44` and reuses `m1014_foregrip_*` texture names. That is a provenance red flag and the uploader-selected licence alone is not sufficient evidence that the uploader owned every underlying component.
+
+**Resolved 2026-09-26:** `stg-44.zip` in the cache was replaced with Arbuzz747's CC BY STG-44 (https://sketchfab.com/3d-models/stg-44-fe139cf77b384d3fbf40bef53a6c809c), identified by matching the archive's byte size to the API's source-archive size. That is the STG-44 now in the game; its hash replaces the quarantined one in `SOURCE_HASHES.tsv`.
+
 # Zombonz third-party asset shortlist
 
 Verified 2026-09-19. This file records source provenance before any third-party art is imported into the game.
@@ -56,21 +62,9 @@ Verified 2026-09-19. This file records source provenance before any third-party 
 - Notes: low-poly, modern-engine oriented, 4K textures.
 - Download: auth-required
 
-### Thompson M1A1
-- Source: https://sketchfab.com/3d-models/m1a1-thompson-199fe2c79a32458f9f420ffb708d4167
-- Creator: calico16
-- Displayed licence: CC Attribution
-- Geometry: ~8.6k triangles
-- Notes: appropriate box-magazine M1A1 configuration.
-- Download: auth-required
+### Thompson
 
-### PPSh-41
-- Source: https://sketchfab.com/3d-models/ppsh-41-5c8a64490fa747389e9cfcaecc69c88a
-- Creator: Zillious
-- Displayed licence: CC Attribution
-- Geometry: ~12.4k triangles
-- Notes: optimized for game engines, 4K PBR textures; magazine and trigger can be separated for animation.
-- Download: auth-required
+The previously shortlisted Thompson M1A1 was skipped because its package was untextured. It was replaced on 2026-09-26 by Artem.Goyko's textured M1928-style Thompson (drum magazine).
 
 ### M1 Garand
 - Source: https://sketchfab.com/3d-models/m1-garand-ec368667c6a54f018c8cb4bacdebbb94
@@ -223,3 +217,28 @@ A standalone Three.js benchmark with 20 animated instances confirmed both zombie
 A browser-ready CC0 environment/prop pack was added on 2026-09-20. It contains 10 tileable PBR environment materials, 5 decal/overlay sets, 18 general props, and 3 lower-fidelity background military vehicles.
 
 Runtime paths, map conventions and vehicle usage notes are documented in `ENVIRONMENT_PACK.md`. Exact CC0 source URLs are carried in the runtime manifests and `public/assets/ATTRIBUTION.txt`. Untouched source archives and metadata remain outside Git in the shared asset cache.
+
+## Second arsenal batch (2026-09-26)
+
+Found with Sketchfab's public search API (downloadable, CC BY or CC0, textured), then vetted by reading each description and tags for game rips or copied designs. Rejected at that stage: an FG42 labelled "(Enlisted)", a CZ-75 Auto tagged CS:GO with no description, Fallout's Alien Blaster, several Ratchet & Clank fan models, and two ray guns built from other artists' designs. CoD's own Ray Gun design is Activision/Treyarch IP, so the two wonder weapons (Irrlicht, Molniya) use original dieselpunk pistols instead. Each downloaded archive was matched to its model by comparing its byte size with the API's source-archive size. All are CC BY 4.0.
+
+| In game | Model | Creator | Source |
+|---|---|---|---|
+| Thompson | Thompson submachine gun | Artem.Goyko | https://sketchfab.com/3d-models/thompson-submachine-gun-5fe11dfebf734b4aa49c43545397abd1 |
+| .357 Magnum | Revolver .357 Magnum | Artem.Goyko | https://sketchfab.com/3d-models/revolver-357-magnum-360c6276282e48109fcca66f31004d81 |
+| STG-44 | STG-44 | Arbuzz747 | https://sketchfab.com/3d-models/stg-44-fe139cf77b384d3fbf40bef53a6c809c |
+| Molniya (original wonder weapon) | Diesel punk USSR gun | Silversem | https://sketchfab.com/3d-models/diesel-punk-ussr-gun-46c24583844e4e628c657d73a04cc07c |
+| Irrlicht (original wonder weapon) | Dieselpunk Signal Flare Pistol | ChickenHatMan | https://sketchfab.com/3d-models/dieselpunk-signal-flare-pistol-3282894611dc43f7a21422c76f024590 |
+| FG42 | FG42 | Shorty_Digitan | https://sketchfab.com/3d-models/fg42-d699ac259bd74f70a51125a7e4320f4b |
+| M1A1 Carbine | M1 Carbine | roelandvermeulen | https://sketchfab.com/3d-models/m1-carbine-d9edbccc56fe4b6db765ebc494dc2ceb |
+| SPAS-12 | Franchi SPAS-12 Shotgun | FameProductions | https://sketchfab.com/3d-models/franchi-spas-12-shotgun-4e5281a2f4394251a8858749f31854a9 |
+| AK-74u | Animated AKs-74u | dan741vlasov | https://sketchfab.com/3d-models/animated-aks-74u-34220aaa62e44b34b7d5ac30701f2b5f |
+| M14 | M14 RIFLE | ecler | https://sketchfab.com/3d-models/m14-rifle-94920332fc7a4d63939b88a8a54baead |
+| Commando | Colt xm177e1 Game Asset | Bazylonator | https://sketchfab.com/3d-models/colt-xm177e1-game-asset-9794e331c2c54bf5b7cfcf170ece7007 |
+| Stakeout | Ithaca-37 | I.sln | https://sketchfab.com/3d-models/ithaca-37-0b60a90d7f5a4b24ad0656c864083983 |
+| FN FAL | FN FAL | MoraAzul | https://sketchfab.com/3d-models/fn-fal-6b98bfff040a43818cf3a8027307e338 |
+| MP5K | Mp5k | davidthe19th | https://sketchfab.com/3d-models/mp5k-993cc73aefb94a238bb7f99fdbe86722 |
+| RPK | Rpk74M | petresco | https://sketchfab.com/3d-models/rpk74m-e2a9707c19954e9882ed6448e28553d9 |
+| RPG-7 | RPG 7 ( Free Model ) | javadbayat | https://sketchfab.com/3d-models/rpg-7-free-model-99c0af8a1803490a86edc48cd3bfc700 |
+| Python | GameReady: Colt Python Revolver | HYQQM | https://sketchfab.com/3d-models/gameready-colt-python-revolver-3def6e3980e64dfa832f298004ce1b94 |
+| Skorpion | Vz.61 Skorpion | Maxim_Van_Daele | https://sketchfab.com/3d-models/vz61-skorpion-403a48e300b944bfbee04b1dda17ff62 |

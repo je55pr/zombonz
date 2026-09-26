@@ -4,13 +4,31 @@ zombie	Zombie	pxltiger	https://sketchfab.com/3d-models/zombie-73ef58af341e46afba
 weapon	M1911	Quinn Kuslich	https://sketchfab.com/3d-models/realistic-m1911-handgun-game-ready-aa874a0e55224aeb99c5fef0aaf109a1	downloaded-converted
 weapon	Kar98k	ARIA	https://sketchfab.com/3d-models/kar98k-c383b7ac23854314989773776e6c76ff	downloaded-converted
 weapon	MP40	Moony_State	https://sketchfab.com/3d-models/mp-40-ww2-submachine-gun-7ec7e1f9656e4319b8edae0d785699ad	downloaded-converted
-weapon	Thompson M1A1	calico16	https://sketchfab.com/3d-models/m1a1-thompson-199fe2c79a32458f9f420ffb708d4167	skipped-untextured
+weapon	Thompson M1A1	calico16	https://sketchfab.com/3d-models/m1a1-thompson-199fe2c79a32458f9f420ffb708d4167	skipped-untextured-replaced
 weapon	PPSh-41	Zillious	https://sketchfab.com/3d-models/ppsh-41-5c8a64490fa747389e9cfcaecc69c88a	downloaded-converted
 weapon	M1 Garand	YieldingMist206	https://sketchfab.com/3d-models/m1-garand-ec368667c6a54f018c8cb4bacdebbb94	downloaded-converted
 weapon	BAR M1918A2	Peanut_Butcher	https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732	downloaded-converted-2k
 weapon	MG42	AxelK	https://sketchfab.com/3d-models/mg42-f00a231e6fd046ecb4defb48c8dcd817	downloaded-converted
-weapon	STG-44	Observer3D	https://sketchfab.com/3d-models/stg-44-c1fa5b79ab0c42a1949506b3e0137424	downloaded-quarantined-provenance
+weapon	STG-44	Observer3D	https://sketchfab.com/3d-models/stg-44-c1fa5b79ab0c42a1949506b3e0137424	replaced-quarantined-provenance
 weapon	Mosin Nagant M91	Doink	https://sketchfab.com/3d-models/mosin-nagant-m91-55c00242c4024307a761a89167e39a7c	downloaded-converted
 weapon	M1903 A3 Springfield	Gintoki1234	https://gintoki1234.itch.io/springfield-m1903-a3	downloaded-converted
 weapon	Winchester Model 1897	buh	https://sketchfab.com/3d-models/winchester-model-1897-6194ecd23344442fb23f5820f895a0d8	downloaded-converted
 weapon	Double Barrel Shotgun	Sebastian Kansik	https://sketchfab.com/3d-models/double-barrel-shotgun-04741a40f2224cffafc343b0236d5bbe	downloaded-converted
+weapon	Thompson submachine gun	Artem.Goyko	https://sketchfab.com/3d-models/thompson-submachine-gun-5fe11dfebf734b4aa49c43545397abd1	downloaded-converted
+weapon	Revolver .357 Magnum	Artem.Goyko	https://sketchfab.com/3d-models/revolver-357-magnum-360c6276282e48109fcca66f31004d81	downloaded-converted
+weapon	STG-44	Arbuzz747	https://sketchfab.com/3d-models/stg-44-fe139cf77b384d3fbf40bef53a6c809c	downloaded-converted
+weapon	Diesel punk USSR gun	Silversem	https://sketchfab.com/3d-models/diesel-punk-ussr-gun-46c24583844e4e628c657d73a04cc07c	downloaded-converted
+weapon	Dieselpunk Signal Flare Pistol	ChickenHatMan	https://sketchfab.com/3d-models/dieselpunk-signal-flare-pistol-3282894611dc43f7a21422c76f024590	downloaded-converted
+weapon	FG42	Shorty_Digitan	https://sketchfab.com/3d-models/fg42-d699ac259bd74f70a51125a7e4320f4b	downloaded-converted
+weapon	M1 Carbine	roelandvermeulen	https://sketchfab.com/3d-models/m1-carbine-d9edbccc56fe4b6db765ebc494dc2ceb	downloaded-converted
+weapon	Franchi SPAS-12 Shotgun	FameProductions	https://sketchfab.com/3d-models/franchi-spas-12-shotgun-4e5281a2f4394251a8858749f31854a9	downloaded-converted
+weapon	Animated AKs-74u	dan741vlasov	https://sketchfab.com/3d-models/animated-aks-74u-34220aaa62e44b34b7d5ac30701f2b5f	downloaded-converted
+weapon	M14 RIFLE	ecler	https://sketchfab.com/3d-models/m14-rifle-94920332fc7a4d63939b88a8a54baead	downloaded-converted
+weapon	Colt xm177e1 Game Asset	Bazylonator	https://sketchfab.com/3d-models/colt-xm177e1-game-asset-9794e331c2c54bf5b7cfcf170ece7007	downloaded-converted
+weapon	Ithaca-37	I.sln	https://sketchfab.com/3d-models/ithaca-37-0b60a90d7f5a4b24ad0656c864083983	downloaded-converted
+weapon	FN FAL	MoraAzul	https://sketchfab.com/3d-models/fn-fal-6b98bfff040a43818cf3a8027307e338	downloaded-converted
+weapon	Mp5k	davidthe19th	https://sketchfab.com/3d-models/mp5k-993cc73aefb94a238bb7f99fdbe86722	downloaded-converted
+weapon	Rpk74M	petresco	https://sketchfab.com/3d-models/rpk74m-e2a9707c19954e9882ed6448e28553d9	downloaded-converted
+weapon	RPG 7 ( Free Model )	javadbayat	https://sketchfab.com/3d-models/rpg-7-free-model-99c0af8a1803490a86edc48cd3bfc700	downloaded-converted
+weapon	GameReady: Colt Python Revolver	HYQQM	https://sketchfab.com/3d-models/gameready-colt-python-revolver-3def6e3980e64dfa832f298004ce1b94	downloaded-converted
+weapon	Vz.61 Skorpion	Maxim_Van_Daele	https://sketchfab.com/3d-models/vz61-skorpion-403a48e300b944bfbee04b1dda17ff62	downloaded-converted
