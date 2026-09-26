@@ -27,6 +27,8 @@ export interface PlayerState extends EntityBase {
   velocity: Vec3;
   yaw: number;
   pitch: number;
+  sprinting: boolean;
+  aiming: boolean;
   health: number;
   recoveryDelayTicks: number;
   meleeCooldownTicks: number;

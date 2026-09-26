@@ -41,7 +41,7 @@ Clear gaps found in code:
 
 ## Later backlog
 
-Sprint/ADS and weapon handling tuning; grenade/power-up loop; more authentic weapon
+Weapon handling tuning and accuracy; grenade/power-up loop; more authentic weapon
 roster and animations; directional/spatial ambience; settings/pause; solo perks and
 Pack-a-Punch; then revive/networked co-op. Do not introduce services or buy assets.
 
@@ -85,3 +85,13 @@ After the fix, the complete 24-zombie stress view held 60 FPS in the in-app
 browser, with about 4.5 ms CPU per frame and no console errors. The render
 bypass also held 60 FPS, establishing this browser/display path's current cap.
 Actual 144 Hz presentation still needs a 144 Hz-capable test surface.
+
+## Movement and handling follow-up
+
+Added fixed-tick sprint and aim states to the serializable player/input model.
+Shift sprints only while moving forward; firing, ADS, reloading, switching or
+knifing cancels it. Right mouse aims, slows movement and hides the hip-fire dot.
+The camera FOV and weapon pose ease toward those authoritative states in the
+renderer, so appearance remains smooth at refresh rates above the 60 Hz
+simulation. This is deliberately a prototype feel pass: hip-fire spread,
+weapon-specific ADS poses and animation are still open work.

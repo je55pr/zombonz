@@ -17,6 +17,8 @@ export interface HudSnapshot {
   gameOver: boolean;
   godMode: boolean;
   noclip: boolean;
+  sprinting: boolean;
+  aiming: boolean;
   assetNotice?: string | null;
   feedback?: FeedbackSnapshot;
 }
@@ -41,6 +43,8 @@ export function buildHudSnapshot(
     gameOver: simulation.state.round.phase === 'gameOver',
     godMode: player.godMode,
     noclip: player.noclip,
+    sprinting: player.sprinting,
+    aiming: player.aiming,
   };
 }
 function weaponLabel(id: string): string {
@@ -127,7 +131,7 @@ export class CanvasHud {
           this.context.lineTo(x + dx * 19, y + dy * 19);
         }
         this.context.stroke();
-      } else {
+      } else if (!snapshot.aiming) {
         this.context.fillStyle = 'rgba(244,241,231,0.75)';
         this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
       }
@@ -145,7 +149,7 @@ export class CanvasHud {
     if (snapshot.reloadTicksRemaining > 0) this.text('RELOADING', width - 48, height - 169, 18, 'right');
     else if (snapshot.magazineAmmo === 0) this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', width - 48, height - 169, 18, 'right');
     if (snapshot.feedback?.message && !snapshot.gameOver) this.text(snapshot.feedback.message, width / 2, height * 0.60, 27, 'center');
-    this.text('WASD MOVE   •   V KNIFE   •   R RELOAD   •   Q SWITCH   •   M MUTE', width / 2, height - 22, 15, 'center');
+    this.text('WASD MOVE   •   SHIFT SPRINT   •   RMB AIM   •   V KNIFE   •   R RELOAD   •   Q SWITCH   •   M MUTE', width / 2, height - 22, 15, 'center');
 
     if (snapshot.gameOver) {
       this.context.fillStyle = 'rgba(0,0,0,0.58)';

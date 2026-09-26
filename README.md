@@ -37,8 +37,11 @@ The intended first milestone is deliberately structural: establish deterministic
 Use Node.js 22.12.0, then `npm ci` and `npm run dev`. Open the local address printed by Vite.
 Run `npm run check` for TypeScript validation, automated tests and a production build.
 
-Click the canvas to capture the mouse. Move with WASD, fire with the left mouse button,
-reload with R, knife with V, switch weapons with Q, interact with E, and restart after game over with Enter.
+Click the canvas to capture the mouse. Move with WASD, hold Shift while moving forward to sprint,
+hold the right mouse button to aim down sights, and fire with the left mouse button.
+Sprinting stops when firing, aiming, reloading or changing weapons; aiming slows movement
+and narrows the view. The sprint/ADS handling is prototype tuning, not a frame-exact recreation.
+Reload with R, knife with V, switch weapons with Q, interact with E, and restart after game over with Enter.
 M mutes synthesized game audio. Escape releases the mouse. Input releases when the window loses focus.
 
 G toggles god mode (restores health and prevents damage). F toggles noclip:

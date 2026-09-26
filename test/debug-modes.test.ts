@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GameSimulation, createInputFrame, damagePlayer, type GameAction } from '../src/core/index.ts';
 import { BrowserInput } from '../src/client/input.ts';
 import { buildHudSnapshot } from '../src/client/hud.ts';
 
 const wall = { min: { x: 1, y: 0, z: -2 }, max: { x: 2, y: 3, z: 2 } };
+afterEach(() => vi.unstubAllGlobals());
 function simulation() {
   return new GameSimulation({ seed: 1, playerSpawns: [{ x: 0, y: 0, z: 0 }],
     map: { zombieSpawns: [], collisionBoxes: [wall], walkSurfaces: [
@@ -96,6 +97,26 @@ describe('G / F debug modes', () => {
     expect(browser.consume().actions.moveForward?.held).toBe(true);
     target.dispatchEvent(new Event('blur'));
     expect(browser.consume().actions.moveForward).toMatchObject({ held: false, released: true });
+    browser.dispose();
+  });
+
+  it('maps shift and right mouse to held sprint and aim, then releases both', () => {
+    const target = new EventTarget(), pointer = new EventTarget();
+    vi.stubGlobal('document', { pointerLockElement: pointer,
+      addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    const browser = new BrowserInput({ pointerElement: pointer as HTMLElement }, target as Window);
+    target.dispatchEvent(Object.assign(new Event('keydown'), { code: 'ShiftLeft', repeat: false }));
+    target.dispatchEvent(Object.assign(new Event('mousedown'), { button: 2 }));
+    expect(browser.consume().actions).toMatchObject({
+      sprint: { held: true, pressed: true }, aim: { held: true, pressed: true },
+    });
+    const menu = new Event('contextmenu', { cancelable: true });
+    pointer.dispatchEvent(menu); expect(menu.defaultPrevented).toBe(true);
+    target.dispatchEvent(Object.assign(new Event('keyup'), { code: 'ShiftLeft' }));
+    target.dispatchEvent(Object.assign(new Event('mouseup'), { button: 2 }));
+    expect(browser.consume().actions).toMatchObject({
+      sprint: { held: false, released: true }, aim: { held: false, released: true },
+    });
     browser.dispose();
   });
 });

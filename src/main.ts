@@ -240,6 +240,11 @@ function frame(nowMs: number): void {
   previousSeconds = nowSeconds;
   const alpha = clock.interpolationAlpha();
   syncCamera(alpha);
+  const playerForCamera = simulation.getPlayer(playerId);
+  const targetFov = playerForCamera?.aiming ? 54 : playerForCamera?.sprinting ? 71 : 67;
+  const fovBlend = 1 - Math.exp(-12 * Math.min(0.1, Math.max(0, interval / 1000)));
+  const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
+  if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
   syncZombieViews(alpha);
   bunker.update(simulation.state);
   renderer.clear();
@@ -251,7 +256,7 @@ function frame(nowMs: number): void {
   }
   renderer.render(scene, camera);
   const player = simulation.getPlayer(playerId);
-  if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha); weaponView.render(renderer, camera.aspect); }
+  if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha, interval / 1000); weaponView.render(renderer, camera.aspect); }
   const hudStarted = performance.now();
   const hudSnapshot = buildHudSnapshot(simulation, playerId);
   if (hudSnapshot) hud.render({ ...hudSnapshot, feedback: feedback.snapshot(simulation.state.world.tick),

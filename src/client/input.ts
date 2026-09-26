@@ -2,6 +2,7 @@ import type { ActionState, GameAction, InputFrame } from '../core/input.ts';
 
 const KEY_ACTIONS: Partial<Record<string, GameAction>> = {
   KeyW: 'moveForward', KeyS: 'moveBackward', KeyA: 'moveLeft', KeyD: 'moveRight',
+  ShiftLeft: 'sprint', ShiftRight: 'sprint',
   KeyR: 'reload', KeyE: 'interact', KeyV: 'melee', KeyQ: 'switchWeapon', Enter: 'restart',
   KeyG: 'toggleGodMode', KeyF: 'toggleNoclip', Space: 'flyUp', KeyC: 'flyDown',
 };
@@ -37,6 +38,7 @@ export class BrowserInput {
       document.addEventListener('pointerlockchange', this.onPointerLockChange);
     }
     options.pointerElement.addEventListener('click', this.onPointerClick);
+    options.pointerElement.addEventListener('contextmenu', this.onContextMenu);
   }
 
   setSensitivity(value: number): void {
@@ -49,6 +51,7 @@ export class BrowserInput {
       void this.options.pointerElement.requestPointerLock().catch(() => { /* Embedded previews may deny pointer lock. */ });
     }
   };
+  private onContextMenu = (event: Event) => event.preventDefault();
 
   private releaseHeld(): void {
     for (const action of this.held) this.released.add(action);
@@ -71,10 +74,15 @@ export class BrowserInput {
   }
   private onKeyDown = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), true, event.repeat);
   private onKeyUp = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), false, false);
-  private onMouseDown = (event: MouseEvent) => event.button === 0
-    && document.pointerLockElement === this.options.pointerElement
-    && this.set('fire', true, false);
-  private onMouseUp = (event: MouseEvent) => event.button === 0 && this.set('fire', false, false);
+  private onMouseDown = (event: MouseEvent) => {
+    if (document.pointerLockElement !== this.options.pointerElement) return;
+    if (event.button === 0) this.set('fire', true, false);
+    if (event.button === 2) this.set('aim', true, false);
+  };
+  private onMouseUp = (event: MouseEvent) => {
+    if (event.button === 0) this.set('fire', false, false);
+    if (event.button === 2) this.set('aim', false, false);
+  };
 
   private set(action: GameAction | undefined, down: boolean, repeat: boolean): boolean {
     if (!action) return false;
@@ -117,5 +125,6 @@ export class BrowserInput {
       document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     }
     this.options.pointerElement.removeEventListener('click', this.onPointerClick);
+    this.options.pointerElement.removeEventListener('contextmenu', this.onContextMenu);
   }
 }

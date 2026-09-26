@@ -89,6 +89,22 @@ describe('runtime GLB integration', () => {
     view.update(player, 0); expect(flash.visible).toBe(false);
   });
 
+  it('centres the weapon while aiming and lowers it while sprinting', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    const view = new WeaponView(), renderer = { clearDepth: vi.fn(), render: vi.fn() };
+    view.update(player, 0); view.render(renderer as unknown as THREE.WebGLRenderer, 16 / 9);
+    const scene = renderer.render.mock.calls[0][0] as THREE.Scene;
+    const pose = scene.getObjectByName('weapon-pose')!;
+    const restX = pose.position.x, restY = pose.position.y;
+    player.aiming = true;
+    for (let i = 0; i < 20; i++) view.update(player, i, 1 / 60);
+    expect(pose.position.x).toBeLessThan(restX * 0.1);
+    expect(pose.position.y).toBeGreaterThan(restY);
+    player.aiming = false; player.sprinting = true;
+    for (let i = 20; i < 40; i++) view.update(player, i, 1 / 60);
+    expect(pose.position.y).toBeLessThan(restY);
+  });
+
   it('enables the keyboard firing harness only when explicitly configured for previews', () => {
     for (const enabled of [true, false]) {
       const target = new EventTarget(), pointer = new EventTarget();

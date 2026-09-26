@@ -40,6 +40,8 @@ describe('gameplay HUD snapshot', () => {
       gameOver: false,
       godMode: false,
       noclip: false,
+      sprinting: false,
+      aiming: false,
     });
   });
 

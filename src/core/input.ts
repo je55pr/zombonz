@@ -3,6 +3,8 @@ export type GameAction =
   | 'moveBackward'
   | 'moveLeft'
   | 'moveRight'
+  | 'sprint'
+  | 'aim'
   | 'fire'
   | 'reload'
   | 'melee'
