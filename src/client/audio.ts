@@ -6,12 +6,15 @@ export class GameAudio {
   private context: AudioContext | null = null;
   private output: GainNode | null = null;
   private noise: AudioBuffer | null = null;
+  private ambient: AudioBufferSourceNode | null = null;
+  private hum: OscillatorNode | null = null;
   private muted = false;
+  private paused = false;
   private readonly unlock = () => this.start();
   private readonly onKeyDown = (event: KeyboardEvent) => {
     if (event.code === 'KeyM' && !event.repeat) {
       this.muted = !this.muted;
-      if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted ? 0 : 0.2,
+      if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || this.paused ? 0 : 0.2,
         this.context.currentTime, 0.015);
     }
   };
@@ -27,7 +30,7 @@ export class GameAudio {
       try {
         this.context = new AudioContext({ latencyHint: 'interactive' });
         this.output = this.context.createGain();
-        this.output.gain.value = this.muted ? 0 : 0.2;
+        this.output.gain.value = this.muted || this.paused ? 0 : 0.2;
         this.output.connect(this.context.destination);
         // One seeded noise buffer reused by all short transients.
         const size = Math.ceil(this.context.sampleRate * 0.22);
@@ -38,9 +41,32 @@ export class GameAudio {
           seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
           samples[i] = seed / 2147483648 - 1;
         }
+        // Continuous, quiet wind/noise and mains hum give the empty rooms a floor.
+        const ambience = this.context.createBuffer(1, Math.ceil(this.context.sampleRate * 2), this.context.sampleRate);
+        const wind = ambience.getChannelData(0);
+        for (let i = 0; i < wind.length; i++) {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          wind[i] = seed / 2147483648 - 1;
+        }
+        const source = this.context.createBufferSource(), filter = this.context.createBiquadFilter();
+        const windGain = this.context.createGain();
+        source.buffer = ambience; source.loop = true;
+        filter.type = 'lowpass'; filter.frequency.value = 320;
+        windGain.gain.value = 0.025;
+        source.connect(filter); filter.connect(windGain); windGain.connect(this.output);
+        source.start(); this.ambient = source;
+        const hum = this.context.createOscillator(), humGain = this.context.createGain();
+        hum.type = 'sine'; hum.frequency.value = 59; humGain.gain.value = 0.012;
+        hum.connect(humGain); humGain.connect(this.output); hum.start(); this.hum = hum;
       } catch { return; }
     }
     if (this.context.state === 'suspended') void this.context.resume().catch(() => {});
+  }
+
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+    if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || paused ? 0 : 0.2,
+      this.context.currentTime, 0.03);
   }
 
   private tone(from: number, to: number, seconds: number, volume: number, shape: OscillatorType = 'sine'): void {
@@ -105,6 +131,7 @@ export class GameAudio {
     this.surface.removeEventListener('pointerdown', this.unlock);
     window.removeEventListener('keydown', this.unlock);
     window.removeEventListener('keydown', this.onKeyDown);
+    this.ambient?.stop(); this.hum?.stop();
     void this.context?.close();
   }
 }

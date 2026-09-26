@@ -3,6 +3,7 @@ import { bunkerMaterial } from './greybox.ts';
 import { environmentMaterial, projectWorldUvs } from './environmentMaterials.ts';
 import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_BOX_CENTER, NACHT_RAILS, UPPER_HEIGHT } from '../maps/nacht.ts';
 import type { SimulationState } from '../core/simulation.ts';
+import { lampFlicker } from './atmosphere.ts';
 
 export function buildBunkerDetails(scene: THREE.Scene): { update(state: SimulationState): void } {
   const group = new THREE.Group();
@@ -119,8 +120,10 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2; chest.add(rewardLabel);
   let rewardText = 'MYSTERY BOX';
   // Warm practical lights against cold exterior moonlight.
+  const practicalLights: THREE.PointLight[] = [];
   for (const [x, y, z] of [[-0.7, 2.35, -2], [5, 2.65, 2], [-0.7, 5.75, 2.5]] as const) {
     const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(x, y, z); group.add(light);
+    practicalLights.push(light);
   }
   // Low rubble stays below the collision step height and out of navigation lanes.
   let seed = 753;
@@ -149,6 +152,9 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   const moon = new THREE.Mesh(new THREE.SphereGeometry(1.4, 20, 12), new THREE.MeshBasicMaterial({ color: 0xc9dad5, fog: false }));
   moon.position.set(-22, 30, -42); group.add(moon);
   return { update(state) {
+    for (let i = 0; i < practicalLights.length; i++) {
+      practicalLights[i].intensity = 11 * lampFlicker(state.world.tick, i * 137 + 47);
+    }
     for (const barrier of state.barriers) {
       const planks = barrierViews.get(barrier.id);
       if (!planks) continue;

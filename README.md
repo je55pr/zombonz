@@ -85,6 +85,8 @@ hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
 and temporary damage tint. Original synthesized audio gives simple gun, melee,
 damage, box and round cues; it unlocks after user input and can be muted with M.
+Quiet synthesized wind and electrical hum fill the empty bunker after audio unlock;
+they fade out while solo play is paused. Practical lamps occasionally flicker.
 Eligible zombie kills can also drop timed Max Ammo, Double Points, Insta-Kill or Nuke pickups.
 Max Ammo refills the reserve ammo of both carried weapons for every living player
 without changing loaded magazines. Double Points doubles combat and barrier-repair

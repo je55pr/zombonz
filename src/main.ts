@@ -198,13 +198,14 @@ function syncZombieViews(alpha: number): void {
 
 const clock = new FixedStepClock({ tickRate: 60 });
 const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022, previewFireKey: !!preview });
+const audio = new GameAudio(canvas);
 const pause = new SoloPauseController(canvas, window, document, paused => {
   clock.reset(); previousPositions.clear();
   if (paused) input.clear();
+  audio.setPaused(paused);
 }, !preview, () => simulation.state.round.phase !== 'gameOver');
 const hud = new CanvasHud(renderer);
 const feedback = new HudFeedback();
-const audio = new GameAudio(canvas);
 const performanceOverlay = new PerformanceOverlay();
 renderer.info.autoReset = false;
 let previousSeconds: number | undefined;
