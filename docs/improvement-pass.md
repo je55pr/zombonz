@@ -112,3 +112,8 @@ Collection activates a team-wide thirty-second combat and repair reward bonus;
 the existing repair-board cap still counts base points. The effect uses a distinct
 amber pickup, a one-second-resolution HUD countdown and a visible pickup cue.
 Grenades, other classic drops and final chance/balance tuning remain open.
+
+Insta-Kill joins the same deterministic roll and lasts thirty seconds after
+collection. Its gun and knife damage are lethal only after their usual range,
+wall and cooldown checks, so the power-up cannot shoot through geometry. The
+timer is authoritative and team-wide; the HUD shows it at one-second resolution.

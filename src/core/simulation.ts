@@ -253,7 +253,8 @@ export class GameSimulation {
     for (const player of livingPlayers(world)) {
       const frame = playerFrames.get(player.id)!;
       if (frame.actions.melee?.pressed) {
-        const meleeEvents = meleeAttack(player, this.zombies(), [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
+        const meleeEvents = meleeAttack(player, this.zombies(), [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
+          this.state.powerups.instaKillTicksRemaining > 0);
         events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig,
           this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
       }
@@ -262,6 +263,7 @@ export class GameSimulation {
       const weaponEvents = firePlayerWeapon(
         player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(),
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
+        this.state.powerups.instaKillTicksRemaining > 0,
       );
       events.push(...weaponEvents);
       events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig,

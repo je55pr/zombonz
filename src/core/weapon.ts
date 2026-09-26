@@ -232,6 +232,7 @@ export function firePlayerWeapon(
   ray: HitscanRay,
   zombies: readonly ZombieState[],
   worldBoxes: readonly CollisionBox[],
+  instaKill = false,
 ): WeaponEvent[] {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition || player.weapon.cooldownTicks > 0 || !player.alive) return [];
@@ -244,7 +245,8 @@ export function firePlayerWeapon(
 
   const zombie = zombies.find((candidate) => candidate.id === hit.zombieId && candidate.alive);
   if (!zombie) return events;
-  const applied = Math.min(zombie.health, definition.damage * (hit.hitZone === 'head' ? 3 : 1));
+  const applied = Math.min(zombie.health, instaKill ? zombie.health
+    : definition.damage * (hit.hitZone === 'head' ? 3 : 1));
   zombie.health -= applied;
   events.push({
     type: 'weaponHit', playerId: player.id, weaponId: definition.id,
@@ -261,7 +263,8 @@ export function firePlayerWeapon(
 
 export const MELEE_RULES = { damage: 150, range: 1.6, cooldownTicks: 48, minFacingDot: 0.65 } as const;
 
-export function meleeAttack(player: PlayerState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[]): WeaponEvent[] {
+export function meleeAttack(player: PlayerState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[],
+  instaKill = false): WeaponEvent[] {
   if (!player.alive || player.meleeCooldownTicks > 0) return [];
   player.meleeCooldownTicks = MELEE_RULES.cooldownTicks;
   player.weapon.reloadTicksRemaining = 0;
@@ -279,7 +282,7 @@ export function meleeAttack(player: PlayerState, zombies: readonly ZombieState[]
     .sort((a, b) => a.distance - b.distance || a.zombie.id.localeCompare(b.zombie.id));
   const zombie = candidates[0]?.zombie;
   if (!zombie) return events;
-  const damage = Math.min(zombie.health, MELEE_RULES.damage);
+  const damage = Math.min(zombie.health, instaKill ? zombie.health : MELEE_RULES.damage);
   zombie.health -= damage;
   events.push({ type: 'meleeHit', playerId: player.id, zombieId: zombie.id, damage },
     { type: 'zombieDamaged', playerId: player.id, zombieId: zombie.id, damage, health: zombie.health });

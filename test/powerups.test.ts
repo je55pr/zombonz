@@ -110,4 +110,37 @@ describe('timed power-ups', () => {
     sim.tick({ [player.id]: fire });
     expect(player.points).toBe(800);
   });
+
+  it('activates and expires Insta-Kill independently of Double Points', () => {
+    const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+    const config: PowerupConfig = { ...forced, kinds: ['instaKill'], instaKillDurationTicks: 2 };
+    tryDropPowerup(state, zombie, [], 42, 1, config);
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    collectPowerups(state, [player], [], config);
+    expect(state.instaKillTicksRemaining).toBe(2);
+    expect(state.doublePointsTicksRemaining).toBe(0);
+    tickPowerupLifetime(state); expect(state.instaKillTicksRemaining).toBe(1);
+    tickPowerupLifetime(state); expect(state.instaKillTicksRemaining).toBe(0);
+  });
+
+  it('routes Insta-Kill through simulation damage until its final tick', () => {
+    const sim = new GameSimulation({ seed: 31, playerSpawns: [{ x: 0, y: 0, z: 0 }],
+      map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] },
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    sim.state.powerups.instaKillTicksRemaining = 2;
+    const first = createZombieState('e:99', { x: 0, y: 0, z: -3 }, 12);
+    addEntity(sim.state.world, first);
+    const fire = createInputFrame(0);
+    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    sim.tick({ [player.id]: fire });
+    expect(first.alive).toBe(false);
+    player.weapon.cooldownTicks = 0;
+    const second = createZombieState('e:100', { x: 0, y: 0, z: -3 }, 12);
+    const secondHealth = second.health;
+    addEntity(sim.state.world, second);
+    sim.tick({ [player.id]: fire });
+    expect(second.alive).toBe(true);
+    expect(second.health).toBe(secondHealth - 150);
+  });
 });

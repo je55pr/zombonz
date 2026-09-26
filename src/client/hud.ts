@@ -16,6 +16,7 @@ export interface HudSnapshot {
   interactionPrompt: string | null;
   nearbyPowerup: string | null;
   bonusStatus: string | null;
+  instaKillStatus: string | null;
   gameOver: boolean;
   godMode: boolean;
   noclip: boolean;
@@ -45,9 +46,12 @@ export function buildHudSnapshot(
     reloadTicksRemaining: player.weapon.reloadTicksRemaining,
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
-    nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO' : 'DOUBLE POINTS' : null,
+    nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO'
+      : nearbyDrop.kind === 'doublePoints' ? 'DOUBLE POINTS' : 'INSTA-KILL' : null,
     bonusStatus: simulation.state.powerups.doublePointsTicksRemaining > 0
       ? `2X POINTS  ${Math.ceil(simulation.state.powerups.doublePointsTicksRemaining / 60)}s` : null,
+    instaKillStatus: simulation.state.powerups.instaKillTicksRemaining > 0
+      ? `INSTA-KILL  ${Math.ceil(simulation.state.powerups.instaKillTicksRemaining / 60)}s` : null,
     gameOver: simulation.state.round.phase === 'gameOver',
     godMode: player.godMode,
     noclip: player.noclip,
@@ -152,6 +156,7 @@ export class CanvasHud {
     this.text(`HP ${snapshot.health}`, 48, height - 54, 36);
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');
     if (snapshot.bonusStatus) this.text(snapshot.bonusStatus, width - 48, height - 226, 23, 'right');
+    if (snapshot.instaKillStatus) this.text(snapshot.instaKillStatus, width - 48, height - 256, 23, 'right');
     this.text(weaponLabel(snapshot.weapon), width - 48, height - 50, 26, 'right');
     this.text(`${snapshot.magazineAmmo} / ${snapshot.reserveAmmo}`, width - 48, height - 20, 30, 'right');
     if (snapshot.holsteredWeapon) this.text(`Q  ${weaponLabel(snapshot.holsteredWeapon)}`, width - 48, height - 130, 20, 'right');

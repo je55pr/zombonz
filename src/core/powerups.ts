@@ -5,7 +5,7 @@ import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import { WEAPON_DEFINITIONS } from './weapon.ts';
 import { rayAabbDistance } from './weapon.ts';
 
-export type PowerupKind = 'maxAmmo' | 'doublePoints';
+export type PowerupKind = 'maxAmmo' | 'doublePoints' | 'instaKill';
 
 export interface PowerupDrop {
   id: string;
@@ -19,6 +19,7 @@ export interface PowerupState {
   nextId: number;
   lastDropTick: number;
   doublePointsTicksRemaining: number;
+  instaKillTicksRemaining: number;
 }
 
 export interface PowerupConfig {
@@ -28,6 +29,7 @@ export interface PowerupConfig {
   pickupRadius: number;
   kinds: readonly PowerupKind[];
   doublePointsDurationTicks: number;
+  instaKillDurationTicks: number;
 }
 
 export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
@@ -35,8 +37,9 @@ export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
   minimumTicksBetweenDrops: 600,
   lifetimeTicks: 900,
   pickupRadius: 1.25,
-  kinds: ['maxAmmo', 'doublePoints'],
+  kinds: ['maxAmmo', 'doublePoints', 'instaKill'],
   doublePointsDurationTicks: 1800,
+  instaKillDurationTicks: 1800,
 };
 
 export type PowerupEvent =
@@ -45,12 +48,14 @@ export type PowerupEvent =
   | { type: 'powerupExpired'; dropId: string; kind: PowerupKind };
 
 export function createPowerupState(): PowerupState {
-  return { drops: [], nextId: 1, lastDropTick: -1_000_000, doublePointsTicksRemaining: 0 };
+  return { drops: [], nextId: 1, lastDropTick: -1_000_000,
+    doublePointsTicksRemaining: 0, instaKillTicksRemaining: 0 };
 }
 
 export function tickPowerupLifetime(state: PowerupState): PowerupEvent[] {
   const events: PowerupEvent[] = [];
   if (state.doublePointsTicksRemaining > 0) state.doublePointsTicksRemaining -= 1;
+  if (state.instaKillTicksRemaining > 0) state.instaKillTicksRemaining -= 1;
   for (const drop of state.drops) {
     drop.ticksRemaining -= 1;
     if (drop.ticksRemaining <= 0) events.push({ type: 'powerupExpired', dropId: drop.id, kind: drop.kind });
@@ -117,6 +122,7 @@ export function collectPowerups(
     if (!collector) continue;
     if (drop.kind === 'maxAmmo') for (const player of living) refillAmmo(player);
     if (drop.kind === 'doublePoints') state.doublePointsTicksRemaining = config.doublePointsDurationTicks;
+    if (drop.kind === 'instaKill') state.instaKillTicksRemaining = config.instaKillDurationTicks;
     events.push({ type: 'powerupCollected', dropId: drop.id, kind: drop.kind, playerId: collector.id });
   }
   const collected = new Set(events.map(event => event.dropId));

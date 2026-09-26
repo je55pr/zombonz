@@ -74,6 +74,19 @@ describe('headshots and knife', () => {
     expect(awardCombatPoints(player, [{ type: 'zombieDied', playerId: 'e:2', zombieId: 'e:3', method: 'melee' }])).toEqual([]);
     expect(player.points).toBe(500);
   });
+  it('lets Insta-Kill finish tough zombies with either a bullet or a knife', () => {
+    const shooter = createPlayerState('e:1', origin);
+    const target = createZombieState('e:2', { x: 0, y: 0, z: -4 }, 12);
+    const startingHealth = target.health;
+    const shot = firePlayerWeapon(shooter, rayFromPlayer(shooter, 1.62), [target], [], true);
+    expect(target.alive).toBe(false);
+    expect(shot).toContainEqual(expect.objectContaining({ type: 'weaponHit', damage: startingHealth }));
+    const knifer = createPlayerState('e:3', origin);
+    const close = createZombieState('e:4', { x: 0, y: 0, z: -1 }, 12);
+    const swing = meleeAttack(knifer, [close], [], true);
+    expect(close.alive).toBe(false);
+    expect(swing).toContainEqual(expect.objectContaining({ type: 'zombieDied', method: 'melee' }));
+  });
 });
 
 describe('repair economy and deterministic integration', () => {

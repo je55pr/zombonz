@@ -39,6 +39,7 @@ describe('gameplay HUD snapshot', () => {
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
       nearbyPowerup: null,
       bonusStatus: null,
+      instaKillStatus: null,
       gameOver: false,
       godMode: false,
       noclip: false,

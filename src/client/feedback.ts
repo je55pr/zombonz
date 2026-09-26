@@ -48,7 +48,8 @@ export class HudFeedback {
         case 'mysteryBoxUnavailable': say('NO NEW WEAPONS IN BOX', 3); break;
         case 'pointsSpendRejected': say('NOT ENOUGH POINTS', 4); break;
         case 'doorOpened': say('PATH OPENED', 3); break;
-        case 'powerupCollected': say(event.kind === 'maxAmmo' ? 'MAX AMMO' : 'DOUBLE POINTS', 8); break;
+        case 'powerupCollected': say(event.kind === 'maxAmmo' ? 'MAX AMMO'
+          : event.kind === 'doublePoints' ? 'DOUBLE POINTS' : 'INSTA-KILL', 8); break;
         case 'roundPhaseChanged':
           if (event.to === 'spawning') say(`ROUND ${event.round}`, 7);
           else if (event.to === 'intermission') say('ROUND COMPLETE', 7);

@@ -32,5 +32,7 @@ describe('local combat feedback', () => {
     expect(feedback.snapshot(50).message).toBe('MAX AMMO');
     feedback.consume([{ type: 'powerupCollected', dropId: 'p:2', kind: 'doublePoints', playerId: 'e:2' }], 'e:1', 51);
     expect(feedback.snapshot(51).message).toBe('DOUBLE POINTS');
+    feedback.consume([{ type: 'powerupCollected', dropId: 'p:3', kind: 'instaKill', playerId: 'e:2' }], 'e:1', 52);
+    expect(feedback.snapshot(52).message).toBe('INSTA-KILL');
   });
 });
