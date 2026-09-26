@@ -73,7 +73,7 @@ describe('runtime GLB integration', () => {
     expect(WEAPON_ASSETS['starter-pistol']).toBe('m1911');
     // Only guns without a suitable licensed model keep the placeholder.
     const unmapped = Object.keys(WEAPON_DEFINITIONS).filter(id => !WEAPON_ASSETS[id]);
-    expect(unmapped.sort()).toEqual(['thompson', 'trench-gun']);
+    expect(unmapped).toEqual(['thompson']);
     for (const [id, asset] of Object.entries(WEAPON_ASSETS)) {
       expect(WEAPON_DEFINITIONS[id], id).toBeDefined();
       expect(assetExists(`public/assets/weapons/${asset}/model.glb`), asset).toBe(true);

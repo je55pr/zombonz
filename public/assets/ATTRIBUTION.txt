@@ -65,6 +65,11 @@ Creator: Sebastian Kansik (Pepego)
 Source: https://sketchfab.com/3d-models/double-barrel-shotgun-04741a40f2224cffafc343b0236d5bbe
 Changes: converted from the source FBX to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic packed into glTF ORM textures.
 
+Winchester Model 1897
+Creator: buh (buh-late)
+Source: https://sketchfab.com/3d-models/winchester-model-1897-6194ecd23344442fb23f5820f895a0d8
+Changes: exported from the source .blend with Blender 4.5 (lights and a loose 12-gauge shell removed), then converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures.
+
 Full provenance, SHA-256 hashes for the downloaded originals, and benchmark notes are in docs/assets/.
 
 Additional in-game adaptations: character height normalization, in-place animation

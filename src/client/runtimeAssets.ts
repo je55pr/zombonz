@@ -9,6 +9,7 @@ export interface ZombieAsset { model: THREE.Group; clips: Partial<Record<ZombieA
 export const WEAPON_ASSETS: Readonly<Record<string, string>> = {
   'starter-pistol': 'm1911', kar98k: 'kar98k', bar: 'bar', mp40: 'mp40', ppsh41: 'ppsh41', mg42: 'mg42',
   'm1-garand': 'm1-garand', springfield: 'springfield', mosin: 'mosin', 'double-barrel': 'double-barrel',
+  'trench-gun': 'trench-gun',
 };
 
 const loader = new GLTFLoader();

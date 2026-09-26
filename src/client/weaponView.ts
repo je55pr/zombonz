@@ -11,7 +11,7 @@ export interface PreparedWeapon { root: THREE.Group; magazine: THREE.Group; muzz
 // Viewmodel lengths in metres, roughly 0.86x each gun's real length.
 export const VIEWMODEL_LENGTHS: Readonly<Record<string, number>> = {
   m1911: 0.36, kar98k: 0.95, bar: 1.05, mp40: 0.72, ppsh41: 0.73, mg42: 1.05, 'm1-garand': 0.95,
-  springfield: 0.95, mosin: 1.1, 'double-barrel': 0.98,
+  springfield: 0.95, mosin: 1.1, 'double-barrel': 0.98, 'trench-gun': 0.86,
 };
 
 // Bake the exported rest pose to ordinary meshes, keeping the magazine separate.

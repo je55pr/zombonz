@@ -25,9 +25,9 @@ function fillTriangle(a, b, c, colour, ox, oy) {
   }
 }
 
-ids.forEach((id, row) => {
+for (const [row, id] of ids.entries()) {
   const config = WEAPONS[id];
-  const raw = collect(loadSource(`${W}/${config.source}`), config);
+  const raw = collect(await loadSource(`${W}/${config.source}`), config);
   const parts = transformParts(raw, orientation(raw, config), config.length);
   const scale = (cellW - 2 * pad) / config.length;
   for (const [view, ox] of [['side', 0], ['top', cellW]]) {
@@ -39,5 +39,5 @@ ids.forEach((id, row) => {
     }
   }
   console.log(id, 'drawn');
-});
+}
 await sharp(image, { raw: { width, height: cellH * ids.length, channels: 3 } }).png().toFile(process.env.OUT ?? 'preview.png');

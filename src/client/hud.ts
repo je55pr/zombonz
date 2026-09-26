@@ -206,7 +206,7 @@ export class CanvasHud {
         'M1911 — Quinn Kuslich · Kar98k — ARIA · BAR M1918 A2 — Peanut_Butcher',
         'MP40 — Moony_State · PPSh-41 — Zillious · M1 Garand — YieldingMist206',
         'MG42 — AxelK · Mosin-Nagant M91 — Doink · M1903 A3 — Gintoki1234',
-        'Double-barrel shotgun — Sebastian Kansik (Pepego)',
+        'Double-barrel shotgun — Sebastian Kansik (Pepego) · Winchester M1897 — buh',
         'Characters / weapons: CC BY 4.0 · converted and adapted',
         'Environment / props: Poly Haven, ambientCG, OpenGameArt · CC0',
         'Source links and licence: /assets/ATTRIBUTION.txt', 'F2 TO CLOSE'];

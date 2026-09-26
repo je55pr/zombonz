@@ -5,15 +5,29 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const fakeImage = () => ({ addEventListener() {}, removeEventListener() {}, set src(_) {}, style: {} });
 globalThis.document ??= { createElementNS: fakeImage, createElement: fakeImage };
 globalThis.self ??= globalThis;
 globalThis.DOMParser ??= DOMParser;
+globalThis.ProgressEvent ??= class { constructor(type, properties) { Object.assign(this, { type }, properties); } };
 THREE.TextureLoader.prototype.load = function () { return new THREE.Texture(); };
+
+/** Geometry-only GLB parse (Blender exports); textures come from the loose maps instead. */
+async function loadGlb(path) {
+  const bytes = readFileSync(path);
+  const length = bytes.readUInt32LE(12);
+  const json = JSON.parse(bytes.toString('utf8', 20, 20 + length));
+  json.buffers[0].uri = `data:application/octet-stream;base64,${bytes.subarray(28 + length).toString('base64')}`;
+  delete json.images; delete json.textures; delete json.samplers;
+  json.materials = json.materials?.map(material => ({ name: material.name }));
+  return (await new GLTFLoader().parseAsync(JSON.stringify(json), '')).scene;
+}
 
 export function loadSource(path) {
   const lower = path.toLowerCase();
+  if (lower.endsWith('.glb')) return loadGlb(path);
   if (lower.endsWith('.fbx')) {
     const bytes = readFileSync(path);
     return new FBXLoader().parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');

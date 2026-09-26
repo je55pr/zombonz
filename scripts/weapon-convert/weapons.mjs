@@ -9,6 +9,8 @@ const shotgunPart = part => pbr('double-barrel-shotgun/textures', `shotgun_${par
   { base: 'BaseColor.png', normal: 'Normal.png', metallic: 'Metallic.png', roughness: 'Roughness.png' });
 const mg42 = size => pbr('mg42/textures', `mg42-low_MG42-${size}_`,
   { base: 'BaseColor_sRGB.png', normal: 'Normal_Raw.png', metallic: 'Metallic_Raw.png', roughness: 'Roughness_Raw.png' });
+const m97 = set => pbr('winchester-model-1897/textures', `m97_${set}`,
+  { base: 'a.png', normal: 'n.png', metallic: 'm_2.png', roughness: 'r_2.png', ao: '2_occlusion.png' });
 const mosin = part => pbr('mosin-nagant-m91/textures', `Mosin${part}_MAT_`,
   { base: 'albedo.jpeg', normal: 'normal.png', metallic: 'metallic.jpeg', roughness: 'roughness.jpeg', ao: 'AO.jpeg' });
 
@@ -37,6 +39,12 @@ export const WEAPONS = {
   mosin: {
     source: 'mosin-nagant-m91/source/x/model/model.dae', length: 1.287,
     materials: { MosinBody_MAT: mosin('Body'), MosinDetail_MAT: mosin('Detail') },
+  },
+  // The source is a .blend; blend-to-glb.py exports it first (loose shell and lights removed).
+  // UV sampling against each atlas's transparency shows material .007 uses the m97 set and .008 the m97_1 set.
+  'trench-gun': {
+    source: 'winchester-model-1897/source/x/m97.glb', length: 1.0, flipForward: true,
+    materials: { 'm97mat.007': m97(''), 'm97mat.008': m97('1_') },
   },
   mp40: {
     source: 'mp-40-ww2-submachine-gun/source/x/MP 40.obj', length: 0.833, magazine: /^MP40.001/,

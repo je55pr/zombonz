@@ -126,13 +126,13 @@ Identical vertices and constant animation tracks are removed in memory; all inst
 share model geometry/textures, with independent skeletons. Source GLBs stay untouched.
 Add `?zombie=pxltiger` to try the alternate rig; it has more draw calls and no death clip.
 
-Every gun except the Thompson and Trench Gun has a real first-person model: M1911, Kar98k,
-Springfield, Mosin-Nagant, M1 Garand, MP40, PPSh-41, BAR, MG42 and the double-barrel.
+Every gun except the Thompson has a real first-person model: M1911, Kar98k, Springfield,
+Mosin-Nagant, M1 Garand, MP40, PPSh-41, BAR, MG42, the double-barrel and the Trench Gun.
 Recoil, muzzle flash and a basic reload pose
 follow authoritative shot/ammo/reload state. The models share textures and load on
 demand; loading failures leave a playable placeholder and a visible notice.
-The Thompson (no textured model found) and Trench Gun (its source is a Blender file not yet
-converted) use labelled procedural placeholders, and there are no animated player hands.
+The Thompson (no textured model found) uses a labelled procedural placeholder, and there
+are no animated player hands.
 Weapon stats are WaW-inspired approximations. Full hand/bolt/round-by-round reload animation,
 authentic box weapon silhouettes/roulette animation, original weapon behaviour,
 recorded sounds and online co-op remain future work.

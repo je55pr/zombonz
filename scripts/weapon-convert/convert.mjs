@@ -103,7 +103,7 @@ async function packOrm({ ao, roughness, metallic }, maxSize) {
 }
 
 export async function convert(id, config, outDir) {
-  const root = loadSource(`${W}/${config.source}`);
+  const root = await loadSource(`${W}/${config.source}`);
   const raw = collect(root, config);
   const parts = transformParts(raw, orientation(raw, config), config.length);
   const doc = new Document();
@@ -133,7 +133,8 @@ export async function convert(id, config, outDir) {
     const material = materials.get(part.material);
     if (!material) throw new Error(`${id}: no material spec for "${part.material}"`);
     const uvs = new Float32Array(part.uvs);
-    for (let i = 1; i < uvs.length; i += 2) uvs[i] = 1 - uvs[i]; // three.js UV v-up -> glTF v-down
+    // FBX/DAE/OBJ loaders give three.js v-up UVs; GLB sources are already v-down.
+    if (!config.source.toLowerCase().endsWith('.glb')) for (let i = 1; i < uvs.length; i += 2) uvs[i] = 1 - uvs[i];
     const primitive = doc.createPrimitive().setMaterial(material)
       .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(new Float32Array(part.positions)).setBuffer(buffer))
       .setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(uvs).setBuffer(buffer));
