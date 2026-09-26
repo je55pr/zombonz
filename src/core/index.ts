@@ -18,3 +18,4 @@ export * from './door.ts';
 export * from './wallWeapon.ts';
 export * from './mysteryBox.ts';
 export * from './barrier.ts';
+export * from './powerups.ts';

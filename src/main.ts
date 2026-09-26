@@ -14,6 +14,7 @@ import { GameAudio } from './client/audio.ts';
 import { loadZombieAsset, type ZombieAsset } from './client/runtimeAssets.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView } from './client/weaponView.ts';
+import { PowerupView } from './client/powerupView.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals } from './client/environmentProps.ts';
 import {
@@ -99,6 +100,9 @@ const simulation = new GameSimulation({
   ...(previewName === 'stress' && preview ? { spawnConfig: {
     baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
   } } : {}),
+  ...(previewName === 'assets' && preview ? { powerupConfig: {
+    dropChanceDenominator: 1, minimumTicksBetweenDrops: 0, lifetimeTicks: 900, pickupRadius: 1.25,
+  } } : {}),
   ...(preview ? { roundConfig: { initialWaitTicks: previewName === 'barrier' || previewName === 'stress' ? 120 : 2147483647, intermissionTicks: 180 },
     economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } } : {}),
 });
@@ -138,6 +142,7 @@ void loadZombieAsset(zombieVariant).then(asset => {
   console.warn('Unable to load zombie asset', error);
 });
 const weaponView = new WeaponView();
+const powerupView = new PowerupView(scene);
 
 function zombies(): ZombieState[] {
   return simulation.zombies();
@@ -246,6 +251,7 @@ function frame(nowMs: number): void {
   const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
   if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
   syncZombieViews(alpha);
+  powerupView.update(simulation.state.powerups.drops, simulation.state.world.tick - 1 + alpha);
   bunker.update(simulation.state);
   renderer.clear();
   renderer.info.reset();

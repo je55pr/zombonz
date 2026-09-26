@@ -41,7 +41,7 @@ Clear gaps found in code:
 
 ## Later backlog
 
-Weapon handling tuning and accuracy; grenade/power-up loop; more authentic weapon
+Weapon handling tuning and accuracy; grenades and more power-up types; more authentic weapon
 roster and animations; directional/spatial ambience; settings/pause; solo perks and
 Pack-a-Punch; then revive/networked co-op. Do not introduce services or buy assets.
 
@@ -95,3 +95,14 @@ The camera FOV and weapon pose ease toward those authoritative states in the
 renderer, so appearance remains smooth at refresh rates above the 60 Hz
 simulation. This is deliberately a prototype feel pass: hip-fire spread,
 weapon-specific ADS poses and animation are still open work.
+
+## Max Ammo follow-up
+
+Added deterministic timed Max Ammo drops with a six-hundred-tick spacing limit,
+one active drop at a time, and a seeded one-in-eighteen eligible kill chance.
+Outside-window kills move the drop to the window's inside point; collision blockers
+prevent collection through walls. Pickup refills current and holstered gun reserves
+for all living players but leaves magazines unchanged. The drop uses a shared,
+low-draw glowing world marker, nearby HUD label and synthesized collection cue.
+The assets inspection preview forces a drop for visual smoke testing. Other
+power-up types and balancing remain open.

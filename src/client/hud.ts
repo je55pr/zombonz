@@ -14,6 +14,7 @@ export interface HudSnapshot {
   reloadTicksRemaining: number;
   roundPhase: string;
   interactionPrompt: string | null;
+  nearbyPowerup: string | null;
   gameOver: boolean;
   godMode: boolean;
   noclip: boolean;
@@ -40,6 +41,9 @@ export function buildHudSnapshot(
     reloadTicksRemaining: player.weapon.reloadTicksRemaining,
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
+    nearbyPowerup: simulation.state.powerups.drops.some(drop => Math.hypot(
+      drop.position.x - player.position.x, drop.position.z - player.position.z) < 4
+      && Math.abs(drop.position.y - player.position.y) < 2) ? 'MAX AMMO' : null,
     gameOver: simulation.state.round.phase === 'gameOver',
     godMode: player.godMode,
     noclip: player.noclip,
@@ -167,6 +171,8 @@ export class CanvasHud {
       this.context.fillRect(x - promptWidth / 2, y - 29, promptWidth, 58);
       this.text(snapshot.interactionPrompt, x, y, 30, 'center');
     }
+    if (snapshot.nearbyPowerup && !snapshot.gameOver) this.text(snapshot.nearbyPowerup,
+      width / 2, height * 0.65, 28, 'center');
     if (this.credits) {
       this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(180, 115, 1240, 540);
       const lines = ['THIRD-PARTY ASSET CREDITS', 'Zombie Soldier — Peter_D (@better_peter)',

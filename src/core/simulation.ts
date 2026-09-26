@@ -13,6 +13,8 @@ import {
 } from './economy.ts';
 import { livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
+import { collectPowerups, createPowerupState, tickPowerupLifetime, tryDropPowerup,
+  DEFAULT_POWERUP_CONFIG, type PowerupConfig, type PowerupEvent, type PowerupState } from './powerups.ts';
 import {
   findInteractionCandidate, triggerInteraction,
   type InteractionCandidate, type InteractionEvent,
@@ -59,6 +61,7 @@ export interface SimulationState {
   wallWeapons: WallWeaponState[];
   mysteryBoxes: MysteryBoxState[];
   barriers: BarrierState[];
+  powerups: PowerupState;
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
@@ -78,7 +81,7 @@ export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | MatchRestartedEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | MatchRestartedEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -88,6 +91,7 @@ export interface GameSimulationOptions {
   roundConfig?: RoundConfig;
   spawnConfig?: SpawnDirectorConfig;
   economyConfig?: EconomyConfig;
+  powerupConfig?: PowerupConfig;
 }
 
 export class GameSimulation {
@@ -97,6 +101,7 @@ export class GameSimulation {
   private readonly roundConfig?: RoundConfig;
   private readonly spawnConfig?: SpawnDirectorConfig;
   private readonly economyConfig: EconomyConfig;
+  private readonly powerupConfig: PowerupConfig;
   private readonly playerSpawns: readonly Vec3[];
   private navigationCache?: { doors: string; query: NavigationQuery };
 
@@ -105,6 +110,7 @@ export class GameSimulation {
     this.roundConfig = options.roundConfig;
     this.spawnConfig = options.spawnConfig;
     this.economyConfig = options.economyConfig ?? DEFAULT_ECONOMY_CONFIG;
+    this.powerupConfig = options.powerupConfig ?? DEFAULT_POWERUP_CONFIG;
     this.playerSpawns = options.playerSpawns.map((spawn) => ({ ...spawn }));
     for (const spawn of this.map.zombieSpawns) {
       if (spawn.barrierId && !this.map.barriers?.some(barrier => barrier.id === spawn.barrierId)) {
@@ -147,7 +153,8 @@ export class GameSimulation {
     }
     syncBarrierInteractables(barriers, Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable'));
-    return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers };
+    return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
+      powerups: createPowerupState() };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -212,6 +219,7 @@ export class GameSimulation {
     }
     const events: SimulationEvent[] = [];
     const world = this.state.world;
+    events.push(...tickPowerupLifetime(this.state.powerups));
     tickMysteryBoxes(this.state.mysteryBoxes, this.interactables(), livingPlayers(world));
     const repairers = new Map<string, EntityId>();
 
@@ -257,6 +265,13 @@ export class GameSimulation {
       events.push(...weaponEvents);
       events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig));
     }
+
+    for (const event of events) if (event.type === 'zombieDied') {
+      const zombie = world.entities[event.zombieId];
+      if (zombie?.kind === 'zombie') events.push(...tryDropPowerup(this.state.powerups, zombie,
+        this.state.barriers, world.seed, world.tick, this.powerupConfig));
+    }
+    events.push(...collectPowerups(this.state.powerups, livingPlayers(world), this.collisionBoxes(), this.powerupConfig));
 
     const navigate = this.navigationQuery();
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {

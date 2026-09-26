@@ -25,4 +25,10 @@ describe('local combat feedback', () => {
     feedback.consume([{ type: 'matchRestarted', previousSeed: 1, seed: 2 }], 'e:1', 4);
     expect(feedback.snapshot(4)).toEqual({ message: null, hitMarker: null, damageVignette: false });
   });
+
+  it('announces a team-wide Max Ammo pickup to every player', () => {
+    const feedback = new HudFeedback();
+    feedback.consume([{ type: 'powerupCollected', dropId: 'p:1', kind: 'maxAmmo', playerId: 'e:2' }], 'e:1', 50);
+    expect(feedback.snapshot(50).message).toBe('MAX AMMO');
+  });
 });

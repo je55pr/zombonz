@@ -75,7 +75,7 @@ export class GameAudio {
   consume(events: readonly SimulationEvent[], playerId: EntityId): void {
     if (!this.context || this.muted) return;
     for (const event of events) {
-      if ('playerId' in event && event.playerId !== playerId) continue;
+      if ('playerId' in event && event.playerId !== playerId && event.type !== 'powerupCollected') continue;
       switch (event.type) {
         case 'weaponFired': this.burst(event.weaponId === 'starter-pistol' ? 0.09 : 0.15, 0.9, 1800);
           this.tone(115, 43, 0.12, 0.3, 'sawtooth'); break;
@@ -89,6 +89,9 @@ export class GameAudio {
         case 'mysteryBoxUsed': this.tone(300, 650, 0.33, 0.17, 'triangle'); break;
         case 'mysteryBoxClaimed': this.tone(500, 940, 0.36, 0.19, 'triangle'); break;
         case 'doorOpened': this.burst(0.2, 0.45, 520); break;
+        case 'powerupCollected':
+          this.tone(330, 660, 0.24, 0.25, 'triangle');
+          this.tone(495, 990, 0.3, 0.16, 'triangle'); break;
         case 'barrierBoardRemoved': this.burst(0.12, 0.32, 680); break;
         case 'roundPhaseChanged': if (event.to === 'spawning') this.tone(240, 80, 0.8, 0.28, 'triangle'); break;
       }

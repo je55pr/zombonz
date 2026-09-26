@@ -82,6 +82,10 @@ hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
 and temporary damage tint. Original synthesized audio gives simple gun, melee,
 damage, box and round cues; it unlocks after user input and can be muted with M.
+Eligible zombie kills can also drop a glowing Max Ammo pickup. It lasts 15 seconds;
+walking into it refills the reserve ammo of both carried weapons for every living
+player without changing loaded magazines. Kills outside a window place the pickup
+just inside it so the reward is reachable.
 
 The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
 attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a

@@ -27,7 +27,8 @@ export class HudFeedback {
       if (rank > priority) { message = value; priority = rank; }
     };
     for (const event of events) {
-      if ('playerId' in event && event.playerId !== playerId && event.type !== 'zombieAttacked') continue;
+      if ('playerId' in event && event.playerId !== playerId
+        && event.type !== 'zombieAttacked' && event.type !== 'powerupCollected') continue;
       switch (event.type) {
         case 'weaponHit': this.marker = event.hitZone === 'head' ? 'head' : 'body'; this.markerUntil = tick + 12; break;
         case 'meleeHit': this.marker = 'body'; this.markerUntil = tick + 12; break;
@@ -47,6 +48,7 @@ export class HudFeedback {
         case 'mysteryBoxUnavailable': say('NO NEW WEAPONS IN BOX', 3); break;
         case 'pointsSpendRejected': say('NOT ENOUGH POINTS', 4); break;
         case 'doorOpened': say('PATH OPENED', 3); break;
+        case 'powerupCollected': say('MAX AMMO', 8); break;
         case 'roundPhaseChanged':
           if (event.to === 'spawning') say(`ROUND ${event.round}`, 7);
           else if (event.to === 'intermission') say('ROUND COMPLETE', 7);
