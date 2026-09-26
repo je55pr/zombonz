@@ -18,17 +18,17 @@ Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; st
 Realistic M1911 Handgun - Game Ready
 Creator: Quinn Kuslich
 Source: https://sketchfab.com/3d-models/realistic-m1911-handgun-game-ready-aa874a0e55224aeb99c5fef0aaf109a1
-Changes: converted to self-contained GLB; 2K PBR textures embedded; AO/roughness/metallic maps packed into glTF ORM textures.
+Changes: converted to self-contained GLB; 2K PBR textures embedded; AO/roughness/metallic maps packed into glTF ORM textures. Textures later re-encoded as WebP (colour/normal at most 2K, packed ORM 1K); geometry unchanged.
 
 Kar98k
 Creator: ARIA
 Source: https://sketchfab.com/3d-models/kar98k-c383b7ac23854314989773776e6c76ff
-Changes: converted to self-contained GLB; source 4K textures reduced to 2K where needed; stale texture URI removed; PBR textures embedded; roughness/metallic packed into glTF ORM textures.
+Changes: converted to self-contained GLB; source 4K textures reduced to 2K where needed; stale texture URI removed; PBR textures embedded; roughness/metallic packed into glTF ORM textures. Textures later re-encoded as WebP (colour/normal at most 2K, packed ORM 1K); geometry unchanged.
 
 B.A.R M1918 A2 - GAME READY & RIGGED
 Creator: Peanut_Butcher
 Source: https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732
-Changes: source GLB retained structurally; embedded 4K PBR textures reduced to 2K for browser runtime.
+Changes: source GLB retained structurally; embedded 4K PBR textures reduced to 2K for browser runtime. Textures later re-encoded as WebP (colour/normal at most 2K, packed ORM 1K); geometry unchanged.
 
 MP 40 - WW2 Submachine Gun
 Creator: Moony_State
