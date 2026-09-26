@@ -196,13 +196,15 @@ export const NACHT_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   weapons: ['kar98k', 'thompson', 'mp40', 'bar'],
 }];
 export const NACHT_PLAYER_SPAWN: Vec3 = { x: 5.2, y: 0, z: 4.2 };
+/** WaW/BO1 windows hold six boards. */
+export const NACHT_WINDOW_BOARDS = 6;
 // Upper windows stay decorative until exterior climbing is implemented.
 export const NACHT_BARRIERS: readonly BarrierDefinition[] = windows.filter(w => w.y === 0).map(w => {
   const point = (distance: number, sideways = 0): Vec3 => ({
     x: w.x + w.outward.x * distance + w.outward.z * sideways, y: w.y,
     z: w.z + w.outward.z * distance - w.outward.x * sideways,
   });
-  return { id: w.id, position: { x: w.x, y: w.y, z: w.z }, outward: w.outward, width: w.width, maxBoards: 3,
+  return { id: w.id, position: { x: w.x, y: w.y, z: w.z }, outward: w.outward, width: w.width, maxBoards: NACHT_WINDOW_BOARDS,
     approachPath: [point(5, 0.6), point(2.4, 0.6), point(0.85)], insidePoint: point(-0.95) };
 });
 export const NACHT_ZOMBIE_SPAWNS: readonly ZombieSpawnPoint[] = NACHT_BARRIERS.map(b => ({ ...b.approachPath[0], barrierId: b.id }));

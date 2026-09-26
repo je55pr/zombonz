@@ -79,9 +79,11 @@ boarded windows, overhead beams,
 stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
 Dimensions and props are an approximation, not a one-to-one recreation of the original game.
 Zombies spawn outside and follow eight ground-level window approaches. They tear out
-the three boards one at a time, climb through the sill, then pursue players through
+the six boards one at a time, climb through the sill, then pursue players through
 open rooms and stairs. Hold E near a damaged window to rebuild one board per second.
-Repairs are free and award 10 points per board up to a per-round cap. Zombies can be shot outside, and only
+Repairs are free and award 10 points per board up to a per-round cap. Once a board is gone,
+a zombie at the window swipes any player within about 1.4 m of it on the inside,
+and it stops tearing while it swipes. Repair from further back to stay safe. Zombies can be shot outside, and only
 one zombie crosses a given window at a time. Upstairs is reached through the stairs;
 upper windows and the ground window behind the north-east stair remain scenery.
 Rounds follow the classic WaW/BO1 curves: solo rounds hold 6, 8, 13, 18 and 24 zombies,

@@ -34,7 +34,8 @@ import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, Zombie
 import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
 import { SeededRng } from './rng.ts';
 import {
-  createZombieState, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, type ZombieAttackEvent,
+  createZombieState, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound,
+  type ZombieAttackEvent,
 } from './zombie.ts';
 import {
   beginReload, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon, type WeaponEvent,
@@ -344,7 +345,11 @@ export class GameSimulation {
     for (const zombie of zombies) {
       if (zombie.entry) {
         const barrier = this.state.barriers.find(barrier => barrier.id === zombie.entry!.barrierId)!;
-        events.push(...updateZombieEntry(zombie, barrier, zombies, deltaSeconds, this.collisionBoxes(), world.tick));
+        const swipe = tickWindowAttack(zombie, barrier, players);
+        events.push(...swipe.events);
+        if (!swipe.engaged) {
+          events.push(...updateZombieEntry(zombie, barrier, zombies, deltaSeconds, this.collisionBoxes(), world.tick));
+        }
         continue;
       }
       updateZombiePursuit(
@@ -360,7 +365,7 @@ export class GameSimulation {
     for (const event of repairEvents) if (event.type === 'barrierBoardRepaired') {
       const player = this.getPlayer(event.playerId);
       if (player) events.push(...awardRepairPoints(player, this.state.round.round,
-        this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
+        this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1, this.economyConfig));
     }
     syncBarrierInteractables(this.state.barriers, this.interactables());
 
