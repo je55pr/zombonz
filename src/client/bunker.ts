@@ -115,8 +115,9 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   const question = writing('?  ?  ?', 1.9, 0.6, '#f6d893');
   question.position.set(0.5, 0.075, 0); question.rotation.x = -Math.PI / 2; question.rotation.z = Math.PI / 2; lid.add(question);
   const glow = new THREE.PointLight(0xffbf57, 4, 6, 2); glow.position.set(0, 1.3, 0); chest.add(glow);
-  const rewardLabel = writing('MYSTERY BOX', 2, 0.3, '#f6d893');
+  let rewardLabel = writing('MYSTERY BOX', 2, 0.3, '#f6d893');
   rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2; chest.add(rewardLabel);
+  let rewardText = 'MYSTERY BOX';
   // Warm practical lights against cold exterior moonlight.
   for (const [x, y, z] of [[-0.7, 2.35, -2], [5, 2.65, 2], [-0.7, 5.75, 2.5]] as const) {
     const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(x, y, z); group.add(light);
@@ -164,8 +165,19 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
       }
     }
     for (const door of state.doors) { const view = doorViews.get(door.id); if (view) view.visible = !door.open; }
-    const active = (state.mysteryBoxes[0]?.cooldownTicks ?? 0) > 0;
+    const currentBox = state.mysteryBoxes[0];
+    const active = !!currentBox && currentBox.phase !== 'idle';
     lid.rotation.z = active ? 1.05 : 0;
-    glow.intensity = active ? 12 : 3;
+    glow.intensity = currentBox?.phase === 'offering' ? 14 : active ? 8 : 3;
+    const nextText = currentBox?.phase === 'offering' ? currentBox.lastWeapon?.toUpperCase() ?? 'WEAPON'
+      : currentBox?.phase === 'rolling' ? '?  ?  ?' : 'MYSTERY BOX';
+    if (rewardText !== nextText) {
+      const oldMaterial = rewardLabel.material as THREE.MeshBasicMaterial;
+      oldMaterial.map?.dispose(); oldMaterial.dispose(); rewardLabel.geometry.dispose();
+      rewardLabel.removeFromParent();
+      rewardLabel = writing(nextText, 2, 0.3, '#f6d893');
+      rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2;
+      chest.add(rewardLabel); rewardText = nextText;
+    }
   } };
 }

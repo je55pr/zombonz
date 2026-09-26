@@ -91,7 +91,10 @@ describe('headless game simulation', () => {
     const simulation = makeSimulation();
     const state = runHeadlessTicks(simulation, 240);
     const player = simulation.getPlayer(simulation.playerIds[0]);
-    expect(state.world.tick).toBe(240);
+    expect(state.world.tick).toBeLessThan(240); // Game over freezes gameplay until restart.
+    const endedAt = state.world.tick;
+    simulation.tick();
+    expect(state.world.tick).toBe(endedAt);
     expect(player?.alive).toBe(false);
     expect(state.round.phase).toBe('gameOver');
     expect(JSON.parse(JSON.stringify(state))).toEqual(state);

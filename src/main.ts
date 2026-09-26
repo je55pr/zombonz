@@ -9,6 +9,8 @@ import { batchStaticMeshes } from './client/staticBatch.ts';
 import { ActorBatch } from './client/actorBatch.ts';
 import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
+import { HudFeedback } from './client/feedback.ts';
+import { GameAudio } from './client/audio.ts';
 import { loadZombieAsset, type ZombieAsset } from './client/runtimeAssets.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView } from './client/weaponView.ts';
@@ -143,6 +145,9 @@ function zombies(): ZombieState[] {
 function syncZombieViews(alpha: number): void {
   if (zombieAsset) {
     const tick = simulation.state.world.tick - 1 + alpha;
+    for (const [id, view] of skinnedViews) if (!simulation.state.world.entities[id]) {
+      view.dispose(); skinnedViews.delete(id);
+    }
     for (const entity of Object.values(simulation.state.world.entities)) {
       if (entity.kind !== 'zombie') continue;
       let view = skinnedViews.get(entity.id);
@@ -181,6 +186,8 @@ function syncZombieViews(alpha: number): void {
 const clock = new FixedStepClock({ tickRate: 60 });
 const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022, previewFireKey: !!preview });
 const hud = new CanvasHud(renderer);
+const feedback = new HudFeedback();
+const audio = new GameAudio(canvas);
 const performanceOverlay = new PerformanceOverlay();
 renderer.info.autoReset = false;
 let previousSeconds: number | undefined;
@@ -196,6 +203,8 @@ function simulate(dt: number): void {
   }
   const events = simulation.tick({ [playerId]: input.consume() }, dt);
   weaponView.events(events, playerId, simulation.state.world.tick);
+  feedback.consume(events, playerId, simulation.state.world.tick);
+  audio.consume(events, playerId);
   if (simulation.state.world !== world) {
     previousPositions.clear();
     for (const view of skinnedViews.values()) view.dispose();
@@ -245,7 +254,8 @@ function frame(nowMs: number): void {
   if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha); weaponView.render(renderer, camera.aspect); }
   const hudStarted = performance.now();
   const hudSnapshot = buildHudSnapshot(simulation, playerId);
-  if (hudSnapshot) hud.render({ ...hudSnapshot, assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice });
+  if (hudSnapshot) hud.render({ ...hudSnapshot, feedback: feedback.snapshot(simulation.state.world.tick),
+    assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice });
   performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
     renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
   performanceOverlay.render(renderer);

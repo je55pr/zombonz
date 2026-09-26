@@ -23,8 +23,14 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     yaw: 0,
     pitch: 0,
     health: 100,
+    recoveryDelayTicks: 0,
+    meleeCooldownTicks: 0,
+    repairRewardRound: 0,
+    repairPointsEarned: 0,
     points: startingPoints,
     weapon: createStarterWeaponState(),
+    holsteredWeapon: null,
+    switchTicksRemaining: 0,
     godMode: false,
     noclip: false,
     noclipAnchor: null,
@@ -35,7 +41,7 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
 function moveToward(current: number, target: number, maxDelta: number): number {
   if (current < target) return Math.min(current + maxDelta, target);
   if (current > target) return Math.max(current - maxDelta, target);
-  return target;
+  return target || 0; // Canonical zero survives JSON snapshots without a -0 distinction.
 }
 
 function held(frame: InputFrame, action: keyof InputFrame['actions']): number {

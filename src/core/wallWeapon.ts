@@ -1,7 +1,7 @@
 import { spendPoints, type EconomyEvent } from './economy.ts';
 import { createInteractableState, type InteractionEvent } from './interaction.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3 } from './types.ts';
-import { createWeaponState, WEAPON_DEFINITIONS } from './weapon.ts';
+import { equipWeapon, ownedWeapon, WEAPON_DEFINITIONS } from './weapon.ts';
 
 export interface WallWeaponDefinition {
   id: string;
@@ -23,6 +23,7 @@ export interface WallWeaponState {
 }
 export type WallWeaponEvent =
   | { type: 'wallWeaponPurchased'; playerId: EntityId; wallWeaponId: string; weaponId: string }
+  | { type: 'wallWeaponAmmoFull'; playerId: EntityId; wallWeaponId: string; weaponId: string }
   | { type: 'wallWeaponAmmoPurchased'; playerId: EntityId; wallWeaponId: string; weaponId: string };
 
 export function createWallWeaponInteractable(
@@ -54,10 +55,6 @@ export function createWallWeaponState(
   };
 }
 
-function refillWeapon(player: PlayerState, weaponId: string): void {
-  player.weapon = createWeaponState(weaponId);
-}
-
 export function handleWallWeaponInteraction(
   player: PlayerState,
   interaction: InteractionEvent,
@@ -65,14 +62,21 @@ export function handleWallWeaponInteraction(
 ): Array<EconomyEvent | WallWeaponEvent> {
   if (interaction.interactionType !== 'wallWeapon') return [];
   const wall = wallWeapons.find((candidate) => candidate.interactableId === interaction.interactableId);
-  if (!wall) return [];
-  const ownsWeapon = player.weapon.weaponId === wall.weaponId;
+  if (!wall || !player.alive) return [];
+  const owned = ownedWeapon(player, wall.weaponId);
+  const ownsWeapon = !!owned;
+  const definition = WEAPON_DEFINITIONS[wall.weaponId];
+  if (owned && owned.reserveAmmo >= definition.startingReserveAmmo) {
+    return [{ type: 'wallWeaponAmmoFull', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId }];
+  }
   const cost = ownsWeapon ? wall.ammoCost : wall.weaponCost;
   const reason = ownsWeapon ? `wallAmmo:${wall.id}` : `wallWeapon:${wall.id}`;
   const spend = spendPoints(player, cost, reason);
   if (spend.type === 'pointsSpendRejected') return [spend];
 
-  refillWeapon(player, wall.weaponId);
+  // Reserve refill preserves the magazine, reload progress and fire cadence.
+  if (owned) owned.reserveAmmo = definition.startingReserveAmmo;
+  else equipWeapon(player, wall.weaponId);
   const event: WallWeaponEvent = ownsWeapon
     ? { type: 'wallWeaponAmmoPurchased', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId }
     : { type: 'wallWeaponPurchased', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId };

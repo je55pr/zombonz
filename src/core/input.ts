@@ -5,6 +5,8 @@ export type GameAction =
   | 'moveRight'
   | 'fire'
   | 'reload'
+  | 'melee'
+  | 'switchWeapon'
   | 'interact'
   | 'toggleGodMode'
   | 'toggleNoclip'

@@ -5,22 +5,26 @@ export interface EconomyConfig {
   startingPoints: number;
   hitReward: number;
   killBonus: number;
+  headshotBonus?: number;
+  meleeKillReward?: number;
 }
 
 export const DEFAULT_ECONOMY_CONFIG: Readonly<EconomyConfig> = {
   startingPoints: 500,
   hitReward: 10,
   killBonus: 50,
+  headshotBonus: 90,
+  meleeKillReward: 130,
 };
 
 export type EconomyEvent =
-  | { type: 'pointsAwarded'; playerId: PlayerState['id']; amount: number; reason: 'hit' | 'kill'; balance: number }
+  | { type: 'pointsAwarded'; playerId: PlayerState['id']; amount: number; reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair'; balance: number }
   | { type: 'pointsSpent'; playerId: PlayerState['id']; amount: number; reason: string; balance: number }
   | { type: 'pointsSpendRejected'; playerId: PlayerState['id']; amount: number; reason: string; balance: number };
 function award(
   player: PlayerState,
   amount: number,
-  reason: 'hit' | 'kill',
+  reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair',
 ): EconomyEvent {
   player.points += amount;
   return { type: 'pointsAwarded', playerId: player.id, amount, reason, balance: player.points };
@@ -33,13 +37,31 @@ export function awardCombatPoints(
 ): EconomyEvent[] {
   const events: EconomyEvent[] = [];
   for (const event of weaponEvents) {
+    if ('playerId' in event && event.playerId !== player.id) continue;
     if (event.type === 'weaponHit' && config.hitReward > 0) {
       events.push(award(player, config.hitReward, 'hit'));
-    } else if (event.type === 'zombieDied' && config.killBonus > 0) {
-      events.push(award(player, config.killBonus, 'kill'));
+    } else if (event.type === 'meleeHit' && !weaponEvents.some(other => other.type === 'zombieDied' && other.zombieId === event.zombieId)) {
+      events.push(award(player, config.hitReward, 'hit'));
+    } else if (event.type === 'zombieDied') {
+      const reason = event.method === 'melee' ? 'melee' : event.method === 'head' ? 'headshot' : 'kill';
+      const amount = reason === 'melee' ? (config.meleeKillReward ?? 130)
+        : reason === 'headshot' ? (config.headshotBonus ?? 90) : config.killBonus;
+      if (amount > 0) events.push(award(player, amount, reason));
     }
   }
   return events;
+}
+
+export function awardRepairPoints(player: PlayerState, round: number): EconomyEvent[] {
+  const currentRound = Math.max(1, round);
+  if (player.repairRewardRound !== currentRound) {
+    player.repairRewardRound = currentRound; player.repairPointsEarned = 0;
+  }
+  const cap = Math.min(500, currentRound * 40);
+  const amount = Math.min(10, cap - player.repairPointsEarned);
+  if (!player.alive || amount <= 0) return [];
+  player.repairPointsEarned += amount;
+  return [award(player, amount, 'repair')];
 }
 export function spendPoints(
   player: PlayerState,

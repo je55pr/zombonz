@@ -2,7 +2,7 @@ import type { ActionState, GameAction, InputFrame } from '../core/input.ts';
 
 const KEY_ACTIONS: Partial<Record<string, GameAction>> = {
   KeyW: 'moveForward', KeyS: 'moveBackward', KeyA: 'moveLeft', KeyD: 'moveRight',
-  KeyR: 'reload', KeyE: 'interact', Enter: 'restart',
+  KeyR: 'reload', KeyE: 'interact', KeyV: 'melee', KeyQ: 'switchWeapon', Enter: 'restart',
   KeyG: 'toggleGodMode', KeyF: 'toggleNoclip', Space: 'flyUp', KeyC: 'flyDown',
 };
 
@@ -31,6 +31,11 @@ export class BrowserInput {
     target.addEventListener('mousedown', this.onMouseDown);
     target.addEventListener('mouseup', this.onMouseUp);
     target.addEventListener('mousemove', this.onMouseMove);
+    target.addEventListener('blur', this.onBlur);
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+      document.addEventListener('pointerlockchange', this.onPointerLockChange);
+    }
     options.pointerElement.addEventListener('click', this.onPointerClick);
   }
 
@@ -41,9 +46,19 @@ export class BrowserInput {
 
   private onPointerClick = () => {
     if (document.pointerLockElement !== this.options.pointerElement) {
-      void this.options.pointerElement.requestPointerLock();
+      void this.options.pointerElement.requestPointerLock().catch(() => { /* Embedded previews may deny pointer lock. */ });
     }
   };
+
+  private releaseHeld(): void {
+    for (const action of this.held) this.released.add(action);
+    this.held.clear(); this.pressed.clear();
+    this.lookYaw = 0; this.lookPitch = 0;
+  }
+
+  private onBlur = () => this.releaseHeld();
+  private onVisibilityChange = () => { if (document.hidden) this.releaseHeld(); };
+  private onPointerLockChange = () => { if (document.pointerLockElement !== this.options.pointerElement) this.releaseHeld(); };
 
   private onMouseMove = (event: MouseEvent) => {
     if (document.pointerLockElement !== this.options.pointerElement) return;
@@ -96,6 +111,11 @@ export class BrowserInput {
     this.target.removeEventListener('mousedown', this.onMouseDown);
     this.target.removeEventListener('mouseup', this.onMouseUp);
     this.target.removeEventListener('mousemove', this.onMouseMove);
+    this.target.removeEventListener('blur', this.onBlur);
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
+      document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    }
     this.options.pointerElement.removeEventListener('click', this.onPointerClick);
   }
 }

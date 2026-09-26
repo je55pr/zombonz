@@ -152,7 +152,7 @@ describe('barrier persistence and rebuilding', () => {
     for (let i = 0; i < 120; i++) sim.tick({ [player.id]: hold });
     expect(barrier.boards).toBe(3);
     expect(sim.interactionCandidate(player.id)).toBeNull();
-    expect(player.points).toBe(500);
+    expect(player.points).toBe(530);
   });
 
   it('never repairs into a zombie currently crossing the sill', () => {

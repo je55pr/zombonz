@@ -80,7 +80,8 @@ describe('render performance contracts', () => {
     const renderer = { clearDepth: vi.fn(), render: vi.fn() };
     const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
     const state: HudSnapshot = { health: 100, points: 500, round: 1, weapon: 'starter-pistol',
-      magazineAmmo: 8, reserveAmmo: 32, interactionPrompt: null, gameOver: false, godMode: false, noclip: false };
+      magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloadTicksRemaining: 0,
+      roundPhase: 'waiting', interactionPrompt: null, gameOver: false, godMode: false, noclip: false };
     for (let i = 0; i < 144; i++) hud.render({ ...state });
     expect(context.clearRect).toHaveBeenCalledTimes(1);
     expect(renderer.render).toHaveBeenCalledTimes(144);

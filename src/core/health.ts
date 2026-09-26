@@ -1,10 +1,21 @@
 import type { EntityState, PlayerState, WorldState } from './types.ts';
 
 export interface DamageEvent {
-  type: 'playerDamaged' | 'playerDied';
+  type: 'playerDamaged' | 'playerDied' | 'playerHealed';
   playerId: PlayerState['id'];
   amount: number;
   health: number;
+}
+
+export const PLAYER_HEALTH = { maximum: 100, recoveryDelayTicks: 300, recoveryPerTick: 2 } as const;
+
+export function tickPlayerRecovery(player: PlayerState): DamageEvent[] {
+  if (!player.alive) return [];
+  if (player.recoveryDelayTicks > 0) { player.recoveryDelayTicks -= 1; return []; }
+  if (player.health >= PLAYER_HEALTH.maximum) return [];
+  const amount = Math.min(PLAYER_HEALTH.recoveryPerTick, PLAYER_HEALTH.maximum - player.health);
+  player.health += amount;
+  return [{ type: 'playerHealed', playerId: player.id, amount, health: player.health }];
 }
 
 export function damagePlayer(player: PlayerState, amount: number): DamageEvent[] {
@@ -12,6 +23,7 @@ export function damagePlayer(player: PlayerState, amount: number): DamageEvent[]
   const nextHealth = Math.max(0, player.health - amount);
   const applied = player.health - nextHealth;
   player.health = nextHealth;
+  player.recoveryDelayTicks = PLAYER_HEALTH.recoveryDelayTicks;
   const events: DamageEvent[] = [{
     type: 'playerDamaged', playerId: player.id, amount: applied, health: player.health,
   }];

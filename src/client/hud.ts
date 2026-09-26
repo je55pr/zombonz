@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { EntityId } from '../core/types.ts';
 import type { GameSimulation } from '../core/simulation.ts';
+import type { FeedbackSnapshot } from './feedback.ts';
 
 export interface HudSnapshot {
   health: number;
@@ -9,11 +10,15 @@ export interface HudSnapshot {
   weapon: string;
   magazineAmmo: number;
   reserveAmmo: number;
+  holsteredWeapon: string | null;
+  reloadTicksRemaining: number;
+  roundPhase: string;
   interactionPrompt: string | null;
   gameOver: boolean;
   godMode: boolean;
   noclip: boolean;
   assetNotice?: string | null;
+  feedback?: FeedbackSnapshot;
 }
 
 export function buildHudSnapshot(
@@ -29,6 +34,9 @@ export function buildHudSnapshot(
     weapon: player.weapon.weaponId,
     magazineAmmo: player.weapon.magazineAmmo,
     reserveAmmo: player.weapon.reserveAmmo,
+    holsteredWeapon: player.holsteredWeapon?.weaponId ?? null,
+    reloadTicksRemaining: player.weapon.reloadTicksRemaining,
+    roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
     gameOver: simulation.state.round.phase === 'gameOver',
     godMode: player.godMode,
@@ -97,14 +105,35 @@ export class CanvasHud {
   private draw(snapshot: HudSnapshot): void {
     const { width, height } = this.canvas;
     this.context.clearRect(0, 0, width, height);
+    if (snapshot.feedback?.damageVignette || snapshot.health <= 50) {
+      const edge = this.context.createRadialGradient(width / 2, height / 2, height * 0.24,
+        width / 2, height / 2, width * 0.67);
+      edge.addColorStop(0, 'rgba(80,0,0,0)');
+      edge.addColorStop(1, snapshot.feedback?.damageVignette ? 'rgba(150,0,0,0.67)' : 'rgba(100,0,0,0.32)');
+      this.context.fillStyle = edge; this.context.fillRect(0, 0, width, height);
+    }
     this.text('NACHT DER UNTOTEN', width / 2, 38, 19, 'center');
     this.text('F2 ASSET CREDITS', width / 2, 64, 13, 'center');
     if (snapshot.assetNotice) this.text(snapshot.assetNotice, width / 2, height - 80, 19, 'center');
     if (!snapshot.gameOver) {
-      this.context.fillStyle = 'rgba(244,241,231,0.75)';
-      this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
+      const mark = snapshot.feedback?.hitMarker;
+      if (mark) {
+        const x = width / 2, y = height / 2;
+        this.context.strokeStyle = mark === 'head' ? '#e6c36d' : mark === 'kill' ? '#df604a' : '#e5e5dd';
+        this.context.lineWidth = mark === 'kill' ? 5 : 3;
+        this.context.beginPath();
+        for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          this.context.moveTo(x + dx * 8, y + dy * 8);
+          this.context.lineTo(x + dx * 19, y + dy * 19);
+        }
+        this.context.stroke();
+      } else {
+        this.context.fillStyle = 'rgba(244,241,231,0.75)';
+        this.context.fillRect(width / 2 - 2, height / 2 - 2, 4, 4);
+      }
     }
     this.text(`ROUND ${snapshot.round}`, 48, 58, 42);
+    if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 48, 100, 22);
     const modes = [snapshot.godMode ? 'GOD MODE [G]' : '', snapshot.noclip ? 'NOCLIP [F]' : ''].filter(Boolean);
     if (modes.length) this.text(modes.join('   /   '), 48, 105, 23);
     if (snapshot.noclip) this.text('WASD fly · SPACE up · C down', 48, 140, 20);
@@ -112,6 +141,11 @@ export class CanvasHud {
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');
     this.text(weaponLabel(snapshot.weapon), width - 48, height - 50, 26, 'right');
     this.text(`${snapshot.magazineAmmo} / ${snapshot.reserveAmmo}`, width - 48, height - 20, 30, 'right');
+    if (snapshot.holsteredWeapon) this.text(`Q  ${weaponLabel(snapshot.holsteredWeapon)}`, width - 48, height - 130, 20, 'right');
+    if (snapshot.reloadTicksRemaining > 0) this.text('RELOADING', width - 48, height - 169, 18, 'right');
+    else if (snapshot.magazineAmmo === 0) this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', width - 48, height - 169, 18, 'right');
+    if (snapshot.feedback?.message && !snapshot.gameOver) this.text(snapshot.feedback.message, width / 2, height * 0.60, 27, 'center');
+    this.text('WASD MOVE   •   V KNIFE   •   R RELOAD   •   Q SWITCH   •   M MUTE', width / 2, height - 22, 15, 'center');
 
     if (snapshot.gameOver) {
       this.context.fillStyle = 'rgba(0,0,0,0.58)';

@@ -60,6 +60,7 @@ describe('hitscan weapons', () => {
   it('applies damage exactly once and enforces fire cadence', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     const target = zombie('e:2', -5);
+    player.pitch = -0.1; // Body shot: eye-level shots now correctly hit the head.
     const first = firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
     expect(target.health).toBe(100);
     expect(first.filter((event) => event.type === 'weaponHit')).toHaveLength(1);
@@ -77,6 +78,7 @@ describe('hitscan weapons', () => {
       roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 },
     });
     const playerId = simulation.playerIds[0];
+    simulation.getPlayer(playerId)!.pitch = -0.1;
     const target = zombie('e:99', -5);
     addEntity(simulation.state.world, target);
     const frame = createInputFrame(0);

@@ -48,6 +48,31 @@ export function createWeaponState(weaponId: string): WeaponState {
 export function createStarterWeaponState(): WeaponState {
   return createWeaponState('starter-pistol');
 }
+
+export const WEAPON_SWITCH_TICKS = 24;
+
+export function ownedWeapon(player: PlayerState, id: string): WeaponState | undefined {
+  return [player.weapon, player.holsteredWeapon].find(weapon => weapon?.weaponId === id) ?? undefined;
+}
+
+/** Fill the second slot first; only a third distinct gun replaces the held weapon. */
+export function equipWeapon(player: PlayerState, id: string): void {
+  const next = createWeaponState(id);
+  player.weapon.reloadTicksRemaining = 0;
+  if (player.weapon.weaponId === id) { player.weapon = next; return; }
+  if (!player.holsteredWeapon) player.holsteredWeapon = player.weapon;
+  else if (player.holsteredWeapon.weaponId === id) player.holsteredWeapon = player.weapon;
+  player.weapon = next;
+  player.switchTicksRemaining = WEAPON_SWITCH_TICKS;
+}
+
+export function switchWeapon(player: PlayerState): WeaponEvent[] {
+  if (!player.alive || !player.holsteredWeapon || player.switchTicksRemaining > 0 || player.meleeCooldownTicks > 0) return [];
+  player.weapon.reloadTicksRemaining = 0;
+  [player.weapon, player.holsteredWeapon] = [player.holsteredWeapon, player.weapon];
+  player.switchTicksRemaining = WEAPON_SWITCH_TICKS;
+  return [{ type: 'weaponSwitched', playerId: player.id, weaponId: player.weapon.weaponId }];
+}
 export interface HitscanRay {
   origin: Vec3;
   direction: Vec3;
@@ -55,16 +80,19 @@ export interface HitscanRay {
 
 export type HitscanTarget =
   | { kind: 'world'; distance: number }
-  | { kind: 'zombie'; distance: number; zombieId: EntityId }
+  | { kind: 'zombie'; distance: number; zombieId: EntityId; hitZone: 'head' | 'body' }
   | { kind: 'none'; distance: number };
 
 export type WeaponEvent =
+  | { type: 'weaponSwitched'; playerId: EntityId; weaponId: string }
   | { type: 'weaponFired'; playerId: EntityId; weaponId: string }
   | { type: 'weaponReloadStarted'; playerId: EntityId; weaponId: string; reloadTicks: number }
   | { type: 'weaponReloadCompleted'; playerId: EntityId; weaponId: string; loaded: number; magazineAmmo: number; reserveAmmo: number }
-  | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number }
+  | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number; hitZone?: 'head' | 'body' }
+  | { type: 'meleeSwung'; playerId: EntityId }
+  | { type: 'meleeHit'; playerId: EntityId; zombieId: EntityId; damage: number }
   | { type: 'zombieDamaged'; zombieId: EntityId; playerId: EntityId; damage: number; health: number }
-  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId };
+  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: 'body' | 'head' | 'melee' };
 
 function normalize(direction: Vec3): Vec3 {
   const length = Math.hypot(direction.x, direction.y, direction.z);
@@ -148,13 +176,18 @@ export function resolveHitscan(
       bestZombie = { zombieId: zombie.id, distance };
     }
   }
-  if (bestZombie) return { kind: 'zombie', ...bestZombie };
+  if (bestZombie) {
+    const zombie = zombies.find(zombie => zombie.id === bestZombie!.zombieId)!;
+    const scale = zombie.entry?.phase === 'vaulting' ? 0.85 : 1;
+    const impactY = ray.origin.y + ray.direction.y * bestZombie.distance - zombie.position.y;
+    return { kind: 'zombie', ...bestZombie, hitZone: impactY >= 1.42 * scale ? 'head' : 'body' };
+  }
   if (worldDistance !== null) return { kind: 'world', distance: worldDistance };
   return { kind: 'none', distance: range };
 }
 export function beginReload(player: PlayerState): WeaponEvent[] {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
-  if (!definition || !player.alive) return [];
+  if (!definition || !player.alive || player.meleeCooldownTicks > 0 || player.switchTicksRemaining > 0) return [];
   if (player.weapon.reloadTicksRemaining > 0) return [];
   if (player.weapon.magazineAmmo >= definition.magazineSize || player.weapon.reserveAmmo <= 0) return [];
   player.weapon.reloadTicksRemaining = definition.reloadTicks;
@@ -173,6 +206,8 @@ function completeReload(player: PlayerState): WeaponEvent[] {
 }
 
 export function tickWeaponState(player: PlayerState): WeaponEvent[] {
+  if (player.switchTicksRemaining > 0) player.switchTicksRemaining -= 1;
+  if (player.holsteredWeapon) tickWeaponCooldown(player.holsteredWeapon);
   const state = player.weapon;
   if (state.cooldownTicks > 0) state.cooldownTicks -= 1;
   if (state.reloadTicksRemaining <= 0) return [];
@@ -200,7 +235,7 @@ export function firePlayerWeapon(
 ): WeaponEvent[] {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition || player.weapon.cooldownTicks > 0 || !player.alive) return [];
-  if (player.weapon.reloadTicksRemaining > 0 || player.weapon.magazineAmmo <= 0) return [];
+  if (player.switchTicksRemaining > 0 || player.meleeCooldownTicks > 0 || player.weapon.reloadTicksRemaining > 0 || player.weapon.magazineAmmo <= 0) return [];
   player.weapon.magazineAmmo -= 1;
   player.weapon.cooldownTicks = definition.fireIntervalTicks;
   const events: WeaponEvent[] = [{ type: 'weaponFired', playerId: player.id, weaponId: definition.id }];
@@ -209,17 +244,48 @@ export function firePlayerWeapon(
 
   const zombie = zombies.find((candidate) => candidate.id === hit.zombieId && candidate.alive);
   if (!zombie) return events;
-  const applied = Math.min(zombie.health, definition.damage);
+  const applied = Math.min(zombie.health, definition.damage * (hit.hitZone === 'head' ? 3 : 1));
   zombie.health -= applied;
   events.push({
     type: 'weaponHit', playerId: player.id, weaponId: definition.id,
-    zombieId: zombie.id, damage: applied, distance: hit.distance,
+    zombieId: zombie.id, damage: applied, distance: hit.distance, hitZone: hit.hitZone,
   });
   events.push({ type: 'zombieDamaged', zombieId: zombie.id, playerId: player.id, damage: applied, health: zombie.health });
   if (zombie.health === 0) {
     zombie.alive = false;
     zombie.velocity = { x: 0, y: 0, z: 0 };
-    events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id });
+    events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: hit.hitZone });
+  }
+  return events;
+}
+
+export const MELEE_RULES = { damage: 150, range: 1.6, cooldownTicks: 48, minFacingDot: 0.65 } as const;
+
+export function meleeAttack(player: PlayerState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[]): WeaponEvent[] {
+  if (!player.alive || player.meleeCooldownTicks > 0) return [];
+  player.meleeCooldownTicks = MELEE_RULES.cooldownTicks;
+  player.weapon.reloadTicksRemaining = 0;
+  const events: WeaponEvent[] = [{ type: 'meleeSwung', playerId: player.id }];
+  const ray = rayFromPlayer(player, 1.3);
+  const candidates = zombies.filter(zombie => zombie.alive).map(zombie => {
+    const offset = { x: zombie.position.x - ray.origin.x, y: zombie.position.y + 1.1 - ray.origin.y,
+      z: zombie.position.z - ray.origin.z };
+    const distance = Math.hypot(offset.x, offset.y, offset.z);
+    const direction = distance > 0 ? normalize(offset) : ray.direction;
+    const facing = direction.x * ray.direction.x + direction.y * ray.direction.y + direction.z * ray.direction.z;
+    const blocked = nearestWorldDistance({ origin: ray.origin, direction }, boxes, distance);
+    return { zombie, distance, facing, blocked };
+  }).filter(hit => hit.distance <= MELEE_RULES.range && hit.facing >= MELEE_RULES.minFacingDot && hit.blocked === null)
+    .sort((a, b) => a.distance - b.distance || a.zombie.id.localeCompare(b.zombie.id));
+  const zombie = candidates[0]?.zombie;
+  if (!zombie) return events;
+  const damage = Math.min(zombie.health, MELEE_RULES.damage);
+  zombie.health -= damage;
+  events.push({ type: 'meleeHit', playerId: player.id, zombieId: zombie.id, damage },
+    { type: 'zombieDamaged', playerId: player.id, zombieId: zombie.id, damage, health: zombie.health });
+  if (zombie.health === 0) {
+    zombie.alive = false; zombie.velocity = { x: 0, y: 0, z: 0 };
+    events.push({ type: 'zombieDied', playerId: player.id, zombieId: zombie.id, method: 'melee' });
   }
   return events;
 }

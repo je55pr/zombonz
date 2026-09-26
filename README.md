@@ -38,7 +38,8 @@ Use Node.js 22.12.0, then `npm ci` and `npm run dev`. Open the local address pri
 Run `npm run check` for TypeScript validation, automated tests and a production build.
 
 Click the canvas to capture the mouse. Move with WASD, fire with the left mouse button,
-reload with R, interact with E, and restart after game over with Enter. Escape releases the mouse.
+reload with R, knife with V, switch weapons with Q, interact with E, and restart after game over with Enter.
+M mutes synthesized game audio. Escape releases the mouse. Input releases when the window loses focus.
 
 G toggles god mode (restores health and prevents damage). F toggles noclip:
 WASD flies in the direction you look, Space rises and C descends. Active modes appear
@@ -55,19 +56,29 @@ the browser or OS may cap presentation to the current display refresh rate.
 
 The playable solo map follows Nacht's starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
-box in the Help room costs 950 and immediately replaces your weapon with a loaded
-Kar98k, Thompson, MP40 or BAR, followed by a three-second cooldown. Wall purchases
-offer a Kar98k in the starting room and a Thompson in the Help room.
+box in the Help room costs 950. It rolls for three seconds, then reserves a Kar98k,
+Thompson, MP40 or BAR for the buyer to claim within ten seconds. A player carries
+two guns; the first purchase keeps the M1911, while a third gun replaces the one
+currently held. The box briefly closes before it can be used again. Wall purchases
+offer a Kar98k in the starting room and a Thompson in the Help room. Buying wall
+ammo refills an owned gun's reserves without replacing its loaded magazine; full
+reserves cannot be purchased again.
 
-The bunker uses original procedural textures, boarded windows, overhead beams,
+The bunker uses imported environment materials and props alongside procedural details,
+boarded windows, overhead beams,
 stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
 Dimensions and props are an approximation, not a one-to-one recreation of the original game.
 Zombies spawn outside and follow eight ground-level window approaches. They tear out
 the three boards one at a time, climb through the sill, then pursue players through
 open rooms and stairs. Hold E near a damaged window to rebuild one board per second.
-Repairs are free and do not award points yet. Zombies can be shot outside, and only
+Repairs are free and award 10 points per board up to a per-round cap. Zombies can be shot outside, and only
 one zombie crosses a given window at a time. Upstairs is reached through the stairs;
 upper windows and the ground window behind the north-east stair remain scenery.
+Zombie health rises with each round. Headshots deal triple damage, knife swings
+hit one nearby zombie in front of the player, and health recovers after five
+damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
+and temporary damage tint. Original synthesized audio gives simple gun, melee,
+damage, box and round cues; it unlocks after user input and can be muted with M.
 
 The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
 attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a
@@ -83,7 +94,8 @@ follow authoritative shot/ammo/reload state. The models share textures and load 
 demand; loading failures leave a playable placeholder and a visible notice.
 Thompson/MP40 models and animated player hands are not in the asset pack: those guns
 use labelled procedural placeholders. Full hand/bolt/round-by-round reload animation,
-box roulette/claim animation, original weapon behaviour, audio and online co-op remain future work.
+authentic box weapon silhouettes/roulette animation, original weapon behaviour,
+recorded sounds and online co-op remain future work.
 
 Press F2 for asset credits. Full source links, licences and conversion notes are in
 [runtime attribution](public/assets/ATTRIBUTION.txt) and [asset provenance](docs/assets/THIRD_PARTY_ASSETS.md).

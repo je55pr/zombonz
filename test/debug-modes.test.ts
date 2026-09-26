@@ -89,4 +89,13 @@ describe('G / F debug modes', () => {
     }
     browser.dispose();
   });
+  it('releases held input when focus is lost', () => {
+    const target = new EventTarget(), pointer = new EventTarget();
+    const browser = new BrowserInput({ pointerElement: pointer as HTMLElement }, target as Window);
+    target.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyW', repeat: false }));
+    expect(browser.consume().actions.moveForward?.held).toBe(true);
+    target.dispatchEvent(new Event('blur'));
+    expect(browser.consume().actions.moveForward).toMatchObject({ held: false, released: true });
+    browser.dispose();
+  });
 });

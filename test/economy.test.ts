@@ -51,6 +51,7 @@ describe('points economy', () => {
       roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 },
     });
     const playerId = simulation.playerIds[0];
+    simulation.getPlayer(playerId)!.pitch = -0.1;
     const target = createZombieState('e:99', { x: 0, y: 0, z: -5 }, 1);
     target.health = 50;
     addEntity(simulation.state.world, target);

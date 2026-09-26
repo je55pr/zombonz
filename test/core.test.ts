@@ -49,6 +49,8 @@ describe('world state', () => {
     addEntity(world, {
       id, kind: 'player', alive: true, position: origin(), velocity: origin(),
       godMode: false, noclip: false, noclipAnchor: null,
+      recoveryDelayTicks: 0, meleeCooldownTicks: 0, repairRewardRound: 0, repairPointsEarned: 0,
+      holsteredWeapon: null, switchTicksRemaining: 0,
       yaw: 0, pitch: 0, health: 100, points: 500, weapon: { weaponId: 'starter-pistol', cooldownTicks: 0, magazineAmmo: 8, reserveAmmo: 32, reloadTicksRemaining: 0 },
     });
     expect(id).toBe('e:1');

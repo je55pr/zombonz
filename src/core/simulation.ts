@@ -1,17 +1,17 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { createBarrier, createZombieEntry, prepareBarriers, updateZombieEntry,
   repairBarriers, syncBarrierInteractables, type BarrierDefinition, type BarrierState, type BarrierEvent } from './barrier.ts';
-import { createMysteryBox, tickMysteryBoxes, useMysteryBox,
+import { createMysteryBox, tickMysteryBoxes, useMysteryBox, mysteryBoxPrompt,
   type MysteryBoxDefinition, type MysteryBoxState, type MysteryBoxEvent } from './mysteryBox.ts';
 import {
   closedDoorBlockers, createDoorInteractable, createDoorState, handleDoorInteraction,
   type DoorDefinition, type DoorEvent, type DoorState,
 } from './door.ts';
 import {
-  DEFAULT_ECONOMY_CONFIG, awardCombatPoints,
+  DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints,
   type EconomyConfig, type EconomyEvent,
 } from './economy.ts';
-import { livingEntityCount, livingPlayers, type DamageEvent } from './health.ts';
+import { livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
 import {
   findInteractionCandidate, triggerInteraction,
@@ -27,12 +27,12 @@ import {
 } from './spawning.ts';
 import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
-import { addEntity, allocateEntityId, createWorld } from './world.ts';
+import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
 import {
   createZombieState, tickZombieMelee, updateZombiePursuit, type ZombieAttackEvent,
 } from './zombie.ts';
 import {
-  beginReload, firePlayerWeapon, rayFromPlayer, tickWeaponState, wantsToFire, type WeaponEvent,
+  beginReload, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon, type WeaponEvent,
 } from './weapon.ts';
 import {
   createWallWeaponInteractable, createWallWeaponState, handleWallWeaponInteraction,
@@ -179,7 +179,9 @@ export class GameSimulation {
 
   interactionCandidate(playerId: EntityId): InteractionCandidate | null {
     const player = this.getPlayer(playerId);
-    return player ? findInteractionCandidate(player, this.reachableInteractables(player)) : null;
+    const candidate = player ? findInteractionCandidate(player, this.reachableInteractables(player)) : null;
+    const box = this.state.mysteryBoxes.find(box => box.interactableId === candidate?.interactableId);
+    return candidate && box ? { ...candidate, prompt: mysteryBoxPrompt(box, playerId) } : candidate;
   }
 
   private navigationQuery(): NavigationQuery {
@@ -206,19 +208,23 @@ export class GameSimulation {
     if (this.state.round.phase === 'gameOver') {
       const restartRequested = Object.values(inputs).some((frame) => frame?.actions.restart?.pressed);
       if (restartRequested) return [this.restart()];
+      return [];
     }
     const events: SimulationEvent[] = [];
     const world = this.state.world;
-    tickMysteryBoxes(this.state.mysteryBoxes, this.interactables());
+    tickMysteryBoxes(this.state.mysteryBoxes, this.interactables(), livingPlayers(world));
     const repairers = new Map<string, EntityId>();
 
     const playerFrames = new Map<EntityId, InputFrame>();
     for (const player of livingPlayers(world)) {
+      events.push(...tickPlayerRecovery(player));
+      if (player.meleeCooldownTicks > 0) player.meleeCooldownTicks -= 1;
       const frame = inputs[player.id] ?? createInputFrame(world.tick);
       playerFrames.set(player.id, frame);
       updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
       events.push(...tickWeaponState(player));
+      if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
       if (frame.actions.interact?.held) {
         const candidate = findInteractionCandidate(player, this.reachableInteractables(player));
@@ -238,6 +244,10 @@ export class GameSimulation {
 
     for (const player of livingPlayers(world)) {
       const frame = playerFrames.get(player.id)!;
+      if (frame.actions.melee?.pressed) {
+        const meleeEvents = meleeAttack(player, this.zombies(), [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
+        events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig));
+      }
       const fire = frame.actions.fire;
       if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
       const weaponEvents = firePlayerWeapon(
@@ -300,7 +310,12 @@ export class GameSimulation {
       events.push(...tickZombieMelee(zombie, players, this.collisionBoxes()));
     }
     // Repair resolves after entry decisions, so rebuilding cannot trap an active vault.
-    events.push(...repairBarriers(this.state.barriers, repairers));
+    const repairEvents = repairBarriers(this.state.barriers, repairers);
+    events.push(...repairEvents);
+    for (const event of repairEvents) if (event.type === 'barrierBoardRepaired') {
+      const player = this.getPlayer(event.playerId);
+      if (player) events.push(...awardRepairPoints(player, this.state.round.round));
+    }
     syncBarrierInteractables(this.state.barriers, this.interactables());
 
     const roundEvents = updateRoundState(this.state.round, {
@@ -314,6 +329,11 @@ export class GameSimulation {
       if (event.to === 'spawning') {
         this.state.spawnDirector = createSpawnDirector(event.round, this.spawnConfig);
       }
+    }
+    // Keep the body through its death animation, then reclaim authoritative state.
+    for (const entity of Object.values(world.entities)) if (entity.kind === 'zombie' && !entity.alive) {
+      entity.deadTicks += 1;
+      if (entity.deadTicks >= 300) removeEntity(world, entity.id);
     }
     world.tick += 1;
     return events;
