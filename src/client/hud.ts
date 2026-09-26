@@ -23,6 +23,8 @@ export interface HudSnapshot {
   instaKillStatus: string | null;
   gameOver: boolean;
   paused: boolean;
+  /** A game opened from the menu shows CLICK TO START instead of PAUSED before its first click. */
+  awaitingStart?: boolean;
   godMode: boolean;
   noclip: boolean;
   sprinting: boolean;
@@ -212,8 +214,8 @@ export class CanvasHud {
     if (snapshot.paused && !snapshot.gameOver) {
       this.context.fillStyle = 'rgba(0,0,0,0.62)';
       this.context.fillRect(0, 0, width, height);
-      this.text('PAUSED', width / 2, height * 0.44, 68, 'center');
-      this.text('CLICK TO RESUME', width / 2, height * 0.53, 30, 'center');
+      this.text(snapshot.awaitingStart ? 'NACHT DER UNTOTEN' : 'PAUSED', width / 2, height * 0.44, 68, 'center');
+      this.text(snapshot.awaitingStart ? 'CLICK TO START' : 'CLICK TO RESUME', width / 2, height * 0.53, 30, 'center');
     }
     if (this.credits) {
       this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(180, 115, 1240, 540);

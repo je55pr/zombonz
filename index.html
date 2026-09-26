@@ -6,11 +6,13 @@
   <title>Zombonz</title>
   <link rel="icon" href="data:,">
   <style>
-    html, body, #game { width: 100%; height: 100%; margin: 0; display: block; overflow: hidden; background: #0d0e0d; }
+    html, body, #game, #menu { width: 100%; height: 100%; margin: 0; display: block; overflow: hidden; background: #0d0e0d; }
+    /* Only one canvas is ever visible: the menu until Solo starts, then the game. */
+    #game[hidden] { display: none; }
   </style>
 </head>
 <body>
-  <canvas id="game" aria-label="Zombonz game canvas"></canvas>
+  <canvas id="game" aria-label="Zombonz game canvas" hidden></canvas>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

@@ -9,12 +9,14 @@ export class GameAudio {
   private ambient: AudioBufferSourceNode | null = null;
   private hum: OscillatorNode | null = null;
   private muted = false;
+  /** Output gain when audible; the player's volume setting scales the original 0.2 mix level. */
+  private level = 0.2;
   private paused = false;
   private readonly unlock = () => this.start();
   private readonly onKeyDown = (event: KeyboardEvent) => {
     if (event.code === 'KeyM' && !event.repeat) {
       this.muted = !this.muted;
-      if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || this.paused ? 0 : 0.2,
+      if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || this.paused ? 0 : this.level,
         this.context.currentTime, 0.015);
     }
   };
@@ -30,7 +32,7 @@ export class GameAudio {
       try {
         this.context = new AudioContext({ latencyHint: 'interactive' });
         this.output = this.context.createGain();
-        this.output.gain.value = this.muted || this.paused ? 0 : 0.2;
+        this.output.gain.value = this.muted || this.paused ? 0 : this.level;
         this.output.connect(this.context.destination);
         // One seeded noise buffer reused by all short transients.
         const size = Math.ceil(this.context.sampleRate * 0.22);
@@ -65,8 +67,14 @@ export class GameAudio {
 
   setPaused(paused: boolean): void {
     this.paused = paused;
-    if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || paused ? 0 : 0.2,
+    if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || paused ? 0 : this.level,
       this.context.currentTime, 0.03);
+  }
+
+  /** 0 to 1 master volume from the settings menu. */
+  setVolume(volume: number): void {
+    this.level = 0.2 * Math.max(0, Math.min(1, volume));
+    this.setPaused(this.paused);
   }
 
   private tone(from: number, to: number, seconds: number, volume: number, shape: OscillatorType = 'sine'): void {

@@ -29,3 +29,5 @@ Core collections are dynamic and keyed by stable entity/player identifiers. Neve
 ## Visible UI
 
 The game exposes one visible HTML canvas. World rendering, HUD, menus, prompts and other visible game UI are rendered into that canvas rather than DOM overlays.
+
+The start menu is drawn on its own 2D canvas so the page can open without loading Three.js or the map. The game's WebGL canvas stays hidden until Solo is chosen, and the menu canvas is removed before the game canvas is shown, so only one canvas is ever visible.
