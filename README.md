@@ -88,7 +88,7 @@ one zombie crosses a given window at a time. Upstairs is reached through the sta
 upper windows and the ground window behind the north-east stair remain scenery.
 Rounds follow the classic WaW/BO1 curves: solo rounds hold 6, 8, 13, 18 and 24 zombies,
 then grow faster from round 10, with more per extra co-op player and at most 24 alive at once.
-Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
+Rounds are ten seconds apart. Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
 sprint gait when it spawns: round 1 is all walkers, runners join from round 2, sprinters from
 round 5, and from round 9 everything sprints. Sprinters nearly match a walking player.
 Zombie health rises with each round. Headshots deal triple damage (quadruple with the Kar98k, which one-shots through round 3), knife swings

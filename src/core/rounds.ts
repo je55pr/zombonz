@@ -26,7 +26,8 @@ export interface RoundEvent {
 
 export const DEFAULT_ROUND_CONFIG: RoundConfig = {
   initialWaitTicks: 60,
-  intermissionTicks: 180,
+  // WaW/BO1 zombie_between_round_time: ten seconds between rounds.
+  intermissionTicks: 600,
 };
 export function createRoundState(): RoundState {
   return { round: 0, phase: 'waiting', phaseTicks: 0 };
