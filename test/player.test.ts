@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   PLAYER_MOVEMENT,
+  SPRINT_RULES,
   createInputFrame,
   createPlayerState,
   moveWithCollision,
@@ -45,6 +46,37 @@ describe('player movement', () => {
     expect(run.position.z).toBeLessThan(walk.position.z * 1.4);
     updatePlayerMovement(run, heldMove('moveForward'), 1 / 60, []);
     expect(run.sprinting).toBe(false);
+  });
+
+  it('runs out of sprint after about four seconds, then recharges after a short pause', () => {
+    const player = createPlayerState(id, { x: 0, y: 0, z: 0 });
+    const sprint = heldMove('moveForward');
+    sprint.actions.sprint = { held: true, pressed: false, released: false, value: 1 };
+    for (let i = 0; i < SPRINT_RULES.maxTicks; i++) updatePlayerMovement(player, sprint, 1 / 60, []);
+    expect(player.sprinting).toBe(true);
+    updatePlayerMovement(player, sprint, 1 / 60, []);
+    expect(player.sprinting).toBe(false);
+    expect(player.sprintTicks).toBe(0);
+
+    // Holding sprint while exhausted does not restart it until one second has recharged.
+    for (let i = 0; i < SPRINT_RULES.rechargeDelayTicks + SPRINT_RULES.minStartTicks - 1; i++) {
+      updatePlayerMovement(player, sprint, 1 / 60, []);
+    }
+    expect(player.sprinting).toBe(false);
+    updatePlayerMovement(player, sprint, 1 / 60, []);
+    expect(player.sprinting).toBe(true);
+  });
+
+  it('only recharges stamina once the pause after sprinting has passed', () => {
+    const player = createPlayerState(id, { x: 0, y: 0, z: 0 });
+    const sprint = heldMove('moveForward');
+    sprint.actions.sprint = { held: true, pressed: false, released: false, value: 1 };
+    for (let i = 0; i < 100; i++) updatePlayerMovement(player, sprint, 1 / 60, []);
+    const spent = player.sprintTicks;
+    for (let i = 0; i < SPRINT_RULES.rechargeDelayTicks; i++) updatePlayerMovement(player, heldMove('moveForward'), 1 / 60, []);
+    expect(player.sprintTicks).toBe(spent);
+    for (let i = 0; i < 1000; i++) updatePlayerMovement(player, heldMove('moveForward'), 1 / 60, []);
+    expect(player.sprintTicks).toBe(SPRINT_RULES.maxTicks);
   });
 
   it('aiming slows movement and wins over sprint; firing cancels sprint', () => {
