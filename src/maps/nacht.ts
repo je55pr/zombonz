@@ -197,17 +197,27 @@ export const NACHT_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
   wallBuy('help-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: -5.96, y: 1, z: -4.6 }),
   wallBuy('upper-trench-gun', 'trench-gun', 'Trench Gun', 1500, { x: -3.1, y: UPPER_HEIGHT + 1, z: -10.76 }),
   wallBuy('upper-bar', 'bar', 'BAR', 1800, { x: -5.96, y: UPPER_HEIGHT + 1, z: -5.6 }),
+  wallBuy('start-m1-carbine', 'm1-carbine', 'M1A1 Carbine', 600, { x: 7.4, y: 1, z: 7.56 }),
+  // BO1-era chalk alongside the WaW set.
+  wallBuy('start-m14', 'm14', 'M14', 500, { x: 17.96, y: 1, z: 2.5 }),
+  wallBuy('help-mp5k', 'mp5k', 'MP5K', 1000, { x: -1.8, y: 1, z: -10.76 }),
+  wallBuy('upper-ak74u', 'ak74u', 'AK-74u', 1200, { x: -5.96, y: UPPER_HEIGHT + 1, z: -3.3 }),
 ];
 /** Presentation: the yaw each chalk outline faces, away from its wall. */
 export const NACHT_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
   'start-kar98k': Math.PI, 'help-thompson': Math.PI / 2, 'help-double-barrel': Math.PI / 2,
-  'upper-trench-gun': 0, 'upper-bar': Math.PI / 2,
+  'upper-trench-gun': 0, 'upper-bar': Math.PI / 2, 'start-m1-carbine': Math.PI, 'start-m14': -Math.PI / 2,
+  'help-mp5k': 0, 'upper-ak74u': Math.PI / 2,
 };
 export const NACHT_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   id: 'help-box', position: { x: -1.45, y: 0.6, z: 6.35 }, cost: 950,
-  weapons: ['kar98k', 'springfield', 'm1-garand', 'thompson', 'mp40', 'bar', 'mg42', 'double-barrel', 'trench-gun',
-    // Not in WaW's Nacht box, but part of this game's WWII arsenal.
-    'ppsh41', 'mosin'],
+  weapons: ['kar98k', 'springfield', 'mosin', 'm1-garand', 'm1-carbine', 'stg44', 'fg42', 'thompson', 'mp40', 'ppsh41',
+    'bar', 'mg42', 'double-barrel', 'trench-gun', 'magnum-357',
+    // BO1's Nacht box added Cold War guns.
+    'm14', 'fal', 'commando', 'ak74u', 'mp5k', 'skorpion', 'rpk', 'spas12', 'ithaca37', 'python', 'rpg7',
+    'irrlicht', 'molniya'],
+  // The wonder weapons are rare, as the Ray Gun and Wunderwaffe were.
+  weights: { irrlicht: 0.25, molniya: 0.15 },
 }];
 export const NACHT_PLAYER_SPAWN: Vec3 = { x: 5.2, y: 0, z: 4.2 };
 /** WaW/BO1 windows hold six boards. */
