@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { collectPowerups, createBarrier, createPlayerState, createPowerupState, createWeaponState,
   createZombieState, tickPowerupLifetime, tryDropPowerup, GameSimulation, createInputFrame,
-  addEntity, type PowerupConfig } from '../src/core/index.ts';
+  addEntity, DEFAULT_POWERUP_CONFIG, type PowerupConfig } from '../src/core/index.ts';
 
-const forced: PowerupConfig = { dropChanceDenominator: 1, minimumTicksBetweenDrops: 600,
-  lifetimeTicks: 900, pickupRadius: 1.25 };
+const forced: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, dropChanceDenominator: 1,
+  minimumTicksBetweenDrops: 600, kinds: ['maxAmmo'] };
 
-describe('max ammo power-up', () => {
+describe('timed power-ups', () => {
   it('drops deterministically and respects active-drop and time spacing limits', () => {
     const first = createPowerupState(), second = createPowerupState();
     const zombie = createZombieState('e:9', { x: 4, y: 0, z: 3 }, 1);
@@ -78,5 +78,36 @@ describe('max ammo power-up', () => {
     expect(player.weapon.magazineAmmo).toBe(4);
     sim.restart();
     expect(sim.state.powerups).toEqual(createPowerupState());
+  });
+
+  it('activates a timed team-wide Double Points bonus only after collection', () => {
+    const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+    const config: PowerupConfig = { ...forced, kinds: ['doublePoints'], doublePointsDurationTicks: 3 };
+    tryDropPowerup(state, zombie, [], 42, 1, config);
+    expect(state.drops[0].kind).toBe('doublePoints');
+    expect(state.doublePointsTicksRemaining).toBe(0);
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    expect(collectPowerups(state, [player], [], config)).toMatchObject([{ kind: 'doublePoints' }]);
+    expect(state.doublePointsTicksRemaining).toBe(3);
+    for (let i = 0; i < 3; i++) tickPowerupLifetime(state);
+    expect(state.doublePointsTicksRemaining).toBe(0);
+  });
+
+  it('doubles gun hit and kill rewards while active, then returns to normal', () => {
+    const sim = new GameSimulation({ seed: 31, playerSpawns: [{ x: 0, y: 0, z: 0 }],
+      map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] },
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    player.weapon = createWeaponState('kar98k');
+    sim.state.powerups.doublePointsTicksRemaining = 2;
+    addEntity(sim.state.world, createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1));
+    const fire = createInputFrame(0);
+    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    sim.tick({ [player.id]: fire });
+    expect(player.points).toBe(700); // Headshot kill: (10 hit + 90 bonus) × 2.
+    player.weapon.cooldownTicks = 0;
+    addEntity(sim.state.world, createZombieState('e:100', { x: 0, y: 0, z: -3 }, 1));
+    sim.tick({ [player.id]: fire });
+    expect(player.points).toBe(800);
   });
 });

@@ -38,6 +38,7 @@ describe('gameplay HUD snapshot', () => {
       roundPhase: 'waiting',
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
       nearbyPowerup: null,
+      bonusStatus: null,
       gameOver: false,
       godMode: false,
       noclip: false,
@@ -76,5 +77,19 @@ describe('gameplay HUD snapshot', () => {
     const playerId = sim.playerIds[0];
     sim.getPlayer(playerId)!.yaw = Math.PI;
     expect(buildHudSnapshot(sim, playerId)?.interactionPrompt).toBeNull();
+  });
+
+  it('shows nearby drops and updates Double Points at one-second resolution', () => {
+    const sim = simulation(), playerId = sim.playerIds[0];
+    sim.state.powerups.drops.push({ id: 'p:1', kind: 'doublePoints',
+      position: { x: 0, y: 0, z: -3 }, ticksRemaining: 900 });
+    sim.state.powerups.doublePointsTicksRemaining = 1799;
+    expect(buildHudSnapshot(sim, playerId)).toMatchObject({
+      nearbyPowerup: 'DOUBLE POINTS', bonusStatus: '2X POINTS  30s',
+    });
+    sim.state.powerups.doublePointsTicksRemaining = 1740;
+    expect(buildHudSnapshot(sim, playerId)?.bonusStatus).toBe('2X POINTS  29s');
+    sim.state.powerups.drops = [];
+    expect(buildHudSnapshot(sim, playerId)?.nearbyPowerup).toBeNull();
   });
 });

@@ -30,5 +30,7 @@ describe('local combat feedback', () => {
     const feedback = new HudFeedback();
     feedback.consume([{ type: 'powerupCollected', dropId: 'p:1', kind: 'maxAmmo', playerId: 'e:2' }], 'e:1', 50);
     expect(feedback.snapshot(50).message).toBe('MAX AMMO');
+    feedback.consume([{ type: 'powerupCollected', dropId: 'p:2', kind: 'doublePoints', playerId: 'e:2' }], 'e:1', 51);
+    expect(feedback.snapshot(51).message).toBe('DOUBLE POINTS');
   });
 });

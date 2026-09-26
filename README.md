@@ -82,10 +82,11 @@ hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
 and temporary damage tint. Original synthesized audio gives simple gun, melee,
 damage, box and round cues; it unlocks after user input and can be muted with M.
-Eligible zombie kills can also drop a glowing Max Ammo pickup. It lasts 15 seconds;
-walking into it refills the reserve ammo of both carried weapons for every living
-player without changing loaded magazines. Kills outside a window place the pickup
-just inside it so the reward is reachable.
+Eligible zombie kills can also drop timed Max Ammo or Double Points pickups.
+Max Ammo refills the reserve ammo of both carried weapons for every living player
+without changing loaded magazines. Double Points doubles combat and barrier-repair
+rewards for 30 seconds. Kills outside a window place the pickup just inside it
+so the reward is reachable.
 
 The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
 attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a
@@ -115,6 +116,8 @@ These overrides are development-only; the normal URL starts the standard surviva
 god mode for repeatable performance checks. `npm run benchmark` measures a headless
 24-zombie stair-routing scenario (mean/p95 tick time); it does not measure GPU time or FPS.
 `/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
+That preview guarantees a Max Ammo drop when the target dies; add
+`&powerup=doublePoints` to inspect the alternate pickup.
 Use `weapon=starter-pistol`, `kar98k`, `bar`, `thompson` or `mp40` on any preview URL
 to inspect that viewmodel. P fires in development previews only (useful in browsers
 without pointer lock); R reloads. Production and normal survival use mouse firing.

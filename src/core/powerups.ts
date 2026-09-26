@@ -5,7 +5,7 @@ import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import { WEAPON_DEFINITIONS } from './weapon.ts';
 import { rayAabbDistance } from './weapon.ts';
 
-export type PowerupKind = 'maxAmmo';
+export type PowerupKind = 'maxAmmo' | 'doublePoints';
 
 export interface PowerupDrop {
   id: string;
@@ -18,6 +18,7 @@ export interface PowerupState {
   drops: PowerupDrop[];
   nextId: number;
   lastDropTick: number;
+  doublePointsTicksRemaining: number;
 }
 
 export interface PowerupConfig {
@@ -25,6 +26,8 @@ export interface PowerupConfig {
   minimumTicksBetweenDrops: number;
   lifetimeTicks: number;
   pickupRadius: number;
+  kinds: readonly PowerupKind[];
+  doublePointsDurationTicks: number;
 }
 
 export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
@@ -32,6 +35,8 @@ export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
   minimumTicksBetweenDrops: 600,
   lifetimeTicks: 900,
   pickupRadius: 1.25,
+  kinds: ['maxAmmo', 'doublePoints'],
+  doublePointsDurationTicks: 1800,
 };
 
 export type PowerupEvent =
@@ -40,11 +45,12 @@ export type PowerupEvent =
   | { type: 'powerupExpired'; dropId: string; kind: PowerupKind };
 
 export function createPowerupState(): PowerupState {
-  return { drops: [], nextId: 1, lastDropTick: -1_000_000 };
+  return { drops: [], nextId: 1, lastDropTick: -1_000_000, doublePointsTicksRemaining: 0 };
 }
 
 export function tickPowerupLifetime(state: PowerupState): PowerupEvent[] {
   const events: PowerupEvent[] = [];
+  if (state.doublePointsTicksRemaining > 0) state.doublePointsTicksRemaining -= 1;
   for (const drop of state.drops) {
     drop.ticksRemaining -= 1;
     if (drop.ticksRemaining <= 0) events.push({ type: 'powerupExpired', dropId: drop.id, kind: drop.kind });
@@ -66,10 +72,11 @@ export function tryDropPowerup(
   const zombieNumber = Number(zombie.id.slice(2));
   const rng = new SeededRng(worldSeed ^ Math.imul(zombieNumber, 0x9e3779b9) ^ tick);
   if (rng.int(0, config.dropChanceDenominator) !== 0) return [];
+  const kind = config.kinds[rng.int(0, config.kinds.length)];
   // Zombies shot before entering would otherwise drop an unreachable reward outdoors.
   const entrance = zombie.entry && barriers.find(barrier => barrier.id === zombie.entry!.barrierId);
   const position = { ...(entrance ? entrance.insidePoint : zombie.position) };
-  const drop: PowerupDrop = { id: `p:${state.nextId++}`, kind: 'maxAmmo', position,
+  const drop: PowerupDrop = { id: `p:${state.nextId++}`, kind, position,
     ticksRemaining: config.lifetimeTicks };
   state.drops.push(drop);
   state.lastDropTick = tick;
@@ -109,6 +116,7 @@ export function collectPowerups(
       && Math.abs(player.position.y - drop.position.y) <= 1.5 && unobstructed(player, drop, boxes));
     if (!collector) continue;
     if (drop.kind === 'maxAmmo') for (const player of living) refillAmmo(player);
+    if (drop.kind === 'doublePoints') state.doublePointsTicksRemaining = config.doublePointsDurationTicks;
     events.push({ type: 'powerupCollected', dropId: drop.id, kind: drop.kind, playerId: collector.id });
   }
   const collected = new Set(events.map(event => event.dropId));

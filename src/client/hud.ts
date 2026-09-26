@@ -15,6 +15,7 @@ export interface HudSnapshot {
   roundPhase: string;
   interactionPrompt: string | null;
   nearbyPowerup: string | null;
+  bonusStatus: string | null;
   gameOver: boolean;
   godMode: boolean;
   noclip: boolean;
@@ -30,6 +31,9 @@ export function buildHudSnapshot(
 ): HudSnapshot | null {
   const player = simulation.getPlayer(playerId);
   if (!player) return null;
+  const nearbyDrop = simulation.state.powerups.drops.find(drop => Math.hypot(
+    drop.position.x - player.position.x, drop.position.z - player.position.z) < 4
+    && Math.abs(drop.position.y - player.position.y) < 2);
   return {
     health: player.health,
     points: player.points,
@@ -41,9 +45,9 @@ export function buildHudSnapshot(
     reloadTicksRemaining: player.weapon.reloadTicksRemaining,
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
-    nearbyPowerup: simulation.state.powerups.drops.some(drop => Math.hypot(
-      drop.position.x - player.position.x, drop.position.z - player.position.z) < 4
-      && Math.abs(drop.position.y - player.position.y) < 2) ? 'MAX AMMO' : null,
+    nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO' : 'DOUBLE POINTS' : null,
+    bonusStatus: simulation.state.powerups.doublePointsTicksRemaining > 0
+      ? `2X POINTS  ${Math.ceil(simulation.state.powerups.doublePointsTicksRemaining / 60)}s` : null,
     gameOver: simulation.state.round.phase === 'gameOver',
     godMode: player.godMode,
     noclip: player.noclip,
@@ -147,6 +151,7 @@ export class CanvasHud {
     if (snapshot.noclip) this.text('WASD fly · SPACE up · C down', 48, 140, 20);
     this.text(`HP ${snapshot.health}`, 48, height - 54, 36);
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');
+    if (snapshot.bonusStatus) this.text(snapshot.bonusStatus, width - 48, height - 226, 23, 'right');
     this.text(weaponLabel(snapshot.weapon), width - 48, height - 50, 26, 'right');
     this.text(`${snapshot.magazineAmmo} / ${snapshot.reserveAmmo}`, width - 48, height - 20, 30, 'right');
     if (snapshot.holsteredWeapon) this.text(`Q  ${weaponLabel(snapshot.holsteredWeapon)}`, width - 48, height - 130, 20, 'right');

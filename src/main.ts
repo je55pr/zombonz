@@ -18,7 +18,8 @@ import { PowerupView } from './client/powerupView.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals } from './client/environmentProps.ts';
 import {
-  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, createWeaponState, createZombieState, allocateEntityId, addEntity,
+  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
+  createWeaponState, createZombieState, allocateEntityId, addEntity,
   type EntityId, type ZombieState, type Vec3,
 } from './core/index.ts';
 import {
@@ -80,6 +81,7 @@ const previewViews = {
   props: { position: { x: -2, y: 0, z: 4.3 }, yaw: Math.PI + 0.15 },
 };
 const previewName = new URLSearchParams(location.search).get('preview');
+const previewPowerup = new URLSearchParams(location.search).get('powerup');
 const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
   ? previewViews[previewName as keyof typeof previewViews] : null;
 
@@ -101,7 +103,8 @@ const simulation = new GameSimulation({
     baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
   } } : {}),
   ...(previewName === 'assets' && preview ? { powerupConfig: {
-    dropChanceDenominator: 1, minimumTicksBetweenDrops: 0, lifetimeTicks: 900, pickupRadius: 1.25,
+    ...DEFAULT_POWERUP_CONFIG, dropChanceDenominator: 1, minimumTicksBetweenDrops: 0,
+    kinds: [previewPowerup === 'doublePoints' ? 'doublePoints' : 'maxAmmo'] as const,
   } } : {}),
   ...(preview ? { roundConfig: { initialWaitTicks: previewName === 'barrier' || previewName === 'stress' ? 120 : 2147483647, intermissionTicks: 180 },
     economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } } : {}),

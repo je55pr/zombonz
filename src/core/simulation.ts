@@ -254,7 +254,8 @@ export class GameSimulation {
       const frame = playerFrames.get(player.id)!;
       if (frame.actions.melee?.pressed) {
         const meleeEvents = meleeAttack(player, this.zombies(), [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
-        events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig));
+        events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig,
+          this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
       }
       const fire = frame.actions.fire;
       if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
@@ -263,7 +264,8 @@ export class GameSimulation {
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
       );
       events.push(...weaponEvents);
-      events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig));
+      events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig,
+        this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
     }
 
     for (const event of events) if (event.type === 'zombieDied') {
@@ -329,7 +331,8 @@ export class GameSimulation {
     events.push(...repairEvents);
     for (const event of repairEvents) if (event.type === 'barrierBoardRepaired') {
       const player = this.getPlayer(event.playerId);
-      if (player) events.push(...awardRepairPoints(player, this.state.round.round));
+      if (player) events.push(...awardRepairPoints(player, this.state.round.round,
+        this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
     }
     syncBarrierInteractables(this.state.barriers, this.interactables());
 

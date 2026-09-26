@@ -3,6 +3,7 @@ import {
   GameSimulation,
   addEntity,
   awardCombatPoints,
+  awardRepairPoints,
   createInputFrame,
   createPlayerState,
   createZombieState,
@@ -41,6 +42,15 @@ describe('points economy', () => {
     expect(spendPoints(player, 300, 'door')).toMatchObject({ type: 'pointsSpent', balance: 200 });
     expect(spendPoints(player, 250, 'wall-weapon')).toMatchObject({ type: 'pointsSpendRejected', balance: 200 });
     expect(player.points).toBe(200);
+  });
+
+  it('doubles repair rewards without consuming the board-repair cap twice', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    expect(awardRepairPoints(player, 1, 2)).toMatchObject([{ amount: 20, balance: 520 }]);
+    expect(player.repairPointsEarned).toBe(10);
+    for (let i = 0; i < 3; i++) awardRepairPoints(player, 1, 2);
+    expect(player.points).toBe(580);
+    expect(awardRepairPoints(player, 1, 2)).toEqual([]);
   });
 
   it('emits combat economy events from the authoritative simulation tick', () => {

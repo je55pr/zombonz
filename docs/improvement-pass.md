@@ -106,3 +106,9 @@ for all living players but leaves magazines unchanged. The drop uses a shared,
 low-draw glowing world marker, nearby HUD label and synthesized collection cue.
 The assets inspection preview forces a drop for visual smoke testing. Other
 power-up types and balancing remain open.
+
+Double Points now shares the same drop system, selected by the seeded roll.
+Collection activates a team-wide thirty-second combat and repair reward bonus;
+the existing repair-board cap still counts base points. The effect uses a distinct
+amber pickup, a one-second-resolution HUD countdown and a visible pickup cue.
+Grenades, other classic drops and final chance/balance tuning remain open.
