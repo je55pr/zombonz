@@ -65,10 +65,23 @@ Exact weapon balance/regen timings are explicit prototype tuning, not asserted o
 - Browser smoke checks: box roll/claim, Q switch and BAR headshot visibly worked;
   imported assets loaded, with no console warnings/errors on the checked views.
 - `npm run benchmark` on this machine: 24-zombie route, mean 2.71 ms/tick,
-  p95 4.69 ms/tick, max 9.80 ms. The in-app browser's stress view showed
-  roughly 24–33 FPS, so 144 Hz presentation remains unverified and currently
-  unmet in that environment. Renderer/GPU profiling is a next pass.
+  p95 4.69 ms/tick, max 9.80 ms.
 - One default full-suite run timed out an existing GLB test under simultaneous
   browser stress. The 8-worker rerun passed all 166 tests. With the browser
   closed, the standard `npm run check` passed: typecheck, 166 tests, production build.
   The build retains the existing large-chunk warning (about 698 kB main bundle).
+
+## Rendering follow-up
+
+The first browser stress run showed roughly 24–33 FPS. A temporary development
+render bypass reached 60 FPS; world and weapon rendering without the HUD also
+reached 60 FPS. This isolated the regression to `CanvasHud`: it compared a new
+feedback object by identity every frame, forcing a full 1600×900 HUD redraw and
+texture upload even when no displayed value changed. The final implementation
+compares the feedback fields and snapshots their values. The renderer performance
+test now covers fresh but equal feedback objects over 144 render frames.
+
+After the fix, the complete 24-zombie stress view held 60 FPS in the in-app
+browser, with about 4.5 ms CPU per frame and no console errors. The render
+bypass also held 60 FPS, establishing this browser/display path's current cap.
+Actual 144 Hz presentation still needs a 144 Hz-capable test surface.

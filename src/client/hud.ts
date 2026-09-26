@@ -177,9 +177,13 @@ export class CanvasHud {
 
   render(snapshot: HudSnapshot): void {
     if (!this.previous || (Object.keys(snapshot) as (keyof HudSnapshot)[])
-      .some(key => snapshot[key] !== this.previous![key])) {
+      .some(key => key === 'feedback'
+        ? snapshot.feedback?.message !== this.previous!.feedback?.message
+          || snapshot.feedback?.hitMarker !== this.previous!.feedback?.hitMarker
+          || snapshot.feedback?.damageVignette !== this.previous!.feedback?.damageVignette
+        : snapshot[key] !== this.previous![key])) {
       this.draw(snapshot);
-      this.previous = { ...snapshot };
+      this.previous = { ...snapshot, feedback: snapshot.feedback && { ...snapshot.feedback } };
     }
     this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);
