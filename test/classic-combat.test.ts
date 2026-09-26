@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { GameSimulation, addEntity, createInputFrame, createPlayerState, createZombieState,
   damagePlayer, tickPlayerRecovery, PLAYER_HEALTH, firePlayerWeapon, rayFromPlayer,
-  meleeAttack, awardCombatPoints, awardRepairPoints, zombieHealthForRound } from '../src/core/index.ts';
+  meleeAttack, awardCombatPoints, awardRepairPoints, zombieHealthForRound, createWeaponState, resolveHitscan,
+  ZOMBIE_HIT_ZONES, WEAPON_DEFINITIONS, hitZoneMultiplier } from '../src/core/index.ts';
 
 const origin = { x: 0, y: 0, z: 0 };
 const wall = [{ min: { x: -2, y: 0, z: -0.7 }, max: { x: 2, y: 3, z: -0.5 } }];
@@ -48,6 +49,26 @@ describe('headshots and knife', () => {
     const bodyEvents = firePlayerWeapon(player, { origin: { x: 0, y: 1, z: 0 }, direction: { x: 0, y: 0, z: -1 } }, [body], []);
     expect(body.health).toBe(100);
     expect(bodyEvents).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'body' }));
+  });
+  it('reads hit zones from data and falls back to the body', () => {
+    expect(ZOMBIE_HIT_ZONES.map(zone => zone.id)).toEqual(['head']);
+    const zombie = createZombieState('e:2', { x: 0, y: 0, z: -4 }, 1);
+    const at = (y: number) => resolveHitscan({ origin: { x: 0, y, z: 0 }, direction: { x: 0, y: 0, z: -1 } },
+      [zombie], [], 60);
+    expect(at(1.5)).toMatchObject({ kind: 'zombie', hitZone: 'head' });
+    expect(at(0.3)).toMatchObject({ kind: 'zombie', hitZone: 'body' });
+  });
+  it('uses per-weapon headshot multipliers: the Kar98k one-shots through round 3 only', () => {
+    expect(hitZoneMultiplier(WEAPON_DEFINITIONS['starter-pistol'], 'head')).toBe(3);
+    expect(hitZoneMultiplier(WEAPON_DEFINITIONS.kar98k, 'head')).toBe(4);
+    expect(hitZoneMultiplier(WEAPON_DEFINITIONS.kar98k, 'body')).toBe(1);
+    for (const [round, dies] of [[3, true], [4, false]] as const) {
+      const player = createPlayerState('e:1', origin);
+      player.weapon = createWeaponState('kar98k');
+      const target = createZombieState('e:2', { x: 0, y: 0, z: -4 }, round);
+      firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
+      expect(target.alive).toBe(!dies);
+    }
   });
   it('knifes one nearest facing target, cancels reload and respects cooldown', () => {
     const player = createPlayerState('e:1', origin);

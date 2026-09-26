@@ -91,7 +91,7 @@ then grow faster from round 10, with more per extra co-op player and at most 24 
 Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
 sprint gait when it spawns: round 1 is all walkers, runners join from round 2, sprinters from
 round 5, and from round 9 everything sprints. Sprinters nearly match a walking player.
-Zombie health rises with each round. Headshots deal triple damage, knife swings
+Zombie health rises with each round. Headshots deal triple damage (quadruple with the Kar98k, which one-shots through round 3), knife swings
 hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
 and temporary damage tint. Original synthesized audio gives simple gun, melee,

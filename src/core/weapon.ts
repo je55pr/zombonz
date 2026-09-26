@@ -12,6 +12,25 @@ export interface WeaponDefinition {
   startingReserveAmmo: number;
   reloadTicks: number;
   hipSpreadRadians: number;
+  /** Damage multipliers per hit zone; missing zones use DEFAULT_HIT_ZONE_MULTIPLIERS. */
+  hitZoneMultipliers?: Partial<Record<HitZoneId, number>>;
+}
+
+export type HitZoneId = 'head' | 'body';
+
+export interface HitZone {
+  id: HitZoneId;
+  /** Lowest impact height that counts, as a fraction of the zombie's current height. */
+  minHeightFraction: number;
+}
+
+/** Checked top-down; an impact below every zone falls back to FALLBACK_HIT_ZONE. */
+export const ZOMBIE_HIT_ZONES: readonly HitZone[] = [{ id: 'head', minHeightFraction: 1.42 / 1.72 }];
+export const FALLBACK_HIT_ZONE: HitZoneId = 'body';
+export const DEFAULT_HIT_ZONE_MULTIPLIERS: Readonly<Record<HitZoneId, number>> = { head: 3, body: 1 };
+
+export function hitZoneMultiplier(definition: WeaponDefinition, zone: HitZoneId): number {
+  return definition.hitZoneMultipliers?.[zone] ?? DEFAULT_HIT_ZONE_MULTIPLIERS[zone];
 }
 
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
@@ -22,6 +41,8 @@ export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   kar98k: {
     id: 'kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
     magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120, hipSpreadRadians: 0.015,
+    // WaW: one headshot kills through round 3 (350 health) but not round 4 (450).
+    hitZoneMultipliers: { head: 4 },
   },
   thompson: {
     id: 'thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
@@ -82,7 +103,7 @@ export interface HitscanRay {
 
 export type HitscanTarget =
   | { kind: 'world'; distance: number }
-  | { kind: 'zombie'; distance: number; zombieId: EntityId; hitZone: 'head' | 'body' }
+  | { kind: 'zombie'; distance: number; zombieId: EntityId; hitZone: HitZoneId }
   | { kind: 'none'; distance: number };
 
 export type WeaponEvent =
@@ -90,12 +111,12 @@ export type WeaponEvent =
   | { type: 'weaponFired'; playerId: EntityId; weaponId: string }
   | { type: 'weaponReloadStarted'; playerId: EntityId; weaponId: string; reloadTicks: number }
   | { type: 'weaponReloadCompleted'; playerId: EntityId; weaponId: string; loaded: number; magazineAmmo: number; reserveAmmo: number }
-  | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number; hitZone?: 'head' | 'body' }
+  | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number; hitZone?: HitZoneId }
   | { type: 'meleeSwung'; playerId: EntityId }
   | { type: 'meleeHit'; playerId: EntityId; zombieId: EntityId; damage: number }
   | { type: 'grenadeHit'; playerId: EntityId; zombieId: EntityId; damage: number }
   | { type: 'zombieDamaged'; zombieId: EntityId; playerId: EntityId; damage: number; health: number }
-  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: 'body' | 'head' | 'melee' };
+  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: HitZoneId | 'melee' };
 
 function normalize(direction: Vec3): Vec3 {
   const length = Math.hypot(direction.x, direction.y, direction.z);
@@ -193,9 +214,10 @@ export function resolveHitscan(
   }
   if (bestZombie) {
     const zombie = zombies.find(zombie => zombie.id === bestZombie!.zombieId)!;
-    const scale = zombie.entry?.phase === 'vaulting' ? 0.85 : 1;
+    const height = 1.72 * (zombie.entry?.phase === 'vaulting' ? 0.85 : 1);
     const impactY = ray.origin.y + ray.direction.y * bestZombie.distance - zombie.position.y;
-    return { kind: 'zombie', ...bestZombie, hitZone: impactY >= 1.42 * scale ? 'head' : 'body' };
+    const zone = ZOMBIE_HIT_ZONES.find(zone => impactY >= zone.minHeightFraction * height);
+    return { kind: 'zombie', ...bestZombie, hitZone: zone?.id ?? FALLBACK_HIT_ZONE };
   }
   if (worldDistance !== null) return { kind: 'world', distance: worldDistance };
   return { kind: 'none', distance: range };
@@ -265,7 +287,7 @@ export function firePlayerWeapon(
   const zombie = zombies.find((candidate) => candidate.id === hit.zombieId && candidate.alive);
   if (!zombie) return events;
   const applied = Math.min(zombie.health, instaKill ? zombie.health
-    : definition.damage * (hit.hitZone === 'head' ? 3 : 1));
+    : definition.damage * hitZoneMultiplier(definition, hit.hitZone));
   zombie.health -= applied;
   events.push({
     type: 'weaponHit', playerId: player.id, weaponId: definition.id,
