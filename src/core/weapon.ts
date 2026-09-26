@@ -1,5 +1,6 @@
 import type { CollisionBox } from './collision.ts';
 import type { EntityId, PlayerState, Vec3, WeaponState, ZombieState } from './types.ts';
+import { SeededRng } from './rng.ts';
 
 export interface WeaponDefinition {
   id: string;
@@ -10,28 +11,29 @@ export interface WeaponDefinition {
   magazineSize: number;
   startingReserveAmmo: number;
   reloadTicks: number;
+  hipSpreadRadians: number;
 }
 
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   'starter-pistol': {
     id: 'starter-pistol', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
-    magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90,
+    magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90, hipSpreadRadians: 0.008,
   },
   kar98k: {
     id: 'kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
-    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120,
+    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120, hipSpreadRadians: 0.015,
   },
   thompson: {
     id: 'thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
-    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120,
+    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120, hipSpreadRadians: 0.03,
   },
   mp40: {
     id: 'mp40', damage: 75, range: 65, fireIntervalTicks: 8, trigger: 'auto',
-    magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138,
+    magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138, hipSpreadRadians: 0.027,
   },
   bar: {
     id: 'bar', damage: 125, range: 80, fireIntervalTicks: 10, trigger: 'auto',
-    magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150,
+    magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150, hipSpreadRadians: 0.035,
   },
 };
 
@@ -110,6 +112,18 @@ export function rayFromPlayer(player: PlayerState, eyeHeight: number): HitscanRa
       z: -Math.cos(player.yaw) * cosPitch,
     }),
   };
+}
+
+/** Seeded angular variation keeps gameplay repeatable while making ADS useful. */
+export function spreadHitscanRay(ray: HitscanRay, radians: number, seed: number): HitscanRay {
+  if (radians <= 0) return ray;
+  const rng = new SeededRng(seed);
+  const yaw = Math.atan2(-ray.direction.x, -ray.direction.z) + (rng.next() * 2 - 1) * radians;
+  const pitch = Math.asin(Math.max(-1, Math.min(1, ray.direction.y))) + (rng.next() * 2 - 1) * radians;
+  const cosPitch = Math.cos(pitch);
+  return { origin: ray.origin, direction: normalize({
+    x: -Math.sin(yaw) * cosPitch, y: Math.sin(pitch), z: -Math.cos(yaw) * cosPitch,
+  }) };
 }
 
 export function rayAabbDistance(
@@ -234,6 +248,7 @@ export function firePlayerWeapon(
   zombies: readonly ZombieState[],
   worldBoxes: readonly CollisionBox[],
   instaKill = false,
+  spreadSeed = 0,
 ): WeaponEvent[] {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition || player.weapon.cooldownTicks > 0 || !player.alive) return [];
@@ -241,7 +256,9 @@ export function firePlayerWeapon(
   player.weapon.magazineAmmo -= 1;
   player.weapon.cooldownTicks = definition.fireIntervalTicks;
   const events: WeaponEvent[] = [{ type: 'weaponFired', playerId: player.id, weaponId: definition.id }];
-  const hit = resolveHitscan(ray, zombies, worldBoxes, definition.range);
+  const seed = spreadSeed ^ Math.imul(Number(player.id.slice(2)), 0x9e3779b9);
+  const shotRay = spreadHitscanRay(ray, definition.hipSpreadRadians * (player.aiming ? 0.1 : 1), seed);
+  const hit = resolveHitscan(shotRay, zombies, worldBoxes, definition.range);
   if (hit.kind !== 'zombie') return events;
 
   const zombie = zombies.find((candidate) => candidate.id === hit.zombieId && candidate.alive);

@@ -9,6 +9,7 @@ import {
   firePlayerWeapon,
   rayFromPlayer,
   resolveHitscan,
+  spreadHitscanRay,
   createWeaponState,
   wantsToFire,
 } from '../src/core/index.ts';
@@ -34,6 +35,20 @@ describe('hitscan weapons', () => {
     expect(WEAPON_DEFINITIONS['starter-pistol']).toMatchObject({
       damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
     });
+  });
+
+  it('makes ADS ten times steadier than hip-fire with repeatable shot spread', () => {
+    const target = zombie('e:2', -50);
+    const hip = Array.from({ length: 20 }, (_, seed) =>
+      resolveHitscan(spreadHitscanRay(ray, WEAPON_DEFINITIONS.bar.hipSpreadRadians, seed + 1),
+        [target], [], 80).kind === 'zombie');
+    const aimed = Array.from({ length: 20 }, (_, seed) =>
+      resolveHitscan(spreadHitscanRay(ray, WEAPON_DEFINITIONS.bar.hipSpreadRadians * 0.1, seed + 1),
+        [target], [], 80).kind === 'zombie');
+    expect(aimed.filter(Boolean).length).toBe(20);
+    expect(hip.filter(Boolean).length).toBeLessThan(10);
+    expect(spreadHitscanRay(ray, 0.035, 42)).toEqual(spreadHitscanRay(ray, 0.035, 42));
+    expect(spreadHitscanRay(ray, 0.035, 42)).not.toEqual(spreadHitscanRay(ray, 0.035, 43));
   });
 
   it('hits the nearest zombie before a farther zombie', () => {

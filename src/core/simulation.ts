@@ -268,6 +268,7 @@ export class GameSimulation {
         player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(),
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
         this.state.powerups.instaKillTicksRemaining > 0,
+        world.seed ^ world.tick,
       );
       events.push(...weaponEvents);
       events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig,

@@ -93,8 +93,11 @@ Shift sprints only while moving forward; firing, ADS, reloading, switching or
 knifing cancels it. Right mouse aims, slows movement and hides the hip-fire dot.
 The camera FOV and weapon pose ease toward those authoritative states in the
 renderer, so appearance remains smooth at refresh rates above the 60 Hz
-simulation. This is deliberately a prototype feel pass: hip-fire spread,
-weapon-specific ADS poses and animation are still open work.
+simulation. This is deliberately a prototype feel pass: weapon-specific ADS
+poses and animation are still open work.
+Weapon-specific seeded hip-fire spread now makes ADS meaningfully steadier without
+making shot outcomes depend on render rate. The exact spread values still need
+playtesting and balance work.
 
 ## Max Ammo follow-up
 
