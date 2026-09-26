@@ -41,7 +41,8 @@ export function awardCombatPoints(
     if ('playerId' in event && event.playerId !== player.id) continue;
     if (event.type === 'weaponHit' && config.hitReward > 0) {
       events.push(award(player, config.hitReward * multiplier, 'hit'));
-    } else if (event.type === 'meleeHit' && !weaponEvents.some(other => other.type === 'zombieDied' && other.zombieId === event.zombieId)) {
+    } else if ((event.type === 'meleeHit' || event.type === 'grenadeHit')
+      && !weaponEvents.some(other => other.type === 'zombieDied' && other.zombieId === event.zombieId)) {
       events.push(award(player, config.hitReward * multiplier, 'hit'));
     } else if (event.type === 'zombieDied') {
       const reason = event.method === 'melee' ? 'melee' : event.method === 'head' ? 'headshot' : 'kill';

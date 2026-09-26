@@ -124,6 +124,17 @@ awards a flat 400 points to each living player without per-zombie kill rewards.
 The world marker is blue and the audio cue is distinct. Drop rates, weighting and
 the remaining classic power-ups are future balancing/content work.
 
+## Frag grenade follow-up
+
+T or middle mouse throws a fixed-tick grenade, with two charges replenished at
+each round start. The projectile has a deterministic arc and bounce, a two-second
+fuse, radius/falloff damage, owner self-damage, wall occlusion, and ordinary
+combat point awards. Insta-Kill and Double Points apply to grenade hits too.
+The small world mesh and brief explosion flash are presentation only. Damage,
+inventory, timing and kill outcomes live in the serializable core.
+After this change, `npm run benchmark` still completed the 24-zombie route at
+2.39 ms mean tick time and 3.97 ms p95 on this machine; it does not measure FPS.
+
 ## Solo pause follow-up
 
 Escape, window blur, tab hiding or pointer-lock release pauses the local solo

@@ -13,6 +13,8 @@ import {
 } from './economy.ts';
 import { livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
+import { GRENADE_RULES, createGrenadePool, tickGrenades, throwGrenade,
+  type GrenadeEvent, type GrenadePool } from './grenade.ts';
 import { collectPowerups, createPowerupState, tickPowerupLifetime, tryDropPowerup,
   DEFAULT_POWERUP_CONFIG, type PowerupConfig, type PowerupEvent, type PowerupState } from './powerups.ts';
 import {
@@ -62,6 +64,7 @@ export interface SimulationState {
   mysteryBoxes: MysteryBoxState[];
   barriers: BarrierState[];
   powerups: PowerupState;
+  grenades: GrenadePool;
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
@@ -81,7 +84,7 @@ export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | MatchRestartedEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -154,7 +157,7 @@ export class GameSimulation {
     syncBarrierInteractables(barriers, Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable'));
     return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
-      powerups: createPowerupState() };
+      powerups: createPowerupState(), grenades: createGrenadePool() };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -234,6 +237,7 @@ export class GameSimulation {
       events.push(...tickWeaponState(player));
       if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
+      if (frame.actions.throwGrenade?.pressed) events.push(...throwGrenade(this.state.grenades, player));
       if (frame.actions.interact?.held) {
         const candidate = findInteractionCandidate(player, this.reachableInteractables(player));
         const barrier = this.state.barriers.find(barrier => barrier.interactableId === candidate?.interactableId);
@@ -270,16 +274,29 @@ export class GameSimulation {
         this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
     }
 
+    if (this.state.grenades.active.length) {
+      const grenadeEvents = tickGrenades(this.state.grenades, this.zombies(), livingPlayers(world),
+        [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])], this.map.walkSurfaces, deltaSeconds,
+        this.state.powerups.instaKillTicksRemaining > 0);
+      events.push(...grenadeEvents);
+      const grenadeCombat = grenadeEvents.filter((event): event is WeaponEvent =>
+        event.type === 'grenadeHit' || event.type === 'zombieDamaged' || event.type === 'zombieDied');
+      if (grenadeCombat.length) for (const player of livingPlayers(world)) events.push(...awardCombatPoints(player,
+        grenadeCombat, this.economyConfig, this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
+    }
+
     for (const event of events) if (event.type === 'zombieDied') {
       const zombie = world.entities[event.zombieId];
       if (zombie?.kind === 'zombie') events.push(...tryDropPowerup(this.state.powerups, zombie,
         this.state.barriers, world.seed, world.tick, this.powerupConfig));
     }
-    const pickupEvents = collectPowerups(this.state.powerups, livingPlayers(world), this.collisionBoxes(),
-      this.powerupConfig, this.zombies());
-    events.push(...pickupEvents);
-    if (pickupEvents.some(event => event.type === 'nukeDetonated')) for (const player of livingPlayers(world)) {
-      events.push(...awardNukePoints(player));
+    if (this.state.powerups.drops.length) {
+      const pickupEvents = collectPowerups(this.state.powerups, livingPlayers(world), this.collisionBoxes(),
+        this.powerupConfig, this.zombies());
+      events.push(...pickupEvents);
+      if (pickupEvents.some(event => event.type === 'nukeDetonated')) for (const player of livingPlayers(world)) {
+        events.push(...awardNukePoints(player));
+      }
     }
 
     const navigate = this.navigationQuery();
@@ -353,6 +370,7 @@ export class GameSimulation {
     for (const event of roundEvents) {
       if (event.to === 'spawning') {
         this.state.spawnDirector = createSpawnDirector(event.round, this.spawnConfig);
+        for (const player of livingPlayers(world)) player.grenadeCharges = GRENADE_RULES.maximum;
       }
     }
     // Keep the body through its death animation, then reclaim authoritative state.

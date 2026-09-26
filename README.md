@@ -41,7 +41,8 @@ Click the canvas to capture the mouse. Move with WASD, hold Shift while moving f
 hold the right mouse button to aim down sights, and fire with the left mouse button.
 Sprinting stops when firing, aiming, reloading or changing weapons; aiming slows movement
 and narrows the view. The sprint/ADS handling is prototype tuning, not a frame-exact recreation.
-Reload with R, knife with V, switch weapons with Q, interact with E, and restart after game over with Enter.
+Reload with R, knife with V, throw a grenade with T or middle mouse, switch weapons
+with Q, interact with E, and restart after game over with Enter.
 M mutes synthesized game audio. Escape releases the mouse and pauses solo play;
 click the canvas to resume. Losing focus or hiding the tab also pauses the game,
 so zombies do not advance while you are away. Input releases when focus is lost.
@@ -92,6 +93,9 @@ so the reward is reachable. Insta-Kill makes gunshots and knife hits lethal to
 zombies for 30 seconds, without bypassing walls or weapon range.
 A Nuke kills all currently active zombies and awards 400 points to every living player;
 it does not award a kill bonus for each zombie.
+Players start with two frag grenades and get two again at the start of each round.
+Grenades follow a fixed-tick arc, bounce off solid geometry and explode after two
+seconds. Walls block blast damage; standing too close to your own grenade hurts.
 
 The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
 attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a

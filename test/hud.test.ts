@@ -35,6 +35,7 @@ describe('gameplay HUD snapshot', () => {
       reserveAmmo: 32,
       holsteredWeapon: null,
       reloadTicksRemaining: 0,
+      grenadeCharges: 2,
       roundPhase: 'waiting',
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
       nearbyPowerup: null,

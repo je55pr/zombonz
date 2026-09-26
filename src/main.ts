@@ -16,6 +16,7 @@ import { loadZombieAsset, type ZombieAsset } from './client/runtimeAssets.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView } from './client/weaponView.ts';
 import { PowerupView } from './client/powerupView.ts';
+import { GrenadeView } from './client/grenadeView.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals } from './client/environmentProps.ts';
 import {
@@ -149,6 +150,7 @@ void loadZombieAsset(zombieVariant).then(asset => {
 });
 const weaponView = new WeaponView();
 const powerupView = new PowerupView(scene);
+const grenadeView = new GrenadeView(scene);
 
 function zombies(): ZombieState[] {
   return simulation.zombies();
@@ -218,6 +220,7 @@ function simulate(dt: number): void {
   }
   const events = simulation.tick({ [playerId]: input.consume() }, dt);
   weaponView.events(events, playerId, simulation.state.world.tick);
+  grenadeView.events(events, simulation.state.world.tick);
   feedback.consume(events, playerId, simulation.state.world.tick);
   audio.consume(events, playerId);
   if (simulation.state.world !== world) {
@@ -263,6 +266,7 @@ function frame(nowMs: number): void {
   if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
   syncZombieViews(alpha);
   powerupView.update(simulation.state.powerups.drops, simulation.state.world.tick - 1 + alpha);
+  grenadeView.update(simulation.state.grenades.active, simulation.state.world.tick - 1 + alpha);
   bunker.update(simulation.state);
   renderer.clear();
   renderer.info.reset();

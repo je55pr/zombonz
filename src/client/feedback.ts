@@ -32,6 +32,7 @@ export class HudFeedback {
       switch (event.type) {
         case 'weaponHit': this.marker = event.hitZone === 'head' ? 'head' : 'body'; this.markerUntil = tick + 12; break;
         case 'meleeHit': this.marker = 'body'; this.markerUntil = tick + 12; break;
+        case 'grenadeHit': this.marker = 'body'; this.markerUntil = tick + 12; break;
         case 'zombieDied':
           this.marker = 'kill'; this.markerUntil = tick + 16;
           if (event.method === 'head') say('HEADSHOT', 5);

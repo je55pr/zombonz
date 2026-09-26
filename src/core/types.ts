@@ -32,6 +32,7 @@ export interface PlayerState extends EntityBase {
   health: number;
   recoveryDelayTicks: number;
   meleeCooldownTicks: number;
+  grenadeCharges: number;
   repairRewardRound: number;
   repairPointsEarned: number;
   points: number;

@@ -67,6 +67,6 @@ describe('deterministic smoke scenario', () => {
     });
     expect(state.round.phase).toBe('intermission');
     // Includes movement stance, survival timers/reward tracking and an aimed body shot.
-    expect(fnv1a(JSON.stringify(state))).toBe('cbe2b8aa');
+    expect(fnv1a(JSON.stringify(state))).toBe('e8766b91');
   });
 });

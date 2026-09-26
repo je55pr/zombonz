@@ -29,6 +29,7 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     health: 100,
     recoveryDelayTicks: 0,
     meleeCooldownTicks: 0,
+    grenadeCharges: 2,
     repairRewardRound: 0,
     repairPointsEarned: 0,
     points: startingPoints,
@@ -98,11 +99,13 @@ export function updatePlayerMovement(
   player.aiming = !player.noclip && held(frame, 'aim') > 0
     && player.weapon.reloadTicksRemaining === 0 && player.switchTicksRemaining === 0
     && player.meleeCooldownTicks === 0 && !frame.actions.reload?.pressed
-    && !frame.actions.switchWeapon?.pressed && !frame.actions.melee?.pressed;
+    && !frame.actions.switchWeapon?.pressed && !frame.actions.melee?.pressed
+    && !frame.actions.throwGrenade?.pressed;
   player.sprinting = !player.noclip && held(frame, 'sprint') > 0 && forwardInput > 0
     && !player.aiming && !frame.actions.fire?.held && !frame.actions.fire?.pressed
     && !frame.actions.reload?.pressed && !frame.actions.switchWeapon?.pressed
-    && !frame.actions.melee?.pressed && player.weapon.reloadTicksRemaining === 0
+    && !frame.actions.melee?.pressed && !frame.actions.throwGrenade?.pressed
+    && player.weapon.reloadTicksRemaining === 0
     && player.switchTicksRemaining === 0 && player.meleeCooldownTicks === 0;
   if (player.noclip) {
     const cp = Math.cos(player.pitch), sp = Math.sin(player.pitch);

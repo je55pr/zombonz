@@ -82,6 +82,7 @@ describe('render performance contracts', () => {
     const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
     const state: HudSnapshot = { health: 100, points: 500, round: 1, weapon: 'starter-pistol',
       magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloadTicksRemaining: 0,
+      grenadeCharges: 2,
       roundPhase: 'waiting', interactionPrompt: null, nearbyPowerup: null, bonusStatus: null, instaKillStatus: null,
       gameOver: false, paused: false, godMode: false, noclip: false,
       sprinting: false, aiming: false };

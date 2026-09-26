@@ -91,6 +91,7 @@ export type WeaponEvent =
   | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number; hitZone?: 'head' | 'body' }
   | { type: 'meleeSwung'; playerId: EntityId }
   | { type: 'meleeHit'; playerId: EntityId; zombieId: EntityId; damage: number }
+  | { type: 'grenadeHit'; playerId: EntityId; zombieId: EntityId; damage: number }
   | { type: 'zombieDamaged'; zombieId: EntityId; playerId: EntityId; damage: number; health: number }
   | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: 'body' | 'head' | 'melee' };
 

@@ -3,7 +3,7 @@ import type { ActionState, GameAction, InputFrame } from '../core/input.ts';
 const KEY_ACTIONS: Partial<Record<string, GameAction>> = {
   KeyW: 'moveForward', KeyS: 'moveBackward', KeyA: 'moveLeft', KeyD: 'moveRight',
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
-  KeyR: 'reload', KeyE: 'interact', KeyV: 'melee', KeyQ: 'switchWeapon', Enter: 'restart',
+  KeyR: 'reload', KeyE: 'interact', KeyV: 'melee', KeyT: 'throwGrenade', KeyQ: 'switchWeapon', Enter: 'restart',
   KeyG: 'toggleGodMode', KeyF: 'toggleNoclip', Space: 'flyUp', KeyC: 'flyDown',
 };
 
@@ -83,10 +83,12 @@ export class BrowserInput {
     if (document.pointerLockElement !== this.options.pointerElement) return;
     if (event.button === 0) this.set('fire', true, false);
     if (event.button === 2) this.set('aim', true, false);
+    if (event.button === 1) this.set('throwGrenade', true, false);
   };
   private onMouseUp = (event: MouseEvent) => {
     if (event.button === 0) this.set('fire', false, false);
     if (event.button === 2) this.set('aim', false, false);
+    if (event.button === 1) this.set('throwGrenade', false, false);
   };
 
   private set(action: GameAction | undefined, down: boolean, repeat: boolean): boolean {

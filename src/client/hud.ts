@@ -12,6 +12,7 @@ export interface HudSnapshot {
   reserveAmmo: number;
   holsteredWeapon: string | null;
   reloadTicksRemaining: number;
+  grenadeCharges: number;
   roundPhase: string;
   interactionPrompt: string | null;
   nearbyPowerup: string | null;
@@ -45,6 +46,7 @@ export function buildHudSnapshot(
     reserveAmmo: player.weapon.reserveAmmo,
     holsteredWeapon: player.holsteredWeapon?.weaponId ?? null,
     reloadTicksRemaining: player.weapon.reloadTicksRemaining,
+    grenadeCharges: player.grenadeCharges,
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
     nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO'
@@ -157,6 +159,7 @@ export class CanvasHud {
     if (modes.length) this.text(modes.join('   /   '), 48, 105, 23);
     if (snapshot.noclip) this.text('WASD fly · SPACE up · C down', 48, 140, 20);
     this.text(`HP ${snapshot.health}`, 48, height - 54, 36);
+    this.text(`T  GRENADES ${snapshot.grenadeCharges}`, 48, height - 95, 20);
     this.text(String(snapshot.points), width - 48, height - 92, 44, 'right');
     if (snapshot.bonusStatus) this.text(snapshot.bonusStatus, width - 48, height - 226, 23, 'right');
     if (snapshot.instaKillStatus) this.text(snapshot.instaKillStatus, width - 48, height - 256, 23, 'right');
@@ -166,7 +169,7 @@ export class CanvasHud {
     if (snapshot.reloadTicksRemaining > 0) this.text('RELOADING', width - 48, height - 169, 18, 'right');
     else if (snapshot.magazineAmmo === 0) this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', width - 48, height - 169, 18, 'right');
     if (snapshot.feedback?.message && !snapshot.gameOver) this.text(snapshot.feedback.message, width / 2, height * 0.60, 27, 'center');
-    this.text('WASD MOVE   •   SHIFT SPRINT   •   RMB AIM   •   V KNIFE   •   R RELOAD   •   Q SWITCH   •   M MUTE', width / 2, height - 22, 15, 'center');
+    this.text('WASD MOVE   •   SHIFT SPRINT   •   RMB AIM   •   V KNIFE   •   T GRENADE   •   R RELOAD   •   Q SWITCH   •   M MUTE', width / 2, height - 22, 15, 'center');
 
     if (snapshot.gameOver) {
       this.context.fillStyle = 'rgba(0,0,0,0.58)';

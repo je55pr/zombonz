@@ -8,6 +8,7 @@ export type GameAction =
   | 'fire'
   | 'reload'
   | 'melee'
+  | 'throwGrenade'
   | 'switchWeapon'
   | 'interact'
   | 'toggleGodMode'
