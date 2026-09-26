@@ -34,6 +34,7 @@ function award(
   reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair' | 'nuke',
 ): EconomyEvent {
   player.points += amount;
+  player.pointsEarned += amount;
   return { type: 'pointsAwarded', playerId: player.id, amount, reason, balance: player.points };
 }
 

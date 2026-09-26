@@ -4,7 +4,8 @@ import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import { rayAabbDistance, rayFromPlayer, type WeaponEvent } from './weapon.ts';
 
 export const GRENADE_RULES = {
-  maximum: 2, fuseTicks: 120, radius: 4, damage: 350, gravity: 13,
+  /** WaW/BO1: two to start, two more each round, carrying at most four. */
+  starting: 2, perRound: 2, maximum: 4, fuseTicks: 120, radius: 4, damage: 350, gravity: 13,
 } as const;
 
 export interface GrenadeState {

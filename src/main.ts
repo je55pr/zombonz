@@ -106,7 +106,7 @@ const simulation = new GameSimulation({
     baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
   } } : {}),
   ...(previewName === 'assets' && preview ? { powerupConfig: {
-    ...DEFAULT_POWERUP_CONFIG, dropChanceDenominator: 1, minimumTicksBetweenDrops: 0,
+    ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 100, maxDropsPerRound: 1_000_000,
     kinds: [previewPowerup === 'doublePoints' ? 'doublePoints'
       : previewPowerup === 'instaKill' ? 'instaKill'
         : previewPowerup === 'nuke' ? 'nuke' : 'maxAmmo'] as const,

@@ -1,22 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { collectPowerups, createBarrier, createPlayerState, createPowerupState, createWeaponState,
   createZombieState, tickPowerupLifetime, tryDropPowerup, GameSimulation, createInputFrame,
-  addEntity, DEFAULT_POWERUP_CONFIG, type PowerupConfig } from '../src/core/index.ts';
+  addEntity, DEFAULT_POWERUP_CONFIG, startPowerupRound, updatePowerupThreshold,
+  type PowerupConfig } from '../src/core/index.ts';
 
-const forced: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, dropChanceDenominator: 1,
-  minimumTicksBetweenDrops: 600, kinds: ['maxAmmo'] };
+const forced: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 100, kinds: ['maxAmmo'] };
 
 describe('timed power-ups', () => {
-  it('drops deterministically and respects active-drop and time spacing limits', () => {
+  it('drops deterministically and caps drops per round', () => {
     const first = createPowerupState(), second = createPowerupState();
     const zombie = createZombieState('e:9', { x: 4, y: 0, z: 3 }, 1);
     const spawn = tryDropPowerup(first, zombie, [], 123, 100, forced);
     expect(spawn).toEqual(tryDropPowerup(second, zombie, [], 123, 100, forced));
     expect(spawn).toMatchObject([{ type: 'powerupSpawned', dropId: 'p:1', kind: 'maxAmmo' }]);
-    expect(tryDropPowerup(first, zombie, [], 123, 100, forced)).toEqual([]);
-    first.drops = [];
-    expect(tryDropPowerup(first, zombie, [], 123, 699, forced)).toEqual([]);
-    expect(tryDropPowerup(first, zombie, [], 123, 700, forced)).toMatchObject([{ dropId: 'p:2' }]);
+    for (let i = 0; i < 3; i++) expect(tryDropPowerup(first, zombie, [], 123, 101 + i, forced)).toHaveLength(1);
+    expect(tryDropPowerup(first, zombie, [], 123, 200, forced)).toEqual([]);
+    expect(first.drops).toHaveLength(4);
+    startPowerupRound(first);
+    expect(tryDropPowerup(first, zombie, [], 123, 300, forced)).toMatchObject([{ dropId: 'p:5' }]);
   });
 
   it('places a reward from an exterior kill inside its window', () => {
@@ -77,7 +78,7 @@ describe('timed power-ups', () => {
     expect(player.weapon.reserveAmmo).toBe(50);
     expect(player.weapon.magazineAmmo).toBe(4);
     sim.restart();
-    expect(sim.state.powerups).toEqual(createPowerupState());
+    expect(sim.state.powerups).toEqual(createPowerupState(500, forced));
   });
 
   it('activates a timed team-wide Double Points bonus only after collection', () => {
@@ -163,5 +164,77 @@ describe('timed power-ups', () => {
     expect(events.some(event => event.type === 'zombieAttacked' || event.type === 'zombieDied')).toBe(false);
     expect(zombies.every(zombie => !zombie.alive && zombie.health === 0)).toBe(true);
     expect(sim.playerIds.map(id => sim.getPlayer(id)!.points)).toEqual([900, 900]);
+  });
+});
+
+describe('classic power-up drop rules', () => {
+  const noLuck: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 0 };
+
+  it('arms a guaranteed drop each time the team earns past a threshold that grows 14%', () => {
+    const state = createPowerupState(500);
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    const zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+    expect(state.scoreToDrop).toBe(2500);
+    player.pointsEarned = 2500;
+    updatePowerupThreshold(state, [player], noLuck);
+    expect(state.dropArmed).toBe(false);
+    expect(tryDropPowerup(state, zombie, [], 1, 1, noLuck)).toEqual([]);
+    player.pointsEarned = 2510;
+    updatePowerupThreshold(state, [player], noLuck);
+    expect(state.dropArmed).toBe(true);
+    expect(state.dropIncrement).toBeCloseTo(2280);
+    expect(state.scoreToDrop).toBeCloseTo(4790);
+    expect(tryDropPowerup(state, zombie, [], 1, 2, noLuck)).toHaveLength(1);
+    expect(state.dropArmed).toBe(false);
+    expect(tryDropPowerup(state, zombie, [], 1, 3, noLuck)).toEqual([]);
+  });
+
+  it('gives about a 3% chance per kill before the threshold', () => {
+    let drops = 0;
+    for (let i = 1; i <= 4000; i++) {
+      const state = createPowerupState(500);
+      drops += tryDropPowerup(state, createZombieState(`e:${i}`, { x: 0, y: 0, z: 0 }, 1), [], 77, i).length;
+    }
+    expect(drops / 4000).toBeGreaterThan(0.02);
+    expect(drops / 4000).toBeLessThan(0.04);
+  });
+
+  it('deals every kind once before any repeats, from a seeded shuffle', () => {
+    const always: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 100, maxDropsPerRound: 99 };
+    const deal = (seed: number) => {
+      const state = createPowerupState();
+      const zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+      return Array.from({ length: 8 }, (_, i) => tryDropPowerup(state, zombie, [], seed, i, always)[0])
+        .map(event => event.type === 'powerupSpawned' ? event.kind : null);
+    };
+    const kinds = deal(1234);
+    expect(new Set(kinds.slice(0, 4)).size).toBe(4);
+    expect(new Set(kinds.slice(4)).size).toBe(4);
+    expect(deal(1234)).toEqual(kinds);
+  });
+
+  it('arms drops from real points earned through the simulation, not the spendable balance', () => {
+    const sim = new GameSimulation({ seed: 3, playerSpawns: [{ x: 0, y: 0, z: 0 }],
+      map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] }, powerupConfig: noLuck,
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    player.points = 0;
+    player.pointsEarned = 2505;
+    player.weapon = createWeaponState('kar98k');
+    addEntity(sim.state.world, createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1));
+    const fire = createInputFrame(0);
+    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    const events = sim.tick({ [player.id]: fire });
+    expect(player.pointsEarned).toBeGreaterThan(2500);
+    expect(events.map(event => event.type)).toContain('powerupSpawned');
+  });
+
+  it('Max Ammo also refills grenades', () => {
+    const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+    tryDropPowerup(state, zombie, [], 42, 1, forced);
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.grenadeCharges = 0;
+    collectPowerups(state, [player], [], forced);
+    expect(player.grenadeCharges).toBe(4);
   });
 });

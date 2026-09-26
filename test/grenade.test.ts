@@ -57,7 +57,7 @@ describe('fixed-tick grenades', () => {
     expect(first.pool.active).toEqual([]);
   });
 
-  it('awards grenade kills through simulation and replenishes charges on a new round', () => {
+  it('awards grenade kills through simulation and adds two charges per new round up to four', () => {
     const sim = new GameSimulation({ seed: 5, playerSpawns: [{ x: 0, y: 0, z: 0 }],
       map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] },
       roundConfig: { initialWaitTicks: 9999, intermissionTicks: 1 } });
@@ -73,9 +73,14 @@ describe('fixed-tick grenades', () => {
     const events = sim.tick();
     expect(zombie.alive).toBe(false);
     expect(events).toContainEqual(expect.objectContaining({ type: 'pointsAwarded', reason: 'kill', playerId: player.id }));
-    sim.state.round.phase = 'intermission'; sim.state.round.phaseTicks = 0;
+    // Each new round adds two frags, up to four carried.
+    Object.assign(sim.state.round, { round: 1, phase: 'intermission', phaseTicks: 0 });
     sim.tick();
-    expect(player.grenadeCharges).toBe(2);
+    expect(sim.state.round.round).toBe(2);
+    expect(player.grenadeCharges).toBe(3);
+    Object.assign(sim.state.round, { phase: 'intermission', phaseTicks: 0 });
+    sim.tick();
+    expect(player.grenadeCharges).toBe(4);
     sim.restart();
     expect(sim.state.grenades).toEqual(createGrenadePool());
     expect(sim.getPlayer(sim.playerIds[0])!.grenadeCharges).toBe(2);

@@ -2,6 +2,7 @@ import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, sampleWalkHeight } from './collision.ts';
 import type { InputFrame } from './input.ts';
 import type { EntityId, PlayerState, Vec3 } from './types.ts';
+import { GRENADE_RULES } from './grenade.ts';
 import { createStarterWeaponState } from './weapon.ts';
 
 export const PLAYER_MOVEMENT = {
@@ -39,10 +40,11 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     health: 100,
     recoveryDelayTicks: 0,
     meleeCooldownTicks: 0,
-    grenadeCharges: 2,
+    grenadeCharges: GRENADE_RULES.starting,
     repairRewardRound: 0,
     repairPointsEarned: 0,
     points: startingPoints,
+    pointsEarned: startingPoints,
     kills: 0,
     headshots: 0,
     weapon: createStarterWeaponState(),

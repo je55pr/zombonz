@@ -98,15 +98,19 @@ and temporary damage tint. Original synthesized audio gives simple gun, melee,
 damage, box and round cues; it unlocks after user input and can be muted with M.
 Quiet synthesized wind and electrical hum fill the empty bunker after audio unlock;
 they fade out while solo play is paused. Practical lamps occasionally flicker.
-Eligible zombie kills can also drop timed Max Ammo, Double Points, Insta-Kill or Nuke pickups.
-Max Ammo refills the reserve ammo of both carried weapons for every living player
-without changing loaded magazines. Double Points doubles combat and barrier-repair
+Zombie kills can also drop Max Ammo, Double Points, Insta-Kill or Nuke pickups, using the
+classic rules. Each time the team's total earned points pass a threshold (2000 above the
+starting points, growing 14% after each drop), the next kill drops one. Any kill also has
+a 3% chance. At most four drop per round, and every kind appears once before any repeats.
+Pickups stay for 15 seconds, then blink faster and faster for about 11 more before vanishing.
+Max Ammo refills the reserve ammo of both carried weapons and all four grenades for every
+living player, without changing loaded magazines. Double Points doubles combat and barrier-repair
 rewards for 30 seconds. Kills outside a window place the pickup just inside it
 so the reward is reachable. Insta-Kill makes gunshots and knife hits lethal to
 zombies for 30 seconds, without bypassing walls or weapon range.
 A Nuke kills all currently active zombies and awards 400 points to every living player;
 it does not award a kill bonus for each zombie.
-Players start with two frag grenades and get two again at the start of each round.
+Players start with two frag grenades and gain two more each new round, carrying at most four.
 Grenades follow a fixed-tick arc, bounce off solid geometry and explode after two
 seconds. Walls block blast damage; standing too close to your own grenade hurts.
 

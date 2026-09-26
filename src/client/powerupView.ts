@@ -1,6 +1,22 @@
 import * as THREE from 'three';
 import type { PowerupDrop } from '../core/powerups.ts';
 
+/** BO1 timeout blink: 15 half-second, 10 quarter-second, then 15 tenth-second flashes. */
+const BLINK_STEPS: readonly number[] = [
+  ...Array<number>(15).fill(30), ...Array<number>(10).fill(15), ...Array<number>(15).fill(6),
+];
+const BLINK_TICKS = BLINK_STEPS.reduce((total, ticks) => total + ticks, 0);
+
+export function powerupBlinkVisible(ticksRemaining: number): boolean {
+  let elapsed = BLINK_TICKS - ticksRemaining;
+  if (elapsed < 0) return true;
+  for (let step = 0; step < BLINK_STEPS.length; step += 1) {
+    if (elapsed < BLINK_STEPS[step]) return step % 2 === 0;
+    elapsed -= BLINK_STEPS[step];
+  }
+  return false;
+}
+
 /** Shared geometry/materials keep a small number of pickups cheap to render. */
 export class PowerupView {
   private readonly objects = new Map<string, THREE.Group>();
@@ -41,6 +57,7 @@ export class PowerupView {
       }
       object.position.set(drop.position.x, drop.position.y + 0.8 + Math.sin(tick * 0.07) * 0.1, drop.position.z);
       object.rotation.y = tick * 0.025;
+      object.visible = powerupBlinkVisible(drop.ticksRemaining);
     }
   }
 

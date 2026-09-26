@@ -15,7 +15,7 @@ import { livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent 
 import { createInputFrame, type InputFrame } from './input.ts';
 import { GRENADE_RULES, createGrenadePool, tickGrenades, throwGrenade,
   type GrenadeEvent, type GrenadePool } from './grenade.ts';
-import { collectPowerups, createPowerupState, tickPowerupLifetime, tryDropPowerup,
+import { collectPowerups, createPowerupState, startPowerupRound, tickPowerupLifetime, tryDropPowerup, updatePowerupThreshold,
   DEFAULT_POWERUP_CONFIG, type PowerupConfig, type PowerupEvent, type PowerupState } from './powerups.ts';
 import {
   findInteractionCandidate, triggerInteraction,
@@ -159,7 +159,8 @@ export class GameSimulation {
     syncBarrierInteractables(barriers, Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable'));
     return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
-      powerups: createPowerupState(), grenades: createGrenadePool() };
+      powerups: createPowerupState(this.playerIds.length * this.economyConfig.startingPoints, this.powerupConfig),
+      grenades: createGrenadePool() };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -288,6 +289,7 @@ export class GameSimulation {
         grenadeCombat, this.economyConfig, this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
     }
 
+    updatePowerupThreshold(this.state.powerups, this.playerIds.map(id => this.getPlayer(id)!), this.powerupConfig);
     for (const event of events) if (event.type === 'zombieDied') {
       const zombie = world.entities[event.zombieId];
       if (zombie?.kind === 'zombie') events.push(...tryDropPowerup(this.state.powerups, zombie,
@@ -379,7 +381,10 @@ export class GameSimulation {
     for (const event of roundEvents) {
       if (event.to === 'spawning') {
         this.state.spawnDirector = createSpawnDirector(event.round, this.spawnConfig, this.playerIds.length);
-        for (const player of livingPlayers(world)) player.grenadeCharges = GRENADE_RULES.maximum;
+        startPowerupRound(this.state.powerups);
+        if (event.round > 1) for (const player of livingPlayers(world)) {
+          player.grenadeCharges = Math.min(GRENADE_RULES.maximum, player.grenadeCharges + GRENADE_RULES.perRound);
+        }
       }
     }
     for (const event of events) if (event.type === 'zombieDied') {
