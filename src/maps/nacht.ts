@@ -185,15 +185,29 @@ export const NACHT_DOORS: readonly DoorDefinition[] = [
     prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
     blocker: { min: { x: -7.85, y: 0, z: 4.5 }, max: { x: -6.25, y: 4.5, z: 5.25 } } },
 ];
+// WaW Nacht chalk: Kar98k in the start room, Thompson and double-barrel in HELP, Trench Gun and BAR upstairs.
+// Ammo costs half the gun. (The start-room M1A1 Carbine still has no suitable model.)
+const wallBuy = (id: string, weaponId: string, name: string, cost: number, position: Vec3): WallWeaponDefinition => ({
+  id, position, weaponId, weaponCost: cost, ammoCost: cost / 2,
+  prompt: `E  ${name} [${cost}] / Ammo [${cost / 2}]`, interactionRange: 2.5, minFacingDot: 0.25,
+});
 export const NACHT_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
-  { id: 'start-kar98k', position: { x: 5.2, y: 1, z: 7.56 }, weaponId: 'kar98k',
-    weaponCost: 200, ammoCost: 100, prompt: 'E  Kar98k [200] / Ammo [100]', interactionRange: 2.5, minFacingDot: 0.25 },
-  { id: 'help-thompson', position: { x: -5.96, y: 1, z: -9.4 }, weaponId: 'thompson',
-    weaponCost: 1200, ammoCost: 600, prompt: 'E  Thompson [1200] / Ammo [600]', interactionRange: 2.5, minFacingDot: 0.25 },
+  wallBuy('start-kar98k', 'kar98k', 'Kar98k', 200, { x: 5.2, y: 1, z: 7.56 }),
+  wallBuy('help-thompson', 'thompson', 'Thompson', 1200, { x: -5.96, y: 1, z: -9.4 }),
+  wallBuy('help-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: -5.96, y: 1, z: -4.6 }),
+  wallBuy('upper-trench-gun', 'trench-gun', 'Trench Gun', 1500, { x: -3.1, y: UPPER_HEIGHT + 1, z: -10.76 }),
+  wallBuy('upper-bar', 'bar', 'BAR', 1800, { x: -5.96, y: UPPER_HEIGHT + 1, z: -5.6 }),
 ];
+/** Presentation: the yaw each chalk outline faces, away from its wall. */
+export const NACHT_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
+  'start-kar98k': Math.PI, 'help-thompson': Math.PI / 2, 'help-double-barrel': Math.PI / 2,
+  'upper-trench-gun': 0, 'upper-bar': Math.PI / 2,
+};
 export const NACHT_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   id: 'help-box', position: { x: -1.45, y: 0.6, z: 6.35 }, cost: 950,
-  weapons: ['kar98k', 'thompson', 'mp40', 'bar'],
+  weapons: ['kar98k', 'springfield', 'm1-garand', 'thompson', 'mp40', 'bar', 'mg42', 'double-barrel', 'trench-gun',
+    // Not in WaW's Nacht box, but part of this game's WWII arsenal.
+    'ppsh41', 'mosin'],
 }];
 export const NACHT_PLAYER_SPAWN: Vec3 = { x: 5.2, y: 0, z: 4.2 };
 /** WaW/BO1 windows hold six boards. */

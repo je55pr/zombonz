@@ -21,7 +21,7 @@ import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/envi
 import { buildEnvironmentProps, buildEnvironmentDecals } from './client/environmentProps.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
-  createWeaponState, createZombieState, allocateEntityId, addEntity,
+  createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity,
   type EntityId, type ZombieState, type Vec3,
 } from './core/index.ts';
 import {
@@ -135,7 +135,7 @@ if (preview) {
   for (const door of simulation.state.doors) door.open = true;
   for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
   const testWeapon = new URLSearchParams(location.search).get('weapon');
-  if (testWeapon && ['starter-pistol', 'kar98k', 'bar', 'thompson', 'mp40'].includes(testWeapon)) {
+  if (testWeapon && Object.hasOwn(WEAPON_DEFINITIONS, testWeapon)) {
     simulation.getPlayer(playerId)!.weapon = createWeaponState(testWeapon);
   }
   if (previewName === 'assets') {

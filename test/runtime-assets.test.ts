@@ -1,24 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { readAssetGeometry } from '../scripts/inspect-assets.mjs';
+import { assetExists, readAssetGeometry } from '../scripts/inspect-assets.mjs';
 import { cloneZombieModel, inPlaceClip, WEAPON_ASSETS, type ZombieAsset } from '../src/client/runtimeAssets.ts';
-import { prepareWeapon, WeaponView } from '../src/client/weaponView.ts';
+import { prepareWeapon, VIEWMODEL_LENGTHS, WeaponView } from '../src/client/weaponView.ts';
 import { SkinnedZombieView, zombieAnimation } from '../src/client/skinnedZombieView.ts';
-import { createPlayerState, createZombieState, createWeaponState } from '../src/core/index.ts';
+import { createPlayerState, createZombieState, createWeaponState, WEAPON_DEFINITIONS } from '../src/core/index.ts';
 import { BrowserInput } from '../src/client/input.ts';
 
 describe('runtime GLB integration', () => {
-  it.each(['m1911', 'kar98k', 'bar'])('prepares %s as a compact, correctly scaled non-skinned viewmodel', async id => {
+  it.each(Object.keys(VIEWMODEL_LENGTHS))('prepares %s as a compact, correctly scaled non-skinned viewmodel', async id => {
     const asset = await readAssetGeometry(`public/assets/weapons/${id}/model.glb`);
     const before = new THREE.Box3().setFromObject(asset.scene);
     const weapon = prepareWeapon(asset.scene, id);
     const box = new THREE.Box3().setFromObject(weapon.root), size = box.getSize(new THREE.Vector3());
-    expect(size.z).toBeCloseTo(id === 'm1911' ? 0.36 : id === 'kar98k' ? 0.95 : 1.05);
-    expect(size.x).toBeLessThan(0.12); // catches the detached-magazine exports
+    expect(size.z).toBeCloseTo(VIEWMODEL_LENGTHS[id]);
+    // Catches detached-magazine exports; the MG42's bipod and the PPSh drum are genuinely wider.
+    expect(size.x).toBeLessThan(id === 'mg42' || id === 'ppsh41' ? 0.2 : 0.12);
     expect(box.max.z).toBeCloseTo(0);
     let meshes = 0;
     weapon.root.traverse(object => { if (object instanceof THREE.Mesh) { meshes++; expect(object).not.toBeInstanceOf(THREE.SkinnedMesh); } });
-    expect(meshes).toBeLessThanOrEqual(5);
+    expect(meshes).toBeLessThanOrEqual(8);
     expect(new THREE.Box3().setFromObject(asset.scene).equals(before)).toBe(true);
   });
 
@@ -70,7 +71,13 @@ describe('runtime GLB integration', () => {
 
   it('maps existing gameplay weapons to real assets without substituting unrelated guns', () => {
     expect(WEAPON_ASSETS['starter-pistol']).toBe('m1911');
-    expect(WEAPON_ASSETS.thompson).toBeUndefined(); expect(WEAPON_ASSETS.mp40).toBeUndefined();
+    // Only guns without a suitable licensed model keep the placeholder.
+    const unmapped = Object.keys(WEAPON_DEFINITIONS).filter(id => !WEAPON_ASSETS[id]);
+    expect(unmapped).toEqual(['thompson']);
+    for (const [id, asset] of Object.entries(WEAPON_ASSETS)) {
+      expect(WEAPON_DEFINITIONS[id], id).toBeDefined();
+      expect(assetExists(`public/assets/weapons/${asset}/model.glb`), asset).toBe(true);
+    }
   });
 
   it('shows recoil/flash only after an authoritative shot, and lowers the gun during reload', () => {
