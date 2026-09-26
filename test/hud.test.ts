@@ -41,6 +41,7 @@ describe('gameplay HUD snapshot', () => {
       bonusStatus: null,
       instaKillStatus: null,
       gameOver: false,
+      paused: false,
       godMode: false,
       noclip: false,
       sprinting: false,

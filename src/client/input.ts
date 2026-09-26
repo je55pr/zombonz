@@ -59,6 +59,11 @@ export class BrowserInput {
     this.lookYaw = 0; this.lookPitch = 0;
   }
 
+  clear(): void {
+    this.held.clear(); this.pressed.clear(); this.released.clear();
+    this.lookYaw = 0; this.lookPitch = 0;
+  }
+
   private onBlur = () => this.releaseHeld();
   private onVisibilityChange = () => { if (document.hidden) this.releaseHeld(); };
   private onPointerLockChange = () => { if (document.pointerLockElement !== this.options.pointerElement) this.releaseHeld(); };

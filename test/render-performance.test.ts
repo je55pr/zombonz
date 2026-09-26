@@ -83,7 +83,7 @@ describe('render performance contracts', () => {
     const state: HudSnapshot = { health: 100, points: 500, round: 1, weapon: 'starter-pistol',
       magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloadTicksRemaining: 0,
       roundPhase: 'waiting', interactionPrompt: null, nearbyPowerup: null, bonusStatus: null, instaKillStatus: null,
-      gameOver: false, godMode: false, noclip: false,
+      gameOver: false, paused: false, godMode: false, noclip: false,
       sprinting: false, aiming: false };
     for (let i = 0; i < 144; i++) hud.render({ ...state,
       feedback: { message: null, hitMarker: null, damageVignette: false } });

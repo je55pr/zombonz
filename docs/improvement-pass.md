@@ -123,3 +123,12 @@ before their movement/attack step, retains their normal short corpse display, an
 awards a flat 400 points to each living player without per-zombie kill rewards.
 The world marker is blue and the audio cue is distinct. Drop rates, weighting and
 the remaining classic power-ups are future balancing/content work.
+
+## Solo pause follow-up
+
+Escape, window blur, tab hiding or pointer-lock release pauses the local solo
+simulation; clicking the canvas resumes it. The fixed-step accumulator and
+pending physical input are cleared at the transition, preventing a burst of
+catch-up ticks or a stuck key after returning. The pause overlay stays in the
+single game canvas. Pointer-lock auto-pause is disabled only in development
+previews so embedded inspection remains usable without mouse capture.

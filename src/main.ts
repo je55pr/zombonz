@@ -4,6 +4,7 @@ import { buildGreybox } from './client/greybox.ts';
 import { buildBunkerDetails } from './client/bunker.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
+import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
 import { ActorBatch } from './client/actorBatch.ts';
@@ -195,6 +196,10 @@ function syncZombieViews(alpha: number): void {
 
 const clock = new FixedStepClock({ tickRate: 60 });
 const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022, previewFireKey: !!preview });
+const pause = new SoloPauseController(canvas, window, document, paused => {
+  clock.reset(); previousPositions.clear();
+  if (paused) input.clear();
+}, !preview, () => simulation.state.round.phase !== 'gameOver');
 const hud = new CanvasHud(renderer);
 const feedback = new HudFeedback();
 const audio = new GameAudio(canvas);
@@ -245,7 +250,8 @@ function frame(nowMs: number): void {
   const nowSeconds = nowMs / 1000;
   if (previousSeconds === undefined) previousSeconds = nowSeconds;
   const interval = (nowSeconds - previousSeconds) * 1000;
-  clock.advance(nowSeconds - previousSeconds, simulate);
+  if (pause.paused) { input.clear(); clock.reset(); }
+  else clock.advance(nowSeconds - previousSeconds, simulate);
   const simulationMs = performance.now() - started;
   previousSeconds = nowSeconds;
   const alpha = clock.interpolationAlpha();
@@ -270,7 +276,8 @@ function frame(nowMs: number): void {
   if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha, interval / 1000); weaponView.render(renderer, camera.aspect); }
   const hudStarted = performance.now();
   const hudSnapshot = buildHudSnapshot(simulation, playerId);
-  if (hudSnapshot) hud.render({ ...hudSnapshot, feedback: feedback.snapshot(simulation.state.world.tick),
+  if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused,
+    feedback: feedback.snapshot(simulation.state.world.tick),
     assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice });
   performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
     renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());

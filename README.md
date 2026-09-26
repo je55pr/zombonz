@@ -42,7 +42,9 @@ hold the right mouse button to aim down sights, and fire with the left mouse but
 Sprinting stops when firing, aiming, reloading or changing weapons; aiming slows movement
 and narrows the view. The sprint/ADS handling is prototype tuning, not a frame-exact recreation.
 Reload with R, knife with V, switch weapons with Q, interact with E, and restart after game over with Enter.
-M mutes synthesized game audio. Escape releases the mouse. Input releases when the window loses focus.
+M mutes synthesized game audio. Escape releases the mouse and pauses solo play;
+click the canvas to resume. Losing focus or hiding the tab also pauses the game,
+so zombies do not advance while you are away. Input releases when focus is lost.
 
 G toggles god mode (restores health and prevents damage). F toggles noclip:
 WASD flies in the direction you look, Space rises and C descends. Active modes appear

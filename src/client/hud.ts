@@ -18,6 +18,7 @@ export interface HudSnapshot {
   bonusStatus: string | null;
   instaKillStatus: string | null;
   gameOver: boolean;
+  paused: boolean;
   godMode: boolean;
   noclip: boolean;
   sprinting: boolean;
@@ -54,6 +55,7 @@ export function buildHudSnapshot(
     instaKillStatus: simulation.state.powerups.instaKillTicksRemaining > 0
       ? `INSTA-KILL  ${Math.ceil(simulation.state.powerups.instaKillTicksRemaining / 60)}s` : null,
     gameOver: simulation.state.round.phase === 'gameOver',
+    paused: false,
     godMode: player.godMode,
     noclip: player.noclip,
     sprinting: player.sprinting,
@@ -172,7 +174,6 @@ export class CanvasHud {
       this.text('GAME OVER', width / 2, height * 0.44, 72, 'center');
       this.text('PRESS ENTER TO RESTART', width / 2, height * 0.54, 30, 'center');
     }
-
     if (snapshot.interactionPrompt) {
       this.context.font = '700 30px Arial, sans-serif';
       const promptWidth = this.context.measureText(snapshot.interactionPrompt).width + 44;
@@ -184,6 +185,12 @@ export class CanvasHud {
     }
     if (snapshot.nearbyPowerup && !snapshot.gameOver) this.text(snapshot.nearbyPowerup,
       width / 2, height * 0.65, 28, 'center');
+    if (snapshot.paused && !snapshot.gameOver) {
+      this.context.fillStyle = 'rgba(0,0,0,0.62)';
+      this.context.fillRect(0, 0, width, height);
+      this.text('PAUSED', width / 2, height * 0.44, 68, 'center');
+      this.text('CLICK TO RESUME', width / 2, height * 0.53, 30, 'center');
+    }
     if (this.credits) {
       this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(180, 115, 1240, 540);
       const lines = ['THIRD-PARTY ASSET CREDITS', 'Zombie Soldier — Peter_D (@better_peter)',
