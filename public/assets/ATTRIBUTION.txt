@@ -30,6 +30,41 @@ Creator: Peanut_Butcher
 Source: https://sketchfab.com/3d-models/bar-m1918-a2-game-ready-rigged-1213683e58b14dd89fd4520489c7b732
 Changes: source GLB retained structurally; embedded 4K PBR textures reduced to 2K for browser runtime.
 
+MP 40 - WW2 Submachine Gun
+Creator: Moony_State
+Source: https://sketchfab.com/3d-models/mp-40-ww2-submachine-gun-7ec7e1f9656e4319b8edae0d785699ad
+Changes: converted from the source OBJ to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic packed into glTF ORM textures; magazine separated for the reload pose.
+
+PPSh-41
+Creator: Zillious
+Source: https://sketchfab.com/3d-models/ppsh-41-5c8a64490fa747389e9cfcaecc69c88a
+Changes: converted from the source FBX to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic packed into glTF ORM textures.
+
+M1 Garand
+Creator: YieldingMist206
+Source: https://sketchfab.com/3d-models/m1-garand-ec368667c6a54f018c8cb4bacdebbb94
+Changes: converted from the source FBX to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic packed into glTF ORM textures; loose clip, rounds and casing removed; untextured rubber/brass parts given flat colours.
+
+MG42
+Creator: AxelK
+Source: https://sketchfab.com/3d-models/mg42-f00a231e6fd046ecb4defb48c8dcd817
+Changes: converted from the source FBX to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic packed into glTF ORM textures.
+
+Mosin Nagant M91
+Creator: Doink (Doinkoloink)
+Source: https://sketchfab.com/3d-models/mosin-nagant-m91-55c00242c4024307a761a89167e39a7c
+Changes: converted from the source Collada (DAE) to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; 4K normal maps reduced to 2K.
+
+M1903 A3 Springfield
+Creator: Gintoki1234
+Source: https://sketchfab.com/3d-models/m1903-a3-springfield-fa6f760cd28b4d3db2011ab2cab0f719
+Changes: converted from the source FBX to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; rig baked to its rest pose; loose cartridges and a displaced floorplate removed.
+
+Double Barrel Shotgun
+Creator: Sebastian Kansik (Pepego)
+Source: https://sketchfab.com/3d-models/double-barrel-shotgun-04741a40f2224cffafc343b0236d5bbe
+Changes: converted from the source FBX to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic packed into glTF ORM textures.
+
 Full provenance, SHA-256 hashes for the downloaded originals, and benchmark notes are in docs/assets/.
 
 Additional in-game adaptations: character height normalization, in-place animation
