@@ -1,3 +1,4 @@
+import type { BarrierState } from './barrier.ts';
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, sampleWalkHeight } from './collision.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
@@ -149,4 +150,37 @@ export function tickZombieMelee(
   }];
   events.push(...damagePlayer(target, ZOMBIE_MOVEMENT.attackDamage));
   return events;
+}
+
+/** Players this close to a window's inner face can be swiped by a zombie tearing at it. */
+export const WINDOW_ATTACK = { reach: 1.4, maxHeightDelta: 1 } as const;
+
+export interface WindowAttackResult {
+  /** A zombie busy swiping through the window stops tearing boards. */
+  engaged: boolean;
+  events: Array<ZombieAttackEvent | DamageEvent>;
+}
+
+export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
+  players: readonly PlayerState[]): WindowAttackResult {
+  if (zombie.attackCooldownTicks > 0) zombie.attackCooldownTicks -= 1;
+  // Only once at least one board is gone is there a gap to reach through.
+  if (!zombie.alive || zombie.entry?.phase !== 'breaking' || barrier.boards >= barrier.maxBoards) {
+    return { engaged: false, events: [] };
+  }
+  const inReach = players.filter(player => {
+    if (!player.alive || Math.abs(player.position.y - barrier.position.y) > WINDOW_ATTACK.maxHeightDelta) return false;
+    const dx = player.position.x - barrier.position.x, dz = player.position.z - barrier.position.z;
+    return dx * barrier.outward.x + dz * barrier.outward.z < 0 && Math.hypot(dx, dz) <= WINDOW_ATTACK.reach;
+  }).sort((a, b) => distanceSquared(zombie.position, a.position) - distanceSquared(zombie.position, b.position)
+    || a.id.localeCompare(b.id));
+  const target = inReach[0];
+  if (!target) return { engaged: false, events: [] };
+  zombie.targetId = target.id;
+  if (zombie.attackCooldownTicks > 0) return { engaged: true, events: [] };
+  zombie.attackCooldownTicks = ZOMBIE_MOVEMENT.attackCooldownTicks;
+  return { engaged: true, events: [
+    { type: 'zombieAttacked', zombieId: zombie.id, playerId: target.id, damage: ZOMBIE_MOVEMENT.attackDamage },
+    ...damagePlayer(target, ZOMBIE_MOVEMENT.attackDamage),
+  ] };
 }

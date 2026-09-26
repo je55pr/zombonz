@@ -1,9 +1,14 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
 import { environmentMaterial, projectWorldUvs } from './environmentMaterials.ts';
-import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_BOX_CENTER, NACHT_RAILS, UPPER_HEIGHT } from '../maps/nacht.ts';
+import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_BOX_CENTER, NACHT_RAILS, NACHT_WINDOW_BOARDS,
+  UPPER_HEIGHT } from '../maps/nacht.ts';
 import type { SimulationState } from '../core/simulation.ts';
 import { lampFlicker } from './atmosphere.ts';
+
+// Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
+const PLANK_TILT = [0.07, -0.16, 0.12, -0.08, 0.17, -0.05] as const;
+function plankHeight(index: number): number { return 1.02 + index * 0.27; }
 
 export function buildBunkerDetails(scene: THREE.Scene): { update(state: SimulationState): void } {
   const group = new THREE.Group();
@@ -48,9 +53,9 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     box(frame, iron, opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
     const planks: THREE.Mesh[] = [];
     barrierViews.set(opening.id, planks);
-    for (let i = 0; i < 3; i++) {
-      const plank = box(frame, wood, 0, 1.16 + i * 0.46, 0.03, opening.width + 0.1, 0.16, 0.09);
-      plank.rotation.z = i === 1 ? -0.16 : 0.07;
+    for (let i = 0; i < NACHT_WINDOW_BOARDS; i++) {
+      const plank = box(frame, wood, 0, plankHeight(i), 0.03, opening.width + 0.1, 0.16, 0.09);
+      plank.rotation.z = PLANK_TILT[i % PLANK_TILT.length];
       plank.userData.dynamic = true;
       planks.push(plank);
     }
@@ -165,8 +170,8 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
         const elapsed = (state.world.tick - barrier.lastTornTick) / 60;
         const falling = !intact && i === barrier.boards && barrier.lastTornTick >= 0 && elapsed < 0.8;
         plank.visible = intact || falling;
-        plank.position.y = 1.16 + i * 0.46 - (falling ? elapsed * elapsed * 4 : 0);
-        plank.rotation.z = (i === 1 ? -0.16 : 0.07) + (falling ? elapsed * 2 : 0);
+        plank.position.y = plankHeight(i) - (falling ? elapsed * elapsed * 4 : 0);
+        plank.rotation.z = PLANK_TILT[i % PLANK_TILT.length] + (falling ? elapsed * 2 : 0);
         plank.rotation.x = falling ? elapsed * 1.5 : 0;
       }
     }

@@ -7,6 +7,10 @@ export interface EconomyConfig {
   killBonus: number;
   headshotBonus?: number;
   meleeKillReward?: number;
+  repairReward?: number;
+  /** Per-round repair earnings cap: round x this, never above repairCapMax. */
+  repairCapPerRound?: number;
+  repairCapMax?: number;
 }
 
 export const DEFAULT_ECONOMY_CONFIG: Readonly<EconomyConfig> = {
@@ -15,6 +19,9 @@ export const DEFAULT_ECONOMY_CONFIG: Readonly<EconomyConfig> = {
   killBonus: 50,
   headshotBonus: 90,
   meleeKillReward: 130,
+  repairReward: 10,
+  repairCapPerRound: 40,
+  repairCapMax: 500,
 };
 
 export type EconomyEvent =
@@ -54,13 +61,14 @@ export function awardCombatPoints(
   return events;
 }
 
-export function awardRepairPoints(player: PlayerState, round: number, multiplier = 1): EconomyEvent[] {
+export function awardRepairPoints(player: PlayerState, round: number, multiplier = 1,
+  config: EconomyConfig = DEFAULT_ECONOMY_CONFIG): EconomyEvent[] {
   const currentRound = Math.max(1, round);
   if (player.repairRewardRound !== currentRound) {
     player.repairRewardRound = currentRound; player.repairPointsEarned = 0;
   }
-  const cap = Math.min(500, currentRound * 40);
-  const amount = Math.min(10, cap - player.repairPointsEarned);
+  const cap = Math.min(config.repairCapMax ?? 500, currentRound * (config.repairCapPerRound ?? 40));
+  const amount = Math.min(config.repairReward ?? 10, cap - player.repairPointsEarned);
   if (!player.alive || amount <= 0) return [];
   player.repairPointsEarned += amount;
   return [award(player, amount * multiplier, 'repair')];
