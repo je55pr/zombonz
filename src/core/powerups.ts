@@ -5,7 +5,7 @@ import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import { WEAPON_DEFINITIONS } from './weapon.ts';
 import { rayAabbDistance } from './weapon.ts';
 
-export type PowerupKind = 'maxAmmo' | 'doublePoints' | 'instaKill';
+export type PowerupKind = 'maxAmmo' | 'doublePoints' | 'instaKill' | 'nuke';
 
 export interface PowerupDrop {
   id: string;
@@ -37,7 +37,7 @@ export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
   minimumTicksBetweenDrops: 600,
   lifetimeTicks: 900,
   pickupRadius: 1.25,
-  kinds: ['maxAmmo', 'doublePoints', 'instaKill'],
+  kinds: ['maxAmmo', 'doublePoints', 'instaKill', 'nuke'],
   doublePointsDurationTicks: 1800,
   instaKillDurationTicks: 1800,
 };
@@ -45,6 +45,7 @@ export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
 export type PowerupEvent =
   | { type: 'powerupSpawned'; dropId: string; kind: PowerupKind; position: Vec3 }
   | { type: 'powerupCollected'; dropId: string; kind: PowerupKind; playerId: EntityId }
+  | { type: 'nukeDetonated'; dropId: string; killed: number }
   | { type: 'powerupExpired'; dropId: string; kind: PowerupKind };
 
 export function createPowerupState(): PowerupState {
@@ -112,6 +113,7 @@ export function collectPowerups(
   players: readonly PlayerState[],
   boxes: readonly CollisionBox[],
   config: PowerupConfig = DEFAULT_POWERUP_CONFIG,
+  zombies: readonly ZombieState[] = [],
 ): PowerupEvent[] {
   const events: PowerupEvent[] = [];
   const living = players.filter(player => player.alive).sort((a, b) => a.id.localeCompare(b.id));
@@ -123,6 +125,14 @@ export function collectPowerups(
     if (drop.kind === 'maxAmmo') for (const player of living) refillAmmo(player);
     if (drop.kind === 'doublePoints') state.doublePointsTicksRemaining = config.doublePointsDurationTicks;
     if (drop.kind === 'instaKill') state.instaKillTicksRemaining = config.instaKillDurationTicks;
+    if (drop.kind === 'nuke') {
+      let killed = 0;
+      for (const zombie of zombies) if (zombie.alive) {
+        zombie.alive = false; zombie.health = 0; zombie.velocity = { x: 0, y: 0, z: 0 };
+        killed += 1;
+      }
+      events.push({ type: 'nukeDetonated', dropId: drop.id, killed });
+    }
     events.push({ type: 'powerupCollected', dropId: drop.id, kind: drop.kind, playerId: collector.id });
   }
   const collected = new Set(events.map(event => event.dropId));

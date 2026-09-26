@@ -92,6 +92,7 @@ export class GameAudio {
         case 'powerupCollected':
           this.tone(330, 660, 0.24, 0.25, 'triangle');
           this.tone(495, 990, 0.3, 0.16, 'triangle'); break;
+        case 'nukeDetonated': this.burst(0.22, 0.5, 900); this.tone(150, 32, 0.7, 0.3, 'sawtooth'); break;
         case 'barrierBoardRemoved': this.burst(0.12, 0.32, 680); break;
         case 'roundPhaseChanged': if (event.to === 'spawning') this.tone(240, 80, 0.8, 0.28, 'triangle'); break;
       }

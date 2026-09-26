@@ -143,4 +143,25 @@ describe('timed power-ups', () => {
     expect(second.alive).toBe(true);
     expect(second.health).toBe(secondHealth - 150);
   });
+
+  it('detonates a Nuke before zombie attacks and awards a flat team bonus', () => {
+    const sim = new GameSimulation({ seed: 17,
+      playerSpawns: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }],
+      map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] },
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
+    sim.state.powerups.drops.push({ id: 'p:1', kind: 'nuke',
+      position: { x: 0, y: 0, z: 0 }, ticksRemaining: 900 });
+    const zombies = [createZombieState('e:99', { x: 0, y: 0, z: -2 }, 10),
+      createZombieState('e:100', { x: 0, y: 0, z: -3 }, 10)];
+    for (const zombie of zombies) addEntity(sim.state.world, zombie);
+    const events = sim.tick();
+    expect(events).toContainEqual({ type: 'nukeDetonated', dropId: 'p:1', killed: 2 });
+    expect(events.filter(event => event.type === 'pointsAwarded')).toMatchObject([
+      { playerId: sim.playerIds[0], amount: 400, reason: 'nuke' },
+      { playerId: sim.playerIds[1], amount: 400, reason: 'nuke' },
+    ]);
+    expect(events.some(event => event.type === 'zombieAttacked' || event.type === 'zombieDied')).toBe(false);
+    expect(zombies.every(zombie => !zombie.alive && zombie.health === 0)).toBe(true);
+    expect(sim.playerIds.map(id => sim.getPlayer(id)!.points)).toEqual([900, 900]);
+  });
 });

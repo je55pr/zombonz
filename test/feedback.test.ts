@@ -34,5 +34,7 @@ describe('local combat feedback', () => {
     expect(feedback.snapshot(51).message).toBe('DOUBLE POINTS');
     feedback.consume([{ type: 'powerupCollected', dropId: 'p:3', kind: 'instaKill', playerId: 'e:2' }], 'e:1', 52);
     expect(feedback.snapshot(52).message).toBe('INSTA-KILL');
+    feedback.consume([{ type: 'powerupCollected', dropId: 'p:4', kind: 'nuke', playerId: 'e:2' }], 'e:1', 53);
+    expect(feedback.snapshot(53).message).toBe('NUKE');
   });
 });

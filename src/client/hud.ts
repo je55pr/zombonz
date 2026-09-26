@@ -47,7 +47,8 @@ export function buildHudSnapshot(
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
     nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO'
-      : nearbyDrop.kind === 'doublePoints' ? 'DOUBLE POINTS' : 'INSTA-KILL' : null,
+      : nearbyDrop.kind === 'doublePoints' ? 'DOUBLE POINTS'
+        : nearbyDrop.kind === 'instaKill' ? 'INSTA-KILL' : 'NUKE' : null,
     bonusStatus: simulation.state.powerups.doublePointsTicksRemaining > 0
       ? `2X POINTS  ${Math.ceil(simulation.state.powerups.doublePointsTicksRemaining / 60)}s` : null,
     instaKillStatus: simulation.state.powerups.instaKillTicksRemaining > 0

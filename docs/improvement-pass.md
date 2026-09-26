@@ -117,3 +117,9 @@ Insta-Kill joins the same deterministic roll and lasts thirty seconds after
 collection. Its gun and knife damage are lethal only after their usual range,
 wall and cooldown checks, so the power-up cannot shoot through geometry. The
 timer is authoritative and team-wide; the HUD shows it at one-second resolution.
+
+Nuke is a fourth seeded pickup. Collection eliminates the current living zombies
+before their movement/attack step, retains their normal short corpse display, and
+awards a flat 400 points to each living player without per-zombie kill rewards.
+The world marker is blue and the audio cue is distinct. Drop rates, weighting and
+the remaining classic power-ups are future balancing/content work.

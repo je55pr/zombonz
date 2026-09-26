@@ -8,7 +8,7 @@ import {
   type DoorDefinition, type DoorEvent, type DoorState,
 } from './door.ts';
 import {
-  DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints,
+  DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints, awardNukePoints,
   type EconomyConfig, type EconomyEvent,
 } from './economy.ts';
 import { livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
@@ -275,7 +275,12 @@ export class GameSimulation {
       if (zombie?.kind === 'zombie') events.push(...tryDropPowerup(this.state.powerups, zombie,
         this.state.barriers, world.seed, world.tick, this.powerupConfig));
     }
-    events.push(...collectPowerups(this.state.powerups, livingPlayers(world), this.collisionBoxes(), this.powerupConfig));
+    const pickupEvents = collectPowerups(this.state.powerups, livingPlayers(world), this.collisionBoxes(),
+      this.powerupConfig, this.zombies());
+    events.push(...pickupEvents);
+    if (pickupEvents.some(event => event.type === 'nukeDetonated')) for (const player of livingPlayers(world)) {
+      events.push(...awardNukePoints(player));
+    }
 
     const navigate = this.navigationQuery();
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {

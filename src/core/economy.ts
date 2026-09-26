@@ -18,13 +18,13 @@ export const DEFAULT_ECONOMY_CONFIG: Readonly<EconomyConfig> = {
 };
 
 export type EconomyEvent =
-  | { type: 'pointsAwarded'; playerId: PlayerState['id']; amount: number; reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair'; balance: number }
+  | { type: 'pointsAwarded'; playerId: PlayerState['id']; amount: number; reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair' | 'nuke'; balance: number }
   | { type: 'pointsSpent'; playerId: PlayerState['id']; amount: number; reason: string; balance: number }
   | { type: 'pointsSpendRejected'; playerId: PlayerState['id']; amount: number; reason: string; balance: number };
 function award(
   player: PlayerState,
   amount: number,
-  reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair',
+  reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair' | 'nuke',
 ): EconomyEvent {
   player.points += amount;
   return { type: 'pointsAwarded', playerId: player.id, amount, reason, balance: player.points };
@@ -63,6 +63,10 @@ export function awardRepairPoints(player: PlayerState, round: number, multiplier
   if (!player.alive || amount <= 0) return [];
   player.repairPointsEarned += amount;
   return [award(player, amount * multiplier, 'repair')];
+}
+
+export function awardNukePoints(player: PlayerState): EconomyEvent[] {
+  return player.alive ? [award(player, 400, 'nuke')] : [];
 }
 export function spendPoints(
   player: PlayerState,

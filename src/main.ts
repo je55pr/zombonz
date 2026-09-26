@@ -105,7 +105,8 @@ const simulation = new GameSimulation({
   ...(previewName === 'assets' && preview ? { powerupConfig: {
     ...DEFAULT_POWERUP_CONFIG, dropChanceDenominator: 1, minimumTicksBetweenDrops: 0,
     kinds: [previewPowerup === 'doublePoints' ? 'doublePoints'
-      : previewPowerup === 'instaKill' ? 'instaKill' : 'maxAmmo'] as const,
+      : previewPowerup === 'instaKill' ? 'instaKill'
+        : previewPowerup === 'nuke' ? 'nuke' : 'maxAmmo'] as const,
   } } : {}),
   ...(preview ? { roundConfig: { initialWaitTicks: previewName === 'barrier' || previewName === 'stress' ? 120 : 2147483647, intermissionTicks: 180 },
     economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } } : {}),
