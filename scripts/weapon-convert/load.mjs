@@ -10,6 +10,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const fakeImage = () => ({ addEventListener() {}, removeEventListener() {}, set src(_) {}, style: {} });
 globalThis.document ??= { createElementNS: fakeImage, createElement: fakeImage };
 globalThis.self ??= globalThis;
+globalThis.window ??= globalThis;
 globalThis.DOMParser ??= DOMParser;
 globalThis.ProgressEvent ??= class { constructor(type, properties) { Object.assign(this, { type }, properties); } };
 THREE.TextureLoader.prototype.load = function () { return new THREE.Texture(); };

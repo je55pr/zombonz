@@ -120,6 +120,11 @@ export class GameAudio {
           this.tone(495, 990, 0.3, 0.16, 'triangle'); break;
         case 'nukeDetonated': this.burst(0.22, 0.5, 900); this.tone(150, 32, 0.7, 0.3, 'sawtooth'); break;
         case 'grenadeThrown': this.tone(420, 240, 0.09, 0.11, 'square'); break;
+        case 'weaponExploded':
+          if (event.weaponId === 'irrlicht') { this.tone(900, 180, 0.22, 0.2, 'sawtooth'); this.burst(0.12, 0.3, 1600); }
+          else { this.burst(0.25, 0.6, 600); this.tone(110, 30, 0.3, 0.28, 'sawtooth'); }
+          break;
+        case 'weaponChained': this.tone(1800, 120, 0.3, 0.16, 'square'); this.burst(0.18, 0.25, 5200); break;
         case 'grenadeExploded': this.burst(0.2, 0.55, 700); this.tone(120, 28, 0.25, 0.25, 'sawtooth'); break;
         case 'barrierBoardRemoved': this.burst(0.12, 0.32, 680); break;
         case 'roundPhaseChanged': if (event.to === 'spawning') this.tone(240, 80, 0.8, 0.28, 'triangle'); break;

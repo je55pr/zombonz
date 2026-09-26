@@ -2,7 +2,8 @@
 // Magazine parts are drawn red so their detection can be checked too.
 import sharp from 'sharp';
 import { loadSource } from './load.mjs';
-import { collect, orientation, transformParts } from './convert.mjs';
+import * as THREE from 'three';
+import { applyIslandRules, collect, orientation, transformParts } from './convert.mjs';
 import { WEAPONS } from './weapons.mjs';
 
 const W = process.env.WEAPONS;
@@ -28,8 +29,14 @@ function fillTriangle(a, b, c, colour, ox, oy) {
 for (const [row, id] of ids.entries()) {
   const config = WEAPONS[id];
   const raw = collect(await loadSource(`${W}/${config.source}`), config);
-  const parts = transformParts(raw, orientation(raw, config), config.length);
-  const scale = (cellW - 2 * pad) / config.length;
+  let parts = transformParts(raw, orientation(raw, config), config.length);
+  if (config.islandRules) parts = transformParts(applyIslandRules(parts, config.islandRules), new THREE.Matrix4(), config.length);
+  // Fit both the length and the tallest/widest extent, so pistols are not clipped.
+  let extent = 0;
+  for (const part of parts) for (let i = 0; i < part.positions.length; i += 3) {
+    extent = Math.max(extent, Math.abs(part.positions[i]), Math.abs(part.positions[i + 1]));
+  }
+  const scale = Math.min((cellW - 2 * pad) / config.length, (cellH / 2 - pad) / extent);
   for (const [view, ox] of [['side', 0], ['top', cellW]]) {
     for (const part of parts) {
       const colour = part.magazine ? [200, 40, 40] : [40, 40, 40];

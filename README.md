@@ -68,12 +68,18 @@ The playable solo map follows Nacht's starting room / Help room / upstairs conne
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
 box in the Help room costs 950. It rolls for three seconds, then reserves a random gun you
 don't already carry for the buyer to claim within ten seconds. The box holds every gun except
-the M1911: Kar98k, Springfield, M1 Garand, Thompson, MP40, BAR, MG42, double-barreled shotgun,
-Trench Gun, and (beyond WaW's Nacht roster) the PPSh-41 and Mosin-Nagant. A player carries
+the M1911: WaW's WWII arsenal (Kar98k, Springfield, Mosin-Nagant, M1 Garand, M1A1 Carbine, STG-44,
+FG42, Thompson, MP40, PPSh-41, BAR, MG42, double-barrel, Trench Gun, .357 Magnum), the Cold War guns
+BO1 added to Nacht (M14, FN FAL, Commando, AK-74u, MP5K, Skorpion, RPK, SPAS-12, Stakeout, Python,
+RPG-7), and two rare original wonder weapons. The **Irrlicht** is a dieselpunk flare pistol whose
+bolts burst on impact, hitting nearby zombies and a careless shooter. The **Molniya** fires lightning
+that jumps through up to five zombies in line of sight. A player carries
 two guns; the first purchase keeps the M1911, while a third gun replaces the one
 currently held. The box briefly closes before it can be used again. Wall chalk follows WaW's
-Nacht: a Kar98k (200) in the starting room, a Thompson and a double-barreled shotgun (1200 each)
-in the Help room, and a Trench Gun (1500) and BAR (1800) upstairs. Wall ammo costs half the gun.
+Nacht: a Kar98k (200) and M1A1 Carbine (600) in the starting room, a Thompson and a
+double-barreled shotgun (1200 each) in the Help room, and a Trench Gun (1500) and BAR (1800)
+upstairs. BO1-style chalk adds an M14 (500) in the starting room, an MP5K (1000) in the Help room
+and an AK-74u (1200) upstairs. Wall ammo costs half the gun.
 Shotguns fire eight pellets per shell, deadly up close and weak at range. Buying wall
 ammo refills an owned gun's reserves without replacing its loaded magazine; full
 reserves cannot be purchased again.
@@ -126,13 +132,11 @@ Identical vertices and constant animation tracks are removed in memory; all inst
 share model geometry/textures, with independent skeletons. Source GLBs stay untouched.
 Add `?zombie=pxltiger` to try the alternate rig; it has more draw calls and no death clip.
 
-Every gun except the Thompson has a real first-person model: M1911, Kar98k, Springfield,
-Mosin-Nagant, M1 Garand, MP40, PPSh-41, BAR, MG42, the double-barrel and the Trench Gun.
+Every gun has a real first-person model (29 licensed CC BY models; see the F2 credits).
 Recoil, muzzle flash and a basic reload pose
 follow authoritative shot/ammo/reload state. The models share textures and load on
 demand; loading failures leave a playable placeholder and a visible notice.
-The Thompson (no textured model found) uses a labelled procedural placeholder, and there
-are no animated player hands.
+There are no animated player hands.
 Weapon stats are WaW-inspired approximations. Full hand/bolt/round-by-round reload animation,
 authentic box weapon silhouettes/roulette animation, original weapon behaviour,
 recorded sounds and online co-op remain future work.
@@ -151,8 +155,8 @@ round N, for example `/?preview=start&round=9` to face a round of sprinters. `np
 `/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
 That preview guarantees a Max Ammo drop when the target dies; add
 `&powerup=doublePoints`, `&powerup=instaKill` or `&powerup=nuke` to inspect the alternate pickups.
-Use `weapon=` with any gun id (`starter-pistol`, `kar98k`, `springfield`, `mosin`, `m1-garand`,
-`thompson`, `mp40`, `ppsh41`, `bar`, `mg42`, `double-barrel`, `trench-gun`) on any preview URL
+Use `weapon=` with any gun id (for example `thompson`, `stg44`, `ak74u`, `spas12`, `rpg7`,
+`irrlicht` or `molniya`; the full list is `WEAPON_DEFINITIONS` in `src/core/weapon.ts`) on any preview URL
 to inspect that viewmodel. P fires in development previews only (useful in browsers
 without pointer lock); R reloads. Production and normal survival use mouse firing.
 See [map notes](docs/nacht-map.md) for layout and validation details.

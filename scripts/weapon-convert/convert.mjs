@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { Document, NodeIO } from '@gltf-transform/core';
 import { EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, weld } from '@gltf-transform/functions';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import { loadSource } from './load.mjs';
 
 const W = process.env.WEAPONS;
@@ -33,6 +33,7 @@ export function collect(root, config) {
     const magazine = !!(config.magazine && config.magazine.test(object.name));
     for (const group of groups) {
       const source = materials[group.materialIndex]?.name ?? 'default';
+      if (config.dropMaterials?.test(source)) continue;
       const name = config.materialAlias?.[source] ?? source;
       const key = `${name}|${magazine}`;
       if (!parts.has(key)) parts.set(key, { material: name, magazine, positions: [], normals: [], uvs: [] });
@@ -83,6 +84,85 @@ export function transformParts(parts, matrix, lengthMetres) {
   return parts;
 }
 
+/** `auto: 'dir/prefix_'` picks each PBR map from the files in dir that start with prefix. */
+const MAP_PATTERNS = {
+  base: /(albedo|base_?colou?r|baseco)/i, normal: /normal/i, metallic: /metal/i,
+  roughness: /rough/i, ao: /(^|[_ -])(ao|mixed_ao|occlusion)([_ .-]|$)/i, emissive: /emissive/i,
+};
+export function resolveMaterialSpec(spec) {
+  if (!spec.auto) return spec;
+  const slash = spec.auto.lastIndexOf('/');
+  const dir = spec.auto.slice(0, slash), prefix = spec.auto.slice(slash + 1).toLowerCase();
+  const files = readdirSync(`${W}/${dir}`).filter(file => file.toLowerCase().startsWith(prefix)
+    && /\.(png|jpe?g)$/i.test(file) && !/(height|mask|opacity|spec|_spec\.|gloss)/i.test(file));
+  const resolved = { ...spec };
+  for (const [key, pattern] of Object.entries(MAP_PATTERNS)) {
+    if (resolved[key] !== undefined) continue;
+    // Prefer OpenGL normals and PNG over re-encoded JPEG duplicates.
+    const matches = files.filter(file => pattern.test(file.slice(prefix.length)))
+      .sort((a, b) => Number(/opengl/i.test(b)) - Number(/opengl/i.test(a)) || Number(/\.png$/i.test(b)) - Number(/\.png$/i.test(a)));
+    if (matches.length) resolved[key] = `${dir}/${matches[0]}`;
+  }
+  if (!resolved.base && !resolved.color) throw new Error(`No base colour map for ${spec.auto}`);
+  return resolved;
+}
+
+/** Connected pieces of the oriented weapon (triangles sharing welded vertices), largest first. */
+export function islands(parts) {
+  const tris = [];
+  for (const part of parts) for (let i = 0; i < part.positions.length; i += 9) tris.push({ part, i });
+  const parent = tris.map((_, i) => i);
+  const find = i => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  const owner = new Map();
+  tris.forEach((tri, index) => {
+    for (let k = 0; k < 3; k++) {
+      const p = tri.part.positions, o = tri.i + k * 3;
+      const key = `${Math.round(p[o] * 2e3)},${Math.round(p[o + 1] * 2e3)},${Math.round(p[o + 2] * 2e3)}`;
+      if (owner.has(key)) parent[find(index)] = find(owner.get(key)); else owner.set(key, index);
+    }
+  });
+  const groups = new Map();
+  tris.forEach((tri, index) => {
+    const root = find(index);
+    if (!groups.has(root)) groups.set(root, { tris: [], min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] });
+    const g = groups.get(root); g.tris.push(tri);
+    for (let k = 0; k < 9; k++) {
+      const axis = k % 3, v = tri.part.positions[tri.i + k];
+      g.min[axis] = Math.min(g.min[axis], v); g.max[axis] = Math.max(g.max[axis], v);
+    }
+  });
+  return [...groups.values()].sort((a, b) => b.tris.length - a.tris.length);
+}
+
+/**
+ * Island rules drop loose display pieces or tag an island as the magazine. Each rule has `min`/`max`
+ * bounds (normalized metres, Z forward, Y up) that the island's centre must fall inside.
+ */
+export function applyIslandRules(parts, rules) {
+  const inside = (g, rule) => [0, 1, 2].every(axis => {
+    const centre = (g.min[axis] + g.max[axis]) / 2;
+    return centre >= (rule.min?.[axis] ?? -Infinity) && centre <= (rule.max?.[axis] ?? Infinity);
+  });
+  const actions = new Map(parts.map(part => [part, new Map()]));
+  for (const g of islands(parts)) {
+    const rule = rules.find(candidate => inside(g, candidate));
+    if (rule) for (const tri of g.tris) actions.get(tri.part).set(tri.i, rule.action);
+  }
+  const out = new Map();
+  for (const part of parts) for (let i = 0; i < part.positions.length; i += 9) {
+    const action = actions.get(part).get(i);
+    if (action === 'drop') continue;
+    const magazine = part.magazine || action === 'magazine';
+    const key = `${part.material}|${magazine}`;
+    if (!out.has(key)) out.set(key, { material: part.material, magazine, positions: [], normals: [], uvs: [] });
+    const o = out.get(key), v = i / 3;
+    o.positions.push(...part.positions.slice(i, i + 9));
+    if (part.normals.length) o.normals.push(...part.normals.slice(i, i + 9));
+    o.uvs.push(...part.uvs.slice(v * 2, v * 2 + 6));
+  }
+  return [...out.values()];
+}
+
 async function encode(path, maxSize, quality) {
   const image = sharp(path).resize({ width: maxSize, height: maxSize, fit: 'inside', withoutEnlargement: true });
   return new Uint8Array(await image.webp({ quality }).toBuffer());
@@ -105,20 +185,30 @@ async function packOrm({ ao, roughness, metallic }, maxSize) {
 export async function convert(id, config, outDir) {
   const root = await loadSource(`${W}/${config.source}`);
   const raw = collect(root, config);
-  const parts = transformParts(raw, orientation(raw, config), config.length);
+  let parts = transformParts(raw, orientation(raw, config), config.length);
+  if (config.islandRules) parts = transformParts(applyIslandRules(parts, config.islandRules), new THREE.Matrix4(), config.length);
   const doc = new Document();
   doc.createExtension(EXTTextureWebP).setRequired(true);
   const buffer = doc.createBuffer();
   const scene = doc.createScene(id);
   const materials = new Map();
   const maxTexture = config.maxTexture ?? 2048;
-  for (const [name, spec] of Object.entries(config.materials)) {
+  const specs = { ...config.materials };
+  // `autoMaterials: 'dir/'` maps every remaining material name to dir/<name>_* maps.
+  if (config.autoMaterials) for (const part of parts) specs[part.material] ??= { auto: `${config.autoMaterials}${part.material}_` };
+  for (const [name, rawSpec] of Object.entries(specs)) {
+    if (!parts.some(part => part.material === name)) continue;
+    const spec = resolveMaterialSpec(rawSpec);
     const material = doc.createMaterial(name).setMetallicFactor(spec.metal ?? 1).setRoughnessFactor(spec.rough ?? 1);
     if (spec.color) material.setBaseColorFactor(spec.color);
     const texture = async (key, path, size, quality) => doc.createTexture(`${name}_${key}`)
       .setImage(await encode(`${W}/${path}`, size, quality)).setMimeType('image/webp');
     if (spec.base) material.setBaseColorTexture(await texture('base', spec.base, maxTexture, 85));
     if (spec.normal) material.setNormalTexture(await texture('normal', spec.normal, maxTexture, 90));
+    if (spec.emissive) {
+      material.setEmissiveTexture(await texture('emissive', spec.emissive, Math.min(1024, maxTexture), 85))
+        .setEmissiveFactor(spec.emissiveFactor ?? [1, 1, 1]);
+    }
     if (spec.roughness || spec.metallic || spec.ao) {
       const orm = doc.createTexture(`${name}_orm`).setMimeType('image/webp').setImage(await packOrm({
         ao: spec.ao && `${W}/${spec.ao}`, roughness: spec.roughness && `${W}/${spec.roughness}`,

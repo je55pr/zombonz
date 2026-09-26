@@ -14,12 +14,13 @@ describe('runtime GLB integration', () => {
     const weapon = prepareWeapon(asset.scene, id);
     const box = new THREE.Box3().setFromObject(weapon.root), size = box.getSize(new THREE.Vector3());
     expect(size.z).toBeCloseTo(VIEWMODEL_LENGTHS[id]);
-    // Catches detached-magazine exports; the MG42's bipod and the PPSh drum are genuinely wider.
-    expect(size.x).toBeLessThan(id === 'mg42' || id === 'ppsh41' ? 0.2 : 0.12);
+    // Catches detached-magazine exports; drums, side magazines and bipods are genuinely wider.
+    expect(size.x).toBeLessThan(['mg42', 'ppsh41', 'thompson', 'fg42', 'rpg7'].includes(id) ? 0.2 : 0.12);
     expect(box.max.z).toBeCloseTo(0);
     let meshes = 0;
     weapon.root.traverse(object => { if (object instanceof THREE.Mesh) { meshes++; expect(object).not.toBeInstanceOf(THREE.SkinnedMesh); } });
-    expect(meshes).toBeLessThanOrEqual(8);
+    // One draw per source material; only one viewmodel renders at a time (the Thompson has 12).
+    expect(meshes).toBeLessThanOrEqual(12);
     expect(new THREE.Box3().setFromObject(asset.scene).equals(before)).toBe(true);
   });
 
@@ -71,9 +72,8 @@ describe('runtime GLB integration', () => {
 
   it('maps existing gameplay weapons to real assets without substituting unrelated guns', () => {
     expect(WEAPON_ASSETS['starter-pistol']).toBe('m1911');
-    // Only guns without a suitable licensed model keep the placeholder.
-    const unmapped = Object.keys(WEAPON_DEFINITIONS).filter(id => !WEAPON_ASSETS[id]);
-    expect(unmapped).toEqual(['thompson']);
+    // Every gun now has a licensed model; none falls back to the placeholder.
+    expect(Object.keys(WEAPON_DEFINITIONS).filter(id => !WEAPON_ASSETS[id])).toEqual([]);
     for (const [id, asset] of Object.entries(WEAPON_ASSETS)) {
       expect(WEAPON_DEFINITIONS[id], id).toBeDefined();
       expect(assetExists(`public/assets/weapons/${asset}/model.glb`), asset).toBe(true);

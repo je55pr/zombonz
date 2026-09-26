@@ -11,8 +11,14 @@ export interface PreparedWeapon { root: THREE.Group; magazine: THREE.Group; muzz
 // Viewmodel lengths in metres, roughly 0.86x each gun's real length.
 export const VIEWMODEL_LENGTHS: Readonly<Record<string, number>> = {
   m1911: 0.36, kar98k: 0.95, bar: 1.05, mp40: 0.72, ppsh41: 0.73, mg42: 1.05, 'm1-garand': 0.95,
-  springfield: 0.95, mosin: 1.1, 'double-barrel': 0.98, 'trench-gun': 0.86,
+  springfield: 0.95, mosin: 1.1, 'double-barrel': 0.98, 'trench-gun': 0.86, thompson: 0.74, stg44: 0.81,
+  fg42: 0.84, 'm1-carbine': 0.78, m14: 0.96, fal: 0.94, rpk: 0.92, commando: 0.66, ak74u: 0.63, spas12: 0.9,
+  ithaca37: 0.86, rpg7: 0.95,
+  // Handguns are drawn larger than life, like the M1911, so they read on screen.
+  mp5k: 0.45, skorpion: 0.52, 'magnum-357': 0.42, python: 0.4, irrlicht: 0.42, molniya: 0.4,
 };
+const HANDGUNS = new Set(['starter-pistol', 'magnum-357', 'python', 'irrlicht', 'molniya']);
+const FLASH_COLOURS: Readonly<Record<string, number>> = { irrlicht: 0x7dff9a, molniya: 0x8fd8ff };
 
 // Bake the exported rest pose to ordinary meshes, keeping the magazine separate.
 // BAR's 58 source parts then batch to two draws, without a needless gun skeleton.
@@ -103,6 +109,7 @@ export class WeaponView {
   }
   private equip(id: string): void {
     this.id = id; this.firedTick = -100;
+    (this.flash.material as THREE.MeshBasicMaterial).color.setHex(FLASH_COLOURS[id] ?? 0xffd57a);
     const generation = ++this.generation;
     this.current?.root.removeFromParent();
     let fallback = this.fallbacks.get(id);
@@ -141,7 +148,7 @@ export class WeaponView {
     const bob = Math.sin(tick * (player.sprinting ? 0.22 : 0.13)) * moving
       * (player.sprinting ? 0.014 : 0.006) * (1 - this.aimBlend * 0.85);
     this.pose.position.set(0.19 * (1 - this.aimBlend) + bob,
-      (this.id === 'starter-pistol' ? -0.10 : -0.15) + this.aimBlend * 0.065 - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob),
+      (HANDGUNS.has(this.id) ? -0.10 : -0.15) + this.aimBlend * 0.065 - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob),
       -0.24 - this.aimBlend * 0.075 + kick * 0.045);
     this.pose.rotation.set(kick * 0.10 + reload * 0.35 - this.sprintBlend * 0.22,
       0.12 * (1 - this.aimBlend), -reload * 0.45 + this.sprintBlend * 0.12);

@@ -1,5 +1,6 @@
 import type { PlayerState } from './types.ts';
 import type { WeaponEvent } from './weapon.ts';
+import type { DamageEvent } from './health.ts';
 
 export interface EconomyConfig {
   startingPoints: number;
@@ -40,7 +41,7 @@ function award(
 
 export function awardCombatPoints(
   player: PlayerState,
-  weaponEvents: readonly WeaponEvent[],
+  weaponEvents: readonly (WeaponEvent | DamageEvent)[],
   config: EconomyConfig = DEFAULT_ECONOMY_CONFIG,
   multiplier = 1,
 ): EconomyEvent[] {

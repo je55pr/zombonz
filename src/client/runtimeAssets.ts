@@ -6,10 +6,12 @@ import { deinterleaveGeometry, mergeVertices } from 'three/addons/utils/BufferGe
 export type ZombieAssetId = 'peter_d' | 'pxltiger';
 export type ZombieAnimation = 'idle' | 'walk' | 'run' | 'attack' | 'death';
 export interface ZombieAsset { model: THREE.Group; clips: Partial<Record<ZombieAnimation, THREE.AnimationClip>> }
+// Every gun's GLB lives in public/assets/weapons/<id>/, except the starter pistol's M1911 folder.
 export const WEAPON_ASSETS: Readonly<Record<string, string>> = {
-  'starter-pistol': 'm1911', kar98k: 'kar98k', bar: 'bar', mp40: 'mp40', ppsh41: 'ppsh41', mg42: 'mg42',
-  'm1-garand': 'm1-garand', springfield: 'springfield', mosin: 'mosin', 'double-barrel': 'double-barrel',
-  'trench-gun': 'trench-gun',
+  'starter-pistol': 'm1911',
+  ...Object.fromEntries(['kar98k', 'springfield', 'mosin', 'm1-garand', 'm1-carbine', 'm14', 'fal', 'stg44', 'fg42',
+    'thompson', 'mp40', 'ppsh41', 'commando', 'ak74u', 'mp5k', 'skorpion', 'bar', 'mg42', 'rpk', 'double-barrel',
+    'trench-gun', 'spas12', 'ithaca37', 'magnum-357', 'python', 'rpg7', 'irrlicht', 'molniya'].map(id => [id, id])),
 };
 
 const loader = new GLTFLoader();

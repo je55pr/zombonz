@@ -73,6 +73,18 @@ function weaponLabel(id: string): string {
   return weaponName(id).toUpperCase();
 }
 
+/** Every CC BY model shown in game, with its creator (full details in ATTRIBUTION.txt). */
+export const MODEL_CREDITS: readonly string[] = [
+  'Zombie Soldier — Peter_D (@better_peter)', 'Zombie — pxltiger', 'M1911 — Quinn Kuslich', 'Kar98k — ARIA',
+  'BAR M1918 A2 — Peanut_Butcher', 'MP40 — Moony_State', 'PPSh-41 — Zillious', 'M1 Garand — YieldingMist206',
+  'MG42 — AxelK', 'Mosin-Nagant M91 — Doink', 'M1903 A3 — Gintoki1234', 'Double-barrel — Sebastian Kansik (Pepego)',
+  'Winchester M1897 — buh', 'Thompson — Artem.Goyko', 'Revolver .357 — Artem.Goyko', 'STG-44 — Arbuzz747',
+  'FG42 — Shorty_Digitan', 'M1 Carbine — roelandvermeulen', 'M14 — ecler', 'FN FAL — MoraAzul',
+  'XM177E1 — Bazylonator', 'AKS-74u — dan741vlasov', 'MP5K — davidthe19th', 'Vz.61 Skorpion — Maxim_Van_Daele',
+  'RPK-74M — petresco', 'SPAS-12 — FameProductions', 'Ithaca 37 — I.sln', 'Colt Python — HYQQM',
+  'RPG-7 — javadbayat', 'Signal flare pistol (Irrlicht) — ChickenHatMan', 'Diesel punk USSR gun (Molniya) — Silversem',
+];
+
 export class CanvasHud {
   private previous: HudSnapshot | null = null;
   private credits = false;
@@ -202,15 +214,20 @@ export class CanvasHud {
     }
     if (this.credits) {
       this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(180, 115, 1240, 540);
-      const lines = ['THIRD-PARTY ASSET CREDITS', 'Zombie Soldier — Peter_D (@better_peter) · Zombie — pxltiger',
-        'M1911 — Quinn Kuslich · Kar98k — ARIA · BAR M1918 A2 — Peanut_Butcher',
-        'MP40 — Moony_State · PPSh-41 — Zillious · M1 Garand — YieldingMist206',
-        'MG42 — AxelK · Mosin-Nagant M91 — Doink · M1903 A3 — Gintoki1234',
-        'Double-barrel shotgun — Sebastian Kansik (Pepego) · Winchester M1897 — buh',
-        'Characters / weapons: CC BY 4.0 · converted and adapted',
+      this.text('THIRD-PARTY ASSET CREDITS', width / 2, 160, 30, 'center');
+      // Wrap the creator list to the panel so every model stays credited as the arsenal grows.
+      this.context.font = '700 18px Arial, sans-serif';
+      const lines: string[] = [];
+      for (const credit of MODEL_CREDITS) {
+        const line = lines.length ? `${lines[lines.length - 1]} · ${credit}` : credit;
+        if (lines.length && this.context.measureText(line).width <= 1180) lines[lines.length - 1] = line;
+        else lines.push(credit);
+      }
+      lines.forEach((line, index) => this.text(line, width / 2, 205 + index * 28, 18, 'center'));
+      const footer = ['Characters / weapons: CC BY 4.0 · converted and adapted',
         'Environment / props: Poly Haven, ambientCG, OpenGameArt · CC0',
         'Source links and licence: /assets/ATTRIBUTION.txt', 'F2 TO CLOSE'];
-      lines.forEach((line, index) => this.text(line, width / 2, 160 + index * 46, index === 0 ? 30 : 23, 'center'));
+      footer.forEach((line, index) => this.text(line, width / 2, 215 + lines.length * 28 + index * 34, 21, 'center'));
     }
     this.texture.needsUpdate = true;
   }

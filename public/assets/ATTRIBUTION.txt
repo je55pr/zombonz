@@ -70,6 +70,96 @@ Creator: buh (buh-late)
 Source: https://sketchfab.com/3d-models/winchester-model-1897-6194ecd23344442fb23f5820f895a0d8
 Changes: exported from the source .blend with Blender 4.5 (lights and a loose 12-gauge shell removed), then converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures.
 
+Thompson submachine gun (in game: Thompson)
+Creator: Artem Goyko (Artem.Goyko)
+Source: https://sketchfab.com/3d-models/thompson-submachine-gun-5fe11dfebf734b4aa49c43545397abd1
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; Collada source; twelve PBR material sets.
+
+Revolver .357 Magnum (in game: .357 Magnum)
+Creator: Artem Goyko (Artem.Goyko)
+Source: https://sketchfab.com/3d-models/revolver-357-magnum-360c6276282e48109fcca66f31004d81
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; Collada source; a small part floating above the revolver removed.
+
+STG-44 (in game: STG-44)
+Creator: Arbuzz747
+Source: https://sketchfab.com/3d-models/stg-44-fe139cf77b384d3fbf40bef53a6c809c
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; Collada source; magazine separated for the reload pose.
+
+Diesel punk USSR gun (in game: Molniya (original wonder weapon))
+Creator: Silversem
+Source: https://sketchfab.com/3d-models/diesel-punk-ussr-gun-46c24583844e4e628c657d73a04cc07c
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; a spare power cell displayed beside the pistol removed; emissive map kept.
+
+Dieselpunk Signal Flare Pistol (in game: Irrlicht (original wonder weapon))
+Creator: ChickenHatMan
+Source: https://sketchfab.com/3d-models/dieselpunk-signal-flare-pistol-3282894611dc43f7a21422c76f024590
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; OBJ source.
+
+FG42 (in game: FG42)
+Creator: Shorty_Digitan
+Source: https://sketchfab.com/3d-models/fg42-d699ac259bd74f70a51125a7e4320f4b
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; magazine separated for the reload pose.
+
+M1 Carbine (in game: M1A1 Carbine)
+Creator: roelandvermeulen
+Source: https://sketchfab.com/3d-models/m1-carbine-d9edbccc56fe4b6db765ebc494dc2ceb
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures.
+
+Franchi SPAS-12 Shotgun (in game: SPAS-12)
+Creator: Faheem Yusuf (FameProductions)
+Source: https://sketchfab.com/3d-models/franchi-spas-12-shotgun-4e5281a2f4394251a8858749f31854a9
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; Collada source; four loose shells removed.
+
+Animated AKs-74u (in game: AK-74u)
+Creator: Vlasov Daniil (dan741vlasov)
+Source: https://sketchfab.com/3d-models/animated-aks-74u-34220aaa62e44b34b7d5ac30701f2b5f
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; first-person arms, a bullet and a spare magazine from the animation rig removed; gun baked to its bind pose; the source has no colour maps, so metal and wood use flat colours with its normal and AO maps.
+
+M14 RIFLE (in game: M14)
+Creator: Ecler (ecler)
+Source: https://sketchfab.com/3d-models/m14-rifle-94920332fc7a4d63939b88a8a54baead
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; OBJ source; magazine separated for the reload pose.
+
+Colt xm177e1 Game Asset (in game: Commando)
+Creator: Bazylonator
+Source: https://sketchfab.com/3d-models/colt-xm177e1-game-asset-9794e331c2c54bf5b7cfcf170ece7007
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures.
+
+Ithaca-37 (in game: Stakeout)
+Creator: Ilia_S (I.sln)
+Source: https://sketchfab.com/3d-models/ithaca-37-0b60a90d7f5a4b24ad0656c864083983
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; Collada source.
+
+FN FAL (in game: FN FAL)
+Creator: Mora (MoraAzul)
+Source: https://sketchfab.com/3d-models/fn-fal-6b98bfff040a43818cf3a8027307e338
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; a display sign removed; magazine separated for the reload pose.
+
+Mp5k (in game: MP5K)
+Creator: The Blyat man (davidthe19th)
+Source: https://sketchfab.com/3d-models/mp5k-993cc73aefb94a238bb7f99fdbe86722
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; rig baked to its bind pose.
+
+Rpk74M (in game: RPK)
+Creator: petresco
+Source: https://sketchfab.com/3d-models/rpk74m-e2a9707c19954e9882ed6448e28553d9
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; magazine separated for the reload pose.
+
+RPG 7 ( Free Model ) (in game: RPG-7)
+Creator: javadbayat
+Source: https://sketchfab.com/3d-models/rpg-7-free-model-99c0af8a1803490a86edc48cd3bfc700
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; the loose warhead lying above the launcher removed.
+
+GameReady: Colt Python Revolver (in game: Python)
+Creator: HYQQM
+Source: https://sketchfab.com/3d-models/gameready-colt-python-revolver-3def6e3980e64dfa832f298004ce1b94
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures.
+
+Vz.61 Skorpion (in game: Skorpion)
+Creator: Maxim_Van_Daele
+Source: https://sketchfab.com/3d-models/vz61-skorpion-403a48e300b944bfbee04b1dda17ff62
+Changes: converted to a self-contained GLB; geometry baked to world space, reoriented (Y up, muzzle +Z) and scaled to real length; PBR maps resized to at most 2K and re-encoded as WebP; roughness/metallic/AO packed into glTF ORM textures; magazine separated for the reload pose.
+
 Full provenance, SHA-256 hashes for the downloaded originals, and benchmark notes are in docs/assets/.
 
 Additional in-game adaptations: character height normalization, in-place animation
