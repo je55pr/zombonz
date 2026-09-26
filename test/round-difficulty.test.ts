@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLASSIC_SPAWN_CONFIG, GameSimulation, SeededRng, ZOMBIE_GAIT_SPEEDS, PLAYER_MOVEMENT,
+  CLASSIC_SPAWN_CONFIG, DEFAULT_ROUND_CONFIG, GameSimulation, SeededRng, ZOMBIE_GAIT_SPEEDS, PLAYER_MOVEMENT,
   createSpawnDirector, spawnIntervalForRound, zombieCountForRound, zombieGaitForRound,
   type ZombieGait, type ZombieState,
 } from '../src/core/index.ts';
@@ -12,6 +12,10 @@ function gaitShare(round: number, samples = 2000): Record<ZombieGait, number> {
 }
 
 describe('classic round sizes', () => {
+  it('waits ten seconds between rounds', () => {
+    expect(DEFAULT_ROUND_CONFIG.intermissionTicks).toBe(600);
+  });
+
   it('matches the WaW/BO1 solo sequence', () => {
     const solo = Array.from({ length: 13 }, (_, i) => zombieCountForRound(i + 1, CLASSIC_SPAWN_CONFIG, 1));
     expect(solo).toEqual([6, 8, 13, 18, 24, 27, 28, 28, 29, 33, 34, 36, 39]);

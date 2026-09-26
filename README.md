@@ -88,25 +88,29 @@ one zombie crosses a given window at a time. Upstairs is reached through the sta
 upper windows and the ground window behind the north-east stair remain scenery.
 Rounds follow the classic WaW/BO1 curves: solo rounds hold 6, 8, 13, 18 and 24 zombies,
 then grow faster from round 10, with more per extra co-op player and at most 24 alive at once.
-Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
+Rounds are ten seconds apart. Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
 sprint gait when it spawns: round 1 is all walkers, runners join from round 2, sprinters from
 round 5, and from round 9 everything sprints. Sprinters nearly match a walking player.
-Zombie health rises with each round. Headshots deal triple damage, knife swings
+Zombie health rises with each round. Headshots deal triple damage (quadruple with the Kar98k, which one-shots through round 3), knife swings
 hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
 and temporary damage tint. Original synthesized audio gives simple gun, melee,
 damage, box and round cues; it unlocks after user input and can be muted with M.
 Quiet synthesized wind and electrical hum fill the empty bunker after audio unlock;
 they fade out while solo play is paused. Practical lamps occasionally flicker.
-Eligible zombie kills can also drop timed Max Ammo, Double Points, Insta-Kill or Nuke pickups.
-Max Ammo refills the reserve ammo of both carried weapons for every living player
-without changing loaded magazines. Double Points doubles combat and barrier-repair
+Zombie kills can also drop Max Ammo, Double Points, Insta-Kill or Nuke pickups, using the
+classic rules. Each time the team's total earned points pass a threshold (2000 above the
+starting points, growing 14% after each drop), the next kill drops one. Any kill also has
+a 3% chance. At most four drop per round, and every kind appears once before any repeats.
+Pickups stay for 15 seconds, then blink faster and faster for about 11 more before vanishing.
+Max Ammo refills the reserve ammo of both carried weapons and all four grenades for every
+living player, without changing loaded magazines. Double Points doubles combat and barrier-repair
 rewards for 30 seconds. Kills outside a window place the pickup just inside it
 so the reward is reachable. Insta-Kill makes gunshots and knife hits lethal to
 zombies for 30 seconds, without bypassing walls or weapon range.
 A Nuke kills all currently active zombies and awards 400 points to every living player;
 it does not award a kill bonus for each zombie.
-Players start with two frag grenades and get two again at the start of each round.
+Players start with two frag grenades and gain two more each new round, carrying at most four.
 Grenades follow a fixed-tick arc, bounce off solid geometry and explode after two
 seconds. Walls block blast damage; standing too close to your own grenade hurts.
 

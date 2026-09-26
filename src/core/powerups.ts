@@ -1,5 +1,6 @@
 import type { BarrierState } from './barrier.ts';
 import type { CollisionBox } from './collision.ts';
+import { GRENADE_RULES } from './grenade.ts';
 import { SeededRng } from './rng.ts';
 import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import { WEAPON_DEFINITIONS } from './weapon.ts';
@@ -17,14 +18,25 @@ export interface PowerupDrop {
 export interface PowerupState {
   drops: PowerupDrop[];
   nextId: number;
-  lastDropTick: number;
+  dropsThisRound: number;
+  /** Team points earned (starting points included) that arm the next guaranteed drop. */
+  scoreToDrop: number;
+  dropIncrement: number;
+  dropArmed: boolean;
+  /** Shuffled deck: every kind drops once before any repeats. */
+  cycle: PowerupKind[];
+  cycleIndex: number;
+  cyclesDealt: number;
   doublePointsTicksRemaining: number;
   instaKillTicksRemaining: number;
 }
 
 export interface PowerupConfig {
-  dropChanceDenominator: number;
-  minimumTicksBetweenDrops: number;
+  /** Chance, out of 100, that any kill drops even before the points threshold is reached. */
+  randomDropPercent: number;
+  scoreDropIncrement: number;
+  scoreDropGrowth: number;
+  maxDropsPerRound: number;
   lifetimeTicks: number;
   pickupRadius: number;
   kinds: readonly PowerupKind[];
@@ -32,10 +44,14 @@ export interface PowerupConfig {
   instaKillDurationTicks: number;
 }
 
+/** WaW/BO1 drop rules: 2000-point threshold growing 14% per drop, 3% per-kill luck, four per round. */
 export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
-  dropChanceDenominator: 18,
-  minimumTicksBetweenDrops: 600,
-  lifetimeTicks: 900,
+  randomDropPercent: 3,
+  scoreDropIncrement: 2000,
+  scoreDropGrowth: 1.14,
+  maxDropsPerRound: 4,
+  // Fifteen seconds solid, then about eleven and a half seconds of blinking.
+  lifetimeTicks: 1590,
   pickupRadius: 1.25,
   kinds: ['maxAmmo', 'doublePoints', 'instaKill', 'nuke'],
   doublePointsDurationTicks: 1800,
@@ -48,9 +64,27 @@ export type PowerupEvent =
   | { type: 'nukeDetonated'; dropId: string; killed: number }
   | { type: 'powerupExpired'; dropId: string; kind: PowerupKind };
 
-export function createPowerupState(): PowerupState {
-  return { drops: [], nextId: 1, lastDropTick: -1_000_000,
+/** `teamStartingScore` is every player's starting points combined. */
+export function createPowerupState(teamStartingScore = 0,
+  config: PowerupConfig = DEFAULT_POWERUP_CONFIG): PowerupState {
+  return { drops: [], nextId: 1, dropsThisRound: 0,
+    scoreToDrop: teamStartingScore + config.scoreDropIncrement, dropIncrement: config.scoreDropIncrement,
+    dropArmed: false, cycle: [], cycleIndex: 0, cyclesDealt: 0,
     doublePointsTicksRemaining: 0, instaKillTicksRemaining: 0 };
+}
+
+export function startPowerupRound(state: PowerupState): void {
+  state.dropsThisRound = 0;
+}
+
+/** Arms a guaranteed drop each time the team's total earned points pass the moving threshold. */
+export function updatePowerupThreshold(state: PowerupState, players: readonly PlayerState[],
+  config: PowerupConfig = DEFAULT_POWERUP_CONFIG): void {
+  const earned = players.reduce((total, player) => total + player.pointsEarned, 0);
+  if (earned <= state.scoreToDrop) return;
+  state.dropIncrement *= config.scoreDropGrowth;
+  state.scoreToDrop = earned + state.dropIncrement;
+  state.dropArmed = true;
 }
 
 export function tickPowerupLifetime(state: PowerupState): PowerupEvent[] {
@@ -65,6 +99,19 @@ export function tickPowerupLifetime(state: PowerupState): PowerupEvent[] {
   return events;
 }
 
+function nextPowerupKind(state: PowerupState, config: PowerupConfig, worldSeed: number): PowerupKind {
+  if (state.cycleIndex >= state.cycle.length) {
+    const deck = [...config.kinds];
+    const rng = new SeededRng(worldSeed ^ Math.imul(state.cyclesDealt + 1, 0x27d4eb2f));
+    for (let i = deck.length - 1; i > 0; i -= 1) {
+      const j = rng.int(0, i + 1);
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    state.cycle = deck; state.cycleIndex = 0; state.cyclesDealt += 1;
+  }
+  return state.cycle[state.cycleIndex++];
+}
+
 /** A kill only creates a pickup; its gameplay effect happens on physical collection. */
 export function tryDropPowerup(
   state: PowerupState,
@@ -74,18 +121,20 @@ export function tryDropPowerup(
   tick: number,
   config: PowerupConfig = DEFAULT_POWERUP_CONFIG,
 ): PowerupEvent[] {
-  if (state.drops.length || tick - state.lastDropTick < config.minimumTicksBetweenDrops) return [];
+  if (state.dropsThisRound >= config.maxDropsPerRound || !config.kinds.length) return [];
   const zombieNumber = Number(zombie.id.slice(2));
   const rng = new SeededRng(worldSeed ^ Math.imul(zombieNumber, 0x9e3779b9) ^ tick);
-  if (rng.int(0, config.dropChanceDenominator) !== 0) return [];
-  const kind = config.kinds[rng.int(0, config.kinds.length)];
+  const lucky = rng.int(0, 100) < config.randomDropPercent;
+  if (!lucky && !state.dropArmed) return [];
+  state.dropArmed = false;
+  state.dropsThisRound += 1;
+  const kind = nextPowerupKind(state, config, worldSeed);
   // Zombies shot before entering would otherwise drop an unreachable reward outdoors.
   const entrance = zombie.entry && barriers.find(barrier => barrier.id === zombie.entry!.barrierId);
   const position = { ...(entrance ? entrance.insidePoint : zombie.position) };
   const drop: PowerupDrop = { id: `p:${state.nextId++}`, kind, position,
     ticksRemaining: config.lifetimeTicks };
   state.drops.push(drop);
-  state.lastDropTick = tick;
   return [{ type: 'powerupSpawned', dropId: drop.id, kind: drop.kind, position: { ...position } }];
 }
 
@@ -100,6 +149,7 @@ function unobstructed(player: PlayerState, drop: PowerupDrop, boxes: readonly Co
 }
 
 function refillAmmo(player: PlayerState): void {
+  player.grenadeCharges = GRENADE_RULES.maximum;
   for (const weapon of [player.weapon, player.holsteredWeapon]) {
     if (!weapon) continue;
     const definition = WEAPON_DEFINITIONS[weapon.weaponId];

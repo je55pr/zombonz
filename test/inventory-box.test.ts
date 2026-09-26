@@ -95,3 +95,32 @@ describe('mystery box lifecycle', () => {
     expect(use()).toMatchObject([{ type: 'mysteryBoxUnavailable' }]); expect(player.points).toBe(balance);
   });
 });
+
+describe('weighted mystery box odds', () => {
+  function rollMany(weights?: Record<string, number>): Record<string, number> {
+    const counts: Record<string, number> = {};
+    for (let seed = 1; seed <= 3000; seed++) {
+      const box = createMysteryBox({ id: 'b', position: { x: 0, y: 0, z: 0 }, cost: 950,
+        weapons: ['kar98k', 'thompson', 'bar'], weights }, 'e:5');
+      const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 }, 5000);
+      const events = useMysteryBox(player, { type: 'interactionTriggered', playerId: player.id,
+        interactableId: 'e:5', interactionType: 'mysteryBox', actionId: 'box:b' }, [box.state], seed * 7919);
+      const used = events.find(event => event.type === 'mysteryBoxUsed');
+      if (used?.type === 'mysteryBoxUsed') counts[used.weaponId] = (counts[used.weaponId] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  it('makes a low-weight weapon proportionally rarer', () => {
+    const counts = rollMany({ bar: 0.1 });
+    expect(counts.bar / 3000).toBeLessThan(0.08);
+    expect(counts.kar98k / 3000).toBeGreaterThan(0.4);
+  });
+
+  it('treats unlisted weapons as weight 1 and rejects invalid weights', () => {
+    const counts = rollMany();
+    for (const id of ['kar98k', 'thompson', 'bar']) expect(counts[id] / 3000).toBeGreaterThan(0.28);
+    expect(() => createMysteryBox({ id: 'b', position: { x: 0, y: 0, z: 0 }, cost: 950,
+      weapons: ['kar98k'], weights: { kar98k: 0 } }, 'e:5')).toThrow();
+  });
+});

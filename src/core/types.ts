@@ -39,6 +39,8 @@ export interface PlayerState extends EntityBase {
   repairRewardRound: number;
   repairPointsEarned: number;
   points: number;
+  /** Every point awarded this match, starting points included; spending never lowers it. */
+  pointsEarned: number;
   kills: number;
   headshots: number;
   weapon: WeaponState;

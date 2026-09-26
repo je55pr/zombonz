@@ -5,9 +5,13 @@ import { equipWeapon, ownedWeapon, WEAPON_DEFINITIONS } from './weapon.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3 } from './types.ts';
 
 export const BOX_RULES = { rollTicks: 180, claimTicks: 600, closingTicks: 120 } as const;
-export interface MysteryBoxDefinition { id: string; position: Vec3; cost: number; weapons: readonly string[] }
+export interface MysteryBoxDefinition {
+  id: string; position: Vec3; cost: number; weapons: readonly string[];
+  /** Relative odds per weapon; unlisted weapons weigh 1. Rare wonder weapons get less. */
+  weights?: Readonly<Record<string, number>>;
+}
 export interface MysteryBoxState {
-  id: string; interactableId: EntityId; cost: number; weapons: string[];
+  id: string; interactableId: EntityId; cost: number; weapons: string[]; weights: Record<string, number>;
   rolls: number; cooldownTicks: number; lastWeapon: string | null;
   phase: 'idle' | 'rolling' | 'offering' | 'closing';
   ownerId: EntityId | null;
@@ -34,8 +38,12 @@ export function createMysteryBox(definition: MysteryBoxDefinition, id: EntityId)
   if (!definition.weapons.length || definition.weapons.some(id => !WEAPON_DEFINITIONS[id])) {
     throw new Error('Mystery box requires a nonempty pool of known weapons.');
   }
+  const weights = Object.fromEntries(definition.weapons.map(id => [id, definition.weights?.[id] ?? 1]));
+  if (Object.values(weights).some(weight => !Number.isFinite(weight) || weight <= 0)) {
+    throw new Error('Mystery box weights must be positive.');
+  }
   return {
-    state: { id: definition.id, interactableId: id, cost: definition.cost, weapons: [...definition.weapons],
+    state: { id: definition.id, interactableId: id, cost: definition.cost, weapons: [...definition.weapons], weights,
       rolls: 0, cooldownTicks: 0, lastWeapon: null, phase: 'idle', ownerId: null },
     interactable: createInteractableState(id, definition.position, {
       interactionType: 'mysteryBox', actionId: `box:${definition.id}`,
@@ -59,6 +67,16 @@ export function tickMysteryBoxes(boxes: MysteryBoxState[], interactables: readon
     if (item) { item.enabled = true; item.prompt = mysteryBoxPrompt(box); }
   }
 }
+function pickWeighted(pool: readonly string[], weights: Readonly<Record<string, number>>, rng: SeededRng): string {
+  const total = pool.reduce((sum, id) => sum + weights[id], 0);
+  let roll = rng.next() * total;
+  for (const id of pool) {
+    roll -= weights[id];
+    if (roll < 0) return id;
+  }
+  return pool[pool.length - 1];
+}
+
 export function useMysteryBox(player: PlayerState, interaction: InteractionEvent,
   boxes: MysteryBoxState[], seed: number): Array<EconomyEvent | MysteryBoxEvent> {
   if (interaction.interactionType !== 'mysteryBox') return [];
@@ -75,7 +93,7 @@ export function useMysteryBox(player: PlayerState, interaction: InteractionEvent
   const spend = spendPoints(player, box.cost, `box:${box.id}`);
   if (spend.type === 'pointsSpendRejected') return [spend];
   const rng = new SeededRng(seed ^ Math.imul(box.rolls + 1, 0x9e3779b9));
-  const weaponId = pool[rng.int(0, pool.length)];
+  const weaponId = pickWeighted(pool, box.weights, rng);
   box.rolls += 1;
   box.phase = 'rolling'; box.ownerId = player.id;
   box.cooldownTicks = BOX_RULES.rollTicks;
