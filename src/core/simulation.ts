@@ -32,8 +32,9 @@ import {
 import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
 import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
+import { SeededRng } from './rng.ts';
 import {
-  createZombieState, tickZombieMelee, updateZombiePursuit, type ZombieAttackEvent,
+  createZombieState, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, type ZombieAttackEvent,
 } from './zombie.ts';
 import {
   beginReload, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon, type WeaponEvent,
@@ -324,7 +325,9 @@ export class GameSimulation {
       if (request) {
         const id = allocateEntityId(world);
         const source = availableSpawns[request.spawnIndex];
-        const zombie = createZombieState(id, request.position, this.state.round.round);
+        const round = this.state.round.round;
+        const gait = zombieGaitForRound(round, new SeededRng(world.seed ^ Math.imul(Number(id.slice(2)), 0x85ebca6b)));
+        const zombie = createZombieState(id, request.position, round, gait);
         if (source.spawn.barrierId) zombie.entry = createZombieEntry(source.spawn.barrierId, this.state.spawnDirector.spawned - 1);
         addEntity(world, zombie);
         events.push({
@@ -370,7 +373,7 @@ export class GameSimulation {
 
     for (const event of roundEvents) {
       if (event.to === 'spawning') {
-        this.state.spawnDirector = createSpawnDirector(event.round, this.spawnConfig);
+        this.state.spawnDirector = createSpawnDirector(event.round, this.spawnConfig, this.playerIds.length);
         for (const player of livingPlayers(world)) player.grenadeCharges = GRENADE_RULES.maximum;
       }
     }

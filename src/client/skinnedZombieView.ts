@@ -8,7 +8,7 @@ export function zombieAnimation(zombie: ZombieState): ZombieAnimation {
   if (!zombie.alive) return 'death';
   if (zombie.entry?.phase === 'breaking' || (!zombie.entry && zombie.attackCooldownTicks > 25)) return 'attack';
   const moving = Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0.05;
-  return moving || zombie.entry?.phase === 'vaulting' ? (zombie.moveSpeed > 1.8 ? 'run' : 'walk') : 'idle';
+  return moving || zombie.entry?.phase === 'vaulting' ? (zombie.gait === 'walk' ? 'walk' : 'run') : 'idle';
 }
 
 export class SkinnedZombieView {
@@ -45,6 +45,8 @@ export class SkinnedZombieView {
       if (name === 'walk' || name === 'run' || name === 'idle') action.time = this.phaseOffset % action.getClip().duration;
       this.current?.fadeOut(0.12); action.fadeIn(0.12); this.current = action;
     }
+    // The pack has no sprint clip; a faster run cycle keeps sprinters' feet planted.
+    if (action && name === 'run') action.timeScale = zombie.gait === 'sprint' ? 1.4 : 1;
     const dt = this.lastTick === undefined ? 0 : Math.max(0, Math.min(0.1, (tick - this.lastTick) / 60));
     this.lastTick = tick; this.mixer.update(dt);
     this.body.scale.y = this.body.scale.x * (phase === 'vaulting' ? 0.85 : 1);

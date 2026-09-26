@@ -123,6 +123,11 @@ if (preview) {
     simulation.getPlayer(playerId)!.pitch = -0.85;
   }
   if (previewName === 'stress') simulation.getPlayer(playerId)!.godMode = true;
+  // `&round=N` starts the wave at round N (after the usual intermission) to inspect later-round gaits.
+  const previewRound = Number(new URLSearchParams(location.search).get('round'));
+  if (Number.isInteger(previewRound) && previewRound > 1) {
+    Object.assign(simulation.state.round, { round: previewRound - 1, phase: 'intermission', phaseTicks: 0 });
+  }
   if (previewName === 'gameOver') {
     Object.assign(simulation.getPlayer(playerId)!, { points: 12345, kills: 42, headshots: 13 });
     Object.assign(simulation.state.round, { round: 9, phase: 'gameOver' });

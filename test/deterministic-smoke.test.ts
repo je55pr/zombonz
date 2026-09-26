@@ -68,7 +68,7 @@ describe('deterministic smoke scenario', () => {
       weapon: { magazineAmmo: 5, reserveAmmo: 32 },
     });
     expect(state.round.phase).toBe('intermission');
-    // Includes movement stance, survival timers/reward tracking and an aimed body-shot kill.
-    expect(fnv1a(JSON.stringify(state))).toBe('9b188632');
+    // Includes movement stance, survival timers/reward tracking, zombie gait, spawn cadence and an aimed body-shot kill.
+    expect(fnv1a(JSON.stringify(state))).toBe('914dd241');
   });
 });

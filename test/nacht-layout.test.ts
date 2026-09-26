@@ -62,11 +62,11 @@ describe('Nacht room routes', () => {
       expect(navigationWaypoint(NACHT_NAVIGATION, start, goal, sim.collisionBoxes(), 0.32, map.walkSurfaces)).toBe(start);
     }
   });
-  it('lets a zombie reach the HELP room through both stairs while its door stays shut', () => {
+  it.each(['walk', 'run', 'sprint'] as const)('lets a %s zombie reach the HELP room through both stairs while its door stays shut', (gait) => {
     const doors = NACHT_DOORS.map((definition, index) => createDoorState(definition, `e:${index + 10}`));
     doors.filter(door => door.id !== 'help-room').forEach(door => { door.open = true; });
     const blockers = [...map.collisionBoxes, ...closedDoorBlockers(doors)];
-    const zombie = createZombieState('e:2', NACHT_PLAYER_SPAWN, 1);
+    const zombie = createZombieState('e:2', NACHT_PLAYER_SPAWN, 1, gait);
     const player = createPlayerState('e:1', { x: -1.5, y: 0, z: 0 });
     const query = createNavigationQuery(NACHT_NAVIGATION, blockers, 0.32, map.walkSurfaces);
     for (let i = 0; i < 3600; i++) updateZombiePursuit(zombie, [player], 1 / 60, blockers, map.walkSurfaces, NACHT_NAVIGATION, query);
