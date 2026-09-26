@@ -1,5 +1,6 @@
 import type { EntityId } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
+import { weaponName } from '../core/weapon.ts';
 
 export interface FeedbackSnapshot {
   message: string | null;
@@ -41,11 +42,11 @@ export class HudFeedback {
         case 'playerDamaged': this.hurtUntil = tick + 32; say('TAKE COVER', 6); break;
         case 'weaponReloadStarted': say('RELOADING', 1); break;
         case 'weaponReloadCompleted': say('READY', 1); break;
-        case 'wallWeaponPurchased': say(`${event.weaponId.toUpperCase()} ACQUIRED`, 3); break;
+        case 'wallWeaponPurchased': say(`${weaponName(event.weaponId).toUpperCase()} ACQUIRED`, 3); break;
         case 'wallWeaponAmmoPurchased': say('AMMO REFILLED', 3); break;
         case 'wallWeaponAmmoFull': say('AMMO ALREADY FULL', 3); break;
         case 'mysteryBoxUsed': say('THE BOX IS ROLLING', 3); break;
-        case 'mysteryBoxClaimed': say(`${event.weaponId.toUpperCase()} CLAIMED`, 4); break;
+        case 'mysteryBoxClaimed': say(`${weaponName(event.weaponId).toUpperCase()} CLAIMED`, 4); break;
         case 'mysteryBoxUnavailable': say('NO NEW WEAPONS IN BOX', 3); break;
         case 'pointsSpendRejected': say('NOT ENOUGH POINTS', 4); break;
         case 'doorOpened': say('PATH OPENED', 3); break;

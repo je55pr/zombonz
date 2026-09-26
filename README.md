@@ -66,11 +66,15 @@ the browser or OS may cap presentation to the current display refresh rate.
 
 The playable solo map follows Nacht's starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
-box in the Help room costs 950. It rolls for three seconds, then reserves a Kar98k,
-Thompson, MP40 or BAR for the buyer to claim within ten seconds. A player carries
+box in the Help room costs 950. It rolls for three seconds, then reserves a random gun you
+don't already carry for the buyer to claim within ten seconds. The box holds every gun except
+the M1911: Kar98k, Springfield, M1 Garand, Thompson, MP40, BAR, MG42, double-barreled shotgun,
+Trench Gun, and (beyond WaW's Nacht roster) the PPSh-41 and Mosin-Nagant. A player carries
 two guns; the first purchase keeps the M1911, while a third gun replaces the one
-currently held. The box briefly closes before it can be used again. Wall purchases
-offer a Kar98k in the starting room and a Thompson in the Help room. Buying wall
+currently held. The box briefly closes before it can be used again. Wall chalk follows WaW's
+Nacht: a Kar98k (200) in the starting room, a Thompson and a double-barreled shotgun (1200 each)
+in the Help room, and a Trench Gun (1500) and BAR (1800) upstairs. Wall ammo costs half the gun.
+Shotguns fire eight pellets per shell, deadly up close and weak at range. Buying wall
 ammo refills an owned gun's reserves without replacing its loaded magazine; full
 reserves cannot be purchased again.
 
@@ -122,12 +126,14 @@ Identical vertices and constant animation tracks are removed in memory; all inst
 share model geometry/textures, with independent skeletons. Source GLBs stay untouched.
 Add `?zombie=pxltiger` to try the alternate rig; it has more draw calls and no death clip.
 
-The starter pistol uses the M1911 model; Kar98k purchases and BAR box rewards equip
-their matching first-person models. Recoil, muzzle flash and a basic reload pose
+Every gun except the Thompson and Trench Gun has a real first-person model: M1911, Kar98k,
+Springfield, Mosin-Nagant, M1 Garand, MP40, PPSh-41, BAR, MG42 and the double-barrel.
+Recoil, muzzle flash and a basic reload pose
 follow authoritative shot/ammo/reload state. The models share textures and load on
 demand; loading failures leave a playable placeholder and a visible notice.
-Thompson/MP40 models and animated player hands are not in the asset pack: those guns
-use labelled procedural placeholders. Full hand/bolt/round-by-round reload animation,
+The Thompson (no textured model found) and Trench Gun (its source is a Blender file not yet
+converted) use labelled procedural placeholders, and there are no animated player hands.
+Weapon stats are WaW-inspired approximations. Full hand/bolt/round-by-round reload animation,
 authentic box weapon silhouettes/roulette animation, original weapon behaviour,
 recorded sounds and online co-op remain future work.
 
@@ -145,7 +151,8 @@ round N, for example `/?preview=start&round=9` to face a round of sprinters. `np
 `/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
 That preview guarantees a Max Ammo drop when the target dies; add
 `&powerup=doublePoints`, `&powerup=instaKill` or `&powerup=nuke` to inspect the alternate pickups.
-Use `weapon=starter-pistol`, `kar98k`, `bar`, `thompson` or `mp40` on any preview URL
+Use `weapon=` with any gun id (`starter-pistol`, `kar98k`, `springfield`, `mosin`, `m1-garand`,
+`thompson`, `mp40`, `ppsh41`, `bar`, `mg42`, `double-barrel`, `trench-gun`) on any preview URL
 to inspect that viewmodel. P fires in development previews only (useful in browsers
 without pointer lock); R reloads. Production and normal survival use mouse firing.
 See [map notes](docs/nacht-map.md) for layout and validation details.

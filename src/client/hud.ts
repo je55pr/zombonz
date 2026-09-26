@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { EntityId } from '../core/types.ts';
 import type { GameSimulation } from '../core/simulation.ts';
+import { weaponName } from '../core/weapon.ts';
 import type { FeedbackSnapshot } from './feedback.ts';
 
 export interface HudSnapshot {
@@ -69,9 +70,7 @@ export function buildHudSnapshot(
   };
 }
 function weaponLabel(id: string): string {
-  if (id === 'kar98k') return 'KAR98K';
-  if (id === 'starter-pistol') return 'M1911';
-  return id.replace(/[-_]/g, ' ').toUpperCase();
+  return weaponName(id).toUpperCase();
 }
 
 export class CanvasHud {
@@ -203,8 +202,11 @@ export class CanvasHud {
     }
     if (this.credits) {
       this.context.fillStyle = 'rgba(0,0,0,0.9)'; this.context.fillRect(180, 115, 1240, 540);
-      const lines = ['THIRD-PARTY ASSET CREDITS', 'Zombie Soldier — Peter_D (@better_peter)',
-        'Zombie — pxltiger', 'M1911 — Quinn Kuslich', 'Kar98k — ARIA', 'BAR M1918 A2 — Peanut_Butcher',
+      const lines = ['THIRD-PARTY ASSET CREDITS', 'Zombie Soldier — Peter_D (@better_peter) · Zombie — pxltiger',
+        'M1911 — Quinn Kuslich · Kar98k — ARIA · BAR M1918 A2 — Peanut_Butcher',
+        'MP40 — Moony_State · PPSh-41 — Zillious · M1 Garand — YieldingMist206',
+        'MG42 — AxelK · Mosin-Nagant M91 — Doink · M1903 A3 — Gintoki1234',
+        'Double-barrel shotgun — Sebastian Kansik (Pepego)',
         'Characters / weapons: CC BY 4.0 · converted and adapted',
         'Environment / props: Poly Haven, ambientCG, OpenGameArt · CC0',
         'Source links and licence: /assets/ATTRIBUTION.txt', 'F2 TO CLOSE'];

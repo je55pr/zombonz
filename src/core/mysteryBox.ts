@@ -1,7 +1,7 @@
 import { spendPoints, type EconomyEvent } from './economy.ts';
 import { createInteractableState, type InteractionEvent } from './interaction.ts';
 import { SeededRng } from './rng.ts';
-import { equipWeapon, ownedWeapon, WEAPON_DEFINITIONS } from './weapon.ts';
+import { equipWeapon, ownedWeapon, weaponName, WEAPON_DEFINITIONS } from './weapon.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3 } from './types.ts';
 
 export const BOX_RULES = { rollTicks: 180, claimTicks: 600, closingTicks: 120 } as const;
@@ -20,9 +20,6 @@ export type MysteryBoxEvent =
   | { type: 'mysteryBoxUsed' | 'mysteryBoxClaimed'; playerId: EntityId; boxId: string; weaponId: string }
   | { type: 'mysteryBoxUnavailable'; playerId: EntityId; boxId: string };
 
-export function weaponName(id: string): string {
-  return id === 'starter-pistol' ? 'M1911' : id.toUpperCase();
-}
 
 export function mysteryBoxPrompt(box: MysteryBoxState, playerId?: EntityId): string {
   if (box.phase === 'rolling') return 'Mystery Box — rolling…';

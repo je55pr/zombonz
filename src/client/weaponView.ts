@@ -2,11 +2,17 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { batchStaticMeshes } from './staticBatch.ts';
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
-import { WEAPON_DEFINITIONS } from '../core/weapon.ts';
+import { WEAPON_DEFINITIONS, weaponName } from '../core/weapon.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
 export interface PreparedWeapon { root: THREE.Group; magazine: THREE.Group; muzzle: THREE.Vector3 }
+
+// Viewmodel lengths in metres, roughly 0.86x each gun's real length.
+export const VIEWMODEL_LENGTHS: Readonly<Record<string, number>> = {
+  m1911: 0.36, kar98k: 0.95, bar: 1.05, mp40: 0.72, ppsh41: 0.73, mg42: 1.05, 'm1-garand': 0.95,
+  springfield: 0.95, mosin: 1.1, 'double-barrel': 0.98,
+};
 
 // Bake the exported rest pose to ordinary meshes, keeping the magazine separate.
 // BAR's 58 source parts then batch to two draws, without a needless gun skeleton.
@@ -40,7 +46,7 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
     (isMagazine ? magazine : body).add(mesh);
   });
   const bounds = new THREE.Box3().setFromObject(root), size = bounds.getSize(new THREE.Vector3());
-  const length = id === 'm1911' ? 0.36 : id === 'kar98k' ? 0.95 : 1.05;
+  const length = VIEWMODEL_LENGTHS[id] ?? 1.05;
   const scale = length / size.z;
   const offset = new THREE.Vector3(-(bounds.min.x + bounds.max.x) / 2, -bounds.max.y, -bounds.max.z);
   for (const group of [body, magazine]) {
@@ -103,7 +109,7 @@ export class WeaponView {
     if (!fallback) { fallback = placeholderWeapon(id); this.fallbacks.set(id, fallback); }
     this.current = fallback; this.pose.add(fallback.root);
     const asset = WEAPON_ASSETS[id];
-    if (!asset) { this.notice = `${id.toUpperCase()}: placeholder model`; return; }
+    if (!asset) { this.notice = `${weaponName(id).toUpperCase()}: placeholder model`; return; }
     this.notice = `Loading ${asset.toUpperCase()} model…`;
     let pending = this.prepared.get(asset);
     if (!pending) { pending = loadModel(`weapons/${asset}/model.glb`).then(gltf => prepareWeapon(gltf.scene, asset)); this.prepared.set(asset, pending); }

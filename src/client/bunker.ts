@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
 import { environmentMaterial, projectWorldUvs } from './environmentMaterials.ts';
-import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_BOX_CENTER, NACHT_RAILS, NACHT_WINDOW_BOARDS,
+import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_WALL_WEAPON_FACING, NACHT_BOX_CENTER, NACHT_RAILS,
+  NACHT_WINDOW_BOARDS,
   UPPER_HEIGHT } from '../maps/nacht.ts';
 import type { SimulationState } from '../core/simulation.ts';
+import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
 
 // Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
@@ -100,15 +102,15 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   label('FROM DARKNESS', 5.6, 2, -2.385, 0, 2.5, 0.38);
   for (const weapon of NACHT_WALL_WEAPONS) {
     const sign = new THREE.Group();
-    sign.position.set(weapon.position.x, 1.4, weapon.position.z);
-    sign.rotation.y = weapon.position.x < 0 ? Math.PI / 2 : Math.PI;
+    sign.position.set(weapon.position.x, weapon.position.y + 0.4, weapon.position.z);
+    sign.rotation.y = NACHT_WALL_WEAPON_FACING[weapon.id] ?? 0;
     group.add(sign);
     // Chalk outline with a simple wall-mounted rifle silhouette.
     const chalk = new THREE.MeshBasicMaterial({ color: 0xc9c7a7 });
     box(sign, chalk, 0, 0, 0, 1.75, 0.17, 0.015);
     box(sign, wood, -0.5, -0.015, 0.025, 0.55, 0.18, 0.055);
     box(sign, iron, 0.25, 0.025, 0.025, 1.15, 0.065, 0.055);
-    const name = writing(weapon.weaponId.toUpperCase(), 1.65, 0.24);
+    const name = writing(weaponName(weapon.weaponId).toUpperCase(), 1.65, 0.24);
     name.position.set(0, -0.38, 0.03); sign.add(name);
   }
   // One fixed, iron-bound random box. Its authoritative state drives the lid.
@@ -180,7 +182,8 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     const active = !!currentBox && currentBox.phase !== 'idle';
     lid.rotation.z = active ? 1.05 : 0;
     glow.intensity = currentBox?.phase === 'offering' ? 14 : active ? 8 : 3;
-    const nextText = currentBox?.phase === 'offering' ? currentBox.lastWeapon?.toUpperCase() ?? 'WEAPON'
+    const nextText = currentBox?.phase === 'offering' && currentBox.lastWeapon
+      ? weaponName(currentBox.lastWeapon).toUpperCase()
       : currentBox?.phase === 'rolling' ? '?  ?  ?' : 'MYSTERY BOX';
     if (rewardText !== nextText) {
       const oldMaterial = rewardLabel.material as THREE.MeshBasicMaterial;

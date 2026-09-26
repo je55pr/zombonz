@@ -4,6 +4,8 @@ import { SeededRng } from './rng.ts';
 
 export interface WeaponDefinition {
   id: string;
+  /** Name shown on the HUD, wall chalk and box. */
+  name: string;
   damage: number;
   range: number;
   fireIntervalTicks: number;
@@ -12,6 +14,10 @@ export interface WeaponDefinition {
   startingReserveAmmo: number;
   reloadTicks: number;
   hipSpreadRadians: number;
+  /** Aiming scales hip spread by this (default 0.1); shotguns tighten far less. */
+  aimSpreadMultiplier?: number;
+  /** Rays per shot; shotgun pellets each deal `damage`, totalled per zombie. */
+  pellets?: number;
   /** Damage multipliers per hit zone; missing zones use DEFAULT_HIT_ZONE_MULTIPLIERS. */
   hitZoneMultipliers?: Partial<Record<HitZoneId, number>>;
 }
@@ -33,30 +39,67 @@ export function hitZoneMultiplier(definition: WeaponDefinition, zone: HitZoneId)
   return definition.hitZoneMultipliers?.[zone] ?? DEFAULT_HIT_ZONE_MULTIPLIERS[zone];
 }
 
+// Stats are WaW-inspired approximations tuned to this game's 60 Hz ticks, not datamined values.
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   'starter-pistol': {
-    id: 'starter-pistol', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
+    id: 'starter-pistol', name: 'M1911', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
     magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90, hipSpreadRadians: 0.008,
   },
   kar98k: {
-    id: 'kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
+    id: 'kar98k', name: 'Kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
     magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120, hipSpreadRadians: 0.015,
     // WaW: one headshot kills through round 3 (350 health) but not round 4 (450).
     hitZoneMultipliers: { head: 4 },
   },
+  springfield: {
+    id: 'springfield', name: 'Springfield', damage: 100, range: 80, fireIntervalTicks: 50, trigger: 'semi',
+    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 135, hipSpreadRadians: 0.015,
+    hitZoneMultipliers: { head: 4 },
+  },
+  mosin: {
+    id: 'mosin', name: 'Mosin-Nagant', damage: 110, range: 80, fireIntervalTicks: 55, trigger: 'semi',
+    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 140, hipSpreadRadians: 0.015,
+    hitZoneMultipliers: { head: 4 },
+  },
+  'm1-garand': {
+    id: 'm1-garand', name: 'M1 Garand', damage: 105, range: 80, fireIntervalTicks: 9, trigger: 'semi',
+    magazineSize: 8, startingReserveAmmo: 128, reloadTicks: 150, hipSpreadRadians: 0.014,
+  },
   thompson: {
-    id: 'thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
+    id: 'thompson', name: 'Thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
     magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120, hipSpreadRadians: 0.03,
   },
   mp40: {
-    id: 'mp40', damage: 75, range: 65, fireIntervalTicks: 8, trigger: 'auto',
+    id: 'mp40', name: 'MP40', damage: 75, range: 65, fireIntervalTicks: 8, trigger: 'auto',
     magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138, hipSpreadRadians: 0.027,
   },
+  ppsh41: {
+    id: 'ppsh41', name: 'PPSh-41', damage: 70, range: 60, fireIntervalTicks: 4, trigger: 'auto',
+    magazineSize: 71, startingReserveAmmo: 284, reloadTicks: 210, hipSpreadRadians: 0.035,
+  },
   bar: {
-    id: 'bar', damage: 125, range: 80, fireIntervalTicks: 10, trigger: 'auto',
+    id: 'bar', name: 'BAR', damage: 125, range: 80, fireIntervalTicks: 10, trigger: 'auto',
     magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150, hipSpreadRadians: 0.035,
   },
+  mg42: {
+    id: 'mg42', name: 'MG42', damage: 120, range: 90, fireIntervalTicks: 3, trigger: 'auto',
+    magazineSize: 125, startingReserveAmmo: 500, reloadTicks: 360, hipSpreadRadians: 0.045,
+  },
+  'double-barrel': {
+    id: 'double-barrel', name: 'Double-Barreled Shotgun', damage: 80, range: 22, fireIntervalTicks: 14,
+    trigger: 'semi', magazineSize: 2, startingReserveAmmo: 60, reloadTicks: 165, hipSpreadRadians: 0.06,
+    aimSpreadMultiplier: 0.6, pellets: 8, hitZoneMultipliers: { head: 1.5 },
+  },
+  'trench-gun': {
+    id: 'trench-gun', name: 'M1897 Trench Gun', damage: 75, range: 22, fireIntervalTicks: 48,
+    trigger: 'semi', magazineSize: 6, startingReserveAmmo: 60, reloadTicks: 240, hipSpreadRadians: 0.055,
+    aimSpreadMultiplier: 0.6, pellets: 8, hitZoneMultipliers: { head: 1.5 },
+  },
 };
+
+export function weaponName(id: string): string {
+  return WEAPON_DEFINITIONS[id]?.name ?? id.toUpperCase();
+}
 
 export function createWeaponState(weaponId: string): WeaponState {
   const definition = WEAPON_DEFINITIONS[weaponId];
@@ -280,24 +323,34 @@ export function firePlayerWeapon(
   const events: WeaponEvent[] = [{ type: 'weaponFired', playerId: player.id, weaponId: definition.id }];
   if (player.weapon.magazineAmmo === 0) events.push(...beginReload(player));
   const seed = spreadSeed ^ Math.imul(Number(player.id.slice(2)), 0x9e3779b9);
-  const shotRay = spreadHitscanRay(ray, definition.hipSpreadRadians * (player.aiming ? 0.1 : 1), seed);
-  const hit = resolveHitscan(shotRay, zombies, worldBoxes, definition.range);
-  if (hit.kind !== 'zombie') return events;
-
-  const zombie = zombies.find((candidate) => candidate.id === hit.zombieId && candidate.alive);
-  if (!zombie) return events;
-  const applied = Math.min(zombie.health, instaKill ? zombie.health
-    : definition.damage * hitZoneMultiplier(definition, hit.hitZone));
-  zombie.health -= applied;
-  events.push({
-    type: 'weaponHit', playerId: player.id, weaponId: definition.id,
-    zombieId: zombie.id, damage: applied, distance: hit.distance, hitZone: hit.hitZone,
-  });
-  events.push({ type: 'zombieDamaged', zombieId: zombie.id, playerId: player.id, damage: applied, health: zombie.health });
-  if (zombie.health === 0) {
-    zombie.alive = false;
-    zombie.velocity = { x: 0, y: 0, z: 0 };
-    events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: hit.hitZone });
+  const spread = definition.hipSpreadRadians * (player.aiming ? definition.aimSpreadMultiplier ?? 0.1 : 1);
+  // Pellets resolve against the pre-shot state, then each zombie takes one combined hit.
+  const hits = new Map<EntityId, { damage: number; distance: number; hitZone: HitZoneId }>();
+  for (let pellet = 0; pellet < (definition.pellets ?? 1); pellet += 1) {
+    const pelletSeed = pellet === 0 ? seed : seed ^ Math.imul(pellet, 0x85ebca6b);
+    const hit = resolveHitscan(spreadHitscanRay(ray, spread, pelletSeed), zombies, worldBoxes, definition.range);
+    if (hit.kind !== 'zombie') continue;
+    const total = hits.get(hit.zombieId) ?? { damage: 0, distance: hit.distance, hitZone: hit.hitZone };
+    total.damage += definition.damage * hitZoneMultiplier(definition, hit.hitZone);
+    total.distance = Math.min(total.distance, hit.distance);
+    if (hit.hitZone === 'head') total.hitZone = 'head';
+    hits.set(hit.zombieId, total);
+  }
+  for (const [zombieId, hit] of hits) {
+    const zombie = zombies.find((candidate) => candidate.id === zombieId && candidate.alive);
+    if (!zombie) continue;
+    const applied = Math.min(zombie.health, instaKill ? zombie.health : hit.damage);
+    zombie.health -= applied;
+    events.push({
+      type: 'weaponHit', playerId: player.id, weaponId: definition.id,
+      zombieId: zombie.id, damage: applied, distance: hit.distance, hitZone: hit.hitZone,
+    });
+    events.push({ type: 'zombieDamaged', zombieId: zombie.id, playerId: player.id, damage: applied, health: zombie.health });
+    if (zombie.health === 0) {
+      zombie.alive = false;
+      zombie.velocity = { x: 0, y: 0, z: 0 };
+      events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: hit.hitZone });
+    }
   }
   return events;
 }
