@@ -63,6 +63,32 @@ describe('runtime GLB integration', () => {
     expect(poseSize.z).toBeLessThan(1.2);
   });
 
+  it.each(['peter_d', 'pxltiger'])('keeps %s running mesh aligned with the fixed-height hitbox', async id => {
+    const [model, run] = await Promise.all([readAssetGeometry(`public/assets/zombies/${id}/model.glb`),
+      readAssetGeometry(`public/assets/zombies/${id}/run.glb`)]);
+    const clip = inPlaceClip(run.animations[0], model.scene);
+    if (id === 'peter_d') {
+      expect(clip.tracks.some(track => track.name === 'Root.scale' || track.name === 'Root.quaternion')).toBe(false);
+    }
+    const instance = cloneZombieModel({ model: model.scene, clips: { run: clip } });
+    const mixer = new THREE.AnimationMixer(instance.model);
+    mixer.clipAction(clip).play();
+    for (const time of [0, 0.2, 0.4, 0.6]) {
+      mixer.setTime(time);
+      instance.body.updateMatrixWorld(true);
+      const bounds = new THREE.Box3();
+      instance.model.traverse(object => {
+        if (object instanceof THREE.SkinnedMesh) {
+          object.computeBoundingBox();
+          bounds.union(object.boundingBox!.clone().applyMatrix4(object.matrixWorld));
+        }
+      });
+      expect(bounds.min.y).toBeGreaterThan(-0.12);
+      expect(bounds.max.y).toBeGreaterThan(1.4);
+      expect(bounds.max.y).toBeLessThan(1.9);
+    }
+  });
+
   it('selects attack/walk/death from simulation state and expires corpses', () => {
     const zombie = createZombieState('e:2', { x: 1, y: 0, z: 1 }, 1);
     expect(zombieAnimation(zombie)).toBe('idle');
