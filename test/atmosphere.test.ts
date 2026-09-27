@@ -15,28 +15,28 @@ describe('presentation atmosphere', () => {
     expect(samples).toEqual(Array.from({ length: 1000 }, (_, tick) => lampFlicker(tick, 47)));
   });
 
-  it('starts one quiet ambient loop and mutes it during pause or M mute', () => {
+  it('starts recorded ambience without oscillators and mutes it during pause or M mute', async () => {
     const target = new EventTarget(), surface = new EventTarget();
     const gains: { gain: { value: number; setTargetAtTime: ReturnType<typeof vi.fn> } }[] = [];
-    const ambientStart = vi.fn(), humStart = vi.fn();
+    const ambientStart = vi.fn(), oscillator = vi.fn();
     class FakeAudioContext {
-      sampleRate = 1000; currentTime = 0; state = 'running'; destination = {};
+      currentTime = 0; state = 'running'; destination = {};
       createGain() {
         const node = { gain: { value: 0, setTargetAtTime: vi.fn() }, connect: vi.fn() };
         gains.push(node); return node;
       }
-      createBuffer(_channels: number, length: number) { return { getChannelData: () => new Float32Array(length) }; }
+      decodeAudioData() { return Promise.resolve({}); }
       createBufferSource() { return { buffer: null, loop: false, connect: vi.fn(), start: ambientStart, stop: vi.fn() }; }
-      createBiquadFilter() { return { type: 'lowpass', frequency: { value: 0 }, connect: vi.fn() }; }
-      createOscillator() { return { type: 'sine', frequency: { value: 0 }, connect: vi.fn(), start: humStart, stop: vi.fn() }; }
+      createOscillator() { oscillator(); throw new Error('Procedural audio must not run'); }
       close() { return Promise.resolve(); }
     }
     vi.stubGlobal('window', target);
     vi.stubGlobal('AudioContext', FakeAudioContext);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) }));
     const audio = new GameAudio(surface as HTMLElement);
     surface.dispatchEvent(new Event('pointerdown'));
-    expect(ambientStart).toHaveBeenCalledTimes(1);
-    expect(humStart).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(ambientStart).toHaveBeenCalledTimes(2));
+    expect(oscillator).not.toHaveBeenCalled();
     audio.setPaused(true);
     expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0, 0, 0.03);
     audio.setPaused(false);
