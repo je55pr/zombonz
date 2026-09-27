@@ -1,3 +1,4 @@
+import type { PerkId } from './perks.ts';
 import type { ZombieEntryState } from './barrier.ts';
 
 export type EntityId = `e:${number}`;
@@ -48,6 +49,8 @@ export interface PlayerState extends EntityBase {
   weapon: WeaponState;
   holsteredWeapon: WeaponState | null;
   switchTicksRemaining: number;
+  /** Perk-a-colas drunk, in the order bought. */
+  perks: PerkId[];
   godMode: boolean;
   noclip: boolean;
   noclipAnchor: Vec3 | null;

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { batchStaticMeshes } from './staticBatch.ts';
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
-import { WEAPON_DEFINITIONS, weaponName } from '../core/weapon.ts';
+import { WEAPON_DEFINITIONS, reloadTicksFor, weaponName } from '../core/weapon.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
@@ -233,7 +233,7 @@ export class WeaponView {
     const sinceShot = Math.max(0, (tick - this.firedTick) / 60);
     const kick = Math.exp(-sinceShot * 24);
     const definition = WEAPON_DEFINITIONS[this.id];
-    const progress = player.weapon.reloadTicksRemaining > 0 ? 1 - player.weapon.reloadTicksRemaining / definition.reloadTicks : 0;
+    const progress = player.weapon.reloadTicksRemaining > 0 ? 1 - player.weapon.reloadTicksRemaining / reloadTicksFor(player, definition) : 0;
     const reload = Math.sin(progress * Math.PI);
     const blend = 1 - Math.exp(-13 * Math.min(0.1, Math.max(0, deltaSeconds)));
     this.aimBlend += ((player.aiming ? 1 : 0) - this.aimBlend) * blend;

@@ -77,7 +77,7 @@ describe('Asylum follows Verrückt', () => {
       expect(floorAt(inside.x, inside.z, UP), id).toBe(UP);
     }
     expect(Object.fromEntries(map.doors.map(d => [d.id, d.cost]))).toEqual({
-      'start-gate': 1500, 'german-stairs': 1000, 'left-upstairs': 750, 'power-west': 1000,
+      'start-gate': 0, 'german-stairs': 1000, 'left-upstairs': 750, 'power-west': 1000,
       'american-hallway': 750, 'bar-room': 750, 'american-stairs': 1000, 'right-upstairs': 750, kitchen: 1000, 'power-east': 750,
     });
     expect(Object.fromEntries(map.wallWeapons.map(w => [w.id, `${w.weaponId}:${w.weaponCost}`]))).toMatchObject({
@@ -122,7 +122,7 @@ describe('Asylum follows Verrückt', () => {
 });
 
 describe('Asylum routes', () => {
-  it.each(map.doors.flatMap(d => {
+  it.each(map.doors.filter(d => !d.requiresPower).flatMap(d => {
     if (d.id.endsWith('-stairs')) {
       // Stair debris is cleared from the foot of its stair.
       const route = d.id === 'german-stairs' ? ASYLUM_STAIR_ROUTES.german : ASYLUM_STAIR_ROUTES.american;

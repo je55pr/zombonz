@@ -3,6 +3,9 @@ import type { NavigationGraph } from '../core/navigation.ts';
 import type { DoorDefinition } from '../core/door.ts';
 import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
 import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
+import type { PowerSwitchDefinition } from '../core/door.ts';
+import type { PerkMachineDefinition } from '../core/perks.ts';
+import type { TrapDefinition } from '../core/traps.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
 import type { Vec3 } from '../core/types.ts';
@@ -67,6 +70,13 @@ export interface GameMap {
   /** The yaw each chalk outline faces, away from its wall. */
   wallWeaponFacing: Readonly<Record<string, number>>;
   mysteryBoxes: readonly MysteryBoxDefinition[];
+  /** A map with a switch starts with the power off; its electric doors, perks and traps wait for it. */
+  powerSwitch?: PowerSwitchDefinition;
+  perkMachines?: readonly PerkMachineDefinition[];
+  /** The yaw each perk machine's front faces (0 faces +z). Its buy point stands in front of it. */
+  perkMachineFacing?: Readonly<Record<string, number>>;
+  traps?: readonly TrapDefinition[];
+  /** Where the box starts. A box with `locations` moves between them; the renderer follows its state. */
   boxCenter: Vec3;
   /** The box's front (where buyers stand) faces (cos yaw, -sin yaw) in x/z. */
   boxYaw: number;

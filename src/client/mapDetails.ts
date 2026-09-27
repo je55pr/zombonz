@@ -7,6 +7,7 @@ import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
 import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
 import { BOX_RULES } from '../core/mysteryBox.ts';
+import { PERKS, type PerkId } from '../core/perks.ts';
 
 // Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
 const PLANK_TILT = [0.07, -0.16, 0.12, -0.08, 0.17, -0.05] as const;
@@ -155,10 +156,24 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     const name = writing(weaponName(weapon.weaponId).toUpperCase(), 1.65, 0.24);
     name.position.set(0, -0.38, 0.03); sign.add(name);
   }
-  // One fixed, iron-bound random box. Its authoritative state drives the lid.
-  // The chest stands on its floor: boxCenter is the middle of its 1.04 m-tall collision box.
+  // The iron-bound random box. Its authoritative state drives the lid, where it stands and the bear.
+  // The chest stands on its floor: a box centre is the middle of its 1.04 m-tall collision box.
   const chest = new THREE.Group(); chest.position.set(map.boxCenter.x, map.boxCenter.y - 0.52, map.boxCenter.z);
   chest.rotation.y = map.boxYaw; group.add(chest);
+  const moves = (map.mysteryBoxes[0]?.locations?.length ?? 0) > 1;
+  // A fixed box's body is part of the greybox; one that moves carries its own.
+  if (moves) { chest.userData.dynamic = true; box(chest, wood, 0, 0.52, 0, 0.95, 1.04, 2.35); }
+  // A box that moves marks where it is with WaW's pale beam of light.
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.8, 30, 12, 1, true), new THREE.MeshBasicMaterial({
+    color: 0xcfe0ff, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  beam.position.set(0, 15.5, 0); beam.visible = moves; chest.add(beam);
+  // The teddy bear that comes up instead of a gun, before the box leaves.
+  const fur = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 });
+  const teddy = new THREE.Group(); teddy.visible = false; chest.add(teddy);
+  for (const [x, y, z, r] of [[0, 0, 0, 0.2], [0, 0.3, 0, 0.14], [0, 0.42, 0.1, 0.05], [0, 0.42, -0.1, 0.05],
+    [0.05, -0.12, 0.2, 0.07], [0.05, -0.12, -0.2, 0.07], [0.1, 0.05, 0.2, 0.06], [0.1, 0.05, -0.2, 0.06]]) {
+    const ball = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 8), fur); ball.position.set(x, y, z); teddy.add(ball);
+  }
   for (const z of [-0.8, 0.8]) box(chest, iron, 0, 0.55, z, 1.01, 1.12, 0.12);
   const lid = new THREE.Group(); lid.position.set(-0.49, 1.06, 0); chest.add(lid);
   lid.userData.dynamic = true;
@@ -195,6 +210,58 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     shownGun = model;
     boxGun.position.set(0, height, 0);
   };
+  // The power switch: a lever on its panel and a lamp that turns from red to green.
+  const lever = new THREE.Group(); lever.userData.dynamic = true;
+  const powerLamp = new THREE.MeshBasicMaterial({ color: 0xc02010 });
+  if (map.powerSwitch) {
+    const { x, y, z } = map.powerSwitch.position;
+    lever.position.set(x + 0.18, y, z); group.add(lever);
+    box(lever, iron, 0, 0.18, 0, 0.07, 0.36, 0.07);
+    box(lever, wood, 0, 0.38, 0, 0.1, 0.1, 0.1);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), powerLamp);
+    lamp.position.set(x - 0.2, y + 0.35, z); group.add(lamp);
+  }
+  // Perk-a-cola machines: a coloured front and name on the machine's metal body, lit once powered.
+  const PERK_COLOURS: Record<PerkId, number> = { juggernog: 0xa01818, 'double-tap': 0xb86e14, 'speed-cola': 0x1f9038, 'quick-revive': 0x2860c0 };
+  const perkLights: { material: THREE.MeshStandardMaterial; light: THREE.PointLight }[] = [];
+  for (const machine of map.perkMachines ?? []) {
+    const facing = map.perkMachineFacing?.[machine.id] ?? 0;
+    const view = new THREE.Group(); group.add(view);
+    view.position.set(machine.position.x - Math.sin(facing), machine.position.y - 1, machine.position.z - Math.cos(facing));
+    view.rotation.y = facing;
+    const material = new THREE.MeshStandardMaterial({ color: PERK_COLOURS[machine.perk], emissive: PERK_COLOURS[machine.perk],
+      emissiveIntensity: 0, roughness: 0.6 });
+    box(view, material, 0, 1.15, 0.46, 1.05, 1.6, 0.04);
+    box(view, material, 0, 2.2, 0.1, 1.2, 0.22, 0.95);
+    const name = writing(PERKS[machine.perk].name.toUpperCase(), 1, 0.25, '#fff4dc');
+    name.position.set(0, 1.55, 0.49); view.add(name);
+    const light = new THREE.PointLight(PERK_COLOURS[machine.perk], 0, 5, 2); light.position.set(0, 1.4, 1); view.add(light);
+    view.userData.dynamic = true;
+    perkLights.push({ material, light });
+  }
+  // Electric traps: iron pylons at either end of the live strip, a grate between, and a switch box.
+  const trapViews = new Map<string, { arcs: THREE.LineSegments; light: THREE.PointLight; lamp: THREE.MeshBasicMaterial;
+    from: THREE.Vector3; to: THREE.Vector3 }>();
+  for (const trap of map.traps ?? []) {
+    const { min, max } = trap.zone;
+    const floor = min.y + 0.5, alongX = max.x - min.x >= max.z - min.z;
+    const mid = { x: (min.x + max.x) / 2, z: (min.z + max.z) / 2 };
+    const from = alongX ? new THREE.Vector3(min.x + 0.15, floor, mid.z) : new THREE.Vector3(mid.x, floor, min.z + 0.15);
+    const to = alongX ? new THREE.Vector3(max.x - 0.15, floor, mid.z) : new THREE.Vector3(mid.x, floor, max.z - 0.15);
+    for (const end of [from, to]) {
+      box(group, iron, end.x, floor + 1.1, end.z, 0.14, 2.2, 0.14);
+      for (const h of [0.5, 1.1, 1.7]) box(group, iron, end.x, floor + h, end.z, 0.26, 0.1, 0.26);
+    }
+    box(group, iron, mid.x, floor + 0.01, mid.z, alongX ? max.x - min.x - 0.3 : 0.5, 0.02, alongX ? 0.5 : max.z - min.z - 0.3);
+    const arcs = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xbfe4ff }));
+    arcs.visible = false; arcs.userData.dynamic = true; group.add(arcs);
+    const light = new THREE.PointLight(0x8fc8ff, 0, 9, 2); light.position.set(mid.x, floor + 1.4, mid.z); group.add(light);
+    box(group, iron, trap.switchPosition.x, trap.switchPosition.y, trap.switchPosition.z, 0.24, 0.4, 0.24);
+    const lamp = new THREE.MeshBasicMaterial({ color: 0x401010 });
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), lamp);
+    bulb.position.set(trap.switchPosition.x, trap.switchPosition.y + 0.28, trap.switchPosition.z); group.add(bulb);
+    trapViews.set(trap.id, { arcs, light, lamp, from, to });
+  }
   // Warm practical lights against cold exterior moonlight.
   const practicalLights: THREE.PointLight[] = [];
   for (const { x, y, z } of map.lights) {
@@ -228,8 +295,42 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
   const moon = new THREE.Mesh(new THREE.SphereGeometry(1.4, 20, 12), new THREE.MeshBasicMaterial({ color: 0xc9dad5, fog: false }));
   moon.position.set(-22, 30, -42); group.add(moon);
   return { ready: Promise.allSettled(wallGuns), update(state) {
+    // On a map with a switch, the lamps burn low until the power comes on.
+    const lampLevel = map.powerSwitch && !state.power.on ? 0.4 : 1;
     for (let i = 0; i < practicalLights.length; i++) {
-      practicalLights[i].intensity = 11 * lampFlicker(state.world.tick, i * 137 + 47);
+      practicalLights[i].intensity = 11 * lampLevel * lampFlicker(state.world.tick, i * 137 + 47);
+    }
+    lever.rotation.z = state.power.on ? -2.3 : 0;
+    powerLamp.color.setHex(state.power.on ? 0x30e060 : 0xc02010);
+    for (const { material, light } of perkLights) {
+      material.emissiveIntensity = state.power.on ? 0.55 : 0;
+      light.intensity = state.power.on ? 3 : 0;
+    }
+    for (const trap of state.traps) {
+      const view = trapViews.get(trap.id);
+      if (!view) continue;
+      const live = trap.activeTicks > 0;
+      view.lamp.color.setHex(!state.power.on ? 0x401010 : live ? 0xffd040 : trap.cooldownTicks > 0 ? 0xc02010 : 0x30e060);
+      view.arcs.visible = live;
+      view.light.intensity = live ? 6 + 5 * Math.sin(state.world.tick * 1.7) ** 2 : 0;
+      // Fresh jagged arcs every few ticks, at three heights between the pylons.
+      if (live && state.world.tick % 3 === 0) {
+        const points: number[] = [];
+        let jitter = state.world.tick * 2654435761 >>> 0;
+        const next = () => { jitter = (Math.imul(jitter, 1664525) + 1013904223) >>> 0; return jitter / 4294967296 - 0.5; };
+        for (const height of [0.5, 1.1, 1.7]) {
+          let last = view.from.clone().setY(view.from.y + height);
+          for (let step = 1; step <= 10; step++) {
+            const point = view.from.clone().lerp(view.to, step / 10);
+            point.y += height + (step < 10 ? next() * 0.4 : 0);
+            if (step < 10) { point.x += next() * 0.3; point.z += next() * 0.3; }
+            points.push(last.x, last.y, last.z, point.x, point.y, point.z);
+            last = point;
+          }
+        }
+        view.arcs.geometry.dispose();
+        view.arcs.geometry = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
+      }
     }
     for (const barrier of state.barriers) {
       const planks = barrierViews.get(barrier.id);
@@ -248,6 +349,16 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     }
     for (const door of state.doors) { const view = doorViews.get(door.id); if (view) view.visible = !door.open; }
     const currentBox = state.mysteryBoxes[0];
+    const spot = currentBox?.locations[currentBox.locationIndex];
+    // The bear rises out of the open box, then the box lifts away and is gone until it lands elsewhere.
+    const leaving = currentBox?.phase === 'teddy' ? 1 - currentBox.cooldownTicks / BOX_RULES.teddyTicks : 0;
+    if (spot) {
+      chest.position.set(spot.center.x, spot.center.y - 0.52 + Math.max(0, leaving - 0.55) * 7, spot.center.z);
+      chest.rotation.y = spot.yaw;
+    }
+    chest.visible = currentBox?.phase !== 'away';
+    teddy.visible = currentBox?.phase === 'teddy';
+    teddy.position.set(0, 0.9 + Math.min(1, leaving * 2) * 0.55, 0);
     const active = !!currentBox && currentBox.phase !== 'idle';
     lid.rotation.z = active ? 1.05 : 0;
     glow.intensity = currentBox?.phase === 'offering' ? 14 : active ? 8 : 3;

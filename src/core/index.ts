@@ -20,3 +20,5 @@ export * from './mysteryBox.ts';
 export * from './barrier.ts';
 export * from './powerups.ts';
 export * from './grenade.ts';
+export * from './perks.ts';
+export * from './traps.ts';

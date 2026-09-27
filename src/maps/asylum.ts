@@ -1,6 +1,8 @@
-import type { DoorDefinition } from '../core/door.ts';
+import type { DoorDefinition, PowerSwitchDefinition } from '../core/door.ts';
 import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
-import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
+import { mysteryBoxBlocker, type MysteryBoxDefinition, type MysteryBoxLocation } from '../core/mysteryBox.ts';
+import type { PerkId, PerkMachineDefinition } from '../core/perks.ts';
+import type { TrapDefinition } from '../core/traps.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { PropPlacement } from './bunkerProps.ts';
 import type { GameMap } from './gameMap.ts';
@@ -124,10 +126,9 @@ b.box(FOUNTAIN.x, 0.28, FOUNTAIN.z, 5.3, 0.56, 5.3, 'wall', false);
 b.box(FOUNTAIN.x, 0.58, FOUNTAIN.z, 3.9, 0.12, 3.9, 'floor', false);
 b.box(FOUNTAIN.x, 1.15, FOUNTAIN.z, 0.7, 1.2, 0.7, 'wall', false);
 
-// ---- The box starts in the power room, by the switch (a visual panel until power is implemented).
+// ---- The box starts in the power room, by the power switch's panel.
 export const ASYLUM_UPPER_HEIGHT = UP;
 export const ASYLUM_BOX_CENTER: Vec3 = { x: -12, y: UP + 0.52, z: NORTH + 0.2 + 0.525 };
-b.box(ASYLUM_BOX_CENTER.x, ASYLUM_BOX_CENTER.y, ASYLUM_BOX_CENTER.z, 2.35, 1.04, 0.95, 'barrier');
 b.box(-4, UP + 1.35, NORTH + 0.27, 0.68, 0.9, 0.16, 'metal', false);
 b.box(-4, UP + 1.35, NORTH + 0.44, 0.14, 0.42, 0.19, 'metal', false);
 
@@ -144,8 +145,8 @@ const stairDebris = (id: string, minX: number, maxX: number, z: number, height: 
   blocker: { min: { x: minX, y: 0, z: z - 0.4 }, max: { x: maxX, y: UP + 1, z: z + 0.4 } },
 });
 export const ASYLUM_DOORS: readonly DoorDefinition[] = [
-  // Verrückt's electric door between the starts; it will open with the power switch.
-  plankDoor('start-gate', 3, 0, 6, 'z', 1500, 'power door'),
+  // Verrückt's electric door between the starts opens only with the power switch.
+  { ...plankDoor('start-gate', 3, 0, 6, 'z', 0, 'power door'), requiresPower: true },
   stairDebris('german-stairs', -29.8, -25.8, 10.8, 0.6),
   plankDoor('left-upstairs', -24, UP, YARD.minZ, 'x', 750, 'Left Upstairs'),
   plankDoor('power-west', -18, UP, -26, 'z', 1000, 'power room'),
@@ -188,11 +189,53 @@ const ASYLUM_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
   'left-upstairs-stg44': Math.PI / 2, 'left-upstairs-trench-gun': 0, 'right-balcony-trench-gun': -Math.PI / 2,
   'right-balcony-bar': -Math.PI / 2, 'speed-cola-sawed-off': -Math.PI / 2,
 };
+/**
+ * A box spot against a wall: `center` is 0.725 m off the wall line, and buyers stand 0.77 m in front.
+ * `yaw` turns the box's front: pi/2 faces -z, -pi/2 faces +z, 0 faces +x and pi faces -x.
+ */
+const boxSpot = (id: string, x: number, y: number, z: number, yaw: number): MysteryBoxLocation => {
+  const front = { x: Math.cos(yaw), z: -Math.sin(yaw) };
+  return { id, center: { x, y: y + 0.52, z }, yaw,
+    position: { x: x + front.x * 0.77, y: y + 0.6, z: z + front.z * 0.77 } };
+};
+// Verrückt's box spots from the room guides: the power room (where it starts), the German start,
+// the German balcony, Left Upstairs and the hallway.
+export const ASYLUM_BOX_SPOTS: readonly MysteryBoxLocation[] = [
+  boxSpot('power-room', ASYLUM_BOX_CENTER.x, UP, ASYLUM_BOX_CENTER.z, -Math.PI / 2),
+  boxSpot('german-start', -22, 0, SOUTH - 0.725, Math.PI / 2),
+  boxSpot('german-balcony', YARD.minX - 0.725, UP, -12, Math.PI),
+  boxSpot('left-upstairs', -20.6, UP, YARD.minZ - 0.725, Math.PI / 2),
+  boxSpot('hallway', EAST - 0.725, 0, -16.6, Math.PI),
+];
 export const ASYLUM_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
-  ...BUNKER_MYSTERY_BOXES[0], id: 'power-box',
-  // Buyers stand south of the box, which sits against the power room's north wall.
-  position: { x: ASYLUM_BOX_CENTER.x, y: UP + 0.6, z: ASYLUM_BOX_CENTER.z + 0.77 },
+  ...BUNKER_MYSTERY_BOXES[0], id: 'power-box', position: ASYLUM_BOX_SPOTS[0].position, locations: ASYLUM_BOX_SPOTS,
 }];
+
+// ---- Power, perks and traps: the switch sits on the power room's panel.
+export const ASYLUM_POWER_SWITCH: PowerSwitchDefinition = { position: { x: -4, y: UP + 1.1, z: NORTH + 0.6 } };
+/** A perk machine's buy point, a metre in front of the 1.2 x 0.9 m body that stands against a wall. */
+const perkSpots: Array<{ id: string; perk: PerkId; x: number; y: number; z: number; facing: number }> = [
+  { id: 'juggernog', perk: 'juggernog', x: -22, y: 0, z: 3 + 0.65, facing: 0 }, // German start, north wall
+  { id: 'double-tap', perk: 'double-tap', x: WEST + 0.65, y: UP, z: -17.5, facing: Math.PI / 2 }, // German balcony
+  { id: 'quick-revive', perk: 'quick-revive', x: 16 - 0.65, y: 0, z: 16.5, facing: -Math.PI / 2 }, // American start
+  { id: 'speed-cola', perk: 'speed-cola', x: 27, y: UP, z: NORTH + 0.65, facing: 0 }, // Speed Cola room
+];
+for (const spot of perkSpots) {
+  const across = Math.abs(Math.sin(spot.facing)) > 0.5;
+  b.box(spot.x, spot.y + 1.05, spot.z, across ? 0.9 : 1.2, 2.1, across ? 1.2 : 0.9, 'metal');
+}
+export const ASYLUM_PERK_MACHINES: readonly PerkMachineDefinition[] = perkSpots.map(spot => ({
+  id: spot.id, perk: spot.perk,
+  position: { x: spot.x + Math.sin(spot.facing), y: spot.y + 1, z: spot.z + Math.cos(spot.facing) },
+}));
+const ASYLUM_PERK_FACING = Object.fromEntries(perkSpots.map(spot => [spot.id, spot.facing]));
+/** An electric trap across a balcony: floor to head height, pulled from a handle on the outer wall. */
+export const ASYLUM_TRAPS: readonly TrapDefinition[] = [
+  { id: 'german-balcony-trap', name: 'electric trap', cost: 1000, switchPosition: { x: WEST + 0.25, y: UP + 1.2, z: 1.2 },
+    zone: { min: { x: WEST + 0.2, y: UP - 0.5, z: -6.5 }, max: { x: YARD.minX - 0.2, y: UP + 2.5, z: -4 } } },
+  { id: 'right-balcony-trap', name: 'electric trap', cost: 1000, switchPosition: { x: EAST - 0.25, y: UP + 1.2, z: -5.5 },
+    zone: { min: { x: 16.2, y: UP - 0.5, z: -3 }, max: { x: EAST - 0.2, y: UP + 2.5, z: -0.5 } } },
+];
 /** Solo starts on the German side, as in WaW. */
 export const ASYLUM_PLAYER_SPAWN: Vec3 = { x: -18, y: 0, z: 9 };
 
@@ -240,7 +283,8 @@ export const ASYLUM_STAIR_ROUTES = {
   german: stairRoute('german-stair', -27.8, 12, 4),
   american: stairRoute('american-stair', 23.5, -8, -16),
 };
-const ASYLUM_NAVIGATION = compileNavigation(b.surfaces, collision,
+// Routes keep clear of every box spot, wherever the box is.
+const ASYLUM_NAVIGATION = compileNavigation(b.surfaces, [...collision, ...ASYLUM_BOX_SPOTS.map(mysteryBoxBlocker)],
   { minX: WEST + 0.8, maxX: EAST, minZ: NORTH + 0.8, maxZ: SOUTH }, [0, UP], [
     { id: 'spawn', position: ASYLUM_PLAYER_SPAWN },
     ...doorSides,
@@ -260,6 +304,7 @@ export const ASYLUM_MAP: GameMap = {
     : { kind: 'planks' as const, yaw: d.blocker.max.x - d.blocker.min.x < 1 ? 0 : Math.PI / 2, width: DOOR_WIDTH }])),
   wallWeapons: ASYLUM_WALL_WEAPONS, wallWeaponFacing: ASYLUM_WALL_WEAPON_FACING,
   mysteryBoxes: ASYLUM_MYSTERY_BOXES, boxCenter: ASYLUM_BOX_CENTER, boxYaw: -Math.PI / 2,
+  powerSwitch: ASYLUM_POWER_SWITCH, perkMachines: ASYLUM_PERK_MACHINES, perkMachineFacing: ASYLUM_PERK_FACING, traps: ASYLUM_TRAPS,
   rails: b.rails, props: ASYLUM_PROPS,
   decals: [
     { asset: 'leaking-grime', x: -20, y: 2.4, z: SOUTH - 0.211, width: 2.6, height: 2.5, yaw: Math.PI },
@@ -296,5 +341,6 @@ export const ASYLUM_MAP: GameMap = {
     courtyard: { position: { x: 17.5, y: UP, z: -12 }, yaw: Math.PI / 2 },
     barrier: { position: { x: -15, y: 0, z: 1.5 }, yaw: 0 },
     upperEntry: { position: { x: -26.8, y: UP, z: -24 }, yaw: Math.PI / 2 },
+    juggernog: { position: { x: -22, y: 0, z: 7.5 }, yaw: 0 },
   },
 };

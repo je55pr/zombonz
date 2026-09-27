@@ -28,6 +28,8 @@ describe('gameplay HUD snapshot', () => {
     const playerId = sim.playerIds[0];
     expect(buildHudSnapshot(sim, playerId)).toEqual({
       health: 100,
+      maxHealth: 100,
+      perks: '',
       points: 500,
       kills: 0,
       headshots: 0,
