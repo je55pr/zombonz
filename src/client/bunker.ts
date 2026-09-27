@@ -7,12 +7,42 @@ import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_WALL_WEAPON_FACIN
 import type { SimulationState } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
+import { prepareWeaponModel, type PreparedWeapon } from './weaponView.ts';
 
 // Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
 const PLANK_TILT = [0.07, -0.16, 0.12, -0.08, 0.17, -0.05] as const;
 function plankHeight(index: number): number { return 1.02 + index * 0.27; }
 
-export function buildBunkerDetails(scene: THREE.Scene): { update(state: SimulationState): void } {
+// Wall guns are shown life-size; viewmodels are modelled at roughly 0.86x.
+const WALL_GUN_SCALE = 1.15;
+const CHALK = 0xc9c7a7;
+
+/**
+ * Hangs a copy of the gun's model on a wall-buy sign, muzzle to the right, over a chalk silhouette
+ * drawn slightly larger on the wall behind it, as WaW's chalk outlines frame their guns.
+ */
+function mountWallGun(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Material): void {
+  const model = weapon.root.clone(true);
+  model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.set(1, 1, 1);
+  model.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(model);
+  const centre = bounds.getCenter(new THREE.Vector3()), size = bounds.getSize(new THREE.Vector3());
+  // Gun space has the muzzle toward -z and the gun's side along x; turning -90 degrees lays it along the wall.
+  const place = (object: THREE.Object3D, scale: THREE.Vector3, wallDepth: number) => {
+    object.rotation.y = -Math.PI / 2; object.scale.copy(scale);
+    const offset = centre.clone().multiply(scale).applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 2);
+    object.position.set(-offset.x, -offset.y, wallDepth - offset.z);
+    sign.add(object);
+  };
+  place(model, new THREE.Vector3().setScalar(WALL_GUN_SCALE), 0.015 + size.x * WALL_GUN_SCALE / 2);
+  const outline = weapon.root.clone(true);
+  outline.traverse(object => { if (object instanceof THREE.Mesh) object.material = chalk; });
+  // Flattened onto the wall, and grown so a chalk rim shows around the gun.
+  const rim = (size.z * WALL_GUN_SCALE + 0.07) / size.z;
+  place(outline, new THREE.Vector3(0.002, (size.y * WALL_GUN_SCALE + 0.05) / size.y, rim), 0.004);
+}
+
+export function buildBunkerDetails(scene: THREE.Scene): { update(state: SimulationState): void; ready: Promise<unknown> } {
   const group = new THREE.Group();
   group.name = 'nacht-bunker-details';
   scene.add(group);
@@ -100,16 +130,24 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   label('HELP', 0.215, 2.3, 2.2, Math.PI / 2, 1.6, 0.45);
   label('YOU MUST ASCEND', 5.6, 2.4, -2.385, 0, 2.7, 0.38);
   label('FROM DARKNESS', 5.6, 2, -2.385, 0, 2.5, 0.38);
+  const chalk = new THREE.MeshBasicMaterial({ color: CHALK });
+  const wallGuns: Promise<unknown>[] = [];
   for (const weapon of NACHT_WALL_WEAPONS) {
     const sign = new THREE.Group();
     sign.position.set(weapon.position.x, weapon.position.y + 0.4, weapon.position.z);
     sign.rotation.y = NACHT_WALL_WEAPON_FACING[weapon.id] ?? 0;
     group.add(sign);
-    // Chalk outline with a simple wall-mounted rifle silhouette.
-    const chalk = new THREE.MeshBasicMaterial({ color: 0xc9c7a7 });
-    box(sign, chalk, 0, 0, 0, 1.75, 0.17, 0.015);
-    box(sign, wood, -0.5, -0.015, 0.025, 0.55, 0.18, 0.055);
-    box(sign, iron, 0.25, 0.025, 0.025, 1.15, 0.065, 0.055);
+    // The real gun over its chalk outline; a chalk bar with a blocky rifle only if the model can't load.
+    const pending = prepareWeaponModel(weapon.weaponId);
+    const fallback = () => {
+      box(sign, chalk, 0, 0, 0, 1.75, 0.17, 0.015);
+      box(sign, wood, -0.5, -0.015, 0.025, 0.55, 0.18, 0.055);
+      box(sign, iron, 0.25, 0.025, 0.025, 1.15, 0.065, 0.055);
+    };
+    if (pending) wallGuns.push(pending.then(model => mountWallGun(sign, model, chalk), error => {
+      console.warn(`Unable to load the ${weapon.weaponId} wall gun`, error); fallback();
+    }));
+    else fallback();
     const name = writing(weaponName(weapon.weaponId).toUpperCase(), 1.65, 0.24);
     name.position.set(0, -0.38, 0.03); sign.add(name);
   }
@@ -158,7 +196,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   }
   const moon = new THREE.Mesh(new THREE.SphereGeometry(1.4, 20, 12), new THREE.MeshBasicMaterial({ color: 0xc9dad5, fog: false }));
   moon.position.set(-22, 30, -42); group.add(moon);
-  return { update(state) {
+  return { ready: Promise.allSettled(wallGuns), update(state) {
     for (let i = 0; i < practicalLights.length; i++) {
       practicalLights[i].intensity = 11 * lampFlicker(state.world.tick, i * 137 + 47);
     }

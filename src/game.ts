@@ -48,6 +48,8 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
     ...[...new Set(NACHT_PROPS.map(prop => prop.asset))].map(asset => () => loadModel(`props/${asset}/model.glb`)),
     () => loadZombieAsset(zombie),
     () => prepareWeaponModel('starter-pistol'),
+    // The chalk wall buys hang the real guns.
+    ...[...new Set(NACHT_WALL_WEAPONS.map(wall => wall.weaponId))].map(id => () => prepareWeaponModel(id)),
   ];
   let done = 0;
   onProgress(done, tasks.length);
@@ -115,6 +117,8 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     overview: { position: { x: 23, y: 25, z: 28 }, yaw: 0.65 },
     doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
     props: { position: { x: -2, y: 0, z: 4.3 }, yaw: Math.PI + 0.15 },
+    wallBuys: { position: { x: 6.3, y: 0, z: 5.9 }, yaw: Math.PI },
+    helpWalls: { position: { x: -3.6, y: 0, z: -5.2 }, yaw: Math.PI / 2 - 0.35 },
   };
   const previewName = new URLSearchParams(location.search).get('preview');
   const previewPowerup = new URLSearchParams(location.search).get('powerup');
@@ -356,7 +360,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
 
   const startingWeapon = simulation.getPlayer(playerId)?.weapon.weaponId ?? 'starter-pistol';
   return (async () => {
-    await Promise.allSettled([environmentReady, zombieReady, prepareWeaponModel(startingWeapon)]);
+    await Promise.allSettled([environmentReady, zombieReady, bunker.ready, prepareWeaponModel(startingWeapon)]);
     // Upload every texture and compile every shader now, rather than stuttering on the first frames.
     await renderer.compileAsync(scene, camera);
     scene.traverse(object => {

@@ -186,7 +186,7 @@ export const NACHT_DOORS: readonly DoorDefinition[] = [
     blocker: { min: { x: -7.85, y: 0, z: 4.5 }, max: { x: -6.25, y: 4.5, z: 5.25 } } },
 ];
 // WaW Nacht chalk: Kar98k in the start room, Thompson and double-barrel in HELP, Trench Gun and BAR upstairs.
-// Ammo costs half the gun. (The start-room M1A1 Carbine still has no suitable model.)
+// Ammo costs half the gun.
 const wallBuy = (id: string, weaponId: string, name: string, cost: number, position: Vec3): WallWeaponDefinition => ({
   id, position, weaponId, weaponCost: cost, ammoCost: cost / 2,
   prompt: `E  ${name} [${cost}] / Ammo [${cost / 2}]`, interactionRange: 2.5, minFacingDot: 0.25,
