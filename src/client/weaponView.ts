@@ -6,7 +6,65 @@ import { WEAPON_DEFINITIONS, weaponName } from '../core/weapon.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
-export interface PreparedWeapon { root: THREE.Group; magazine: THREE.Group; muzzle: THREE.Vector3 }
+/**
+ * The sight picture in gun space (butt at z = 0, muzzle toward -z, highest point at y = 0): aiming puts the
+ * top of the front sight (`height`) on the screen centre with the bore level, as with a real post-and-notch
+ * or aperture sight, and holds the rear sight (`rearZ`) a fixed distance from the eye.
+ */
+export interface SightLine { height: number; x: number; rearZ: number }
+export interface PreparedWeapon { root: THREE.Group; magazine: THREE.Group; muzzle: THREE.Vector3; sight: SightLine }
+
+/**
+ * Hand-tuned corrections, checked against screenshots of every gun aimed:
+ * - `drop` lowers the aim point below the measured front sight (a hood's top down to the post inside it);
+ * - `scope` aims along the top of a scope (the highest point along the receiver) instead;
+ * - `height`/`x` place the gun outright where iron sights do not apply;
+ * - `hide` drops model parts that block the aimed view.
+ */
+interface SightOverride { drop?: number; scope?: boolean; height?: number; x?: number; rearZ?: number; hide?: RegExp }
+const SIGHT_OVERRIDES: Readonly<Record<string, SightOverride>> = {
+  // WaW's Kar98k is unscoped; the model's scope (opaque lens) would black out the aimed view.
+  kar98k: { hide: /Scope/ },
+  mp40: { drop: 0.013 },
+  // The Skorpion's front post stands three-quarters along; the muzzle band only holds the barrel nut.
+  skorpion: { height: -0.004 },
+  // The FAL's front sight sits on the gas block, three-quarters along, behind the searched muzzle band.
+  fal: { height: -0.002, rearZ: -0.22 },
+  // The launcher rides on the right shoulder; the eye sits above and left of the tube.
+  rpg7: { height: 0.05, x: -0.08 },
+  // A later-pattern folding carry handle; WaW's BAR has none, and it filled the left of the aimed view.
+  bar: { hide: /^Handle/ },
+};
+
+/**
+ * Finds the sight picture: the bore's centre line from the muzzle tip, the front post as the highest point
+ * near the muzzle on that line (so protective ears either side are ignored), and the rear sight as the
+ * highest point along the receiver (used only for eye distance).
+ */
+export function measureSightLine(geometries: readonly THREE.BufferGeometry[], length: number, id: string): SightLine {
+  const point = new THREE.Vector3();
+  const each = (visit: (p: THREE.Vector3, t: number) => void) => {
+    for (const geometry of geometries) {
+      const position = geometry.getAttribute('position');
+      for (let i = 0; i < position.count; i++) { point.fromBufferAttribute(position, i); visit(point, -point.z / length); }
+    }
+  };
+  let boreX = 0, muzzleVertices = 0;
+  each((p, t) => { if (t >= 0.97) { boreX += p.x; muzzleVertices++; } });
+  boreX = muzzleVertices ? boreX / muzzleVertices : 0;
+  const post = { y: -Infinity }, rear = { x: 0, y: -Infinity, z: -length * 0.3 };
+  each((p, t) => {
+    if (t >= 0.8 && Math.abs(p.x - boreX) <= 0.004 && p.y > post.y) post.y = p.y;
+    else if (t >= 0.04 && t <= 0.78 && p.y > rear.y) { rear.x = p.x; rear.y = p.y; rear.z = p.z; }
+  });
+  const override = SIGHT_OVERRIDES[id] ?? {};
+  const measured = override.scope ? rear.y : Number.isFinite(post.y) ? post.y : 0;
+  return {
+    height: override.height ?? measured - (override.drop ?? 0),
+    x: override.x ?? (override.scope ? rear.x : boreX),
+    rearZ: override.rearZ ?? (Number.isFinite(rear.y) ? rear.z : -length * 0.3),
+  };
+}
 
 // Viewmodel lengths in metres, roughly 0.86x each gun's real length.
 export const VIEWMODEL_LENGTHS: Readonly<Record<string, number>> = {
@@ -18,6 +76,12 @@ export const VIEWMODEL_LENGTHS: Readonly<Record<string, number>> = {
   mp5k: 0.45, skorpion: 0.52, 'magnum-357': 0.42, python: 0.4, irrlicht: 0.42, molniya: 0.4,
 };
 const HANDGUNS = new Set(['starter-pistol', 'magnum-357', 'python', 'irrlicht', 'molniya']);
+/** Rear sight distance in front of the eye when aimed, and how far the sights sit below dead centre. */
+const ADS_EYE_RELIEF = 0.13;
+const ADS_SIGHT_DROP = 0.0015;
+/** Hip-fire offsets from the aimed position (right, down, forward). */
+const HIP_OFFSET_LONG_GUN = { x: 0.11, y: -0.07, z: 0.02 };
+const HIP_OFFSET_HANDGUN = { x: 0.1, y: -0.065, z: -0.06 };
 const FLASH_COLOURS: Readonly<Record<string, number>> = { irrlicht: 0x7dff9a, molniya: 0x8fd8ff };
 
 // Bake the exported rest pose to ordinary meshes, keeping the magazine separate.
@@ -27,8 +91,9 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
   const root = new THREE.Group(), body = new THREE.Group(), magazine = new THREE.Group();
   root.add(body, magazine);
   const rotation = new THREE.Matrix4().makeRotationY(id === 'bar' ? Math.PI / 2 : Math.PI);
+  const hidden = SIGHT_OVERRIDES[id]?.hide;
   source.traverse(object => {
-    if (!(object instanceof THREE.Mesh)) return;
+    if (!(object instanceof THREE.Mesh) || hidden?.test(object.name)) return;
     const geometry = object.geometry.index ? object.geometry.toNonIndexed() : object.geometry.clone();
     if (object instanceof THREE.SkinnedMesh) {
       const position = geometry.getAttribute('position'), point = new THREE.Vector3();
@@ -52,6 +117,7 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
     (isMagazine ? magazine : body).add(mesh);
   });
   const bounds = new THREE.Box3().setFromObject(root), size = bounds.getSize(new THREE.Vector3());
+  let sight: SightLine = { height: 0, x: 0, rearZ: -0.3 };
   const length = VIEWMODEL_LENGTHS[id] ?? 1.05;
   const scale = length / size.z;
   const offset = new THREE.Vector3(-(bounds.min.x + bounds.max.x) / 2, -bounds.max.y, -bounds.max.z);
@@ -60,6 +126,7 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
       const mesh = object as THREE.Mesh;
       mesh.geometry.translate(offset.x, offset.y, offset.z); mesh.geometry.scale(scale, scale, scale);
     }
+    if (group === body) sight = measureSightLine(group.children.map(object => (object as THREE.Mesh).geometry), length, id);
     batchStaticMeshes(group);
     group.traverse(object => {
       if (object instanceof THREE.Mesh) {
@@ -67,8 +134,7 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
       }
     });
   }
-  // Keep the rifle flash at barrel height rather than at the top of its scope.
-  return { root, magazine, muzzle: new THREE.Vector3(0, id === 'kar98k' ? -0.065 : -0.035, -length) };
+  return { root, magazine, muzzle: new THREE.Vector3(0, -0.035, -length), sight };
 }
 
 const preparedWeapons = new Map<string, Promise<PreparedWeapon>>();
@@ -100,7 +166,7 @@ function placeholderWeapon(id: string): PreparedWeapon {
   part(root, 0, -0.045, -0.25, 0.065, 0.09, 0.5);
   part(root, 0, -0.1, -0.06, 0.055, 0.17, 0.09, wood);
   part(magazine, 0, -0.15, -0.23, 0.045, id === 'mp40' ? 0.23 : 0.17, 0.08);
-  return { root, magazine, muzzle: new THREE.Vector3(0, -0.045, -0.5) };
+  return { root, magazine, muzzle: new THREE.Vector3(0, -0.045, -0.5), sight: { height: 0, x: 0, rearZ: -0.1 } };
 }
 
 export class WeaponView {
@@ -169,11 +235,17 @@ export class WeaponView {
     const moving = Math.min(1, Math.hypot(player.velocity.x, player.velocity.z) / 3);
     const bob = Math.sin(tick * (player.sprinting ? 0.22 : 0.13)) * moving
       * (player.sprinting ? 0.014 : 0.006) * (1 - this.aimBlend * 0.85);
-    this.pose.position.set(0.19 * (1 - this.aimBlend) + bob,
-      (HANDGUNS.has(this.id) ? -0.10 : -0.15) + this.aimBlend * 0.065 - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob),
-      -0.24 - this.aimBlend * 0.075 + kick * 0.045);
-    this.pose.rotation.set(kick * 0.10 + reload * 0.35 - this.sprintBlend * 0.22,
-      0.12 * (1 - this.aimBlend), -reload * 0.45 + this.sprintBlend * 0.12);
+    // Aimed: bore level, front sight on the screen centre, rear sight a fixed distance from the eye.
+    const { height, x, rearZ } = this.current.sight;
+    const aimed = { x: -x, y: -height - ADS_SIGHT_DROP, z: -ADS_EYE_RELIEF - rearZ };
+    // Hip: the same gun held lower-right and a little further out, turned slightly inwards.
+    const hip = HANDGUNS.has(this.id) ? HIP_OFFSET_HANDGUN : HIP_OFFSET_LONG_GUN;
+    const away = 1 - this.aimBlend;
+    this.pose.position.set(aimed.x + hip.x * away + bob,
+      aimed.y + hip.y * away - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob),
+      aimed.z + hip.z * away + kick * (0.045 - this.aimBlend * 0.025));
+    this.pose.rotation.set(kick * (0.10 - this.aimBlend * 0.06) + reload * 0.35 - this.sprintBlend * 0.22,
+      0.12 * away, -reload * 0.45 + this.sprintBlend * 0.12);
     this.current.magazine.position.y = -reload * 0.18;
     this.flash.position.copy(this.current.muzzle); this.flash.position.z -= 0.04;
     this.flash.scale.set(0.025, 0.025, 0.065);
