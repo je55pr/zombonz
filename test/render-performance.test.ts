@@ -87,7 +87,7 @@ describe('render performance contracts', () => {
     const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
     // The HUD's own full-screen canvas is the first one it creates; animated pieces have their own.
     const context = contexts[0];
-    const state: HudSnapshot = { health: 100, points: 500, kills: 0, headshots: 0,
+    const state: HudSnapshot = { health: 100, maxHealth: 100, perks: '', points: 500, kills: 0, headshots: 0,
       round: 1, weapon: 'starter-pistol',
       magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloading: false,
       grenadeCharges: 2,

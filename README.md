@@ -176,6 +176,7 @@ For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs
 open inspection views with waves disabled, routes open and 10000 test points.
 These overrides are development-only; the normal URL starts the standard survival game.
 Add `&map=asylum` to any preview URL to open Asylum instead of Bunker (see [Asylum](docs/asylum-map.md)).
+On Asylum, `&power=on` starts with the power on, and `&traps=on` also sets both electric traps running.
 `/?preview=wallBuys` and `/?preview=helpWalls` face the start-room and HELP-room chalk wall buys.
 `/?preview=barrier` runs a live wave at the first window for entry-animation checks.
 `/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and

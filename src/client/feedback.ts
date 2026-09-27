@@ -1,6 +1,7 @@
 import type { EntityId } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
+import { PERKS } from '../core/perks.ts';
 
 export interface FeedbackSnapshot {
   message: string | null;
@@ -29,7 +30,7 @@ export class HudFeedback {
     };
     for (const event of events) {
       if ('playerId' in event && event.playerId !== playerId
-        && event.type !== 'zombieAttacked' && event.type !== 'powerupCollected') continue;
+        && event.type !== 'zombieAttacked' && event.type !== 'powerupCollected' && event.type !== 'powerActivated') continue;
       switch (event.type) {
         case 'weaponHit': this.marker = event.hitZone === 'head' ? 'head' : 'body'; this.markerUntil = tick + 12; break;
         case 'meleeHit': this.marker = 'body'; this.markerUntil = tick + 12; break;
@@ -50,6 +51,11 @@ export class HudFeedback {
         case 'mysteryBoxUnavailable': say('NO NEW WEAPONS IN BOX', 3); break;
         case 'pointsSpendRejected': say('NOT ENOUGH POINTS', 4); break;
         case 'doorOpened': say('PATH OPENED', 3); break;
+        case 'powerActivated': say('THE POWER IS ON', 9); break;
+        case 'perkBought': say(PERKS[event.perk].name.toUpperCase(), 5); break;
+        case 'playerRevived': say('QUICK REVIVE SPENT', 9); break;
+        case 'trapActivated': say('ELECTRIC TRAP ACTIVE', 4); break;
+        case 'mysteryBoxTeddy': say('BYE BYE — THE BOX IS MOVING', 6); break;
         case 'powerupCollected': say(event.kind === 'maxAmmo' ? 'MAX AMMO'
           : event.kind === 'doublePoints' ? 'DOUBLE POINTS'
             : event.kind === 'instaKill' ? 'INSTA-KILL' : 'NUKE', 8); break;

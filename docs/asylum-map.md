@@ -32,7 +32,7 @@ upstairs at the north end, and each side reaches it by its own route:
 
 | Unlock | Cost |
 | --- | --- |
-| Power door between the starts | 1500 |
+| Power door between the starts | Opens with the power |
 | German stair debris / American stair debris | 1000 each |
 | Left Upstairs / Right Upstairs | 750 each |
 | Power room from Left Upstairs | 1000 |
@@ -53,14 +53,35 @@ There are seventeen zombie windows, as in the original's room guides:
 Zombies climb into the upstairs windows off a short roof ledge outside. A window only takes zombies
 once players can reach the room behind it. The other upstairs windows are decorative.
 
+## Power, perks, traps and the box
+
+- **Power:** the switch is on the panel in the power room. Until it is thrown, the door between the
+  starts cannot be bought, and it opens by itself once the power comes on. The lamps burn low until then.
+- **Perks** need the power on:
+
+  | Perk | Where | Cost | Effect |
+  | --- | --- | --- | --- |
+  | Jugger-Nog | German start | 2500 | 250 health: zombies need five hits instead of two |
+  | Double Tap Root Beer | German balcony | 2000 | Fire rate a third faster |
+  | Quick Revive | American start | 1500 | Saves the player from one killing blow |
+  | Speed Cola | Speed Cola room | 3000 | Reloads take half as long |
+
+  The game has no downed state yet, so Quick Revive works like Black Ops' solo Quick Revive: a killing
+  blow brings the player straight back at full health, and every perk is lost.
+- **Electric traps:** one across each balcony, 1000 points once the power is on. A trap runs for
+  25 seconds and then recharges for 25. It kills zombies that walk into it, for no points, and
+  hurts players standing in it.
+- **The box** starts in the power room and can move to the German start, the German balcony,
+  Left Upstairs or the hallway. A pale beam of light shows where it is. The teddy bear follows
+  Black Ops' odds as best I recall them: never in a spot's first four rolls, then 15%. At the
+  starting spot, the roll after the eighth always brings the bear. After a move, the odds rise to
+  30% after eight rolls and 50% after thirteen. The bear refunds the roll, then the box leaves and
+  lands at another spot.
+
 ## Not yet implemented
 
-- The power switch. The power door is buyable for now, so solo play can still reach the
-  American side.
-- Perks.
-- The electric traps on both balconies.
 - The German balcony's second entry, where zombies climb over the railing from the courtyard.
-- The moving box. The box stays in the power room.
+- A downed state and reviving, which Quick Revive would speed up in co-op.
 
 ## Checks
 
@@ -77,5 +98,15 @@ once players can reach the room behind it. The other upstairs windows are decora
 - Zombies chasing down both routes.
 - The box, and every wall buy.
 
+`test/power-perks.test.ts` covers:
+
+- The power door and the switch.
+- Buying each perk from its own floor, only with the power on.
+- Each perk's effect.
+- Both trap switches, and what traps do.
+- The box at every spot.
+- The teddy odds and the box moving.
+
 Development views use `?preview=<view>&map=asylum`. The views are `american`, `hallway`,
-`balcony`, `upstairs`, `power`, `kitchen`, `rightBalcony`, `courtyard`, `barrier` and `upperEntry`.
+`balcony`, `upstairs`, `power`, `kitchen`, `rightBalcony`, `courtyard`, `barrier`, `upperEntry` and `juggernog`. Add `&power=on` to start with the power on,
+or `&traps=on` to also set both traps running.

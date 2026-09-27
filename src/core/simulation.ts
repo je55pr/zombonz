@@ -1,12 +1,16 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { createBarrier, createZombieEntry, prepareBarriers, updateZombieEntry,
   repairBarriers, syncBarrierInteractables, type BarrierDefinition, type BarrierState, type BarrierEvent } from './barrier.ts';
-import { createMysteryBox, tickMysteryBoxes, useMysteryBox, mysteryBoxPrompt,
+import { createMysteryBox, mysteryBoxBlocker, tickMysteryBoxes, useMysteryBox, mysteryBoxPrompt,
   type MysteryBoxDefinition, type MysteryBoxState, type MysteryBoxEvent } from './mysteryBox.ts';
 import {
-  closedDoorBlockers, createDoorInteractable, createDoorState, handleDoorInteraction,
-  type DoorDefinition, type DoorEvent, type DoorState,
+  activatePower, closedDoorBlockers, createDoorInteractable, createDoorState, createPowerSwitchInteractable, handleDoorInteraction,
+  type DoorDefinition, type DoorEvent, type DoorState, type PowerEvent, type PowerSwitchDefinition,
 } from './door.ts';
+import { buyPerk, createPerkMachine, syncPerkInteractables,
+  type PerkEvent, type PerkMachineDefinition, type PerkMachineState } from './perks.ts';
+import { activateTrap, createTrap, syncTrapInteractables, tickTraps,
+  type TrapDefinition, type TrapEvent, type TrapState } from './traps.ts';
 import {
   DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints, awardNukePoints,
   type EconomyConfig, type EconomyEvent,
@@ -55,6 +59,10 @@ export interface SimulationMap {
   doors?: readonly DoorDefinition[];
   wallWeapons?: readonly WallWeaponDefinition[];
   mysteryBoxes?: readonly MysteryBoxDefinition[];
+  /** A map with a power switch starts with the power off. */
+  powerSwitch?: PowerSwitchDefinition;
+  perkMachines?: readonly PerkMachineDefinition[];
+  traps?: readonly TrapDefinition[];
 }
 
 export interface SimulationState {
@@ -67,6 +75,10 @@ export interface SimulationState {
   barriers: BarrierState[];
   powerups: PowerupState;
   grenades: GrenadePool;
+  /** Always on for maps without a switch. */
+  power: { on: boolean };
+  perkMachines: PerkMachineState[];
+  traps: TrapState[];
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
@@ -86,7 +98,8 @@ export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent;
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
+  | PowerEvent | PerkEvent | TrapEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -158,9 +171,26 @@ export class GameSimulation {
     }
     syncBarrierInteractables(barriers, Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable'));
+    // Allocated last, so maps without them keep their entity ids.
+    if (this.map.powerSwitch) addEntity(world, createPowerSwitchInteractable(allocateEntityId(world), this.map.powerSwitch));
+    const perkMachines: PerkMachineState[] = [];
+    for (const definition of this.map.perkMachines ?? []) {
+      const machine = createPerkMachine(definition, allocateEntityId(world));
+      perkMachines.push(machine.state); addEntity(world, machine.interactable);
+    }
+    const traps: TrapState[] = [];
+    for (const definition of this.map.traps ?? []) {
+      const trap = createTrap(definition, allocateEntityId(world));
+      traps.push(trap.state); addEntity(world, trap.interactable);
+    }
+    const power = { on: !this.map.powerSwitch };
+    const interactables = Object.values(world.entities).filter(
+      (entity): entity is InteractableState => entity.kind === 'interactable');
+    syncPerkInteractables(perkMachines, interactables, power.on);
+    syncTrapInteractables(traps, interactables, power.on);
     return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
       powerups: createPowerupState(this.playerIds.length * this.economyConfig.startingPoints, this.powerupConfig),
-      grenades: createGrenadePool() };
+      grenades: createGrenadePool(), power, perkMachines, traps };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -175,7 +205,9 @@ export class GameSimulation {
   }
 
   collisionBoxes(): CollisionBox[] {
-    return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors)];
+    const boxes = this.state.mysteryBoxes.filter(box => box.locations.length && box.phase !== 'away')
+      .map(box => mysteryBoxBlocker(box.locations[box.locationIndex]));
+    return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors), ...boxes];
   }
 
   zombies(): ZombieState[] {
@@ -198,7 +230,9 @@ export class GameSimulation {
   }
 
   private navigationQuery(): NavigationQuery {
-    const doors = this.state.doors.map(door => `${door.id}:${door.open}`).join('|');
+    // Opening doors and the box moving both change what blocks the way.
+    const doors = [...this.state.doors.map(door => `${door.id}:${door.open}`),
+      ...this.state.mysteryBoxes.map(box => `${box.id}:${box.phase === 'away' ? -1 : box.locationIndex}`)].join('|');
     if (this.navigationCache?.doors !== doors) {
       this.navigationCache = { doors, query: createNavigationQuery(this.map.navigationGraph,
         this.collisionBoxes(), 0.32, this.map.walkSurfaces) };
@@ -226,7 +260,7 @@ export class GameSimulation {
     const events: SimulationEvent[] = [];
     const world = this.state.world;
     events.push(...tickPowerupLifetime(this.state.powerups));
-    tickMysteryBoxes(this.state.mysteryBoxes, this.interactables(), livingPlayers(world));
+    events.push(...tickMysteryBoxes(this.state.mysteryBoxes, this.interactables(), livingPlayers(world), world.seed ^ world.tick));
     const repairers = new Map<string, EntityId>();
 
     const playerFrames = new Map<EntityId, InputFrame>();
@@ -253,6 +287,9 @@ export class GameSimulation {
           events.push(...handleDoorInteraction(player, interaction, this.state.doors, this.interactables()));
           events.push(...handleWallWeaponInteraction(player, interaction, this.state.wallWeapons));
           events.push(...useMysteryBox(player, interaction, this.state.mysteryBoxes, world.seed));
+          events.push(...activatePower(player, interaction, this.state.power, this.state.doors, this.interactables()));
+          events.push(...buyPerk(player, interaction, this.state.perkMachines, this.state.power.on));
+          events.push(...activateTrap(player, interaction, this.state.traps, this.state.power.on));
         }
       }
     }
@@ -361,6 +398,11 @@ export class GameSimulation {
       );
       events.push(...tickZombieMelee(zombie, players, this.collisionBoxes()));
     }
+    if (this.state.traps.length) {
+      events.push(...tickTraps(this.state.traps, this.zombies(), livingPlayers(world), world.tick));
+      syncTrapInteractables(this.state.traps, this.interactables(), this.state.power.on);
+    }
+    if (this.state.perkMachines.length) syncPerkInteractables(this.state.perkMachines, this.interactables(), this.state.power.on);
     // Repair resolves after entry decisions, so rebuilding cannot trap an active vault.
     const repairEvents = repairBarriers(this.state.barriers, repairers);
     events.push(...repairEvents);

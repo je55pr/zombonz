@@ -2,6 +2,16 @@ import * as THREE from 'three';
 import type { EntityId } from '../core/types.ts';
 import type { GameSimulation } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
+import { maxPlayerHealth } from '../core/health.ts';
+import type { PerkId } from '../core/perks.ts';
+
+/** WaW's perk colours: Jugger-Nog red, Double Tap amber, Speed Cola green, Quick Revive blue. */
+const PERK_ICONS: Readonly<Record<PerkId, { fill: string; mark: string }>> = {
+  juggernog: { fill: 'rgba(150,24,24,0.9)', mark: 'JN' },
+  'double-tap': { fill: 'rgba(176,104,20,0.9)', mark: 'DT' },
+  'speed-cola': { fill: 'rgba(32,120,40,0.9)', mark: 'SC' },
+  'quick-revive': { fill: 'rgba(30,86,160,0.9)', mark: 'QR' },
+};
 import type { FeedbackSnapshot } from './feedback.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
 import { Crosshair, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
@@ -9,6 +19,9 @@ import type { SimulationEvent } from '../core/simulation.ts';
 
 export interface HudSnapshot {
   health: number;
+  maxHealth: number;
+  /** Perk-a-colas drunk, in order and comma-joined (a string, so an unchanged list skips the repaint). */
+  perks: string;
   points: number;
   kills: number;
   headshots: number;
@@ -49,6 +62,8 @@ export function buildHudSnapshot(
     && Math.abs(drop.position.y - player.position.y) < 2);
   return {
     health: player.health,
+    maxHealth: maxPlayerHealth(player),
+    perks: player.perks.join(','),
     points: player.points,
     kills: player.kills,
     headshots: player.headshots,
@@ -299,7 +314,13 @@ export class CanvasHud {
     const low = snapshot.health <= 50;
     this.text('HP', 44, height - 36, { size: 15, weight: 500, color: DIM, spacing: 2 });
     this.panel(74, height - 41, 180, 10, 5, 'rgba(0,0,0,0.55)', EDGE);
-    const healthWidth = 180 * Math.max(0, Math.min(1, snapshot.health / 100));
+    const healthWidth = 180 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
+    // Perk icons sit in a row above the round counter, in the order they were drunk.
+    (snapshot.perks ? snapshot.perks.split(',') as PerkId[] : []).forEach((perk, index) => {
+      const style = PERK_ICONS[perk], x = 44 + index * 46, y = height - 250;
+      this.panel(x, y, 38, 38, 8, style.fill, 'rgba(255,255,255,0.35)');
+      this.text(style.mark, x + 19, y + 20, { size: 17, color: '#fff7e6', align: 'center' });
+    });
     if (healthWidth > 0) this.panel(74, height - 41, healthWidth, 10, 5, low ? BLOOD : INK, null);
     this.text(String(snapshot.health), 266, height - 36, { size: 17, color: low ? BLOOD : INK });
     let grenadeX = 318 + this.keycap('T', 318, height - 36, 13) + 12;

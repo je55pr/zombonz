@@ -1,4 +1,5 @@
 import type { CollisionBox } from './collision.ts';
+import { hasPerk, PERK_RULES } from './perks.ts';
 import type { EntityId, PlayerState, Vec3, WeaponState, ZombieState } from './types.ts';
 import { SeededRng } from './rng.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
@@ -347,13 +348,19 @@ export function resolveHitscan(
   if (worldDistance !== null) return { kind: 'world', distance: worldDistance };
   return { kind: 'none', distance: range };
 }
+/** A full reload's length for this player; Speed Cola halves it. */
+export function reloadTicksFor(player: PlayerState, definition: WeaponDefinition): number {
+  return hasPerk(player, 'speed-cola') ? Math.round(definition.reloadTicks * PERK_RULES.speedColaReload) : definition.reloadTicks;
+}
+
 export function beginReload(player: PlayerState): WeaponEvent[] {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition || !player.alive || player.meleeCooldownTicks > 0 || player.switchTicksRemaining > 0) return [];
   if (player.weapon.reloadTicksRemaining > 0) return [];
   if (player.weapon.magazineAmmo >= definition.magazineSize || player.weapon.reserveAmmo <= 0) return [];
-  player.weapon.reloadTicksRemaining = definition.reloadTicks;
-  return [{ type: 'weaponReloadStarted', playerId: player.id, weaponId: definition.id, reloadTicks: definition.reloadTicks }];
+  const reloadTicks = reloadTicksFor(player, definition);
+  player.weapon.reloadTicksRemaining = reloadTicks;
+  return [{ type: 'weaponReloadStarted', playerId: player.id, weaponId: definition.id, reloadTicks }];
 }
 
 function completeReload(player: PlayerState): WeaponEvent[] {
@@ -483,7 +490,8 @@ export function firePlayerWeapon(
   if (!definition || player.weapon.cooldownTicks > 0 || !player.alive) return [];
   if (player.switchTicksRemaining > 0 || player.meleeCooldownTicks > 0 || player.weapon.reloadTicksRemaining > 0 || player.weapon.magazineAmmo <= 0) return [];
   player.weapon.magazineAmmo -= 1;
-  player.weapon.cooldownTicks = definition.fireIntervalTicks;
+  player.weapon.cooldownTicks = hasPerk(player, 'double-tap')
+    ? Math.max(1, Math.round(definition.fireIntervalTicks * PERK_RULES.doubleTapInterval)) : definition.fireIntervalTicks;
   const events: Array<WeaponEvent | DamageEvent> = [{ type: 'weaponFired', playerId: player.id, weaponId: definition.id }];
   if (player.weapon.magazineAmmo === 0) events.push(...beginReload(player));
   const seed = spreadSeed ^ Math.imul(Number(player.id.slice(2)), 0x9e3779b9);

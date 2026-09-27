@@ -154,6 +154,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       doors: map.doors,
       wallWeapons: map.wallWeapons,
       mysteryBoxes: map.mysteryBoxes,
+      powerSwitch: map.powerSwitch,
+      perkMachines: map.perkMachines,
+      traps: map.traps,
     },
     playerSpawns: [preview?.position ?? map.playerSpawn],
     ...(previewName === 'stress' && preview ? { spawnConfig: {
@@ -178,6 +181,19 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       simulation.getPlayer(playerId)!.pitch = -0.85;
     }
     if (previewName === 'stress') simulation.getPlayer(playerId)!.godMode = true;
+    // `&power=on` starts with the power on; `&traps=on` also sets every electric trap running.
+    const previewParams = new URLSearchParams(location.search);
+    if (previewParams.get('power') === 'on' || previewParams.get('traps') === 'on') {
+      simulation.state.power.on = true;
+      for (const door of simulation.state.doors) if (door.requiresPower) {
+        door.open = true;
+        const item = simulation.interactables().find(entry => entry.id === door.interactableId);
+        if (item) item.enabled = false;
+      }
+    }
+    if (previewParams.get('traps') === 'on') for (const trap of simulation.state.traps) {
+      trap.activeTicks = 2147483647; trap.ownerId = playerId;
+    }
     // `&round=N` starts the wave at round N (after the usual intermission) to inspect later-round gaits.
     const previewRound = Number(new URLSearchParams(location.search).get('round'));
     if (Number.isInteger(previewRound) && previewRound > 1) {

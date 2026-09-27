@@ -246,12 +246,20 @@ export class GameAudio {
       this.playClip(variant('ambience-sting', 2, world.tick), MIX.sting, ((world.tick * 104729) % 200) / 100 - 1);
     }
     for (const event of events) {
-      if ('playerId' in event && event.playerId !== playerId && event.type !== 'powerupCollected') continue;
+      if ('playerId' in event && event.playerId !== playerId && event.type !== 'powerupCollected'
+        && event.type !== 'powerActivated') continue;
       switch (event.type) {
         case 'weaponFired': { const { clip, rate } = gunClip(event.weaponId); this.playClip(clip, MIX.gunfire, 0, rate); break; }
         case 'weaponHit': this.playClip('flesh-hit', event.hitZone === 'head' ? MIX.headshot : MIX.hit); break;
-        case 'zombieDied': this.playAt(variant('zombie-death', 2, Number(event.zombieId.slice(2))), MIX.zombieDeath,
-          world.entities[event.zombieId]?.position, player); break;
+        case 'zombieDied':
+          if (event.method === 'trap') this.playAt('electric-hit', MIX.electric, world.entities[event.zombieId]?.position, player);
+          this.playAt(variant('zombie-death', 2, Number(event.zombieId.slice(2))), MIX.zombieDeath,
+            world.entities[event.zombieId]?.position, player); break;
+        case 'powerActivated': this.playClip('electric-boom', MIX.explosion * 0.8); this.playClip('electric-powerup', MIX.electric); break;
+        case 'perkBought': this.playClip('pickup', MIX.pickup); this.playClip('electric-powerup', MIX.electric * 0.4); break;
+        case 'playerRevived': this.playClip('electric-powerup', MIX.electric); break;
+        case 'trapActivated': this.playClip('electric-powerup', MIX.electric); this.playClip('electric-hit', MIX.electric * 0.7); break;
+        case 'mysteryBoxTeddy': this.playClip('ambience-sting-1', MIX.sting * 3); break;
         case 'meleeSwung': this.playClip('knife', MIX.knife); break;
         // A zombie's swipe lands with a grunt as well as the hit.
         case 'playerDamaged': this.playClip('flesh-hit', MIX.hurt); this.playClip(variant('zombie-attack', 3, world.tick), MIX.zombieAttack); break;
