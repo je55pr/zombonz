@@ -169,6 +169,7 @@ Press F2 for asset credits. Full source links, licences and conversion notes are
 For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs`
 open inspection views with waves disabled, routes open and 10000 test points.
 These overrides are development-only; the normal URL starts the standard survival game.
+`/?preview=wallBuys` and `/?preview=helpWalls` face the start-room and HELP-room chalk wall buys.
 `/?preview=barrier` runs a live wave at the first window for entry-animation checks.
 `/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and
 god mode for repeatable performance checks. Add `&round=N` to any preview URL to start its wave at
