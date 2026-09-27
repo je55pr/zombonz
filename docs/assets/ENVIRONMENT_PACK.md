@@ -14,7 +14,12 @@ Each tileable material uses:
 
 - `basecolor.webp` in sRGB.
 - `normal.webp` as an OpenGL tangent-space normal map in linear colour space.
-- `arm.jpg` as packed linear data: **R = ambient occlusion, G = roughness, B = metallic**.
+- `arm.webp` as packed linear data: **R = ambient occlusion, G = roughness, B = metallic**.
+
+Every material and decal map is stored at 1024 px as WebP, the size the game decodes it at
+(`ENVIRONMENT_TEXTURE_SIZE`). The 2K originals were re-encoded on 2026-09-27 by
+`scripts/weapon-convert/shrink-environment.mjs` (59.1 MB to 10.6 MB); the untouched 2K downloads
+remain in the external asset cache.
 
 In Three.js the same ARM texture can be assigned to `aoMap`, `roughnessMap`, and `metalnessMap`. Geometry using AO also needs the UV channel expected by the Three.js version in use.
 
@@ -22,7 +27,7 @@ Decals expose whichever of base colour, normal, opacity, roughness, and AO the s
 
 ## Prop convention
 
-Every prop path in `/assets/props/manifest.json` points to a self-contained GLB. The main prop set uses 1K textures to keep environment dressing inexpensive.
+Every prop path in `/assets/props/manifest.json` points to a self-contained GLB. The main prop set uses 1K textures to keep environment dressing inexpensive. On 2026-09-27 their high-quality JPEG textures were re-encoded as WebP at the same 1K size, and textures no material used were dropped (`recompress.mjs`): 43 MB to 19 MB.
 
 Especially useful first-pass props include:
 
@@ -66,8 +71,8 @@ the tile size consistent. Base colour uses sRGB, and normal/ARM use linear data;
 the same ARM image feeds AO (R), roughness (G), and metalness (B), using UV channel 0.
 
 `environmentMaterials.ts` shares materials and textures across the level. Images
-are decoded at 1024 square before GPU upload, preserving the 2K repository originals.
-This bounds texture memory and avoids uploading all the 2K maps during gameplay.
+are decoded at 1024 square before GPU upload, which is also the size they are stored at,
+so no bytes are downloaded only to be discarded.
 Grime/leak overlays use their opacity maps, do not write depth, and have polygon
 offset to avoid flickering against the walls. The modern graffiti atlas is left out.
 

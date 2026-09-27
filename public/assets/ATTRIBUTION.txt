@@ -8,12 +8,12 @@ https://creativecommons.org/licenses/by/4.0/
 Zombie Soldier
 Creator: Peter_D (@better_peter)
 Source: https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f
-Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; animation clips separated for runtime use.
+Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; animation clips separated for runtime use. Textures later re-encoded as WebP (colour/normal kept at full size, packed maps at most 1K) and an embedded texture no material used was removed.
 
 Zombie
 Creator: pxltiger
 Source: https://sketchfab.com/3d-models/zombie-73ef58af341e46afba1da53366ed79cf
-Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; stale PSD reference removed; attack/idle/run/walk clips rebuilt as pruned animation-only GLBs.
+Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; stale PSD reference removed; attack/idle/run/walk clips rebuilt as pruned animation-only GLBs. Textures later re-encoded as WebP (colour/normal kept at full size, packed maps at most 1K) and an embedded texture no material used was removed.
 
 Realistic M1911 Handgun - Game Ready
 Creator: Quinn Kuslich
@@ -168,7 +168,7 @@ weapon rest-pose baking/batching, detached-magazine assembly, scale/orientation
 normalization, and procedural recoil/reload/muzzle flash. Source GLBs are unchanged.
 ## CC0 environment textures
 
-The environment materials and decal sets in /assets/environment are CC0. Attribution is not required, but source pages are preserved here and in /assets/environment/manifest.json.
+The environment materials and decal sets in /assets/environment are CC0. Attribution is not required, but source pages are preserved here and in /assets/environment/manifest.json. They are stored as 1024 px WebP re-encodes of the 2K sources, and the prop models' textures as WebP.
 
 Poly Haven:
 - weathered-concrete-a: https://polyhaven.com/a/concrete_wall_006
