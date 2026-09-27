@@ -125,20 +125,19 @@ describe('start menu', () => {
   });
 });
 
-describe('click to start', () => {
-  it('starts paused until the first click, then behaves like a normal pause', () => {
+describe('direct start', () => {
+  it('holds simulation during loading and resumes it without a second click', () => {
     const surface = new EventTarget() as unknown as HTMLElement;
     const target = new EventTarget() as unknown as Window;
     const page = Object.assign(new EventTarget(), { hidden: false, pointerLockElement: null }) as unknown as Document;
     const pause = new SoloPauseController(surface, target, page, () => {}, true, () => true, true);
     expect(pause.paused).toBe(true);
-    expect(pause.started).toBe(false);
-    surface.dispatchEvent(new Event('pointerdown'));
+    pause.resume();
     expect(pause.paused).toBe(false);
-    expect(pause.started).toBe(true);
     const plain = new SoloPauseController(surface, target, page);
     expect(plain.paused).toBe(false);
-    expect(plain.started).toBe(true);
+    pause.dispose();
+    plain.dispose();
   });
 });
 

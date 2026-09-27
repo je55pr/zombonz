@@ -1,8 +1,6 @@
 /** Presentation-owned solo pause: no simulation tick or wall-clock timer runs while paused. */
 export class SoloPauseController {
   paused = false;
-  /** False until the first resume of a game that starts paused, so the HUD can say "click to start". */
-  started = true;
 
   constructor(
     private readonly surface: HTMLElement,
@@ -13,8 +11,8 @@ export class SoloPauseController {
     private readonly canPause: () => boolean = () => true,
     startPaused = false,
   ) {
-    // A game opened from the menu waits for a click, which also captures the mouse.
-    this.paused = startPaused; this.started = !startPaused;
+    // Menu launches hold the simulation only while the selected map finishes loading.
+    this.paused = startPaused;
     target.addEventListener('keydown', this.onKeyDown);
     target.addEventListener('blur', this.onBlur);
     page.addEventListener('visibilitychange', this.onVisibilityChange);
@@ -26,9 +24,11 @@ export class SoloPauseController {
     if (value && !this.canPause()) return;
     if (this.paused === value) return;
     this.paused = value;
-    if (!value) this.started = true;
     this.onChange(value);
   }
+
+  resume(): void { if (!this.page.hidden) this.setPaused(false); }
+  pause(): void { this.setPaused(true); }
 
   private onKeyDown = (event: KeyboardEvent) => {
     if (event.code === 'Escape' && !event.repeat) this.setPaused(true);
@@ -39,7 +39,7 @@ export class SoloPauseController {
     if (this.autoPauseOnPointerUnlock && this.page.pointerLockElement !== this.surface) this.setPaused(true);
   };
   private onPointerDown = () => {
-    if (!this.page.hidden) this.setPaused(false);
+    this.resume();
   };
 
   dispose(): void {

@@ -161,11 +161,6 @@ export class MenuView {
     const rule = c.createLinearGradient(centre - 260 * scale, 0, centre + 260 * scale, 0);
     rule.addColorStop(0, 'rgba(0,0,0,0)'); rule.addColorStop(0.5, '#b3281d'); rule.addColorStop(1, 'rgba(0,0,0,0)');
     c.fillStyle = rule; c.fillRect(centre - 260 * scale, height * 0.22 + 44 * scale, 520 * scale, 2 * scale);
-    c.fillStyle = '#c8392b'; c.font = `500 ${Math.round(20 * scale)}px ${UI_FONT}`;
-    c.letterSpacing = `${Math.round(8 * scale)}px`;
-    c.fillText('BUNKER', centre, height * 0.22 + 70 * scale);
-    c.letterSpacing = '0px';
-
     this.rows = [];
     const screen = this.state.screen;
     let y = height * (screen === 'main' ? 0.52 : 0.47);

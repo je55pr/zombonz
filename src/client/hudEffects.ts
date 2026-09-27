@@ -101,6 +101,10 @@ export class PointsPopups {
   }
 
   get count(): number { return this.popups.length; }
+
+  clear(): void {
+    for (const popup of [...this.popups]) this.remove(popup);
+  }
 }
 
 /** Seconds for the round-complete flash, and for a new round to fade in white and settle to red. */

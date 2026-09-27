@@ -26,6 +26,10 @@ export class GrenadeView {
       this.projectiles.clear();
       for (const flash of this.flashes) { flash.mesh.removeFromParent(); (flash.mesh.material as THREE.Material).dispose(); }
       this.flashes.length = 0;
+      for (const arc of this.arcs) {
+        arc.line.removeFromParent(); arc.line.geometry.dispose(); (arc.line.material as THREE.Material).dispose();
+      }
+      this.arcs.length = 0;
     }
     for (const event of events) {
       if (event.type === 'grenadeExploded') this.flash(event.position, 0xffa749, 1, tick);

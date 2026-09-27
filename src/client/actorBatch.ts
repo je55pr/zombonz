@@ -34,4 +34,9 @@ export class ActorBatch {
       batch.instanceMatrix.needsUpdate = true;
     }
   }
+
+  dispose(): void {
+    for (const batch of this.batches.values()) { this.scene.remove(batch); batch.dispose(); }
+    this.batches.clear();
+  }
 }

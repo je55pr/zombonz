@@ -31,6 +31,16 @@ import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
 // Re-exported so the start screen can preload through the same chunk it will run.
 export { downloadAssets, gameAssetUrls, type DownloadProgress } from './client/preload.ts';
 
+export interface GameSession {
+  ready: Promise<void>;
+  start(): void;
+  resume(): void;
+  restart(): void;
+  updateSettings(settings: GameSettings): void;
+  dispose(): void;
+}
+export interface GameHooks { onPauseChange?(paused: boolean): void }
+
 /**
  * Start-screen warm-up after the download: decode every environment texture and parse the props, the
  * zombie rig and the starting pistol into the loaders' page-wide caches, so startGame finds them ready.
@@ -66,8 +76,9 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
  * Resolves once the map, props, zombie and starting gun are in place, textures are uploaded and shaders
  * compiled, so the caller can keep the canvas hidden until then and never show a half-loaded map.
  */
-export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DEFAULT_SETTINGS,
-  mapId: MapId = 'bunker'): Promise<void> {
+export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettings = DEFAULT_SETTINGS,
+  mapId: MapId = 'bunker', hooks: GameHooks = {}): GameSession {
+  let settings = { ...initialSettings };
   // Development previews (`?preview=`) pick their map with `&map=`.
   const previewMap = import.meta.env.DEV ? new URLSearchParams(location.search).get('map') : null;
   const map = MAPS[isMapId(previewMap) ? previewMap : mapId];
@@ -155,7 +166,8 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
           : previewPowerup === 'nuke' ? 'nuke' : 'maxAmmo'] as const,
     } } : {}),
     ...(preview ? { roundConfig: { initialWaitTicks: previewName === 'barrier' || previewName === 'stress' ? 120 : 2147483647, intermissionTicks: 180 },
-      economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } } : {}),
+      economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } }
+      : { roundConfig: { initialWaitTicks: 1, intermissionTicks: 600 } }),
   });
   const playerId = simulation.playerIds[0];
   if (!simulation.getPlayer(playerId)) throw new Error('Simulation failed to create local player.');
@@ -253,18 +265,23 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   const clock = new FixedStepClock({ tickRate: 60 });
   const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022 * settings.sensitivity, previewFireKey: !!preview });
   const audio = new GameAudio(canvas);
+  audio.setPaused(!preview);
+  if (!preview) audio.startFromGesture();
   audio.setVolume(settings.volume);
   const pause = new SoloPauseController(canvas, window, document, paused => {
     clock.reset(); previousPositions.clear();
     if (paused) input.clear();
     audio.setPaused(paused);
-  }, !preview, () => simulation.state.round.phase !== 'gameOver', !preview);
+    hooks.onPauseChange?.(paused);
+  }, !preview, () => !preview, !preview);
   const hud = new CanvasHud(renderer, map.name);
   const feedback = new HudFeedback();
   const performanceOverlay = new PerformanceOverlay();
   renderer.info.autoReset = false;
   let previousSeconds: number | undefined;
   let lastShadowTick = -Infinity;
+  let disposed = false;
+  let frameId = 0;
 
   function simulate(dt: number): void {
     previousPositions.clear();
@@ -318,6 +335,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   }
 
   function frame(nowMs: number): void {
+    if (disposed) return;
     const started = performance.now();
     if (++lastWarmFrame % 20 === 0) warmUpcomingWeapons();
     const nowSeconds = nowMs / 1000;
@@ -351,23 +369,23 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha, interval / 1000); weaponView.render(renderer, camera.aspect); }
     const hudStarted = performance.now();
     const hudSnapshot = buildHudSnapshot(simulation, playerId);
-    if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused, awaitingStart: !pause.started,
+    if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused,
       feedback: feedback.snapshot(simulation.state.world.tick),
       assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice }, performance.now(),
       player ? { spread: currentSpread(player), verticalFov: camera.fov } : undefined);
     performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
       renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
     performanceOverlay.render(renderer);
-    requestAnimationFrame(frame);
+    frameId = requestAnimationFrame(frame);
   }
 
   addEventListener('resize', resize);
   resize();
   syncCamera();
-  requestAnimationFrame(frame);
+  frameId = requestAnimationFrame(frame);
 
   const startingWeapon = simulation.getPlayer(playerId)?.weapon.weaponId ?? 'starter-pistol';
-  return (async () => {
+  const ready = (async () => {
     await Promise.allSettled([environmentReady, zombieReady, details.ready, prepareWeaponModel(startingWeapon)]);
     // Upload every texture and compile every shader now, rather than stuttering on the first frames.
     await renderer.compileAsync(scene, camera);
@@ -386,9 +404,46 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     // flick through real models without one long stall.
     void (async () => {
       for (const id of map.mysteryBoxes[0].weapons) {
+        if (disposed) break;
         await prepareWeaponModel(id)?.catch(() => {});
         await new Promise(resolve => setTimeout(resolve, 60));
       }
     })();
   })();
+  return {
+    ready,
+    start: () => {
+      pause.resume();
+      if (pause.paused) hooks.onPauseChange?.(true);
+    },
+    resume: () => pause.resume(),
+    restart: () => {
+      const event = simulation.restart();
+      input.clear(); clock.reset(); previousPositions.clear(); previousSeconds = undefined; lastShadowTick = -Infinity;
+      for (const view of skinnedViews.values()) view.dispose();
+      skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
+      grenadeView.events([event], simulation.state.world.tick);
+      weaponView.events([event], playerId, simulation.state.world.tick);
+      feedback.consume([event], playerId, simulation.state.world.tick);
+      hud.reset();
+      audio.consume([event], playerId, simulation.state.world);
+      pause.resume();
+    },
+    updateSettings: next => {
+      settings = { ...next };
+      input.setSensitivity(0.0022 * settings.sensitivity);
+      audio.setVolume(settings.volume);
+    },
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      cancelAnimationFrame(frameId);
+      removeEventListener('resize', resize);
+      pause.dispose(); input.dispose(); audio.dispose(); hud.dispose();
+      performanceOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose();
+      for (const view of skinnedViews.values()) view.dispose();
+      skinnedViews.clear(); zombieViews.clear();
+      renderer.dispose();
+    },
+  };
 }

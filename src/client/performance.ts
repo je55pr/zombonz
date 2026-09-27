@@ -16,6 +16,11 @@ export class PerformanceOverlay {
   private simulation = 0;
   private hud = 0;
   private intervals: number[] = [];
+  private readonly onKeyDown = (event: KeyboardEvent) => {
+    if (event.code === 'F3' && !event.repeat) {
+      event.preventDefault(); this.visible = !this.visible;
+    }
+  };
 
   constructor() {
     this.canvas.width = 512; this.canvas.height = 150;
@@ -27,11 +32,7 @@ export class PerformanceOverlay {
       map: this.texture, transparent: true, depthTest: false, depthWrite: false,
     }));
     this.scene.add(this.quad); this.camera.position.z = 1;
-    addEventListener('keydown', event => {
-      if (event.code === 'F3' && !event.repeat) {
-        event.preventDefault(); this.visible = !this.visible;
-      }
-    });
+    addEventListener('keydown', this.onKeyDown);
   }
 
   sample(interval: number, cpu: number, simulation: number, hud: number, calls: number, triangles: number, scale: number): void {
@@ -64,5 +65,12 @@ export class PerformanceOverlay {
       this.quad.position.set(this.size.x - width / 2 - 12, this.size.y - height / 2 - 12, 0);
     }
     renderer.render(this.scene, this.camera);
+  }
+
+  dispose(): void {
+    removeEventListener('keydown', this.onKeyDown);
+    this.quad.geometry.dispose();
+    (this.quad.material as THREE.Material).dispose();
+    this.texture.dispose();
   }
 }

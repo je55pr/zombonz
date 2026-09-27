@@ -6,9 +6,29 @@
   <title>Zombonz</title>
   <link rel="icon" href="data:,">
   <style>
-    html, body, #game, #menu { width: 100%; height: 100%; margin: 0; display: block; overflow: hidden; background: #0d0e0d; }
-    /* Only one canvas is ever visible: the menu until Solo starts, then the game. */
-    #game[hidden] { display: none; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #0d0e0d; }
+    #game, #menu { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #game { z-index: 0; }
+    #menu { z-index: 1; }
+    [hidden] { display: none !important; }
+    .pause-menu { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center;
+      background: rgba(3, 4, 4, .79); color: #e5ddc8; font-family: 'Oswald', sans-serif; }
+    .pause-panel { width: min(440px, calc(100vw - 36px)); padding: 38px 40px 26px;
+      background: linear-gradient(150deg, #22211e, #111312); border: 1px solid #6a433b;
+      box-shadow: 0 24px 80px #000c, inset 0 1px #ffffff1c; text-align: center; }
+    .pause-panel h1 { margin: 0; font: 68px 'Special Elite', Georgia, serif; letter-spacing: 2px; }
+    .pause-rule { height: 2px; margin: 15px auto 28px; width: 75%;
+      background: linear-gradient(90deg, transparent, #ad3025, transparent); }
+    .pause-main, .pause-settings { display: grid; gap: 10px; }
+    .pause-menu button { width: 100%; padding: 12px; border: 1px solid #5b5b50; background: #242723;
+      color: #e5ddc8; font: 22px 'Oswald', sans-serif; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; }
+    .pause-menu button:hover, .pause-menu button:focus-visible { border-color: #c64130; background: #44302b;
+      outline: none; }
+    .pause-setting { display: grid; grid-template-columns: 1fr auto; gap: 8px; text-align: left;
+      font: 18px 'Oswald', sans-serif; }
+    .pause-setting input { grid-column: 1 / -1; width: 100%; accent-color: #bf382b; }
+    .pause-setting output { color: #dbb75d; }
+    .pause-panel p { margin: 25px 0 0; color: #aaa391; font: 14px 'Oswald', sans-serif; letter-spacing: 2px; }
   </style>
 </head>
 <body>

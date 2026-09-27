@@ -30,8 +30,6 @@ export interface HudSnapshot {
   instaKillStatus: string | null;
   gameOver: boolean;
   paused: boolean;
-  /** A game opened from the menu shows CLICK TO START instead of PAUSED before its first click. */
-  awaitingStart?: boolean;
   godMode: boolean;
   noclip: boolean;
   sprinting: boolean;
@@ -262,7 +260,7 @@ export class CanvasHud {
     // Top: the map, the credits key and the controls, kept quiet.
     this.text(this.mapName.toUpperCase(), 40, 40, { size: 22, font: 'title', color: DIM });
     this.text('F2  CREDITS', 42, 66, { size: 13, weight: 500, color: FAINT, spacing: 2 });
-    // The controls line only fits clear of the map name on wider screens; the pause screen always lists them.
+    // The controls line only fits clear of the map name on wider screens.
     const controls: TextStyle = { size: 13, weight: 500, color: FAINT, align: 'center', spacing: 1.5 };
     if (!snapshot.paused && centre - this.measure(CONTROLS, controls) / 2 > 280) this.text(CONTROLS, centre, 26, controls);
     const modes = [snapshot.godMode ? 'GOD MODE [G]' : '', snapshot.noclip ? 'NOCLIP [F]' : ''].filter(Boolean);
@@ -361,15 +359,6 @@ export class CanvasHud {
       this.text(`${snapshot.points} POINTS`, centre, height * 0.58, { size: 30, color: GOLD, align: 'center', spacing: 2 });
       this.text('PRESS ENTER TO RESTART', centre, height * 0.68, { size: 22, color: DIM, align: 'center', spacing: 5 });
     }
-    if (snapshot.paused && !snapshot.gameOver) {
-      this.overlay(width, height, 0.66);
-      this.text(snapshot.awaitingStart ? this.mapName.toUpperCase() : 'PAUSED', centre, height * 0.41,
-        { size: 76, font: 'title', align: 'center' });
-      this.rule(centre, height * 0.48, 560, 'rgba(216,56,43,0.8)');
-      this.text(snapshot.awaitingStart ? 'CLICK TO START' : 'CLICK TO RESUME', centre, height * 0.54,
-        { size: 26, color: GOLD, align: 'center', spacing: 6 });
-      this.text(CONTROLS, centre, height * 0.62, { size: 15, weight: 500, color: DIM, align: 'center', spacing: 1.5 });
-    }
     if (this.credits) {
       const panelWidth = Math.min(1240, width - 80), left = centre - panelWidth / 2;
       const body: TextStyle = { size: 17, weight: 500 };
@@ -429,6 +418,12 @@ export class CanvasHud {
       effects && !!aim && !snapshot.aiming && !snapshot.sprinting);
     this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  reset(): void {
+    this.previous = null;
+    this.credits = false;
+    this.popups.clear();
   }
 
   dispose(): void {

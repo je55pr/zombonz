@@ -114,6 +114,9 @@ export class GameAudio {
     window.addEventListener('keydown', this.onKeyDown);
   }
 
+  /** Call within the level-selection gesture so the first round has audio immediately. */
+  startFromGesture(): void { this.start(); }
+
   private start(): void {
     if (!this.context) {
       try {

@@ -55,12 +55,12 @@ holds mouse sensitivity, field of view and volume, saved in this browser. While 
 downloads the game code and every model and texture the game uses (about 88 MB), with a progress
 bar, then unpacks them (decodes the textures and parses the props, zombie and starting pistol).
 Solo and Multiplayer unlock when both finish (Settings works throughout). The files are kept in
-memory, so starting Solo makes no further requests, and the menu stays up until Bunker is fully built,
+memory, so starting Solo makes no further requests, and the menu stays up until the chosen map is fully built,
 its textures uploaded and shaders compiled, so the map never appears half-loaded. In play, a gun
 starts unpacking while the box rolls it or while you stand at its wall buy, so it appears straight
-away. Solo then waits on CLICK TO START.
+away. Choosing a map captures the mouse and starts round one as soon as loading finishes.
 
-Click the canvas to capture the mouse. Move with WASD, hold Shift while moving forward to sprint,
+If the browser denies mouse capture, click the game canvas to retry. Move with WASD, hold Shift while moving forward to sprint,
 hold the right mouse button to aim down sights, and fire with the left mouse button.
 Sprint lasts about four seconds, then recharges after a short pause; once exhausted you
 need a second of stamina back before sprinting again. Sprinting also stops when firing, aiming, reloading or changing weapons; aiming slows movement
@@ -70,8 +70,8 @@ prototype tuning, not a frame-exact recreation.
 Reload early with R (or automatically when the magazine empties), knife with V,
 throw a grenade with T or middle mouse, switch weapons
 with Q, interact with E, and restart after game over with Enter.
-M mutes synthesized game audio. Escape releases the mouse and pauses solo play;
-click the canvas to resume. Losing focus or hiding the tab also pauses the game,
+M mutes game audio. Escape releases the mouse and opens the pause menu, with Resume,
+Restart, Settings and Quit to Main Menu. Losing focus or hiding the tab also pauses the game,
 so zombies do not advance while you are away. Input releases when focus is lost.
 
 G toggles god mode (restores health and prevents damage). F toggles noclip:
