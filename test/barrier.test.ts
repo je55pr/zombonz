@@ -27,7 +27,7 @@ describe('exterior entry routes', () => {
     expect(sim.state.barriers[0].boards).toBe(NACHT_WINDOW_BOARDS);
     let firstTear = -1, vaultStarted = -1, entered = -1;
     const tears: number[] = [];
-    for (let tick = 0; tick < 1200; tick++) {
+    for (let tick = 0; tick < 2000; tick++) {
       const previous = { ...zombie.position };
       const frameEvents = sim.tick();
       for (const event of frameEvents) {
@@ -46,7 +46,7 @@ describe('exterior entry routes', () => {
     expect(entered - vaultStarted).toBe(BARRIER_RULES.vaultTicks);
     expect(zombie.entry).toBeNull();
     expect(zombie.position).toEqual(NACHT_BARRIERS[0].insidePoint);
-    for (let i = 0; i < 600; i++) sim.tick();
+    for (let i = 0; i < 1200; i++) sim.tick();
     expect(zombie.targetId).toBe(sim.playerIds[0]);
     expect(sim.getPlayer(sim.playerIds[0])!.health).toBeLessThan(1000);
   });
@@ -58,7 +58,7 @@ describe('exterior entry routes', () => {
       const player = sim.getPlayer(sim.playerIds[0])!;
       player.health = 100000;
       let entered = false;
-      for (let tick = 0; tick < 2000; tick++) {
+      for (let tick = 0; tick < 3400; tick++) {
         if (sim.tick().some(event => event.type === 'zombieEntered')) entered = true;
       }
       const zombie = sim.zombies()[0];
@@ -72,7 +72,7 @@ describe('exterior entry routes', () => {
     const sim = makeSimulation(0, 3);
     sim.getPlayer(sim.playerIds[0])!.health = 100000;
     let crossings = 0, entered = 0;
-    for (let tick = 0; tick < 1000; tick++) {
+    for (let tick = 0; tick < 1700; tick++) {
       const events = sim.tick();
       crossings += events.filter(event => event.type === 'zombieVaultStarted').length;
       entered += events.filter(event => event.type === 'zombieEntered').length;
@@ -97,7 +97,7 @@ describe('exterior entry routes', () => {
     const sim = makeSimulation(0, 2);
     const player = sim.getPlayer(sim.playerIds[0])!;
     player.health = 100000;
-    for (let tick = 0; tick < 700 && sim.state.barriers[0].vaultingZombieId === null; tick++) sim.tick();
+    for (let tick = 0; tick < 1200 && sim.state.barriers[0].vaultingZombieId === null; tick++) sim.tick();
     const victim = sim.zombies().find(zombie => zombie.id === sim.state.barriers[0].vaultingZombieId)!;
     expect(victim).toBeDefined();
     const target = { x: victim.position.x, y: victim.position.y + 1.25, z: victim.position.z };
@@ -111,7 +111,7 @@ describe('exterior entry routes', () => {
     }
     expect(victim.alive).toBe(false);
     let entered = false;
-    for (let tick = 0; tick < 250; tick++) {
+    for (let tick = 0; tick < 400; tick++) {
       if (sim.tick().some(event => event.type === 'zombieEntered')) entered = true;
     }
     expect(entered).toBe(true);
@@ -159,7 +159,7 @@ describe('barrier persistence and rebuilding', () => {
   it('never repairs into a zombie currently crossing the sill', () => {
     const sim = makeSimulation();
     const player = sim.getPlayer(sim.playerIds[0])!; player.health = 100000;
-    for (let i = 0; i < 700 && sim.state.barriers[0].vaultingZombieId === null; i++) sim.tick();
+    for (let i = 0; i < 1200 && sim.state.barriers[0].vaultingZombieId === null; i++) sim.tick();
     player.position = { ...NACHT_BARRIERS[0].insidePoint }; player.yaw = 0;
     const hold = createInputFrame(0);
     hold.actions.interact = { pressed: true, held: true, released: false, value: 1 };
@@ -170,7 +170,7 @@ describe('barrier persistence and rebuilding', () => {
   it('replays entry state deterministically, including restore midway through a vault', () => {
     const a = makeSimulation(0, 3), b = makeSimulation(0, 3);
     a.getPlayer(a.playerIds[0])!.health = b.getPlayer(b.playerIds[0])!.health = 100000;
-    for (let i = 0; i < 1100 && a.state.barriers[0].vaultingZombieId === null; i++) {
+    for (let i = 0; i < 1900 && a.state.barriers[0].vaultingZombieId === null; i++) {
       expect(a.tick()).toEqual(b.tick());
     }
     expect(a.state.barriers[0].vaultingZombieId).not.toBeNull();

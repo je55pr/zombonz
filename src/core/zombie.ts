@@ -21,8 +21,12 @@ export interface ZombieAttackEvent {
   damage: number;
 }
 
-/** Sprinters sit just under the player's 4.2 m/s walk, so only sprinting opens a gap. */
-export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 1.35, run: 2.9, sprint: 4.1 };
+/**
+ * Walkers shamble at their walk cycle's own ground pace (about 0.75 m/s), so feet don't slide and an
+ * early round is as slow as WaW's. Sprinters sit just under the player's 4.2 m/s walk, so only sprinting
+ * opens a gap.
+ */
+export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 0.8, run: 2.9, sprint: 4.1 };
 
 /** WaW/BO1 set_run_speed: roll [speed, speed + 35); up to 35 walks, up to 70 runs, beyond sprints. */
 export const ZOMBIE_GAIT_RULES = { speedPerRound: 8, rollRange: 35, walkMax: 35, runMax: 70 } as const;

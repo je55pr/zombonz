@@ -55,6 +55,8 @@ describe('zombie gaits', () => {
   it('lets sprinters nearly match a walking player but not a sprinting one', () => {
     expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeGreaterThan(PLAYER_MOVEMENT.maxSpeed * 0.9);
     expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeLessThan(PLAYER_MOVEMENT.maxSpeed);
+    // Round-one walkers are a slow shamble: a walking player leaves them well behind.
+    expect(ZOMBIE_GAIT_SPEEDS.walk).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.2);
   });
 
   it('assigns spawned gaits deterministically from the match seed', () => {
