@@ -74,9 +74,10 @@ describe('render performance contracts', () => {
   });
 
   it('redraws and uploads the HUD only when its displayed state changes', () => {
-    const context = { clearRect: vi.fn(), strokeText: vi.fn(), fillText: vi.fn(), fillRect: vi.fn(),
-      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(),
-      measureText: () => ({ width: 100 }) };
+    // Any other drawing call is a no-op; gradients accept colour stops.
+    const calls: Record<string | symbol, unknown> = { clearRect: vi.fn(), measureText: () => ({ width: 100 }) };
+    const context = new Proxy(calls, { get: (target, key) => target[key]
+      ?? (target[key] = vi.fn(() => ({ addColorStop: vi.fn() }))) }) as { clearRect: ReturnType<typeof vi.fn> };
     vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => context }) });
     const renderer = { clearDepth: vi.fn(), render: vi.fn() };
     const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
