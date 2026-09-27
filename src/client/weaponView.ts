@@ -156,6 +156,12 @@ export function prepareWeaponModel(id: string): Promise<PreparedWeapon> | null {
   return pending;
 }
 
+/** The prepared model if it has already finished loading, without starting or waiting for a load. */
+export function readyWeaponModel(id: string): PreparedWeapon | null {
+  const asset = WEAPON_ASSETS[id];
+  return asset ? readyWeapons.get(asset) ?? null : null;
+}
+
 function placeholderWeapon(id: string): PreparedWeapon {
   const root = new THREE.Group(), magazine = new THREE.Group(); root.add(magazine);
   const metal = new THREE.MeshStandardMaterial({ color: 0x444a48, roughness: 0.6, metalness: 0.5 });

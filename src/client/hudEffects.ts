@@ -1,0 +1,188 @@
+import * as THREE from 'three';
+import { TITLE_FONT, UI_FONT } from './fonts.ts';
+
+/**
+ * Animated HUD pieces drawn as their own small textured quads over the HUD canvas, so animating them
+ * never repaints and re-uploads the whole HUD. Positions are in HUD layout units (900 tall; the width
+ * follows the window), converted to the HUD camera's -1..1 space.
+ */
+export interface HudLayout { width: number; height: number; scale: number }
+
+const GOLD = '#f2c55c';
+const RED = '#d8382b';
+const ROUND_RED = new THREE.Color(0xd8382b);
+const WHITE = new THREE.Color(0xf4efe0);
+
+function placeQuad(mesh: THREE.Mesh, layout: HudLayout, x: number, y: number, width: number, height: number): void {
+  mesh.position.set(((x + width / 2) / layout.width) * 2 - 1, 1 - ((y + height / 2) / layout.height) * 2, 0);
+  mesh.scale.set((width / layout.width) * 2, (height / layout.height) * 2, 1);
+}
+
+function overlayMaterial(texture: THREE.Texture): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false });
+}
+
+interface Popup { mesh: THREE.Mesh; born: number; x: number; y: number; vx: number; vy: number; width: number; height: number }
+
+/** Popup lifetime in seconds, and how many can be on screen at once (automatic fire stays readable). */
+const POPUP_LIFE = 1.2;
+const MAX_POPUPS = 24;
+
+/**
+ * WaW's floating score: every hit and kill throws a gold "+10", "+50" or "+100" off the points counter,
+ * and spending throws a red "-950". Each distinct label is rasterised once and reused.
+ */
+export class PointsPopups {
+  private readonly popups: Popup[] = [];
+  private readonly labels = new Map<string, { texture: THREE.CanvasTexture; width: number; height: number }>();
+  private labelScale = 0;
+  private spawned = 0;
+  private readonly geometry = new THREE.PlaneGeometry(1, 1);
+
+  constructor(private readonly scene: THREE.Scene) {}
+
+  private label(text: string, colour: string, scale: number) {
+    if (scale !== this.labelScale) {
+      for (const label of this.labels.values()) label.texture.dispose();
+      this.labels.clear(); this.labelScale = scale;
+    }
+    const key = `${colour}${text}`;
+    let label = this.labels.get(key);
+    if (!label) {
+      const size = 34, height = 48, font = `700 ${size}px ${UI_FONT}`;
+      const canvas = document.createElement('canvas');
+      const measure = canvas.getContext('2d')!;
+      measure.font = font;
+      const width = Math.ceil(measure.measureText(text).width) + 20;
+      canvas.width = Math.ceil(width * scale); canvas.height = Math.ceil(height * scale);
+      // Resizing the canvas resets its state, so the font is set again below.
+      const c = canvas.getContext('2d')!;
+      c.scale(scale, scale);
+      c.font = font; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.shadowColor = 'rgba(0,0,0,0.9)'; c.shadowBlur = 5; c.shadowOffsetY = 2;
+      c.fillStyle = colour; c.fillText(text, width / 2, height / 2 + 1);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace; texture.generateMipmaps = false; texture.minFilter = THREE.LinearFilter;
+      label = { texture, width, height };
+      this.labels.set(key, label);
+    }
+    return label;
+  }
+
+  /** Throws a popup from the left edge of the points counter (layout coordinates). */
+  spawn(amount: number, from: { x: number; y: number }, layout: HudLayout, now: number): void {
+    if (amount === 0) return;
+    const spend = amount < 0;
+    const label = this.label(`${spend ? '-' : '+'}${Math.abs(amount)}`, spend ? RED : GOLD, layout.scale);
+    // A fixed scatter pattern rather than randomness: consecutive popups fan out instead of stacking.
+    const fan = [0.1, -0.35, 0.55, -0.1, 0.35, -0.55, 0.2][this.spawned++ % 7];
+    const mesh = new THREE.Mesh(this.geometry, overlayMaterial(label.texture));
+    mesh.renderOrder = 10; mesh.frustumCulled = false;
+    this.scene.add(mesh);
+    this.popups.push({ mesh, born: now, x: from.x - label.width, y: from.y - label.height / 2,
+      vx: -70 - Math.abs(fan) * 60, vy: spend ? 45 : -60 + fan * 90, width: label.width, height: label.height });
+    while (this.popups.length > MAX_POPUPS) this.remove(this.popups[0]);
+  }
+
+  private remove(popup: Popup): void {
+    popup.mesh.removeFromParent(); (popup.mesh.material as THREE.Material).dispose();
+    this.popups.splice(this.popups.indexOf(popup), 1);
+  }
+
+  update(layout: HudLayout, now: number, visible: boolean): void {
+    for (const popup of [...this.popups]) {
+      const age = (now - popup.born) / 1000;
+      if (age >= POPUP_LIFE) { this.remove(popup); continue; }
+      const t = age / POPUP_LIFE, ease = 1 - (1 - t) * (1 - t);
+      placeQuad(popup.mesh, layout, popup.x + popup.vx * ease, popup.y + popup.vy * ease, popup.width, popup.height);
+      (popup.mesh.material as THREE.MeshBasicMaterial).opacity = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45;
+      popup.mesh.visible = visible;
+    }
+  }
+
+  get count(): number { return this.popups.length; }
+}
+
+/** Seconds for the round-complete flash, and for a new round to fade in white and settle to red. */
+const FLASH_SECONDS = 3;
+const ARRIVE_SECONDS = 2.2;
+
+/**
+ * The round counter, WaW style: chalk tally marks for rounds one to five, painted numerals after.
+ * It flashes white when a round is cleared, dims through the break, and the next round fades in
+ * white before settling to red.
+ */
+export class RoundCounter {
+  private readonly canvas = document.createElement('canvas');
+  private readonly texture: THREE.CanvasTexture;
+  private readonly mesh: THREE.Mesh;
+  private drawn: { round: number; scale: number } | null = null;
+  private round = 0;
+  private phase = '';
+  private changedAt = 0;
+  private mode: 'arrive' | 'flash' | 'steady' = 'steady';
+  /** Layout box the counter occupies: left, top, width, height. */
+  static readonly BOX = { x: 22, top: 150, width: 330, height: 104 };
+
+  constructor(scene: THREE.Scene) {
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.texture.colorSpace = THREE.SRGBColorSpace; this.texture.generateMipmaps = false;
+    this.texture.minFilter = THREE.LinearFilter;
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), overlayMaterial(this.texture));
+    this.mesh.renderOrder = 5; this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  /** Drawn in white; the material colour tints it red or white as it animates. */
+  private draw(round: number, scale: number): void {
+    const { width, height } = RoundCounter.BOX;
+    this.canvas.width = Math.ceil(width * scale); this.canvas.height = Math.ceil(height * scale);
+    const c = this.canvas.getContext('2d')!;
+    c.setTransform(scale, 0, 0, scale, 0, 0);
+    c.clearRect(0, 0, width, height);
+    c.shadowColor = 'rgba(0,0,0,0.85)'; c.shadowBlur = 8; c.shadowOffsetY = 3;
+    c.fillStyle = c.strokeStyle = '#ffffff';
+    if (round >= 1 && round <= 5) {
+      c.lineCap = 'round'; c.lineWidth = 9;
+      // Hand-drawn strokes: a fixed small lean and length variation per mark.
+      const lean = [0.06, -0.04, 0.08, -0.02, 0.05], stretch = [0, 5, -3, 4, -2];
+      for (let i = 0; i < Math.min(round, 4); i++) {
+        const x = 26 + i * 30, top = 16 - stretch[i], bottom = height - 14 + stretch[(i + 2) % 5];
+        c.beginPath(); c.moveTo(x + lean[i] * 40, top); c.lineTo(x - lean[i] * 40, bottom); c.stroke();
+      }
+      if (round === 5) { c.beginPath(); c.moveTo(10, height - 26); c.lineTo(132, 22); c.stroke(); }
+    } else {
+      c.font = `400 100px ${TITLE_FONT}`; c.textBaseline = 'middle'; c.textAlign = 'left';
+      c.fillText(String(round), 14, height / 2 + 4);
+    }
+    this.texture.needsUpdate = true;
+    this.drawn = { round, scale };
+  }
+
+  update(round: number, roundPhase: string, layout: HudLayout, now: number, visible: boolean): void {
+    if (round !== this.round) { this.round = round; this.mode = 'arrive'; this.changedAt = now; }
+    else if (roundPhase !== this.phase && roundPhase === 'intermission') { this.mode = 'flash'; this.changedAt = now; }
+    this.phase = roundPhase;
+    if (!this.drawn || this.drawn.round !== round || this.drawn.scale !== layout.scale) this.draw(round, layout.scale);
+    const { x, top, width, height } = RoundCounter.BOX;
+    const age = (now - this.changedAt) / 1000;
+    const material = this.mesh.material as THREE.MeshBasicMaterial;
+    let grow = 1;
+    if (this.mode === 'arrive') {
+      const fade = Math.min(1, age / 0.6);
+      material.opacity = fade; grow = 1.25 - 0.25 * fade;
+      material.color.copy(WHITE).lerp(ROUND_RED, Math.max(0, Math.min(1, (age - 0.6) / (ARRIVE_SECONDS - 0.6))));
+      if (age >= ARRIVE_SECONDS) this.mode = 'steady';
+    } else if (this.mode === 'flash') {
+      const pulse = age < FLASH_SECONDS ? 0.5 + 0.5 * Math.cos(age * Math.PI * 4) : 0;
+      material.color.copy(ROUND_RED).lerp(WHITE, pulse);
+      // After the flash the cleared round stays dimmed until the next one arrives.
+      material.opacity = age < FLASH_SECONDS ? 1 : Math.max(0.45, 1 - (age - FLASH_SECONDS) * 1.5);
+    } else {
+      material.color.copy(ROUND_RED); material.opacity = 1;
+    }
+    placeQuad(this.mesh, layout, x - width * (grow - 1) / 2, layout.height - top - height * (grow - 1) / 2,
+      width * grow, height * grow);
+    this.mesh.visible = visible;
+  }
+}

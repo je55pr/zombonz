@@ -274,6 +274,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     weaponView.events(events, playerId, simulation.state.world.tick);
     grenadeView.events(events, simulation.state.world.tick);
     feedback.consume(events, playerId, simulation.state.world.tick);
+    hud.events(events, playerId);
     audio.consume(events, playerId);
     if (simulation.state.world !== world) {
       previousPositions.clear();
@@ -374,5 +375,13 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     await weaponView.warm(renderer);
     // Let the frame loop draw twice with everything in place before the caller reveals the canvas.
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Then unpack the rest of the box's guns one at a time in the background, so the box's roll can
+    // flick through real models without one long stall.
+    void (async () => {
+      for (const id of BUNKER_MYSTERY_BOXES[0].weapons) {
+        await prepareWeaponModel(id)?.catch(() => {});
+        await new Promise(resolve => setTimeout(resolve, 60));
+      }
+    })();
   })();
 }

@@ -7,7 +7,8 @@ import { BUNKER_DOORS, BUNKER_WINDOWS, BUNKER_WALL_WEAPONS, BUNKER_WALL_WEAPON_F
 import type { SimulationState } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
-import { prepareWeaponModel, type PreparedWeapon } from './weaponView.ts';
+import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
+import { BOX_RULES } from '../core/mysteryBox.ts';
 
 // Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
 const PLANK_TILT = [0.07, -0.16, 0.12, -0.08, 0.17, -0.05] as const;
@@ -164,6 +165,32 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   let rewardLabel = writing('MYSTERY BOX', 2, 0.3, '#f6d893');
   rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2; chest.add(rewardLabel);
   let rewardText = 'MYSTERY BOX';
+  // WaW's roll: guns flick past above the open box, slowing until the prize settles, then sink back in.
+  const boxGun = new THREE.Group(); boxGun.userData.dynamic = true; chest.add(boxGun);
+  const boxGunModels = new Map<string, THREE.Object3D>();
+  const boxGunModel = (id: string): THREE.Object3D | null => {
+    let model = boxGunModels.get(id);
+    if (!model) {
+      const weapon = readyWeaponModel(id);
+      if (!weapon) { void prepareWeaponModel(id)?.catch(() => {}); return null; }
+      model = weapon.root.clone(true);
+      model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.setScalar(1.1);
+      model.updateMatrixWorld(true);
+      // Centre the gun over the box; its side faces the front, its muzzle runs along the box.
+      const centre = new THREE.Box3().setFromObject(model).getCenter(new THREE.Vector3());
+      model.position.sub(centre);
+      model.visible = false; boxGun.add(model); boxGunModels.set(id, model);
+    }
+    return model;
+  };
+  let shownGun: THREE.Object3D | null = null;
+  const showBoxGun = (id: string | null, height: number) => {
+    const model = id ? boxGunModel(id) : null;
+    if (shownGun && shownGun !== model) shownGun.visible = false;
+    if (model) model.visible = true;
+    shownGun = model;
+    boxGun.position.set(0, height, 0);
+  };
   // Warm practical lights against cold exterior moonlight.
   const practicalLights: THREE.PointLight[] = [];
   for (const [x, y, z] of [[-0.7, 2.35, -2], [5, 2.65, 2], [-0.7, 5.75, 2.5]] as const) {
@@ -220,6 +247,24 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     const active = !!currentBox && currentBox.phase !== 'idle';
     lid.rotation.z = active ? 1.05 : 0;
     glow.intensity = currentBox?.phase === 'offering' ? 14 : active ? 8 : 3;
+    if (currentBox?.phase === 'rolling') {
+      const progress = 1 - currentBox.cooldownTicks / BOX_RULES.rollTicks;
+      // Easing out: many switches early, fewer as the roll ends; the prize holds for the last stretch.
+      const step = Math.floor((1 - (1 - progress) ** 2) * 22);
+      const pool = currentBox.weapons;
+      let id: string | null = currentBox.lastWeapon;
+      if (progress < 0.86 && pool.length) {
+        id = null;
+        for (let probe = 0; probe < pool.length && !id; probe++) {
+          const candidate = pool[(Math.imul(step + probe, 2654435761) + currentBox.rolls * 7 >>> 0) % pool.length];
+          if (readyWeaponModel(candidate)) id = candidate;
+        }
+      }
+      showBoxGun(id, 0.95 + 0.5 * Math.min(1, progress * 1.8));
+    } else if (currentBox?.phase === 'offering') {
+      showBoxGun(currentBox.lastWeapon, 1.45 - 0.45 * (1 - currentBox.cooldownTicks / BOX_RULES.claimTicks));
+    } else showBoxGun(null, 0);
+    rewardLabel.visible = currentBox?.phase !== 'rolling';
     const nextText = currentBox?.phase === 'offering' && currentBox.lastWeapon
       ? weaponName(currentBox.lastWeapon).toUpperCase()
       : currentBox?.phase === 'rolling' ? '?  ?  ?' : 'MYSTERY BOX';
@@ -229,7 +274,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
       rewardLabel.removeFromParent();
       rewardLabel = writing(nextText, 2, 0.3, '#f6d893');
       rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2;
-      chest.add(rewardLabel); rewardText = nextText;
+      chest.add(rewardLabel); rewardText = nextText; rewardLabel.visible = currentBox?.phase !== 'rolling';
     }
   } };
 }

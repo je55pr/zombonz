@@ -53,10 +53,6 @@ export class HudFeedback {
         case 'powerupCollected': say(event.kind === 'maxAmmo' ? 'MAX AMMO'
           : event.kind === 'doublePoints' ? 'DOUBLE POINTS'
             : event.kind === 'instaKill' ? 'INSTA-KILL' : 'NUKE', 8); break;
-        case 'roundPhaseChanged':
-          if (event.to === 'spawning') say(`ROUND ${event.round}`, 7);
-          else if (event.to === 'intermission') say('ROUND COMPLETE', 7);
-          break;
       }
     }
     if (message) { this.message = message; this.messageUntil = tick + 105; }

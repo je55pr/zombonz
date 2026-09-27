@@ -74,13 +74,19 @@ describe('render performance contracts', () => {
   });
 
   it('redraws and uploads the HUD only when its displayed state changes', () => {
-    // Any other drawing call is a no-op; gradients accept colour stops.
-    const calls: Record<string | symbol, unknown> = { clearRect: vi.fn(), measureText: () => ({ width: 100 }) };
-    const context = new Proxy(calls, { get: (target, key) => target[key]
-      ?? (target[key] = vi.fn(() => ({ addColorStop: vi.fn() }))) }) as { clearRect: ReturnType<typeof vi.fn> };
-    vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => context }) });
+    // Each canvas gets its own mock context; any other drawing call is a no-op and gradients accept stops.
+    const contexts: { clearRect: ReturnType<typeof vi.fn> }[] = [];
+    vi.stubGlobal('document', { createElement: () => {
+      const calls: Record<string | symbol, unknown> = { clearRect: vi.fn(), measureText: () => ({ width: 100 }) };
+      const context = new Proxy(calls, { get: (target, key) => target[key]
+        ?? (target[key] = vi.fn(() => ({ addColorStop: vi.fn() }))) }) as { clearRect: ReturnType<typeof vi.fn> };
+      contexts.push(context);
+      return { width: 0, height: 0, getContext: () => context };
+    } });
     const renderer = { clearDepth: vi.fn(), render: vi.fn() };
     const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
+    // The HUD's own full-screen canvas is the first one it creates; animated pieces have their own.
+    const context = contexts[0];
     const state: HudSnapshot = { health: 100, points: 500, kills: 0, headshots: 0,
       round: 1, weapon: 'starter-pistol',
       magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloading: false,
@@ -102,6 +108,15 @@ describe('render performance contracts', () => {
     hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair',
       feedback: { message: 'HEADSHOT', hitMarker: 'kill', damageVignette: false } });
     expect(context.clearRect).toHaveBeenCalledTimes(6);
+    // Score popups and a round change animate on their own quads without repainting the HUD canvas.
+    const frame = { ...state, godMode: true, interactionPrompt: 'Hold E to repair',
+      feedback: { message: 'HEADSHOT', hitMarker: 'kill', damageVignette: false } } as HudSnapshot;
+    hud.events([{ type: 'pointsAwarded', playerId: 'e:1', amount: 50, reason: 'kill', balance: 550 },
+      { type: 'pointsSpent', playerId: 'e:1', amount: 950, reason: 'box', balance: 0 },
+      { type: 'pointsAwarded', playerId: 'e:2', amount: 10, reason: 'hit', balance: 10 }], 'e:1', 0);
+    for (let ms = 0; ms < 3000; ms += 16) hud.render({ ...frame, round: ms < 1500 ? 1 : 2 }, ms);
+    // Only the round change itself repaints the canvas, once.
+    expect(context.clearRect).toHaveBeenCalledTimes(7);
     hud.dispose();
   });
 });
