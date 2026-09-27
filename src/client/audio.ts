@@ -34,9 +34,29 @@ function variant(prefix: string, count: number, seed: number): Clip {
 const NORMALISED_PEAK_DB = -12;
 /** Normalisation never boosts a quiet clip by more than this, or cuts a loud one by more. */
 const MAX_TRIM_DB = 12;
-/** One-shot mix levels, relative to the player's own gunfire. */
+/**
+ * Master gain at full volume. Normalised clips peak near full scale, so at the default 80% volume the
+ * player's gunshots peak a little under 0 dBFS; a soft ceiling after it catches overlaps. (The old 0.2 was
+ * set for quiet synthesised tones and left recorded gunfire around 16 dB too quiet.)
+ */
+const MASTER_LEVEL = 0.7;
+
+/**
+ * A soft ceiling for the output: unchanged up to 70% of full scale, then rounded off so overlapping
+ * shots and explosions never exceed about -0.6 dBFS. (A WaveShaper rather than Chrome's
+ * DynamicsCompressorNode, which cut even quiet gunfire by about 15 dB when measured.)
+ */
+export function softCeilingCurve(points = 4097): Float32Array {
+  const curve = new Float32Array(points);
+  for (let i = 0; i < points; i++) {
+    const x = i / (points - 1) * 2 - 1, size = Math.abs(x);
+    curve[i] = size <= 0.7 ? x : Math.sign(x) * (0.7 + 0.3 * Math.tanh((size - 0.7) / 0.3));
+  }
+  return curve;
+}
+/** One-shot mix levels; everything else sits below the player's own gunfire. */
 const MIX = {
-  gunfire: 1, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.35, knife: 0.5, hit: 0.35, headshot: 0.5,
+  gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.35, knife: 0.5, hit: 0.35, headshot: 0.5,
   hurt: 0.6, footstep: 0.28, sprintStep: 0.34, zombieVoice: 0.6, zombieStep: 0.3, zombieDeath: 0.55,
   boardBreak: 0.55, boardRepair: 0.4, door: 0.6, box: 0.4, pickup: 0.5, reject: 0.35, roundStart: 0.5,
   zombieAttack: 0.55, sting: 0.22,
@@ -76,8 +96,8 @@ export class GameAudio {
   private nextStingTick = 60 * 50;
   private stepCount = 0;
   private muted = false;
-  /** Output gain when audible; the player's volume setting scales the original 0.2 mix level. */
-  private level = 0.2;
+  /** Output gain when audible: the master level scaled by the player's volume setting. */
+  private level = MASTER_LEVEL;
   private paused = false;
   private readonly unlock = () => this.start();
   private readonly onKeyDown = (event: KeyboardEvent) => {
@@ -100,7 +120,12 @@ export class GameAudio {
         this.context = new AudioContext({ latencyHint: 'interactive' });
         this.output = this.context.createGain();
         this.output.gain.value = this.muted || this.paused ? 0 : this.level;
-        this.output.connect(this.context.destination);
+        // The soft ceiling keeps automatic fire, explosions and a crowd of zombies from clipping.
+        const ceiling = this.context.createWaveShaper?.();
+        if (ceiling) {
+          ceiling.curve = softCeilingCurve() as Float32Array<ArrayBuffer>;
+          this.output.connect(ceiling); ceiling.connect(this.context.destination);
+        } else this.output.connect(this.context.destination);
         void this.loadClips();
       } catch { return; }
     }
@@ -177,7 +202,7 @@ export class GameAudio {
 
   /** 0 to 1 master volume from the settings menu. */
   setVolume(volume: number): void {
-    this.level = 0.2 * Math.max(0, Math.min(1, volume));
+    this.level = MASTER_LEVEL * Math.max(0, Math.min(1, volume));
     this.setPaused(this.paused);
   }
 

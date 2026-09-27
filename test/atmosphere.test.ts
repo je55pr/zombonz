@@ -40,7 +40,7 @@ describe('presentation atmosphere', () => {
     audio.setPaused(true);
     expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0, 0, 0.03);
     audio.setPaused(false);
-    expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.2, 0, 0.03);
+    expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.7, 0, 0.03);
     target.dispatchEvent(Object.assign(new Event('keydown'), { code: 'KeyM', repeat: false }));
     expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0, 0, 0.015);
     audio.dispose();
