@@ -14,11 +14,17 @@ let game: GameModule | undefined;
 let menu: MenuView | undefined;
 let menuCanvas: HTMLCanvasElement | undefined;
 
-function startSolo(module: GameModule): void {
+/**
+ * Builds the game behind the menu and only swaps canvases once it reports the map, zombie and starting
+ * gun ready (or after a timeout, so a stalled warm-up can never trap the player on the menu).
+ */
+async function startSolo(module: GameModule): Promise<void> {
+  const ready = module.startGame(gameCanvas!, loadSettings());
+  await Promise.race([ready.catch(error => console.warn('Game warm-up failed', error)),
+    new Promise(resolve => setTimeout(resolve, 20000))]);
   menuCanvas?.remove();
   menu?.dispose();
   gameCanvas!.hidden = false;
-  module.startGame(gameCanvas!, loadSettings());
 }
 
 /**
@@ -45,12 +51,17 @@ async function downloadGame(view: MenuView): Promise<void> {
     phase: 'assets', ...progress, failedFiles: progress.failed.length,
   }));
   if (result.failed.length) console.warn('Assets that failed to download', result.failed);
-  view.setDownload({ phase: 'ready', ...result, failedFiles: result.failed.length });
+  const downloaded = { ...result, failedFiles: result.failed.length };
+  // Unpack everything the opening moments need, so Nacht appears fully textured with the real pistol.
+  await game.prepareGameAssets((preparedSteps, totalSteps) => view.setDownload({
+    phase: 'preparing', ...downloaded, preparedSteps, totalSteps,
+  }), zombieVariant);
+  view.setDownload({ phase: 'ready', ...downloaded });
 }
 
 // Development inspection URLs (?preview=...) skip the menu and open the map directly.
 if (import.meta.env.DEV && new URLSearchParams(location.search).has('preview')) {
-  void import('./game.ts').then(startSolo);
+  void import('./game.ts').then(module => { gameCanvas.hidden = false; void module.startGame(gameCanvas, loadSettings()); });
 } else {
   menuCanvas = document.createElement('canvas');
   menuCanvas.id = 'menu';
@@ -60,7 +71,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('preview')) 
     if (effect.type === 'saveSettings') saveSettings(effect.settings);
     if (effect.type === 'retryDownload') void downloadGame(view);
     // Solo is only selectable once the download has finished, so the module is loaded.
-    if (effect.type === 'startSolo' && game) startSolo(game);
+    if (effect.type === 'startSolo' && game) void startSolo(game);
   }, buildId);
   menu = view;
   void downloadGame(view);

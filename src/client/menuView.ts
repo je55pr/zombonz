@@ -101,7 +101,9 @@ export class MenuView {
   private drawDownload(centre: number, y: number, scale: number): void {
     const c = this.context, d = this.state.download;
     const mb = (bytes: number) => (bytes / 1e6).toFixed(1);
-    const fraction = d.phase === 'ready' ? 1 : d.totalBytes > 0 ? Math.min(1, d.loadedBytes / d.totalBytes) : 0;
+    const fraction = d.phase === 'ready' ? 1
+      : d.phase === 'preparing' ? (d.totalSteps ? (d.preparedSteps ?? 0) / d.totalSteps : 0)
+        : d.totalBytes > 0 ? Math.min(1, d.loadedBytes / d.totalBytes) : 0;
     const barWidth = Math.min(460 * scale, innerWidth - 32), barHeight = Math.max(6, 8 * scale);
     c.textAlign = 'center';
     let title: string, detail: string;
@@ -109,6 +111,9 @@ export class MenuView {
     else if (d.phase === 'assets') {
       title = `Downloading models and textures  ${Math.floor(fraction * 100)}%`;
       detail = `${mb(d.loadedBytes)} / ${mb(d.totalBytes)} MB  ·  ${d.doneFiles} / ${d.totalFiles} files`;
+    } else if (d.phase === 'preparing') {
+      title = `Preparing Nacht der Untoten  ${Math.floor(fraction * 100)}%`;
+      detail = `Unpacking models and textures  ·  ${d.preparedSteps ?? 0} / ${d.totalSteps ?? 0}`;
     } else if (d.phase === 'ready') {
       title = d.failedFiles ? `Ready, with ${d.failedFiles} file${d.failedFiles > 1 ? 's' : ''} missing` : 'Ready';
       detail = d.failedFiles ? 'Missing models or textures will show as placeholders.'

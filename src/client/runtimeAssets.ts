@@ -87,7 +87,20 @@ export function zombieAssetPaths(id: ZombieAssetId): string[] {
   return [`zombies/${id}/model.glb`, ...zombieClipNames(id).map(name => `zombies/${id}/${name}.glb`)];
 }
 
-export async function loadZombieAsset(id: ZombieAssetId): Promise<ZombieAsset> {
+const zombieAssets = new Map<ZombieAssetId, Promise<ZombieAsset>>();
+
+/** Parsed once per page, so the start screen can unpack it before the game asks for it. */
+export function loadZombieAsset(id: ZombieAssetId): Promise<ZombieAsset> {
+  let pending = zombieAssets.get(id);
+  if (!pending) {
+    pending = buildZombieAsset(id);
+    zombieAssets.set(id, pending);
+    pending.catch(() => zombieAssets.delete(id));
+  }
+  return pending;
+}
+
+async function buildZombieAsset(id: ZombieAssetId): Promise<ZombieAsset> {
   const names = zombieClipNames(id);
   const [model, ...animations] = await Promise.all(zombieAssetPaths(id).map(path => loadModel(path)));
   const clips: ZombieAsset['clips'] = {};

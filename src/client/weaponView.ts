@@ -71,6 +71,25 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
   return { root, magazine, muzzle: new THREE.Vector3(0, id === 'kar98k' ? -0.065 : -0.035, -length) };
 }
 
+const preparedWeapons = new Map<string, Promise<PreparedWeapon>>();
+const readyWeapons = new Map<string, PreparedWeapon>();
+
+/**
+ * Parses and bakes a gun's viewmodel once per page. The start screen and the game call this ahead of
+ * time (starting pistol, box rolls, nearby wall buys) so equipping never shows the placeholder block.
+ */
+export function prepareWeaponModel(id: string): Promise<PreparedWeapon> | null {
+  const asset = WEAPON_ASSETS[id];
+  if (!asset) return null;
+  let pending = preparedWeapons.get(asset);
+  if (!pending) {
+    pending = loadModel(`weapons/${asset}/model.glb`).then(gltf => prepareWeapon(gltf.scene, asset));
+    pending.then(weapon => readyWeapons.set(asset, weapon), () => {});
+    preparedWeapons.set(asset, pending);
+  }
+  return pending;
+}
+
 function placeholderWeapon(id: string): PreparedWeapon {
   const root = new THREE.Group(), magazine = new THREE.Group(); root.add(magazine);
   const metal = new THREE.MeshStandardMaterial({ color: 0x444a48, roughness: 0.6, metalness: 0.5 });
@@ -90,7 +109,6 @@ export class WeaponView {
   private readonly pose = new THREE.Group();
   private readonly flash = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6),
     new THREE.MeshBasicMaterial({ color: 0xffd57a, transparent: true, opacity: 0.9, depthWrite: false }));
-  private readonly prepared = new Map<string, Promise<PreparedWeapon>>();
   private readonly fallbacks = new Map<string, PreparedWeapon>();
   private current?: PreparedWeapon;
   private id = '';
@@ -117,9 +135,13 @@ export class WeaponView {
     this.current = fallback; this.pose.add(fallback.root);
     const asset = WEAPON_ASSETS[id];
     if (!asset) { this.notice = `${weaponName(id).toUpperCase()}: placeholder model`; return; }
+    const ready = readyWeapons.get(asset);
+    if (ready) {
+      this.current.root.removeFromParent(); this.current = ready; this.pose.add(ready.root); this.notice = null;
+      return;
+    }
     this.notice = `Loading ${asset.toUpperCase()} model…`;
-    let pending = this.prepared.get(asset);
-    if (!pending) { pending = loadModel(`weapons/${asset}/model.glb`).then(gltf => prepareWeapon(gltf.scene, asset)); this.prepared.set(asset, pending); }
+    const pending = prepareWeaponModel(id)!;
     void pending.then(weapon => {
       if (this.generation !== generation) return;
       this.current?.root.removeFromParent(); this.current = weapon; this.pose.add(weapon.root); this.notice = null;
@@ -157,6 +179,17 @@ export class WeaponView {
     this.flash.scale.set(0.025, 0.025, 0.065);
     this.flash.visible = sinceShot < 0.055;
   }
+  /** Compiles the viewmodel's shaders and uploads its textures before the game is shown. */
+  async warm(renderer: THREE.WebGLRenderer): Promise<void> {
+    await renderer.compileAsync(this.scene, this.camera);
+    this.scene.traverse(object => {
+      const material = (object as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
+      for (const texture of [material?.map, material?.normalMap, material?.roughnessMap, material?.aoMap, material?.emissiveMap]) {
+        if (texture) renderer.initTexture(texture);
+      }
+    });
+  }
+
   render(renderer: THREE.WebGLRenderer, aspect: number): void {
     if (!this.active) return;
     if (this.camera.aspect !== aspect) { this.camera.aspect = aspect; this.camera.updateProjectionMatrix(); }

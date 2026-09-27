@@ -77,6 +77,15 @@ describe('start menu', () => {
     expect(reduceMenu(state, { type: 'activate' })).toEqual({ type: 'startSolo' });
   });
 
+  it('keeps play locked while downloaded files are unpacked', () => {
+    const state = createMenuState({ ...DEFAULT_SETTINGS });
+    setDownload(state, { ...READY, phase: 'preparing', preparedSteps: 3, totalSteps: 24 });
+    expect(menuItems(state).slice(0, 2).every(item => item.disabled)).toBe(true);
+    expect(reduceMenu(state, { type: 'activate', index: 0 })).toBeNull();
+    setDownload(state, READY);
+    expect(menuItems(state)[0].disabled).toBe(false);
+  });
+
   it('still unlocks play when some assets fail, but offers a retry if the game itself fails', () => {
     const partial = createMenuState({ ...DEFAULT_SETTINGS });
     setDownload(partial, { ...READY, failedFiles: 2 });

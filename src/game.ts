@@ -12,13 +12,14 @@ import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import { HudFeedback } from './client/feedback.ts';
 import { GameAudio } from './client/audio.ts';
-import { loadZombieAsset, type ZombieAsset } from './client/runtimeAssets.ts';
+import { loadModel, loadZombieAsset, type ZombieAsset, type ZombieAssetId } from './client/runtimeAssets.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
-import { WeaponView } from './client/weaponView.ts';
+import { WeaponView, prepareWeaponModel } from './client/weaponView.ts';
 import { PowerupView } from './client/powerupView.ts';
 import { GrenadeView } from './client/grenadeView.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
-import { buildEnvironmentProps, buildEnvironmentDecals } from './client/environmentProps.ts';
+import { buildEnvironmentProps, buildEnvironmentDecals, DECALS, loadDecalTextures } from './client/environmentProps.ts';
+import { NACHT_PROPS } from './maps/nachtProps.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
   createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity,
@@ -34,10 +35,35 @@ import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
 export { downloadAssets, gameAssetUrls, type DownloadProgress } from './client/preload.ts';
 
 /**
+ * Start-screen warm-up after the download: decode every environment texture and parse the props, the
+ * zombie rig and the starting pistol into the loaders' page-wide caches, so startGame finds them ready.
+ * Failures are left for the game to report; it already falls back to placeholders.
+ */
+export async function prepareGameAssets(onProgress: (done: number, total: number) => void,
+  zombie: ZombieAssetId = 'peter_d'): Promise<void> {
+  const manifest = await readEnvironmentManifest().catch(() => null);
+  const tasks: Array<() => Promise<unknown> | null> = [
+    ...(manifest ? [() => loadEnvironmentMaterials(manifest),
+      ...[...new Set(DECALS.map(decal => decal.asset))].map(id => () => loadDecalTextures(manifest, id))] : []),
+    ...[...new Set(NACHT_PROPS.map(prop => prop.asset))].map(asset => () => loadModel(`props/${asset}/model.glb`)),
+    () => loadZombieAsset(zombie),
+    () => prepareWeaponModel('starter-pistol'),
+  ];
+  let done = 0;
+  onProgress(done, tasks.length);
+  for (const task of tasks) {
+    try { await task(); } catch { /* reported in game */ }
+    onProgress(++done, tasks.length);
+  }
+}
+
+/**
  * Builds Nacht, the simulation and every view on the given canvas, then runs the frame loop.
  * Loaded on demand (dynamic import) when Solo is chosen, so the menu never pays for the map.
+ * Resolves once the map, props, zombie and starting gun are in place, textures are uploaded and shaders
+ * compiled, so the caller can keep the canvas hidden until then and never show half-loaded Nacht.
  */
-export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DEFAULT_SETTINGS): void {
+export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DEFAULT_SETTINGS): Promise<void> {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
@@ -66,7 +92,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   const bunker = buildBunkerDetails(scene);
   batchStaticMeshes(scene);
   let environmentNotice: string | null = 'Loading bunker materials and props…';
-  void (async () => {
+  const environmentReady = (async () => {
     // Prop proxies/collision must stay visible even when the texture manifest fails.
     const props = buildEnvironmentProps(scene);
     const surfaces = readEnvironmentManifest().then(manifest =>
@@ -158,7 +184,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   let zombieAsset: ZombieAsset | undefined;
   let zombieAssetNotice: string | null = 'Loading zombie model…';
   const zombieVariant = new URLSearchParams(location.search).get('zombie') === 'pxltiger' ? 'pxltiger' : 'peter_d';
-  void loadZombieAsset(zombieVariant).then(asset => {
+  const zombieReady = loadZombieAsset(zombieVariant).then(asset => {
     zombieAsset = asset; zombieAssetNotice = null;
     zombieViews.clear(); zombieBatch.update([]);
   }).catch(error => {
@@ -267,8 +293,19 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     camera.updateProjectionMatrix();
   }
 
+  let lastWarmFrame = 0;
+  function warmUpcomingWeapons(): void {
+    for (const box of simulation.state.mysteryBoxes) if (box.lastWeapon) prepareWeaponModel(box.lastWeapon);
+    const candidate = simulation.interactionCandidate(playerId);
+    const wall = simulation.state.wallWeapons.find(weapon => weapon.interactableId === candidate?.interactableId);
+    if (wall) prepareWeaponModel(wall.weaponId);
+    const holstered = simulation.getPlayer(playerId)?.holsteredWeapon;
+    if (holstered) prepareWeaponModel(holstered.weaponId);
+  }
+
   function frame(nowMs: number): void {
     const started = performance.now();
+    if (++lastWarmFrame % 20 === 0) warmUpcomingWeapons();
     const nowSeconds = nowMs / 1000;
     if (previousSeconds === undefined) previousSeconds = nowSeconds;
     const interval = (nowSeconds - previousSeconds) * 1000;
@@ -313,4 +350,22 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   resize();
   syncCamera();
   requestAnimationFrame(frame);
+
+  const startingWeapon = simulation.getPlayer(playerId)?.weapon.weaponId ?? 'starter-pistol';
+  return (async () => {
+    await Promise.allSettled([environmentReady, zombieReady, prepareWeaponModel(startingWeapon)]);
+    // Upload every texture and compile every shader now, rather than stuttering on the first frames.
+    await renderer.compileAsync(scene, camera);
+    scene.traverse(object => {
+      const materials = (object as THREE.Mesh).material;
+      for (const material of Array.isArray(materials) ? materials : materials ? [materials] : []) {
+        const standard = material as THREE.MeshStandardMaterial;
+        for (const texture of [standard.map, standard.normalMap, standard.roughnessMap, standard.aoMap,
+          standard.metalnessMap, standard.alphaMap, standard.emissiveMap]) if (texture) renderer.initTexture(texture);
+      }
+    });
+    await weaponView.warm(renderer);
+    // Let the frame loop draw twice with everything in place before the caller reveals the canvas.
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  })();
 }
