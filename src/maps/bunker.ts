@@ -6,7 +6,7 @@ import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
-import { NACHT_PROPS, propCollisionBox } from './nachtProps.ts';
+import { BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
 
 // Hand-built from WaW floor plans. Scale is estimated, not extracted game data.
 // HELP wing west (negative x), spawn east, box at the south end of HELP.
@@ -29,7 +29,7 @@ const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number
   center: { x, y, z }, size: { x: sx, y: sy, z: sz }, material, collides,
 });
 const shell: GreyboxBox[] = [], prisms: GreyboxPrism[] = [], windows: BunkerWindow[] = [];
-export const NACHT_RAILS: { from: Vec3; to: Vec3 }[] = [];
+export const BUNKER_RAILS: { from: Vec3; to: Vec3 }[] = [];
 const surfaces: WalkSurface[] = [];
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number, height: number): WalkSurface =>
   ({ minX, maxX, minZ, maxZ, startHeight: height, endHeight: height });
@@ -128,7 +128,7 @@ for (let i = 0; i < 14; i++) {
     const [x, z] = p(r, (a + b) / 2);
     shell.push({ ...box(x, top + 0.43, z, 0.26, 0.86, 0.26, 'metal'), visible: false });
     const [ax, az] = p(r, a), [bx, bz] = p(r, b);
-    NACHT_RAILS.push({ from: { x: ax, y: i / 14 * 2.2 + 0.88, z: az },
+    BUNKER_RAILS.push({ from: { x: ax, y: i / 14 * 2.2 + 0.88, z: az },
       to: { x: bx, y: (i + 1) / 14 * 2.2 + 0.88, z: bz } });
   }
 }
@@ -137,7 +137,7 @@ for (let i = 0; i < 8; i++) {
   shell.push(box(x, top - 0.09, -0.975, 0.3, 0.18, 1.85, 'stair', false));
   for (const z of [-1.99, 0.04]) shell.push({ ...box(x, top + 0.43, z, 0.3, 0.86, 0.16, 'metal'), visible: false });
 }
-for (const z of [-1.99, 0.04]) NACHT_RAILS.push({ from: { x: 4.8, y: UPPER_HEIGHT + 0.88, z }, to: { x: 7.2, y: 3.08, z } });
+for (const z of [-1.99, 0.04]) BUNKER_RAILS.push({ from: { x: 4.8, y: UPPER_HEIGHT + 0.88, z }, to: { x: 7.2, y: 3.08, z } });
 // Compact HELP stair in a projecting west annex; top returns east then north.
 surfaces.push({ ...rect(-7.8, -6.3, 3.1, 6.65, 0), endHeight: UPPER_HEIGHT, slopeAxis: 'z' });
 for (let i = 0; i < 20; i++) shell.push(box(-7.05, (i + 0.5) / 20 * UPPER_HEIGHT - 0.085,
@@ -153,8 +153,8 @@ mainRoute.push({ x: 4.1, y: UPPER_HEIGHT, z: -1 });
 const helpRoute: Vec3[] = [{ x: -7.05, y: 0, z: 2.5 }];
 for (let i = 0; i <= 16; i++) helpRoute.push({ x: -7.05, y: UPPER_HEIGHT * i / 16, z: 3.1 + 3.55 * i / 16 });
 helpRoute.push({ x: -7.05, y: UPPER_HEIGHT, z: 7.15 }, { x: -5.5, y: UPPER_HEIGHT, z: 7.15 });
-export const NACHT_STAIRS = [{ id: 'start-stairs', route: mainRoute }, { id: 'help-stairs', route: helpRoute }] as const;
-export const NACHT_BOX_CENTER: Vec3 = { x: -1.45, y: 0.52, z: 7.12 };
+export const BUNKER_STAIRS = [{ id: 'start-stairs', route: mainRoute }, { id: 'help-stairs', route: helpRoute }] as const;
+export const BUNKER_BOX_CENTER: Vec3 = { x: -1.45, y: 0.52, z: 7.12 };
 shell.push(box(-1.45, 0.52, 7.12, 2.35, 1.04, 0.95, 'barrier'));
 // Large broken roof apertures, not uniformly repeated slats.
 for (const [x, z, sx, sz] of [[-5.5, -3, 1.2, 16], [-0.6, -7.6, 1.2, 6.8], [-3.1, -10.4, 6.2, 1.2],
@@ -170,11 +170,11 @@ shell.push(box(-8.25, 1.3, 2.15, 0.3, 2.6, 0.7, 'wall'));
 shell.push(box(-12.5, 1.3, 0.7, 0.5, 2.6, 3.6, 'wall'));
 shell.push(box(-9.4, 2.8, 0.7, 6.4, 0.4, 3.6, 'wall'));
 
-export const NACHT_WINDOWS: readonly BunkerWindow[] = windows;
-export const NACHT_GREYBOX: readonly GreyboxBox[] = shell;
-export const NACHT_PRISMS: readonly GreyboxPrism[] = prisms;
-export const NACHT_WALK_SURFACES: readonly WalkSurface[] = surfaces;
-export const NACHT_DOORS: readonly DoorDefinition[] = [
+export const BUNKER_WINDOWS: readonly BunkerWindow[] = windows;
+export const BUNKER_GREYBOX: readonly GreyboxBox[] = shell;
+export const BUNKER_PRISMS: readonly GreyboxPrism[] = prisms;
+export const BUNKER_WALK_SURFACES: readonly WalkSurface[] = surfaces;
+export const BUNKER_DOORS: readonly DoorDefinition[] = [
   { id: 'help-room', position: { x: 0, y: 0, z: 0 }, cost: 1000,
     prompt: 'E  Open HELP room  [1000]', interactionRange: 2.6, minFacingDot: 0.3,
     blocker: { min: { x: -0.2, y: 0, z: -1.2 }, max: { x: 0.2, y: 2.85, z: 1.2 } } },
@@ -185,13 +185,13 @@ export const NACHT_DOORS: readonly DoorDefinition[] = [
     prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
     blocker: { min: { x: -7.85, y: 0, z: 4.5 }, max: { x: -6.25, y: 4.5, z: 5.25 } } },
 ];
-// WaW Nacht chalk: Kar98k in the start room, Thompson and double-barrel in HELP, Trench Gun and BAR upstairs.
+// WaW's original chalk: Kar98k in the start room, Thompson and double-barrel in HELP, Trench Gun and BAR upstairs.
 // Ammo costs half the gun.
 const wallBuy = (id: string, weaponId: string, name: string, cost: number, position: Vec3): WallWeaponDefinition => ({
   id, position, weaponId, weaponCost: cost, ammoCost: cost / 2,
   prompt: `E  ${name} [${cost}] / Ammo [${cost / 2}]`, interactionRange: 2.5, minFacingDot: 0.25,
 });
-export const NACHT_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
+export const BUNKER_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
   wallBuy('start-kar98k', 'kar98k', 'Kar98k', 200, { x: 5.2, y: 1, z: 7.56 }),
   wallBuy('help-thompson', 'thompson', 'Thompson', 1200, { x: -5.96, y: 1, z: -9.4 }),
   wallBuy('help-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: -5.96, y: 1, z: -4.6 }),
@@ -204,46 +204,46 @@ export const NACHT_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
   wallBuy('upper-ak74u', 'ak74u', 'AK-74u', 1200, { x: -5.96, y: UPPER_HEIGHT + 1, z: -3.3 }),
 ];
 /** Presentation: the yaw each chalk outline faces, away from its wall. */
-export const NACHT_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
+export const BUNKER_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
   'start-kar98k': Math.PI, 'help-thompson': Math.PI / 2, 'help-double-barrel': Math.PI / 2,
   'upper-trench-gun': 0, 'upper-bar': Math.PI / 2, 'start-m1-carbine': Math.PI, 'start-m14': -Math.PI / 2,
   'help-mp5k': 0, 'upper-ak74u': Math.PI / 2,
 };
-export const NACHT_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
+export const BUNKER_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   id: 'help-box', position: { x: -1.45, y: 0.6, z: 6.35 }, cost: 950,
   weapons: ['kar98k', 'springfield', 'mosin', 'm1-garand', 'm1-carbine', 'stg44', 'fg42', 'thompson', 'mp40', 'ppsh41',
     'bar', 'mg42', 'double-barrel', 'trench-gun', 'magnum-357',
-    // BO1's Nacht box added Cold War guns.
+    // BO1's version of the map added Cold War guns to the box.
     'm14', 'fal', 'commando', 'ak74u', 'mp5k', 'skorpion', 'rpk', 'spas12', 'ithaca37', 'python', 'rpg7',
     'irrlicht', 'molniya'],
   // The wonder weapons are rare, as the Ray Gun and Wunderwaffe were.
   weights: { irrlicht: 0.25, molniya: 0.15 },
 }];
-export const NACHT_PLAYER_SPAWN: Vec3 = { x: 5.2, y: 0, z: 4.2 };
+export const BUNKER_PLAYER_SPAWN: Vec3 = { x: 5.2, y: 0, z: 4.2 };
 /** WaW/BO1 windows hold six boards. */
-export const NACHT_WINDOW_BOARDS = 6;
+export const BUNKER_WINDOW_BOARDS = 6;
 // Upper windows stay decorative until exterior climbing is implemented.
-export const NACHT_BARRIERS: readonly BarrierDefinition[] = windows.filter(w => w.y === 0).map(w => {
+export const BUNKER_BARRIERS: readonly BarrierDefinition[] = windows.filter(w => w.y === 0).map(w => {
   const point = (distance: number, sideways = 0): Vec3 => ({
     x: w.x + w.outward.x * distance + w.outward.z * sideways, y: w.y,
     z: w.z + w.outward.z * distance - w.outward.x * sideways,
   });
-  return { id: w.id, position: { x: w.x, y: w.y, z: w.z }, outward: w.outward, width: w.width, maxBoards: NACHT_WINDOW_BOARDS,
+  return { id: w.id, position: { x: w.x, y: w.y, z: w.z }, outward: w.outward, width: w.width, maxBoards: BUNKER_WINDOW_BOARDS,
     approachPath: [point(5, 0.6), point(2.4, 0.6), point(0.85)], insidePoint: point(-0.95) };
 });
-export const NACHT_ZOMBIE_SPAWNS: readonly ZombieSpawnPoint[] = NACHT_BARRIERS.map(b => ({ ...b.approachPath[0], barrierId: b.id }));
-export const NACHT_MARKERS: readonly MapMarker[] = [
-  ...NACHT_BARRIERS.map(b => ({ id: b.id, type: 'zombieSpawn' as const, position: b.approachPath[0], label: 'Barricaded entry' })),
-  ...NACHT_DOORS.map(d => ({ id: d.id, type: 'door' as const, position: d.position, label: d.prompt! })),
-  ...NACHT_WALL_WEAPONS.map(w => ({ id: w.id, type: 'wallBuy' as const, position: w.position, label: w.prompt! })),
-  { id: 'box-help', type: 'mysteryBox', position: NACHT_MYSTERY_BOXES[0].position, label: 'Mystery Box [950]' },
+export const BUNKER_ZOMBIE_SPAWNS: readonly ZombieSpawnPoint[] = BUNKER_BARRIERS.map(b => ({ ...b.approachPath[0], barrierId: b.id }));
+export const BUNKER_MARKERS: readonly MapMarker[] = [
+  ...BUNKER_BARRIERS.map(b => ({ id: b.id, type: 'zombieSpawn' as const, position: b.approachPath[0], label: 'Barricaded entry' })),
+  ...BUNKER_DOORS.map(d => ({ id: d.id, type: 'door' as const, position: d.position, label: d.prompt! })),
+  ...BUNKER_WALL_WEAPONS.map(w => ({ id: w.id, type: 'wallBuy' as const, position: w.position, label: w.prompt! })),
+  { id: 'box-help', type: 'mysteryBox', position: BUNKER_MYSTERY_BOXES[0].position, label: 'Mystery Box [950]' },
 ];
-export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = NACHT_GREYBOX): CollisionBox[] {
+export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = BUNKER_GREYBOX): CollisionBox[] {
   const result = boxes.filter(b => b.collides).map(b => ({
     min: { x: b.center.x - b.size.x / 2, y: b.center.y - b.size.y / 2, z: b.center.z - b.size.z / 2 },
     max: { x: b.center.x + b.size.x / 2, y: b.center.y + b.size.y / 2, z: b.center.z + b.size.z / 2 },
   }));
-  if (boxes === NACHT_GREYBOX) result.push(...NACHT_PROPS.filter(p => p.solid).map(propCollisionBox));
+  if (boxes === BUNKER_GREYBOX) result.push(...BUNKER_PROPS.filter(p => p.solid).map(propCollisionBox));
   return result;
 }
 // Rectangular slabs stay single blockers; only the bevelled floor needs narrow strips.
@@ -259,7 +259,7 @@ for (const s of surfaces.filter(s => s.startHeight === UPPER_HEIGHT && s.endHeig
     slabBlockers.push({ min: { x: s.minX, y: UPPER_HEIGHT - 0.24, z }, max: { x: end, y: UPPER_HEIGHT, z: Math.min(z + 0.1, s.maxZ) } });
   }
 }
-export const NACHT_SHOT_BLOCKERS: readonly CollisionBox[] = slabBlockers;
+export const BUNKER_SHOT_BLOCKERS: readonly CollisionBox[] = slabBlockers;
 
 // Sparse floor grid + exact stair centre-lines, compiled once from real geometry.
 const nodes: NavigationNode[] = [], collision = greyboxCollisionBoxes();
@@ -271,9 +271,9 @@ for (const y of [0, UPPER_HEIGHT]) for (let x = -7; x < 18; x += 1.5) for (let z
     && surfaces.some(s => s.startHeight === y && s.endHeight === y && walkSurfaceHeight(s, x, z) === y))
     add(`floor-${y}-${x}-${z}`, { x, y, z });
 }
-for (const stair of NACHT_STAIRS) stair.route.forEach((p, i) => add(`${stair.id}-${i}`, p));
-for (const b of NACHT_BARRIERS) add(b.id, b.insidePoint);
-for (const [id, p] of Object.entries({ spawn: NACHT_PLAYER_SPAWN, helpWest: { x: -1, y: 0, z: 0 },
+for (const stair of BUNKER_STAIRS) stair.route.forEach((p, i) => add(`${stair.id}-${i}`, p));
+for (const b of BUNKER_BARRIERS) add(b.id, b.insidePoint);
+for (const [id, p] of Object.entries({ spawn: BUNKER_PLAYER_SPAWN, helpWest: { x: -1, y: 0, z: 0 },
   helpEast: { x: 1, y: 0, z: 0 }, upperWest: { x: -1, y: UPPER_HEIGHT, z: -0.4 },
   upperEast: { x: 1, y: UPPER_HEIGHT, z: -0.4 }, annexBase: { x: -5.5, y: 0, z: 2.5 },
   annexTop: { x: -5.5, y: UPPER_HEIGHT, z: 4.5 } })) add(id, p);
@@ -285,4 +285,4 @@ for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++
     (a.neighbors as string[]).push(b.id); (b.neighbors as string[]).push(a.id);
   }
 }
-export const NACHT_NAVIGATION: NavigationGraph = { nodes };
+export const BUNKER_NAVIGATION: NavigationGraph = { nodes };

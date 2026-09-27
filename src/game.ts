@@ -19,16 +19,16 @@ import { PowerupView } from './client/powerupView.ts';
 import { GrenadeView } from './client/grenadeView.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals, DECALS, loadDecalTextures } from './client/environmentProps.ts';
-import { NACHT_PROPS } from './maps/nachtProps.ts';
+import { BUNKER_PROPS } from './maps/bunkerProps.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
   createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity,
   type EntityId, type ZombieState, type Vec3,
 } from './core/index.ts';
 import {
-  NACHT_DOORS, NACHT_GREYBOX, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_WALL_WEAPONS, NACHT_MYSTERY_BOXES,
-  greyboxCollisionBoxes, NACHT_SHOT_BLOCKERS, NACHT_BARRIERS, NACHT_PRISMS,
-} from './maps/nacht.ts';
+  BUNKER_DOORS, BUNKER_GREYBOX, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN, BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, BUNKER_WALL_WEAPONS, BUNKER_MYSTERY_BOXES,
+  greyboxCollisionBoxes, BUNKER_SHOT_BLOCKERS, BUNKER_BARRIERS, BUNKER_PRISMS,
+} from './maps/bunker.ts';
 
 import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
 // Re-exported so the start screen can preload through the same chunk it will run.
@@ -45,11 +45,11 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
   const tasks: Array<() => Promise<unknown> | null> = [
     ...(manifest ? [() => loadEnvironmentMaterials(manifest),
       ...[...new Set(DECALS.map(decal => decal.asset))].map(id => () => loadDecalTextures(manifest, id))] : []),
-    ...[...new Set(NACHT_PROPS.map(prop => prop.asset))].map(asset => () => loadModel(`props/${asset}/model.glb`)),
+    ...[...new Set(BUNKER_PROPS.map(prop => prop.asset))].map(asset => () => loadModel(`props/${asset}/model.glb`)),
     () => loadZombieAsset(zombie),
     () => prepareWeaponModel('starter-pistol'),
     // The chalk wall buys hang the real guns.
-    ...[...new Set(NACHT_WALL_WEAPONS.map(wall => wall.weaponId))].map(id => () => prepareWeaponModel(id)),
+    ...[...new Set(BUNKER_WALL_WEAPONS.map(wall => wall.weaponId))].map(id => () => prepareWeaponModel(id)),
   ];
   let done = 0;
   onProgress(done, tasks.length);
@@ -60,10 +60,10 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
 }
 
 /**
- * Builds Nacht, the simulation and every view on the given canvas, then runs the frame loop.
+ * Builds Bunker, the simulation and every view on the given canvas, then runs the frame loop.
  * Loaded on demand (dynamic import) when Solo is chosen, so the menu never pays for the map.
  * Resolves once the map, props, zombie and starting gun are in place, textures are uploaded and shaders
- * compiled, so the caller can keep the canvas hidden until then and never show half-loaded Nacht.
+ * compiled, so the caller can keep the canvas hidden until then and never show a half-loaded Bunker.
  */
 export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DEFAULT_SETTINGS): Promise<void> {
 
@@ -90,7 +90,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   Object.assign(keyLight.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, far: 65 });
   keyLight.shadow.bias = -0.0006;
   scene.add(keyLight);
-  scene.add(buildGreybox(NACHT_GREYBOX, NACHT_PRISMS));
+  scene.add(buildGreybox(BUNKER_GREYBOX, BUNKER_PRISMS));
   const bunker = buildBunkerDetails(scene);
   batchStaticMeshes(scene);
   let environmentNotice: string | null = 'Loading bunker materials and props…';
@@ -107,13 +107,13 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
 
   // Development-only inspection views for iterating on the map without a running wave.
   const previewViews = {
-    start: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
+    start: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
     help: { position: { x: -1.8, y: 0, z: -7.8 }, yaw: Math.PI - 0.12 },
     upstairs: { position: { x: 2, y: 3.4, z: 3.8 }, yaw: -0.5 },
     barrier: { position: { x: 12, y: 0, z: -0.8 }, yaw: 0 },
-    stress: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
-    assets: { position: NACHT_PLAYER_SPAWN, yaw: 0 },
-    gameOver: { position: NACHT_PLAYER_SPAWN, yaw: -0.35 },
+    stress: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
+    assets: { position: BUNKER_PLAYER_SPAWN, yaw: 0 },
+    gameOver: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
     overview: { position: { x: 23, y: 25, z: 28 }, yaw: 0.65 },
     doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
     props: { position: { x: -2, y: 0, z: 4.3 }, yaw: Math.PI + 0.15 },
@@ -130,16 +130,16 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     seed: 0x5a0b0a2,
     map: {
       collisionBoxes: greyboxCollisionBoxes(),
-      shotBlockers: NACHT_SHOT_BLOCKERS,
-      walkSurfaces: NACHT_WALK_SURFACES,
-      zombieSpawns: preview && previewName === 'barrier' ? [NACHT_ZOMBIE_SPAWNS[0]] : NACHT_ZOMBIE_SPAWNS,
-      barriers: NACHT_BARRIERS,
-      navigationGraph: NACHT_NAVIGATION,
-      doors: NACHT_DOORS,
-      wallWeapons: NACHT_WALL_WEAPONS,
-      mysteryBoxes: NACHT_MYSTERY_BOXES,
+      shotBlockers: BUNKER_SHOT_BLOCKERS,
+      walkSurfaces: BUNKER_WALK_SURFACES,
+      zombieSpawns: preview && previewName === 'barrier' ? [BUNKER_ZOMBIE_SPAWNS[0]] : BUNKER_ZOMBIE_SPAWNS,
+      barriers: BUNKER_BARRIERS,
+      navigationGraph: BUNKER_NAVIGATION,
+      doors: BUNKER_DOORS,
+      wallWeapons: BUNKER_WALL_WEAPONS,
+      mysteryBoxes: BUNKER_MYSTERY_BOXES,
     },
-    playerSpawns: [preview?.position ?? NACHT_PLAYER_SPAWN],
+    playerSpawns: [preview?.position ?? BUNKER_PLAYER_SPAWN],
     ...(previewName === 'stress' && preview ? { spawnConfig: {
       baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
     } } : {}),

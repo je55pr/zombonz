@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
 import { environmentMaterial, projectWorldUvs } from './environmentMaterials.ts';
-import { NACHT_DOORS, NACHT_WINDOWS, NACHT_WALL_WEAPONS, NACHT_WALL_WEAPON_FACING, NACHT_BOX_CENTER, NACHT_RAILS,
-  NACHT_WINDOW_BOARDS,
-  UPPER_HEIGHT } from '../maps/nacht.ts';
+import { BUNKER_DOORS, BUNKER_WINDOWS, BUNKER_WALL_WEAPONS, BUNKER_WALL_WEAPON_FACING, BUNKER_BOX_CENTER, BUNKER_RAILS,
+  BUNKER_WINDOW_BOARDS,
+  UPPER_HEIGHT } from '../maps/bunker.ts';
 import type { SimulationState } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
@@ -44,7 +44,7 @@ function mountWallGun(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Ma
 
 export function buildBunkerDetails(scene: THREE.Scene): { update(state: SimulationState): void; ready: Promise<unknown> } {
   const group = new THREE.Group();
-  group.name = 'nacht-bunker-details';
+  group.name = 'bunker-details';
   scene.add(group);
   const wood = bunkerMaterial('barrier');
   const concrete = bunkerMaterial('wall');
@@ -75,7 +75,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   }
   // Broken wooden window boards, deep frames, and projecting stone sills.
   const barrierViews = new Map<string, THREE.Mesh[]>();
-  for (const opening of NACHT_WINDOWS) {
+  for (const opening of BUNKER_WINDOWS) {
     const frame = new THREE.Group();
     frame.position.set(opening.x, opening.y, opening.z);
     if (opening.axis === 'z') frame.rotation.y = Math.PI / 2;
@@ -85,7 +85,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     box(frame, iron, opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
     const planks: THREE.Mesh[] = [];
     barrierViews.set(opening.id, planks);
-    for (let i = 0; i < NACHT_WINDOW_BOARDS; i++) {
+    for (let i = 0; i < BUNKER_WINDOW_BOARDS; i++) {
       const plank = box(frame, wood, 0, plankHeight(i), 0.03, opening.width + 0.1, 0.16, 0.09);
       plank.rotation.z = PLANK_TILT[i % PLANK_TILT.length];
       plank.userData.dynamic = true;
@@ -95,7 +95,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   // Architecture lives in shared map data, so the visuals and collision agree.
   // Short exposed reinforcing bars hang across the surviving roof edges.
   for (let i = 0; i < 12; i++) box(group, iron, -4.7 + i * 0.34, 6.66, -9.2, 0.025, 0.035, 1.5);
-  for (const rail of NACHT_RAILS) {
+  for (const rail of BUNKER_RAILS) {
     const a = new THREE.Vector3(rail.from.x, rail.from.y, rail.from.z);
     const b = new THREE.Vector3(rail.to.x, rail.to.y, rail.to.z);
     const direction = b.clone().sub(a);
@@ -106,7 +106,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     box(group, iron, a.x, a.y - 0.44, a.z, 0.035, 0.88, 0.035);
   }
   const doorViews = new Map<string, THREE.Group>();
-  for (const door of NACHT_DOORS) {
+  for (const door of BUNKER_DOORS) {
     const view = new THREE.Group(); group.add(view); doorViews.set(door.id, view);
     view.userData.dynamic = true;
     if (door.id === 'help-room') {
@@ -119,7 +119,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
       const { x, y, z } = door.position;
       view.position.set(x, y, z);
       if (door.id === 'start-stairs') view.rotation.y = Math.PI / 2;
-      // A sofa and stacked crates, matching the silhouette of Nacht's debris.
+      // A sofa and stacked crates, matching the silhouette of the original map's debris.
       const width = door.id === 'start-stairs' ? 1.85 : 1.45;
       box(view, upholstery, 0, 0.35, 0, width, 0.55, 0.75);
       box(view, upholstery, 0, 0.85, 0.3, width, 0.7, 0.25);
@@ -132,10 +132,10 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   label('FROM DARKNESS', 5.6, 2, -2.385, 0, 2.5, 0.38);
   const chalk = new THREE.MeshBasicMaterial({ color: CHALK });
   const wallGuns: Promise<unknown>[] = [];
-  for (const weapon of NACHT_WALL_WEAPONS) {
+  for (const weapon of BUNKER_WALL_WEAPONS) {
     const sign = new THREE.Group();
     sign.position.set(weapon.position.x, weapon.position.y + 0.4, weapon.position.z);
-    sign.rotation.y = NACHT_WALL_WEAPON_FACING[weapon.id] ?? 0;
+    sign.rotation.y = BUNKER_WALL_WEAPON_FACING[weapon.id] ?? 0;
     group.add(sign);
     // The real gun over its chalk outline; a chalk bar with a blocky rifle only if the model can't load.
     const pending = prepareWeaponModel(weapon.weaponId);
@@ -152,7 +152,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     name.position.set(0, -0.38, 0.03); sign.add(name);
   }
   // One fixed, iron-bound random box. Its authoritative state drives the lid.
-  const chest = new THREE.Group(); chest.position.set(NACHT_BOX_CENTER.x, 0, NACHT_BOX_CENTER.z);
+  const chest = new THREE.Group(); chest.position.set(BUNKER_BOX_CENTER.x, 0, BUNKER_BOX_CENTER.z);
   chest.rotation.y = Math.PI / 2; group.add(chest);
   for (const z of [-0.8, 0.8]) box(chest, iron, 0, 0.55, z, 1.01, 1.12, 0.12);
   const lid = new THREE.Group(); lid.position.set(-0.49, 1.06, 0); chest.add(lid);

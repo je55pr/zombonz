@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import type { GreyboxBox, GreyboxPrism } from '../maps/nacht.ts';
+import type { GreyboxBox, GreyboxPrism } from '../maps/bunker.ts';
 import { bunkerMaterial, environmentMaterial, materialForBox, projectWorldUvs } from './environmentMaterials.ts';
 export { bunkerMaterial } from './environmentMaterials.ts';
 
 export function buildGreybox(boxes: readonly GreyboxBox[], prisms: readonly GreyboxPrism[] = []): THREE.Group {
-  const group = new THREE.Group(); group.name = 'nacht-greybox';
+  const group = new THREE.Group(); group.name = 'bunker-greybox';
   for (const entry of boxes) {
     if (entry.visible === false) continue;
     const geometry = new THREE.BoxGeometry(entry.size.x, entry.size.y, entry.size.z);

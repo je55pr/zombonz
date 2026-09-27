@@ -64,7 +64,7 @@ Do not copy those source caches into the repository.
 
 ## In-game integration
 
-The Nacht map uses all ten material sets: plaster/brick wall panels, concrete
+The Bunker map uses all ten material sets: plaster/brick wall panels, concrete
 structure, damaged floors, concrete steps, wood boards/box, rusted rails, cave rock,
 ground dirt, rubble, and leather on the two stair barricades. World-scaled UVs keep
 the tile size consistent. Base colour uses sRGB, and normal/ARM use linear data;
@@ -76,7 +76,7 @@ so no bytes are downloaded only to be discarded.
 Grime/leak overlays use their opacity maps, do not write depth, and have polygon
 offset to avoid flickering against the walls. The modern graffiti atlas is left out.
 
-`nachtProps.ts` places 31 props across spawn, HELP, upstairs and the exterior:
+`bunkerProps.ts` places 31 props across spawn, HELP, upstairs and the exterior:
 workbenches, radio, ammunition, shelves, crates, fuel containers, stove, tools,
 ladder, cart, bags, lamps, a jeep and a tank. Vehicles stay in the background.
 Props are scenery, not new pickups/explosive gameplay objects. Existing barriers,

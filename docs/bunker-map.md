@@ -1,4 +1,4 @@
-# Nacht geometry blockout
+# Bunker geometry blockout
 
 Target: the original **World at War** building, with three gameplay areas, three
 1000-point unlocks and one fixed 950-point mystery box. This is hand-built geometry
@@ -42,7 +42,7 @@ exterior vehicles and all small debris placements are outside this geometry pass
 
 ## Shared geometry and gameplay
 
-`src/maps/nacht.ts` owns geometry, support surfaces, collision, navigation, windows,
+`src/maps/bunker.ts` owns geometry, support surfaces, collision, navigation, windows,
 doors, purchases and spawn locations. `src/client/bunker.ts` only adds presentation,
 including authoritative barrier boards and door visibility. Polygon slabs and fan
 treads are rendered in `src/client/greybox.ts`.

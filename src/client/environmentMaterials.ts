@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { getAsset } from './assetStore.ts';
-import type { GreyboxBox, GreyboxMaterial } from '../maps/nacht.ts';
+import type { GreyboxBox, GreyboxMaterial } from '../maps/bunker.ts';
 
 export const MATERIAL_IDS = ['weathered-concrete-a', 'weathered-concrete-b', 'cracked-concrete-floor',
   'broken-plaster-brick', 'concrete-rubble', 'cave-rock', 'dirt', 'splintered-wood', 'rusted-metal', 'sofa-upholstery'] as const;

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { NACHT_PROPS, type PropPlacement } from '../maps/nachtProps.ts';
+import { BUNKER_PROPS, type PropPlacement } from '../maps/bunkerProps.ts';
 import { loadModel } from './runtimeAssets.ts';
 import { batchStaticMeshes } from './staticBatch.ts';
 import { loadEnvironmentTexture, type EnvironmentManifest } from './environmentMaterials.ts';
@@ -31,7 +31,7 @@ export async function buildEnvironmentProps(scene: THREE.Scene): Promise<number>
   const group = new THREE.Group(); group.name = 'imported-environment-props'; scene.add(group);
   const placeholders = new Map<string, THREE.Mesh>();
   const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x69543c, roughness: 1 });
-  for (const p of NACHT_PROPS.filter(p => p.solid)) {
+  for (const p of BUNKER_PROPS.filter(p => p.solid)) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(p.size.x, p.size.y, p.size.z), fallbackMaterial);
     mesh.name = `loading-${p.id}`;
     mesh.position.set(p.position.x, p.position.y + p.size.y / 2, p.position.z); mesh.rotation.y = p.yaw;
@@ -39,10 +39,10 @@ export async function buildEnvironmentProps(scene: THREE.Scene): Promise<number>
   }
   let failures = 0;
   // Load each unique asset once and batch repeated props in spatial cells.
-  for (const asset of new Set(NACHT_PROPS.map(p => p.asset))) {
+  for (const asset of new Set(BUNKER_PROPS.map(p => p.asset))) {
     try {
       const gltf = await loadModel(`props/${asset}/model.glb`);
-      for (const p of NACHT_PROPS.filter(p => p.asset === asset)) {
+      for (const p of BUNKER_PROPS.filter(p => p.asset === asset)) {
         group.add(prepareProp(gltf.scene, p));
         const placeholder = placeholders.get(p.id);
         if (placeholder) { placeholder.removeFromParent(); placeholder.geometry.dispose(); placeholders.delete(p.id); }

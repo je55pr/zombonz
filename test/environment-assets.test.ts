@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { readAssetGeometry, readAssetJson, assetExists } from '../scripts/inspect-assets.mjs';
-import { NACHT_PROPS, propCollisionBox } from '../src/maps/nachtProps.ts';
-import { NACHT_BARRIERS, NACHT_STAIRS, NACHT_PLAYER_SPAWN, greyboxCollisionBoxes } from '../src/maps/nacht.ts';
+import { BUNKER_PROPS, propCollisionBox } from '../src/maps/bunkerProps.ts';
+import { BUNKER_BARRIERS, BUNKER_STAIRS, BUNKER_PLAYER_SPAWN, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
 import { hasClearNavigationLine } from '../src/core/navigation.ts';
 import { prepareProp } from '../src/client/environmentProps.ts';
 import { applyPbrMaps, environmentMaterial, bunkerMaterial, MATERIAL_IDS, projectWorldUvs } from '../src/client/environmentMaterials.ts';
@@ -15,14 +15,14 @@ describe('environment pack integration', () => {
     const paths = new Set(Object.values({ ...props.props, ...props.vehicles }).map((p: any) => p.model));
     for (const id of MATERIAL_IDS) for (const map of ['basecolor', 'normal', 'arm'])
       expect(assetExists(`public${environment.materials[id][map]}`)).toBe(true);
-    for (const prop of NACHT_PROPS) expect(paths.has(`/assets/props/${prop.asset}/model.glb`)).toBe(true);
-    expect(new Set(NACHT_PROPS.map(p => p.id)).size).toBe(NACHT_PROPS.length);
+    for (const prop of BUNKER_PROPS) expect(paths.has(`/assets/props/${prop.asset}/model.glb`)).toBe(true);
+    expect(new Set(BUNKER_PROPS.map(p => p.id)).size).toBe(BUNKER_PROPS.length);
   });
 
-  it.each([...new Set(NACHT_PROPS.map(p => p.asset))])('fits %s on its authored floor and inside its collision envelope', async asset => {
+  it.each([...new Set(BUNKER_PROPS.map(p => p.asset))])('fits %s on its authored floor and inside its collision envelope', async asset => {
     const gltf = await readAssetGeometry(`public/assets/props/${asset}/model.glb`);
     const original = new THREE.Box3().setFromObject(gltf.scene);
-    for (const placement of NACHT_PROPS.filter(p => p.asset === asset)) {
+    for (const placement of BUNKER_PROPS.filter(p => p.asset === asset)) {
       const prop = prepareProp(gltf.scene, placement), bounds = new THREE.Box3().setFromObject(prop);
       const envelope = propCollisionBox(placement);
       expect(bounds.min.y).toBeCloseTo(placement.position.y);
@@ -35,8 +35,8 @@ describe('environment pack integration', () => {
   });
 
   it('keeps spawn, barrier landings and stair centre-lines free of solid dressing', () => {
-    const props = NACHT_PROPS.filter(p => p.solid).map(propCollisionBox);
-    for (const point of [NACHT_PLAYER_SPAWN, ...NACHT_BARRIERS.map(b => b.insidePoint), ...NACHT_STAIRS.flatMap(s => s.route)])
+    const props = BUNKER_PROPS.filter(p => p.solid).map(propCollisionBox);
+    for (const point of [BUNKER_PLAYER_SPAWN, ...BUNKER_BARRIERS.map(b => b.insidePoint), ...BUNKER_STAIRS.flatMap(s => s.route)])
       expect(hasClearNavigationLine(point, point, props, 0.34), JSON.stringify(point)).toBe(true);
     for (const prop of props) expect(greyboxCollisionBoxes()).toContainEqual(prop);
   });

@@ -1,4 +1,4 @@
-import { NACHT_PROPS } from '../maps/nachtProps.ts';
+import { BUNKER_PROPS } from '../maps/bunkerProps.ts';
 import { assetUrl, MATERIAL_IDS, readEnvironmentManifest } from './environmentMaterials.ts';
 import { DECALS } from './environmentProps.ts';
 import { WEAPON_ASSETS, zombieAssetPaths, type ZombieAssetId } from './runtimeAssets.ts';
@@ -16,7 +16,7 @@ export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<
     const maps = manifest.decals[id].maps;
     paths.push(maps.basecolor, maps.opacity);
   }
-  for (const asset of new Set(NACHT_PROPS.map(prop => prop.asset))) paths.push(`/assets/props/${asset}/model.glb`);
+  for (const asset of new Set(BUNKER_PROPS.map(prop => prop.asset))) paths.push(`/assets/props/${asset}/model.glb`);
   paths.push(...zombieAssetPaths(zombie).map(path => `/assets/${path}`));
   for (const asset of new Set(Object.values(WEAPON_ASSETS))) paths.push(`/assets/weapons/${asset}/model.glb`);
   return [...new Set(paths.map(assetUrl))];
