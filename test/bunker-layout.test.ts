@@ -3,15 +3,15 @@ import { GameSimulation, createInputFrame, createPlayerState, createZombieState,
   updatePlayerMovement, updateZombiePursuit, tickZombieMelee, navigationWaypoint,
   closedDoorBlockers, createDoorState, hasWalkableConnection, resolveHitscan, createNavigationQuery,
 } from '../src/core/index.ts';
-import { NACHT_DOORS, NACHT_MYSTERY_BOXES, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN,
-  NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, NACHT_STAIRS, NACHT_SHOT_BLOCKERS,
-  UPPER_HEIGHT, greyboxCollisionBoxes, NACHT_BARRIERS } from '../src/maps/nacht.ts';
+import { BUNKER_DOORS, BUNKER_MYSTERY_BOXES, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN,
+  BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, BUNKER_STAIRS, BUNKER_SHOT_BLOCKERS,
+  UPPER_HEIGHT, greyboxCollisionBoxes, BUNKER_BARRIERS } from '../src/maps/bunker.ts';
 
-const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: NACHT_WALK_SURFACES,
-  zombieSpawns: NACHT_ZOMBIE_SPAWNS, navigationGraph: NACHT_NAVIGATION,
-  doors: NACHT_DOORS, mysteryBoxes: NACHT_MYSTERY_BOXES, shotBlockers: NACHT_SHOT_BLOCKERS,
-  barriers: NACHT_BARRIERS };
-function makeSimulation(points = 500, spawn = NACHT_PLAYER_SPAWN) {
+const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: BUNKER_WALK_SURFACES,
+  zombieSpawns: BUNKER_ZOMBIE_SPAWNS, navigationGraph: BUNKER_NAVIGATION,
+  doors: BUNKER_DOORS, mysteryBoxes: BUNKER_MYSTERY_BOXES, shotBlockers: BUNKER_SHOT_BLOCKERS,
+  barriers: BUNKER_BARRIERS };
+function makeSimulation(points = 500, spawn = BUNKER_PLAYER_SPAWN) {
   return new GameSimulation({ seed: 42, map, playerSpawns: [spawn],
     economyConfig: { startingPoints: points, hitReward: 10, killBonus: 50 },
     roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
@@ -21,7 +21,7 @@ function interact(sim: GameSimulation) {
   frame.actions.interact = { pressed: true, held: true, released: false, value: 1 };
   return sim.tick({ [sim.playerIds[0]]: frame });
 }
-describe('Nacht room routes', () => {
+describe('Bunker room routes', () => {
   it.each([
     { id: 'help-room', position: { x: 1.4, y: 0, z: 0 }, yaw: Math.PI / 2 },
     { id: 'start-stairs', position: { x: 7.3, y: 2.1, z: -1 }, yaw: Math.PI / 2 },
@@ -36,7 +36,7 @@ describe('Nacht room routes', () => {
     ]);
     expect(sim.getPlayer(sim.playerIds[0])!.points).toBe(1000);
   });
-  it.each(NACHT_STAIRS)('walks up and down $id without clipping the landing', stair => {
+  it.each(BUNKER_STAIRS)('walks up and down $id without clipping the landing', stair => {
     const forward = createInputFrame(0);
     forward.actions.moveForward = { pressed: true, held: true, released: false, value: 1 };
     const player = createPlayerState('e:1', stair.route[0]);
@@ -58,29 +58,29 @@ describe('Nacht room routes', () => {
   it('blocks both stairways and the HELP route until purchased', () => {
     const sim = makeSimulation();
     for (const goal of [{ x: -1.5, y: 0, z: 0 }, { x: -2, y: UPPER_HEIGHT, z: 0 }]) {
-      const start = NACHT_PLAYER_SPAWN;
-      expect(navigationWaypoint(NACHT_NAVIGATION, start, goal, sim.collisionBoxes(), 0.32, map.walkSurfaces)).toBe(start);
+      const start = BUNKER_PLAYER_SPAWN;
+      expect(navigationWaypoint(BUNKER_NAVIGATION, start, goal, sim.collisionBoxes(), 0.32, map.walkSurfaces)).toBe(start);
     }
   });
   it.each(['walk', 'run', 'sprint'] as const)('lets a %s zombie reach the HELP room through both stairs while its door stays shut', (gait) => {
-    const doors = NACHT_DOORS.map((definition, index) => createDoorState(definition, `e:${index + 10}`));
+    const doors = BUNKER_DOORS.map((definition, index) => createDoorState(definition, `e:${index + 10}`));
     doors.filter(door => door.id !== 'help-room').forEach(door => { door.open = true; });
     const blockers = [...map.collisionBoxes, ...closedDoorBlockers(doors)];
-    const zombie = createZombieState('e:2', NACHT_PLAYER_SPAWN, 1, gait);
+    const zombie = createZombieState('e:2', BUNKER_PLAYER_SPAWN, 1, gait);
     const player = createPlayerState('e:1', { x: -1.5, y: 0, z: 0 });
-    const query = createNavigationQuery(NACHT_NAVIGATION, blockers, 0.32, map.walkSurfaces);
-    for (let i = 0; i < 3600; i++) updateZombiePursuit(zombie, [player], 1 / 60, blockers, map.walkSurfaces, NACHT_NAVIGATION, query);
+    const query = createNavigationQuery(BUNKER_NAVIGATION, blockers, 0.32, map.walkSurfaces);
+    for (let i = 0; i < 3600; i++) updateZombiePursuit(zombie, [player], 1 / 60, blockers, map.walkSurfaces, BUNKER_NAVIGATION, query);
     expect(Math.hypot(zombie.position.x - player.position.x, zombie.position.y,
       zombie.position.z - player.position.z)).toBeLessThan(1.1);
   });
   it('has supported navigation edges rather than floating cross-floor shortcuts', () => {
-    for (const node of NACHT_NAVIGATION.nodes) for (const id of node.neighbors) {
-      const target = NACHT_NAVIGATION.nodes.find(node => node.id === id)!;
+    for (const node of BUNKER_NAVIGATION.nodes) for (const id of node.neighbors) {
+      const target = BUNKER_NAVIGATION.nodes.find(node => node.id === id)!;
       expect(hasWalkableConnection(node.position, target.position, map.walkSurfaces), `${node.id} -> ${id}`).toBe(true);
     }
   });
   it('does not spawn inaccessible enemies in locked rooms', () => {
-    const sim = new GameSimulation({ seed: 42, map, playerSpawns: [NACHT_PLAYER_SPAWN],
+    const sim = new GameSimulation({ seed: 42, map, playerSpawns: [BUNKER_PLAYER_SPAWN],
       roundConfig: { initialWaitTicks: 1, intermissionTicks: 10 },
       spawnConfig: { baseZombieCount: 12, additionalPerRound: 0, maxAlive: 12, spawnIntervalTicks: 0 } });
     for (let i = 0; i < 15; i++) sim.tick();
@@ -97,7 +97,7 @@ describe('Nacht room routes', () => {
     expect(player.health).toBe(100);
     const upstairsZombie = createZombieState('e:3', player.position, 1);
     expect(resolveHitscan({ origin: { x: -3, y: 1.62, z: 0 }, direction: { x: 0, y: 1, z: 0 } },
-      [upstairsZombie], NACHT_SHOT_BLOCKERS, 60).kind).toBe('world');
+      [upstairsZombie], BUNKER_SHOT_BLOCKERS, 60).kind).toBe('world');
   });
 });
 describe('single fixed mystery box', () => {
@@ -113,7 +113,7 @@ describe('single fixed mystery box', () => {
     for (let i = 0; i < 180; i++) sim.tick();
     expect(interact(sim).some(event => event.type === 'mysteryBoxClaimed')).toBe(true);
     expect(player.weapon.magazineAmmo).toBeGreaterThan(0);
-    expect(NACHT_MYSTERY_BOXES[0].weapons).toContain(player.weapon.weaponId);
+    expect(BUNKER_MYSTERY_BOXES[0].weapons).toContain(player.weapon.weaponId);
     expect(interact(sim).some(event => event.type === 'mysteryBoxUsed')).toBe(false);
     expect(player.points).toBe(2050);
     for (let i = 0; i < 120; i++) sim.tick();

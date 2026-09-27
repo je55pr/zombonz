@@ -52,7 +52,7 @@ async function downloadGame(view: MenuView): Promise<void> {
   }));
   if (result.failed.length) console.warn('Assets that failed to download', result.failed);
   const downloaded = { ...result, failedFiles: result.failed.length };
-  // Unpack everything the opening moments need, so Nacht appears fully textured with the real pistol.
+  // Unpack everything the opening moments need, so Bunker appears fully textured with the real pistol.
   await game.prepareGameAssets((preparedSteps, totalSteps) => view.setDownload({
     phase: 'preparing', ...downloaded, preparedSteps, totalSteps,
   }), zombieVariant);

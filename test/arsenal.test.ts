@@ -4,9 +4,9 @@ import {
   rayFromPlayer, weaponName, zombieHealthForRound as zombieHealth, type ZombieState,
 } from '../src/core/index.ts';
 import {
-  NACHT_MYSTERY_BOXES, NACHT_SHOT_BLOCKERS, NACHT_WALK_SURFACES, NACHT_WALL_WEAPONS, NACHT_WALL_WEAPON_FACING,
+  BUNKER_MYSTERY_BOXES, BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_WALL_WEAPONS, BUNKER_WALL_WEAPON_FACING,
   UPPER_HEIGHT, greyboxCollisionBoxes,
-} from '../src/maps/nacht.ts';
+} from '../src/maps/bunker.ts';
 
 const origin = { x: 0, y: 0, z: 0 };
 
@@ -56,9 +56,9 @@ describe('weapon arsenal', () => {
     expect(150 - zombie.health).toBeLessThanOrEqual(WEAPON_DEFINITIONS['m1-garand'].damage * 3);
   });
 
-  it('places the WaW Nacht wall buys, with ammo at half price', () => {
-    const walls = Object.fromEntries(NACHT_WALL_WEAPONS.map(wall => [wall.weaponId, wall]));
-    // WaW Nacht's chalk, plus four BO1-era wall guns.
+  it('places the WaW-style Bunker wall buys, with ammo at half price', () => {
+    const walls = Object.fromEntries(BUNKER_WALL_WEAPONS.map(wall => [wall.weaponId, wall]));
+    // WaW's original chalk, plus four BO1-era wall guns.
     expect(Object.keys(walls).sort()).toEqual(['ak74u', 'bar', 'double-barrel', 'kar98k', 'm1-carbine', 'm14', 'mp5k',
       'thompson', 'trench-gun']);
     expect(walls['m1-carbine'].weaponCost).toBe(600);
@@ -66,33 +66,33 @@ describe('weapon arsenal', () => {
     expect(walls.bar.weaponCost).toBe(1800);
     expect(walls['trench-gun'].position.y).toBeGreaterThan(UPPER_HEIGHT);
     expect(walls.bar.position.y).toBeGreaterThan(UPPER_HEIGHT);
-    for (const wall of NACHT_WALL_WEAPONS) {
+    for (const wall of BUNKER_WALL_WEAPONS) {
       expect(wall.ammoCost).toBe(wall.weaponCost / 2);
-      expect(NACHT_WALL_WEAPON_FACING[wall.id], wall.id).toBeDefined();
+      expect(BUNKER_WALL_WEAPON_FACING[wall.id], wall.id).toBeDefined();
     }
   });
 
-  it('can buy every wall weapon from real Nacht floor in front of it', () => {
-    for (const wall of NACHT_WALL_WEAPONS) {
-      const facing = NACHT_WALL_WEAPON_FACING[wall.id];
+  it('can buy every wall weapon from real Bunker floor in front of it', () => {
+    for (const wall of BUNKER_WALL_WEAPONS) {
+      const facing = BUNKER_WALL_WEAPON_FACING[wall.id];
       const stand = { x: wall.position.x + Math.sin(facing) * 1.2, y: wall.position.y - 1,
         z: wall.position.z + Math.cos(facing) * 1.2 };
       const sim = new GameSimulation({ seed: 1, playerSpawns: [stand],
-        map: { collisionBoxes: greyboxCollisionBoxes(), shotBlockers: NACHT_SHOT_BLOCKERS,
-          walkSurfaces: NACHT_WALK_SURFACES, zombieSpawns: [], wallWeapons: [wall] },
+        map: { collisionBoxes: greyboxCollisionBoxes(), shotBlockers: BUNKER_SHOT_BLOCKERS,
+          walkSurfaces: BUNKER_WALK_SURFACES, zombieSpawns: [], wallWeapons: [wall] },
         roundConfig: { initialWaitTicks: 9999, intermissionTicks: 1 },
         economyConfig: { startingPoints: 5000, hitReward: 10, killBonus: 50 } });
       const player = sim.getPlayer(sim.playerIds[0])!;
       player.yaw = facing; // Players look along (-sin yaw, -cos yaw): back toward the wall.
       sim.tick();
-      // Standing spot is real floor, and the chalk is visible through Nacht's actual walls.
+      // Standing spot is real floor, and the chalk is visible through Bunker's actual walls.
       expect(player.position.y, wall.id).toBeCloseTo(stand.y);
       expect(sim.interactionCandidate(player.id)?.prompt, wall.id).toContain(`[${wall.weaponCost}]`);
     }
   });
 
   it('stocks the box with every weapon except the starting pistol, wonder weapons rarest', () => {
-    const box = NACHT_MYSTERY_BOXES[0];
+    const box = BUNKER_MYSTERY_BOXES[0];
     expect([...box.weapons].sort()).toEqual(Object.keys(WEAPON_DEFINITIONS).filter(id => id !== 'starter-pistol').sort());
     const weights = box.weapons.map(id => box.weights?.[id] ?? 1);
     expect(box.weights?.irrlicht).toBeLessThan(1);

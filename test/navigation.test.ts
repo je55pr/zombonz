@@ -11,9 +11,9 @@ import {
   type NavigationGraph,
 } from '../src/core/index.ts';
 import {
-  NACHT_NAVIGATION,
+  BUNKER_NAVIGATION,
   greyboxCollisionBoxes,
-} from '../src/maps/nacht.ts';
+} from '../src/maps/bunker.ts';
 
 const branchGraph: NavigationGraph = {
   nodes: [
@@ -64,10 +64,10 @@ describe('navigation graph', () => {
     expect(simulation.zombies()[0]?.position.x).toBeGreaterThan(2);
   });
 
-  it('keeps every Nacht navigation edge clear of static collision', () => {
+  it('keeps every Bunker navigation edge clear of static collision', () => {
     const boxes = greyboxCollisionBoxes();
-    const nodes = new Map(NACHT_NAVIGATION.nodes.map((node) => [node.id, node]));
-    for (const node of NACHT_NAVIGATION.nodes) {
+    const nodes = new Map(BUNKER_NAVIGATION.nodes.map((node) => [node.id, node]));
+    for (const node of BUNKER_NAVIGATION.nodes) {
       for (const neighborId of node.neighbors) {
         const neighbor = nodes.get(neighborId);
         expect(neighbor, `missing neighbor ${neighborId}`).toBeDefined();

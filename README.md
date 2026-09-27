@@ -8,7 +8,7 @@ Browser-based, round-driven co-op zombie survival game built with Three.js.
 
 - Strongly target the grounded, weighty **World at War / Black Ops 1 Zombies** feel rather than modern movement-heavy FPS design.
 - Support **1-N players** architecturally. Classic small co-op is the first target; larger player counts are an explicit scalability experiment rather than a promise.
-- Use handcrafted maps. **Nacht der Untoten** is the first development/reference map for validating the classic loop.
+- Use handcrafted maps. **Bunker** is the first development/reference map for validating the classic loop.
 - Preserve match purity for now: players start each run fresh rather than bringing persistent power/loadouts into a match.
 - Mirror the classic loop closely: escalating rounds, points, doors, wall weapons, random weapon box, barriers, revives, perks, power, power-ups, ammo pressure and game-over survival.
 - Stay close to the original WWII / occult-horror flavour while the project identity develops.
@@ -54,7 +54,7 @@ holds mouse sensitivity, field of view and volume, saved in this browser. While 
 downloads the game code and every model and texture the game uses (about 88 MB), with a progress
 bar, then unpacks them (decodes the textures and parses the props, zombie and starting pistol).
 Solo and Multiplayer unlock when both finish (Settings works throughout). The files are kept in
-memory, so starting Solo makes no further requests, and the menu stays up until Nacht is fully built,
+memory, so starting Solo makes no further requests, and the menu stays up until Bunker is fully built,
 its textures uploaded and shaders compiled, so the map never appears half-loaded. In play, a gun
 starts unpacking while the box rolls it or while you stand at its wall buy, so it appears straight
 away. Solo then waits on CLICK TO START.
@@ -86,19 +86,19 @@ are batched where appropriate, and the HUD texture is redrawn only when its cont
 144 FPS requires a 144 Hz-or-faster active display and enough GPU/CPU headroom;
 the browser or OS may cap presentation to the current display refresh rate.
 
-The playable solo map follows Nacht's starting room / Help room / upstairs connections.
+The playable solo map, Bunker, follows WaW's first map: starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
 box in the Help room costs 950. It rolls for three seconds, then reserves a random gun you
 don't already carry for the buyer to claim within ten seconds. The box holds every gun except
 the M1911: WaW's WWII arsenal (Kar98k, Springfield, Mosin-Nagant, M1 Garand, M1A1 Carbine, STG-44,
 FG42, Thompson, MP40, PPSh-41, BAR, MG42, double-barrel, Trench Gun, .357 Magnum), the Cold War guns
-BO1 added to Nacht (M14, FN FAL, Commando, AK-74u, MP5K, Skorpion, RPK, SPAS-12, Stakeout, Python,
+BO1 added to that map (M14, FN FAL, Commando, AK-74u, MP5K, Skorpion, RPK, SPAS-12, Stakeout, Python,
 RPG-7), and two rare original wonder weapons. The **Irrlicht** is a dieselpunk flare pistol whose
 bolts burst on impact, hitting nearby zombies and a careless shooter. The **Molniya** fires lightning
 that jumps through up to five zombies in line of sight. A player carries
 two guns; the first purchase keeps the M1911, while a third gun replaces the one
 currently held. The box briefly closes before it can be used again. Wall chalk follows WaW's
-Nacht: a Kar98k (200) and M1A1 Carbine (600) in the starting room, a Thompson and a
+original map: a Kar98k (200) and M1A1 Carbine (600) in the starting room, a Thompson and a
 double-barreled shotgun (1200 each) in the Help room, and a Trench Gun (1500) and BAR (1800)
 upstairs. BO1-style chalk adds an M14 (500) in the starting room, an MP5K (1000) in the Help room
 and an AK-74u (1200) upstairs. Wall ammo costs half the gun.
@@ -182,4 +182,4 @@ Use `weapon=` with any gun id (for example `thompson`, `stg44`, `ak74u`, `spas12
 `irrlicht` or `molniya`; the full list is `WEAPON_DEFINITIONS` in `src/core/weapon.ts`) on any preview URL
 to inspect that viewmodel; add `&aim=1` to hold it aimed down the sights (development only). P fires in development previews only (useful in browsers
 without pointer lock); R reloads. Production and normal survival use mouse firing.
-See [map notes](docs/nacht-map.md) for layout and validation details.
+See [map notes](docs/bunker-map.md) for layout and validation details.

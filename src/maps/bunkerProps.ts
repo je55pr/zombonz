@@ -9,7 +9,7 @@ const prop = (id: string, asset: string, x: number, y: number, z: number,
   ({ id, asset, position: { x, y, z }, size: { x: sx, y: sy, z: sz }, yaw, solid, background });
 // Fit each model uniformly inside these authored envelopes. Collision is independent
 // of download completion, and props intentionally avoid entry landings / stair lanes.
-export const NACHT_PROPS: readonly PropPlacement[] = [
+export const BUNKER_PROPS: readonly PropPlacement[] = [
   prop('spawn-workbench', 'wooden-table', 1.7, 0, -2.02, 1.8, 0.55, 0.66),
   prop('spawn-ammo', 'ammo-box', 1.1, 0.55, -2.02, 0.15, 0.3, 0.44, Math.PI / 2, false),
   prop('workbench-vice', 'bench-vice', 2.15, 0.55, -2.02, 0.2, 0.285, 0.396, 0, false),

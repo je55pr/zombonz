@@ -117,7 +117,7 @@ export class MenuView {
       title = `Downloading models and textures  ${Math.floor(fraction * 100)}%`;
       detail = `${mb(d.loadedBytes)} / ${mb(d.totalBytes)} MB  ·  ${d.doneFiles} / ${d.totalFiles} files`;
     } else if (d.phase === 'preparing') {
-      title = `Preparing Nacht der Untoten  ${Math.floor(fraction * 100)}%`;
+      title = `Preparing Bunker  ${Math.floor(fraction * 100)}%`;
       detail = `Unpacking models and textures  ·  ${d.preparedSteps ?? 0} / ${d.totalSteps ?? 0}`;
     } else if (d.phase === 'ready') {
       title = d.failedFiles ? `Ready, with ${d.failedFiles} file${d.failedFiles > 1 ? 's' : ''} missing` : 'Ready';
@@ -162,7 +162,7 @@ export class MenuView {
     c.fillStyle = rule; c.fillRect(centre - 260 * scale, height * 0.22 + 44 * scale, 520 * scale, 2 * scale);
     c.fillStyle = '#c8392b'; c.font = `500 ${Math.round(20 * scale)}px ${UI_FONT}`;
     c.letterSpacing = `${Math.round(8 * scale)}px`;
-    c.fillText('NACHT DER UNTOTEN', centre, height * 0.22 + 70 * scale);
+    c.fillText('BUNKER', centre, height * 0.22 + 70 * scale);
     c.letterSpacing = '0px';
 
     this.rows = [];
@@ -177,7 +177,7 @@ export class MenuView {
     }
     if (screen === 'loading') {
       c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(28 * scale)}px ${UI_FONT}`;
-      c.fillText('Starting Nacht der Untoten…', centre, y);
+      c.fillText('Starting Bunker…', centre, y);
     }
     if (screen === 'main') this.drawDownload(centre, height * 0.22 + 112 * scale, scale);
     const rowHeight = 58 * scale, rowWidth = Math.min(width - 32, (screen === 'settings' ? 560 : 340) * scale);

@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { BARRIER_RULES, GameSimulation, createInputFrame, createNavigationQuery, createZombieState,
   createZombieEntry, createBarrier, prepareBarriers, updateZombieEntry, syncBarrierInteractables,
   tickZombieMelee, firePlayerWeapon, type SimulationEvent } from '../src/core/index.ts';
-import { NACHT_BARRIERS, NACHT_DOORS, NACHT_NAVIGATION, NACHT_PLAYER_SPAWN, NACHT_WINDOW_BOARDS,
-  NACHT_SHOT_BLOCKERS, NACHT_WALK_SURFACES, NACHT_ZOMBIE_SPAWNS, greyboxCollisionBoxes } from '../src/maps/nacht.ts';
+import { BUNKER_BARRIERS, BUNKER_DOORS, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN, BUNKER_WINDOW_BOARDS,
+  BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
 
-const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: NACHT_WALK_SURFACES,
-  shotBlockers: NACHT_SHOT_BLOCKERS, zombieSpawns: NACHT_ZOMBIE_SPAWNS,
-  barriers: NACHT_BARRIERS, doors: NACHT_DOORS, navigationGraph: NACHT_NAVIGATION };
+const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: BUNKER_WALK_SURFACES,
+  shotBlockers: BUNKER_SHOT_BLOCKERS, zombieSpawns: BUNKER_ZOMBIE_SPAWNS,
+  barriers: BUNKER_BARRIERS, doors: BUNKER_DOORS, navigationGraph: BUNKER_NAVIGATION };
 function makeSimulation(index = 0, count = 1, initialWaitTicks = 1) {
   return new GameSimulation({ seed: 4848,
-    map: { ...map, zombieSpawns: [NACHT_ZOMBIE_SPAWNS[index]] }, playerSpawns: [NACHT_PLAYER_SPAWN],
+    map: { ...map, zombieSpawns: [BUNKER_ZOMBIE_SPAWNS[index]] }, playerSpawns: [BUNKER_PLAYER_SPAWN],
     roundConfig: { initialWaitTicks, intermissionTicks: 9999 },
     spawnConfig: { baseZombieCount: count, additionalPerRound: 0, spawnIntervalTicks: 20, maxAlive: count } });
 }
@@ -21,10 +21,10 @@ describe('exterior entry routes', () => {
     sim.getPlayer(sim.playerIds[0])!.health = 1000;
     sim.tick(); const events = sim.tick();
     const zombie = sim.zombies()[0];
-    expect(events.find(event => event.type === 'zombieSpawned')).toMatchObject({ spawnIndex: 0, barrierId: NACHT_BARRIERS[0].id });
-    expect(zombie.position.z).toBeLessThan(NACHT_BARRIERS[0].position.z - 4);
+    expect(events.find(event => event.type === 'zombieSpawned')).toMatchObject({ spawnIndex: 0, barrierId: BUNKER_BARRIERS[0].id });
+    expect(zombie.position.z).toBeLessThan(BUNKER_BARRIERS[0].position.z - 4);
     expect(zombie.entry?.phase).toBe('approach');
-    expect(sim.state.barriers[0].boards).toBe(NACHT_WINDOW_BOARDS);
+    expect(sim.state.barriers[0].boards).toBe(BUNKER_WINDOW_BOARDS);
     let firstTear = -1, vaultStarted = -1, entered = -1;
     const tears: number[] = [];
     for (let tick = 0; tick < 2000; tick++) {
@@ -38,20 +38,20 @@ describe('exterior entry routes', () => {
       // The entry is continuous, not a jump from the exterior to the room.
       expect(Math.hypot(zombie.position.x - previous.x, zombie.position.y - previous.y,
         zombie.position.z - previous.z)).toBeLessThan(0.08);
-      if (sim.state.barriers[0].boards > 0) expect(zombie.position.z).toBeLessThan(NACHT_BARRIERS[0].position.z - 0.5);
+      if (sim.state.barriers[0].boards > 0) expect(zombie.position.z).toBeLessThan(BUNKER_BARRIERS[0].position.z - 0.5);
       if (entered >= 0) break;
     }
     expect(tears).toEqual([5, 4, 3, 2, 1, 0]);
     expect(firstTear).toBeGreaterThan(BARRIER_RULES.tearTicks);
     expect(entered - vaultStarted).toBe(BARRIER_RULES.vaultTicks);
     expect(zombie.entry).toBeNull();
-    expect(zombie.position).toEqual(NACHT_BARRIERS[0].insidePoint);
+    expect(zombie.position).toEqual(BUNKER_BARRIERS[0].insidePoint);
     for (let i = 0; i < 1200; i++) sim.tick();
     expect(zombie.targetId).toBe(sim.playerIds[0]);
     expect(sim.getPlayer(sim.playerIds[0])!.health).toBeLessThan(1000);
   });
 
-  it.each(NACHT_BARRIERS.map((barrier, index) => ({ id: barrier.id, index })))
+  it.each(BUNKER_BARRIERS.map((barrier, index) => ({ id: barrier.id, index })))
    ('completes exterior entry and interior pursuit from $id', ({ index }) => {
       const sim = makeSimulation(index);
       sim.state.doors.forEach(door => { door.open = true; });
@@ -101,7 +101,7 @@ describe('exterior entry routes', () => {
     const victim = sim.zombies().find(zombie => zombie.id === sim.state.barriers[0].vaultingZombieId)!;
     expect(victim).toBeDefined();
     const target = { x: victim.position.x, y: victim.position.y + 1.25, z: victim.position.z };
-    const eye = { x: victim.position.x, y: 1.62, z: NACHT_BARRIERS[0].position.z + 1.5 };
+    const eye = { x: victim.position.x, y: 1.62, z: BUNKER_BARRIERS[0].position.z + 1.5 };
     const direction = { x: target.x - eye.x, y: target.y - eye.y, z: target.z - eye.z };
     const length = Math.hypot(direction.x, direction.y, direction.z);
     direction.x /= length; direction.y /= length; direction.z /= length;
@@ -119,7 +119,7 @@ describe('exterior entry routes', () => {
   });
 
   it('keeps original spawn indexes after filtering out locked rooms', () => {
-    const sim = new GameSimulation({ seed: 11, map, playerSpawns: [NACHT_PLAYER_SPAWN],
+    const sim = new GameSimulation({ seed: 11, map, playerSpawns: [BUNKER_PLAYER_SPAWN],
       roundConfig: { initialWaitTicks: 1, intermissionTicks: 9999 },
       spawnConfig: { baseZombieCount: 12, additionalPerRound: 0, spawnIntervalTicks: 0, maxAlive: 12 } });
     const events: SimulationEvent[] = [];
@@ -127,8 +127,8 @@ describe('exterior entry routes', () => {
     const spawns = events.filter(event => event.type === 'zombieSpawned');
     expect(spawns).toHaveLength(12);
     for (const event of spawns) {
-      expect(event.barrierId).toBe(NACHT_ZOMBIE_SPAWNS[event.spawnIndex].barrierId);
-      expect(NACHT_BARRIERS.find(barrier => barrier.id === event.barrierId)!.insidePoint.x).toBeGreaterThan(0);
+      expect(event.barrierId).toBe(BUNKER_ZOMBIE_SPAWNS[event.spawnIndex].barrierId);
+      expect(BUNKER_BARRIERS.find(barrier => barrier.id === event.barrierId)!.insidePoint.x).toBeGreaterThan(0);
     }
   });
 });
@@ -137,7 +137,7 @@ describe('barrier persistence and rebuilding', () => {
   it('requires holding E, resets progress on release, and rebuilds one board per second', () => {
     const sim = makeSimulation(0, 1, 9999);
     const player = sim.getPlayer(sim.playerIds[0])!;
-    player.position = { ...NACHT_BARRIERS[0].insidePoint }; player.yaw = 0;
+    player.position = { ...BUNKER_BARRIERS[0].insidePoint }; player.yaw = 0;
     const barrier = sim.state.barriers[0]; barrier.boards = 0;
     syncBarrierInteractables(sim.state.barriers, sim.interactables());
     const hold = createInputFrame(0);
@@ -149,8 +149,8 @@ describe('barrier persistence and rebuilding', () => {
     expect(barrier.boards).toBe(0);
     expect(sim.tick({ [player.id]: hold }).some(event => event.type === 'barrierBoardRepaired')).toBe(true);
     expect(barrier.boards).toBe(1);
-    for (let i = 0; i < 60 * (NACHT_WINDOW_BOARDS - 1); i++) sim.tick({ [player.id]: hold });
-    expect(barrier.boards).toBe(NACHT_WINDOW_BOARDS);
+    for (let i = 0; i < 60 * (BUNKER_WINDOW_BOARDS - 1); i++) sim.tick({ [player.id]: hold });
+    expect(barrier.boards).toBe(BUNKER_WINDOW_BOARDS);
     expect(sim.interactionCandidate(player.id)).toBeNull();
     // Round-one repair earnings stop at the 40-point cap.
     expect(player.points).toBe(540);
@@ -160,7 +160,7 @@ describe('barrier persistence and rebuilding', () => {
     const sim = makeSimulation();
     const player = sim.getPlayer(sim.playerIds[0])!; player.health = 100000;
     for (let i = 0; i < 1200 && sim.state.barriers[0].vaultingZombieId === null; i++) sim.tick();
-    player.position = { ...NACHT_BARRIERS[0].insidePoint }; player.yaw = 0;
+    player.position = { ...BUNKER_BARRIERS[0].insidePoint }; player.yaw = 0;
     const hold = createInputFrame(0);
     hold.actions.interact = { pressed: true, held: true, released: false, value: 1 };
     for (let i = 0; i < 65; i++) sim.tick({ [player.id]: hold });
@@ -178,12 +178,12 @@ describe('barrier persistence and rebuilding', () => {
     for (let i = 0; i < 200; i++) expect(a.tick()).toEqual(b.tick());
     expect(a.state).toEqual(b.state);
     a.restart(4848);
-    expect(a.state.barriers.every(barrier => barrier.boards === NACHT_WINDOW_BOARDS && barrier.vaultingZombieId === null)).toBe(true);
+    expect(a.state.barriers.every(barrier => barrier.boards === BUNKER_WINDOW_BOARDS && barrier.vaultingZombieId === null)).toBe(true);
     expect(a.zombies()).toEqual([]);
   });
 
   it('a group still needs the full tear interval for each board', () => {
-    const barrier = createBarrier(NACHT_BARRIERS[0], 'e:10').state;
+    const barrier = createBarrier(BUNKER_BARRIERS[0], 'e:10').state;
     const zombies = [0, 1, 2].map(i => {
       const zombie = createZombieState(`e:${i + 1}`, barrier.approachPath.at(-1)!, 1);
       zombie.entry = createZombieEntry(barrier.id, i); zombie.entry.phase = 'breaking';
@@ -193,13 +193,13 @@ describe('barrier persistence and rebuilding', () => {
       prepareBarriers([barrier], zombies);
       for (const zombie of zombies) updateZombieEntry(zombie, barrier, zombies, 1 / 60, [], tick);
     }
-    expect(barrier.boards).toBe(NACHT_WINDOW_BOARDS);
+    expect(barrier.boards).toBe(BUNKER_WINDOW_BOARDS);
     for (const zombie of zombies) updateZombieEntry(zombie, barrier, zombies, 1 / 60, [], 74);
-    expect(barrier.boards).toBe(NACHT_WINDOW_BOARDS - 1);
+    expect(barrier.boards).toBe(BUNKER_WINDOW_BOARDS - 1);
   });
 
   it('makes the next attacker break rebuilt boards before entering', () => {
-    const barrier = createBarrier(NACHT_BARRIERS[0], 'e:10').state;
+    const barrier = createBarrier(BUNKER_BARRIERS[0], 'e:10').state;
     barrier.boards = 1;
     const zombie = createZombieState('e:2', barrier.approachPath.at(-1)!, 1);
     zombie.entry = createZombieEntry(barrier.id, 0); zombie.entry.phase = 'breaking';
@@ -218,13 +218,13 @@ describe('barrier persistence and rebuilding', () => {
     zombie.alive = false; zombie.health = 0;
     sim.tick(); sim.tick();
     expect(sim.state.round.phase).toBe('intermission');
-    expect(sim.state.barriers[0].boards).toBe(NACHT_WINDOW_BOARDS);
+    expect(sim.state.barriers[0].boards).toBe(BUNKER_WINDOW_BOARDS);
   });
 
   it('all active inside landings have a path to the starting room with doors open', () => {
-    const query = createNavigationQuery(NACHT_NAVIGATION, map.collisionBoxes, 0.32, map.walkSurfaces);
-    for (const barrier of NACHT_BARRIERS) {
-      expect(query(barrier.insidePoint, NACHT_PLAYER_SPAWN), barrier.id).not.toBe(barrier.insidePoint);
+    const query = createNavigationQuery(BUNKER_NAVIGATION, map.collisionBoxes, 0.32, map.walkSurfaces);
+    for (const barrier of BUNKER_BARRIERS) {
+      expect(query(barrier.insidePoint, BUNKER_PLAYER_SPAWN), barrier.id).not.toBe(barrier.insidePoint);
     }
   });
 });

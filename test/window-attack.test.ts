@@ -3,9 +3,9 @@ import {
   BARRIER_RULES, GameSimulation, WINDOW_ATTACK, ZOMBIE_MOVEMENT, awardRepairPoints, createBarrier,
   createPlayerState, createZombieEntry, createZombieState, tickWindowAttack,
 } from '../src/core/index.ts';
-import { NACHT_BARRIERS, NACHT_WINDOW_BOARDS } from '../src/maps/nacht.ts';
+import { BUNKER_BARRIERS, BUNKER_WINDOW_BOARDS } from '../src/maps/bunker.ts';
 
-const definition = NACHT_BARRIERS[0];
+const definition = BUNKER_BARRIERS[0];
 
 function inward(distance: number) {
   return { x: definition.position.x - definition.outward.x * distance, y: definition.position.y,
@@ -20,9 +20,9 @@ function zombieAtWindow(id: `e:${number}` = 'e:2') {
 }
 
 describe('window attacks', () => {
-  it('uses six boards per Nacht window', () => {
-    expect(NACHT_BARRIERS.every(barrier => barrier.maxBoards === NACHT_WINDOW_BOARDS)).toBe(true);
-    expect(NACHT_WINDOW_BOARDS).toBe(6);
+  it('uses six boards per Bunker window', () => {
+    expect(BUNKER_BARRIERS.every(barrier => barrier.maxBoards === BUNKER_WINDOW_BOARDS)).toBe(true);
+    expect(BUNKER_WINDOW_BOARDS).toBe(6);
   });
 
   it('cannot reach through a fully boarded window', () => {
@@ -34,7 +34,7 @@ describe('window attacks', () => {
 
   it('swipes a player at the window once a board is gone, then waits for its cooldown', () => {
     const barrier = createBarrier(definition, 'e:10').state;
-    barrier.boards = NACHT_WINDOW_BOARDS - 1;
+    barrier.boards = BUNKER_WINDOW_BOARDS - 1;
     const player = createPlayerState('e:1', inward(0.9));
     const zombie = zombieAtWindow();
     const first = tickWindowAttack(zombie, barrier, [player]);
@@ -64,16 +64,16 @@ describe('window attacks', () => {
     const player = sim.getPlayer(sim.playerIds[0])!;
     player.health = 100000;
     const barrier = sim.state.barriers[0];
-    barrier.boards = NACHT_WINDOW_BOARDS - 1;
+    barrier.boards = BUNKER_WINDOW_BOARDS - 1;
     const zombie = zombieAtWindow('e:50');
     sim.state.world.entities[zombie.id] = zombie;
     for (let i = 0; i < BARRIER_RULES.tearTicks * 3; i++) sim.tick();
-    expect(barrier.boards).toBe(NACHT_WINDOW_BOARDS - 1);
+    expect(barrier.boards).toBe(BUNKER_WINDOW_BOARDS - 1);
     expect(player.health).toBeLessThan(100000);
 
     player.position = inward(WINDOW_ATTACK.reach + 1);
     for (let i = 0; i < BARRIER_RULES.tearTicks + 1; i++) sim.tick();
-    expect(barrier.boards).toBe(NACHT_WINDOW_BOARDS - 2);
+    expect(barrier.boards).toBe(BUNKER_WINDOW_BOARDS - 2);
   });
 });
 

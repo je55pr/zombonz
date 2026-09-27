@@ -2,7 +2,7 @@
 
 ## Direction and boundaries
 
-WaW / BO1-inspired, not a claim of frame-exact emulation. Preserve the Nacht
+WaW / BO1-inspired, not a claim of frame-exact emulation. Preserve the Bunker
 geometry, imported assets, deterministic core and refresh-rate-independent renderer.
 User decisions: polish solo play and atmosphere first; perks and Pack-a-Punch later.
 Keep work in focused local commits; no remote pushes without approval.
