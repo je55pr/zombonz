@@ -275,7 +275,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     grenadeView.events(events, simulation.state.world.tick);
     feedback.consume(events, playerId, simulation.state.world.tick);
     hud.events(events, playerId);
-    audio.consume(events, playerId);
+    audio.consume(events, playerId, simulation.state.world);
     if (simulation.state.world !== world) {
       previousPositions.clear();
       for (const view of skinnedViews.values()) view.dispose();
