@@ -40,6 +40,10 @@ export function inPlaceClip(source: THREE.AnimationClip, model: THREE.Object3D):
     const parsed = THREE.PropertyBinding.parseTrackName(track.name);
     const node = model.getObjectByName(parsed.nodeName);
     if (!node) return false;
+    // Peter_D's run export rekeys its coordinate-conversion Root to 0.001 scale
+    // and a 90-degree rotation. The model already has the conversion in its bind
+    // pose, so those keys shrink/tip the visible mesh while its hitbox stays put.
+    if (parsed.nodeName === 'Root' && (parsed.propertyName === 'scale' || parsed.propertyName === 'quaternion')) return false;
     // pxltiger's animation export bakes its FBX helper chain into pelvis keys,
     // while the model retains that chain. Convert back to the bone's local space
     // instead of applying the helper transform twice (which tips the rig sideways).
