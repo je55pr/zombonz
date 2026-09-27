@@ -212,7 +212,7 @@ Full intake hashes, API snapshots, source archives and conversion notes are kept
 ## CC0 audio selection
 
 Compressed, edited MP3 derivatives in /assets/audio. The original downloads remain outside the repository. CC0 permits reuse, but these source links are retained for provenance and thanks to the creators:
-- Firearm shots: The Free Firearm Sound Library (Ben Jaszczak and contributors): https://opengameart.org/content/the-free-firearm-sound-library (the near-distance take of 17 guns, one per weapon family)
+- Firearm shots: The Free Firearm Sound Library (Ben Jaszczak and contributors): https://opengameart.org/content/the-free-firearm-sound-library (the near-distance take of 17 guns, one per weapon family; the 1911 is layered with a synthetic low-end kick)
 - Reloads: Gun Reload Sound Effects: https://opengameart.org/content/gun-reload-sound-effects
 - Shotgun handling: Shotgun Reload Sound effects: https://opengameart.org/content/shotgun-reload-sound-effects
 - Mechanical clicks: 7 mechanical clicks and buzzes: https://opengameart.org/content/7-mechanical-clicks-and-buzzes

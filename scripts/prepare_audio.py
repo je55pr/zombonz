@@ -18,6 +18,17 @@ import py7zr
 
 # (download, member or None for a loose file, runtime name, maximum seconds)
 LIB = "Prepared SFX Library.7z"
+# Recorded a few metres in front of the gun, these takes lack the low "thump" a close first-person
+# shot has, which reads as distance. A low shelf plus a short synthetic kick (a 140 -> 55 Hz sweep
+# decaying over ~25 ms, starting on the shot, tuned to the ~20% low-end body of the AK and Trench Gun takes) restores it; a limiter keeps the sum from clipping.
+PUNCH = {"gun-pistol"}
+PUNCH_FILTER = (
+    "[0:a]aformat=channel_layouts=mono,aresample=32000,highpass=f=35,"
+    "silenceremove=start_periods=1:start_threshold=-55dB,lowshelf=f=150:g=4[shot];"
+    "aevalsrc=exprs='0.8*sin(2*PI*(55*t+2.55*(1-exp(-t/0.03))))*exp(-t/0.025)':s=32000:d=0.15[thump];"
+    "[shot][thump]amix=inputs=2:weights=1 0.08:normalize=0,alimiter=limit=0.95:attack=1:release=50,"
+    "afade=t=out:st={fade}:d=0.25[out]"
+)
 L = "Prepared SFX Library"
 WOOD = "independent_nu_ljudbank-wood_crack_hit_destruction.7z"
 CLIPS = [
@@ -29,7 +40,8 @@ CLIPS = [
     (LIB, f"{L}/Mosin Nagant/M_21P.wav", "gun-mosin", 1.2),
     (LIB, f"{L}/Tikka/W_29P.wav", "gun-30-06", 1.1),
     (LIB, f"{L}/SKS/U_14P.wav", "gun-carbine", 1.0),
-    (LIB, f"{L}/Savage 10 .300 Blackout/T_27P.wav", "gun-battle-rifle", 1.0),
+    # The Marlin's .30-30 is the driest, fullest rifle take; the .300 Blackout sounded thin and distant.
+    (LIB, f"{L}/Marlin 336/I_22P.wav", "gun-battle-rifle", 1.1),
     (LIB, f"{L}/AK-47/C_28P.wav", "gun-ak", 0.8),
     (LIB, f"{L}/AR-15/D_32P.wav", "gun-commando", 0.8),
     (LIB, f"{L}/Carl Gustav M45/G_31P.wav", "gun-smg-45", 0.7),
@@ -113,9 +125,11 @@ def main() -> None:
             command = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y", "-i", str(source),
                        "-t", str(seconds), "-ac", "1", "-ar", "24000" if ambience else "32000",
                        "-b:a", "48k" if ambience else "64k", "-codec:a", "libmp3lame"]
-            if not ambience:
-                # Fade the last 0.25 s so a clip cut short of its tail never ends on a click.
-                fade = max(0.0, seconds - 0.25)
+            # Fade the last 0.25 s so a clip cut short of its tail never ends on a click.
+            fade = max(0.0, seconds - 0.25)
+            if name in PUNCH:
+                command += ["-filter_complex", PUNCH_FILTER.format(fade=fade), "-map", "[out]"]
+            elif not ambience:
                 command += ["-af", "highpass=f=45,silenceremove=start_periods=1:start_threshold=-55dB,"
                             f"afade=t=out:st={fade}:d=0.25"]
             command.append(str(output))
