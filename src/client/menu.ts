@@ -15,12 +15,15 @@ export interface MenuItem {
 
 /** Start-screen download of the game code and every model/texture; play options unlock when it ends. */
 export interface DownloadStatus {
-  phase: 'code' | 'assets' | 'ready' | 'error';
+  /** 'preparing' unpacks the downloaded files (decode textures, parse models) before play unlocks. */
+  phase: 'code' | 'assets' | 'preparing' | 'ready' | 'error';
   loadedBytes: number;
   totalBytes: number;
   doneFiles: number;
   totalFiles: number;
   failedFiles: number;
+  preparedSteps?: number;
+  totalSteps?: number;
 }
 
 export const INITIAL_DOWNLOAD: Readonly<DownloadStatus> = {

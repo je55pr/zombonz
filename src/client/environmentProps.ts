@@ -64,12 +64,17 @@ export const DECALS = [
   { asset: 'smear-grime', x: -0.211, y: 1.5, z: -8.1, width: 2.5, height: 2.3, yaw: -Math.PI / 2 },
   { asset: 'leaking-grime', x: 6.8, y: 5.15, z: 5.189, width: 3.1, height: 2.5, yaw: Math.PI },
 ] as const;
+/** The colour and opacity maps for one decal set (shared with the start-screen warm-up). */
+export function loadDecalTextures(manifest: EnvironmentManifest, id: string): Promise<[THREE.Texture, THREE.Texture]> {
+  const maps = manifest.decals[id].maps;
+  return Promise.all([loadEnvironmentTexture(maps.basecolor, true, false), loadEnvironmentTexture(maps.opacity, false, false)]);
+}
+
 export async function buildEnvironmentDecals(scene: THREE.Scene, manifest: EnvironmentManifest): Promise<number> {
   let failures = 0;
   for (const id of new Set(DECALS.map(d => d.asset))) {
     try {
-      const maps = manifest.decals[id].maps;
-      const [color, alpha] = await Promise.all([loadEnvironmentTexture(maps.basecolor, true, false), loadEnvironmentTexture(maps.opacity, false, false)]);
+      const [color, alpha] = await loadDecalTextures(manifest, id);
       const material = new THREE.MeshStandardMaterial({ map: color, alphaMap: alpha, transparent: true,
         depthWrite: false, roughness: 1, opacity: 0.65, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
       for (const d of DECALS.filter(d => d.asset === id)) {

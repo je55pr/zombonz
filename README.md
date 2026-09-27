@@ -52,9 +52,12 @@ The game opens on a start menu: **Solo**, **Multiplayer** and **Settings** (mous
 Enter to choose, Esc to go back). Multiplayer is a placeholder until online co-op lands. Settings
 holds mouse sensitivity, field of view and volume, saved in this browser. While the menu is open it
 downloads the game code and every model and texture the game uses (about 88 MB), with a progress
-bar; Solo and Multiplayer unlock when it finishes (Settings works throughout). The files are kept in
-memory and the game reads them from there, so starting Solo makes no further requests. Solo then
-waits on CLICK TO START.
+bar, then unpacks them (decodes the textures and parses the props, zombie and starting pistol).
+Solo and Multiplayer unlock when both finish (Settings works throughout). The files are kept in
+memory, so starting Solo makes no further requests, and the menu stays up until Nacht is fully built,
+its textures uploaded and shaders compiled, so the map never appears half-loaded. In play, a gun
+starts unpacking while the box rolls it or while you stand at its wall buy, so it appears straight
+away. Solo then waits on CLICK TO START.
 
 Click the canvas to capture the mouse. Move with WASD, hold Shift while moving forward to sprint,
 hold the right mouse button to aim down sights, and fire with the left mouse button.
