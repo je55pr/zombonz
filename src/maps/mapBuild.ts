@@ -118,16 +118,19 @@ export class MapBuilder {
 
 /**
  * Ground-floor windows become zombie entries: a path in from five metres outside, a landing just
- * inside. Upper windows stay decorative until exterior climbing exists.
+ * inside. Upper windows stay decorative unless listed in `upperEntries`; zombies reach those along a
+ * short outside ledge (the map draws it) instead.
  */
-export function barriersFromWindows(windows: readonly MapWindow[], boards: number): BarrierDefinition[] {
-  return windows.filter(w => w.y === 0).map(w => {
+export function barriersFromWindows(windows: readonly MapWindow[], boards: number,
+  upperEntries: readonly string[] = []): BarrierDefinition[] {
+  return windows.filter(w => w.y === 0 || upperEntries.includes(w.id)).map(w => {
     const point = (distance: number, sideways = 0): Vec3 => ({
       x: w.x + w.outward.x * distance + w.outward.z * sideways, y: w.y,
       z: w.z + w.outward.z * distance - w.outward.x * sideways,
     });
+    const approachPath = w.y === 0 ? [point(5, 0.6), point(2.4, 0.6), point(0.85)] : [point(2.6, 0.6), point(1.8, 0.6), point(0.85)];
     return { id: w.id, position: { x: w.x, y: w.y, z: w.z }, outward: w.outward, width: w.width, maxBoards: boards,
-      approachPath: [point(5, 0.6), point(2.4, 0.6), point(0.85)], insidePoint: point(-0.95) };
+      approachPath, insidePoint: point(-0.95) };
   });
 }
 

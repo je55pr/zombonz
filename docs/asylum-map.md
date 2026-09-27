@@ -44,7 +44,14 @@ The fourteen wall buys follow the original's rooms: Kar98k and Gewehr 43 in the 
 M1 Garand and Springfield in the American start, Thompson and double-barrel in the hallway, BAR
 in the back room, MP40 and double-barrel on the German balcony, STG-44 and Trench Gun in Left
 Upstairs, Trench Gun and BAR on the right balcony, and the sawed-off in the Speed Cola room.
-There are nine zombie windows on the ground floor. The upper windows are decorative.
+There are seventeen zombie windows, as in the original's room guides:
+
+- **Ground floor (nine):** four in the German start, three in the American start and two in the hallway.
+- **Upstairs (eight):** one on the German balcony, two in Left Upstairs, two on the right balcony,
+  and one each in the Speed Cola room, the kitchen and the power room.
+
+Zombies climb into the upstairs windows off a short roof ledge outside. A window only takes zombies
+once players can reach the room behind it. The other upstairs windows are decorative.
 
 ## Not yet implemented
 
@@ -52,6 +59,7 @@ There are nine zombie windows on the ground floor. The upper windows are decorat
   American side.
 - Perks.
 - The electric traps on both balconies.
+- The German balcony's second entry, where zombies climb over the railing from the courtyard.
 - The moving box. The box stays in the power room.
 
 ## Checks
@@ -61,6 +69,7 @@ There are nine zombie windows on the ground floor. The upper windows are decorat
 - The courtyard and two-storey footprint, and the room positions.
 - Costs and wall buys.
 - Round-one windows.
+- Zombies climbing in through the upstairs windows.
 - Buying every door from its own floor.
 - Walking both stairs.
 - A connected navigation graph.
@@ -69,4 +78,4 @@ There are nine zombie windows on the ground floor. The upper windows are decorat
 - The box, and every wall buy.
 
 Development views use `?preview=<view>&map=asylum`. The views are `american`, `hallway`,
-`balcony`, `upstairs`, `power`, `kitchen`, `rightBalcony`, `courtyard` and `barrier`.
+`balcony`, `upstairs`, `power`, `kitchen`, `rightBalcony`, `courtyard`, `barrier` and `upperEntry`.
