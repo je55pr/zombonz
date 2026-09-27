@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { PointsPopups, RoundCounter, type HudLayout } from '../src/client/hudEffects.ts';
+import { Crosshair, PointsPopups, RoundCounter, type HudLayout } from '../src/client/hudEffects.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -46,5 +46,17 @@ describe('WaW-style HUD effects', () => {
     expect(material.opacity).toBeCloseTo(0.45);
     counter.update(2, 'spawning', layout, 13000, false);
     expect((scene.children[0] as THREE.Mesh).visible).toBe(false);
+  });
+
+  it('opens the crosshair to the real spread cone and fades it out when hidden', () => {
+    const scene = new THREE.Scene(), crosshair = new Crosshair(scene);
+    // A 0.05 rad cone at a 70 degree field of view reaches about 32 layout units from the centre.
+    expect(Crosshair.gapFor(0.05, 70, layout)).toBeCloseTo(5 + Math.tan(0.05) / Math.tan(35 * Math.PI / 180) * 450);
+    expect(Crosshair.gapFor(0.05, 50, layout)).toBeGreaterThan(Crosshair.gapFor(0.05, 70, layout));
+    crosshair.update(0.01, 70, layout, 0, true);
+    for (let ms = 16; ms < 1000; ms += 16) crosshair.update(0.05, 70, layout, ms, true);
+    expect(crosshair.currentGap).toBeCloseTo(Crosshair.gapFor(0.05, 70, layout), 1);
+    for (let ms = 1000; ms < 2000; ms += 16) crosshair.update(0.05, 70, layout, ms, false);
+    expect(scene.children.every(child => !child.visible)).toBe(true);
   });
 });

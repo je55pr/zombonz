@@ -37,6 +37,7 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     sprintTicks: SPRINT_RULES.maxTicks,
     sprintRechargeDelayTicks: 0,
     aiming: false,
+    spreadBloom: 0,
     health: 100,
     recoveryDelayTicks: 0,
     meleeCooldownTicks: 0,

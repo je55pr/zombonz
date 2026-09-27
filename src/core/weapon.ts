@@ -2,6 +2,7 @@ import type { CollisionBox } from './collision.ts';
 import type { EntityId, PlayerState, Vec3, WeaponState, ZombieState } from './types.ts';
 import { SeededRng } from './rng.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
+import { PLAYER_MOVEMENT } from './player.ts';
 
 export interface WeaponDefinition {
   id: string;
@@ -366,8 +367,25 @@ function completeReload(player: PlayerState): WeaponEvent[] {
     magazineAmmo: player.weapon.magazineAmmo, reserveAmmo: player.weapon.reserveAmmo }];
 }
 
+/**
+ * WaW-style dynamic spread: hip fire opens up while moving (most while sprinting) and blooms with each
+ * shot, settling back over about half a second. Aiming scales the whole cone by the gun's aim multiplier.
+ */
+export const SPREAD_RULES = { movingExtra: 0.8, sprintExtra: 1.6, bloomPerShot: 0.3, maxBloom: 1.2, bloomDecayPerTick: 0.03 } as const;
+
+/** The spread cone (radians) the player's next shot will use; the HUD crosshair draws the same value. */
+export function currentSpread(player: PlayerState): number {
+  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  if (!definition) return 0;
+  const pace = Math.min(1, Math.hypot(player.velocity.x, player.velocity.z) / PLAYER_MOVEMENT.maxSpeed);
+  const movement = player.sprinting ? SPREAD_RULES.sprintExtra : SPREAD_RULES.movingExtra * pace;
+  return definition.hipSpreadRadians * (1 + movement + player.spreadBloom)
+    * (player.aiming ? definition.aimSpreadMultiplier ?? 0.1 : 1);
+}
+
 export function tickWeaponState(player: PlayerState): WeaponEvent[] {
   if (player.switchTicksRemaining > 0) player.switchTicksRemaining -= 1;
+  player.spreadBloom = Math.max(0, player.spreadBloom - SPREAD_RULES.bloomDecayPerTick);
   if (player.holsteredWeapon) tickWeaponCooldown(player.holsteredWeapon);
   const state = player.weapon;
   if (state.cooldownTicks > 0) state.cooldownTicks -= 1;
@@ -469,7 +487,8 @@ export function firePlayerWeapon(
   const events: Array<WeaponEvent | DamageEvent> = [{ type: 'weaponFired', playerId: player.id, weaponId: definition.id }];
   if (player.weapon.magazineAmmo === 0) events.push(...beginReload(player));
   const seed = spreadSeed ^ Math.imul(Number(player.id.slice(2)), 0x9e3779b9);
-  const spread = definition.hipSpreadRadians * (player.aiming ? definition.aimSpreadMultiplier ?? 0.1 : 1);
+  const spread = currentSpread(player);
+  player.spreadBloom = Math.min(SPREAD_RULES.maxBloom, player.spreadBloom + SPREAD_RULES.bloomPerShot);
   // Pellets resolve against the pre-shot state, then each zombie takes one combined hit.
   const hits = new Map<EntityId, { damage: number; distance: number; hitZone: HitZoneId }>();
   let first: { ray: HitscanRay; hit: HitscanTarget } | null = null;

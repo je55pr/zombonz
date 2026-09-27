@@ -186,3 +186,62 @@ export class RoundCounter {
     this.mesh.visible = visible;
   }
 }
+
+/** The screen gap (layout units) left at the centre even for a perfectly accurate shot. */
+const CROSSHAIR_MIN_GAP = 5;
+const CROSSHAIR_LENGTH = 11;
+const CROSSHAIR_WIDTH = 2;
+
+/**
+ * WaW's four-line hip crosshair. The gap is the player's actual spread cone projected to the screen,
+ * so it opens while moving, sprinting and firing and closes as the aim settles. Each line has a dark
+ * outline so it reads against bright walls.
+ */
+export class Crosshair {
+  private readonly lines: { outline: THREE.Mesh; line: THREE.Mesh }[] = [];
+  private gap = CROSSHAIR_MIN_GAP;
+  private lastNow: number | null = null;
+  private opacity = 1;
+
+  constructor(scene: THREE.Scene) {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    for (let i = 0; i < 4; i++) {
+      const outline = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false }));
+      const line = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0xf4f1e7, transparent: true, depthTest: false, depthWrite: false }));
+      outline.renderOrder = 6; line.renderOrder = 7;
+      outline.frustumCulled = line.frustumCulled = false;
+      scene.add(outline, line);
+      this.lines.push({ outline, line });
+    }
+  }
+
+  /** Gap in layout units for a spread cone, given the camera's current vertical field of view. */
+  static gapFor(spreadRadians: number, verticalFovDegrees: number, layout: HudLayout): number {
+    const halfFov = THREE.MathUtils.degToRad(verticalFovDegrees) / 2;
+    return CROSSHAIR_MIN_GAP + Math.tan(spreadRadians) / Math.tan(halfFov) * (layout.height / 2);
+  }
+
+  get currentGap(): number { return this.gap; }
+
+  update(spreadRadians: number, verticalFovDegrees: number, layout: HudLayout, now: number, visible: boolean): void {
+    const dt = this.lastNow === null ? 1 : Math.min(0.1, Math.max(0, (now - this.lastNow) / 1000));
+    this.lastNow = now;
+    // Ease the lines rather than snapping them tick by tick, and fade in and out rather than popping.
+    const target = Crosshair.gapFor(spreadRadians, verticalFovDegrees, layout);
+    this.gap += (target - this.gap) * (1 - Math.exp(-18 * dt));
+    this.opacity += ((visible ? 1 : 0) - this.opacity) * (1 - Math.exp(-16 * dt));
+    const cx = layout.width / 2, cy = layout.height / 2;
+    const arms = [[0, -1], [0, 1], [-1, 0], [1, 0]] as const;
+    arms.forEach(([dx, dy], i) => {
+      const { outline, line } = this.lines[i];
+      const along = this.gap + CROSSHAIR_LENGTH / 2;
+      const x = cx + dx * along, y = cy + dy * along;
+      const w = dx ? CROSSHAIR_LENGTH : CROSSHAIR_WIDTH, h = dx ? CROSSHAIR_WIDTH : CROSSHAIR_LENGTH;
+      placeQuad(line, layout, x - w / 2, y - h / 2, w, h);
+      placeQuad(outline, layout, x - w / 2 - 1, y - h / 2 - 1, w + 2, h + 2);
+      (line.material as THREE.MeshBasicMaterial).opacity = 0.9 * this.opacity;
+      (outline.material as THREE.MeshBasicMaterial).opacity = 0.55 * this.opacity;
+      line.visible = outline.visible = this.opacity > 0.01;
+    });
+  }
+}
