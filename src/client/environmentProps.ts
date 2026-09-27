@@ -3,6 +3,7 @@ import { BUNKER_PROPS, type PropPlacement } from '../maps/bunkerProps.ts';
 import { loadModel } from './runtimeAssets.ts';
 import { batchStaticMeshes } from './staticBatch.ts';
 import { loadEnvironmentTexture, type EnvironmentManifest } from './environmentMaterials.ts';
+import { px, pz } from '../maps/bunkerPlan.ts';
 
 export function prepareProp(source: THREE.Object3D, placement: PropPlacement): THREE.Group {
   // Never mutate the cached GLB. Clones share geometry/materials, but not transforms.
@@ -58,12 +59,12 @@ export async function buildEnvironmentProps(scene: THREE.Scene): Promise<number>
 }
 
 export const DECALS = [
-  { asset: 'leaking-grime', x: 15.6, y: 1.8, z: -2.389, width: 2.6, height: 2.5, yaw: 0 },
-  { asset: 'leaking-grime', x: -5.989, y: 5.1, z: -6.5, width: 2.5, height: 2.7, yaw: Math.PI / 2 },
-  { asset: 'smear-grime', x: 0.211, y: 1.5, z: 5, width: 2.8, height: 2.3, yaw: Math.PI / 2 },
-  { asset: 'smear-grime', x: -0.211, y: 1.5, z: -8.1, width: 2.5, height: 2.3, yaw: -Math.PI / 2 },
-  { asset: 'leaking-grime', x: 6.8, y: 5.15, z: 5.189, width: 3.1, height: 2.5, yaw: Math.PI },
-] as const;
+  { asset: 'leaking-grime', x: px(15.6), y: 1.8, z: pz(-2.389), width: 2.6, height: 2.5, yaw: 0 },
+  { asset: 'leaking-grime', x: px(-5.989), y: 5.1, z: pz(-6.5), width: 2.5, height: 2.7, yaw: Math.PI / 2 },
+  { asset: 'smear-grime', x: px(0.211), y: 1.5, z: pz(5), width: 2.8, height: 2.3, yaw: Math.PI / 2 },
+  { asset: 'smear-grime', x: px(-0.211), y: 1.5, z: pz(-8.1), width: 2.5, height: 2.3, yaw: -Math.PI / 2 },
+  { asset: 'leaking-grime', x: px(6.8), y: 5.15, z: pz(5.189), width: 3.1, height: 2.5, yaw: Math.PI },
+];
 /** The colour and opacity maps for one decal set (shared with the start-screen warm-up). */
 export function loadDecalTextures(manifest: EnvironmentManifest, id: string): Promise<[THREE.Texture, THREE.Texture]> {
   const maps = manifest.decals[id].maps;

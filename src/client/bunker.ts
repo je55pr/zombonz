@@ -9,6 +9,7 @@ import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
 import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
 import { BOX_RULES } from '../core/mysteryBox.ts';
+import { px, pz } from '../maps/bunkerPlan.ts';
 
 // Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
 const PLANK_TILT = [0.07, -0.16, 0.12, -0.08, 0.17, -0.05] as const;
@@ -95,7 +96,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   }
   // Architecture lives in shared map data, so the visuals and collision agree.
   // Short exposed reinforcing bars hang across the surviving roof edges.
-  for (let i = 0; i < 12; i++) box(group, iron, -4.7 + i * 0.34, 6.66, -9.2, 0.025, 0.035, 1.5);
+  for (let i = 0; i < 12; i++) box(group, iron, px(-4.7) + i * 0.34, 6.66, pz(-9.2), 0.025, 0.035, 1.5);
   for (const rail of BUNKER_RAILS) {
     const a = new THREE.Vector3(rail.from.x, rail.from.y, rail.from.z);
     const b = new THREE.Vector3(rail.to.x, rail.to.y, rail.to.z);
@@ -128,9 +129,9 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
       const crate = box(view, wood, 0.2, 1.4, 0, 0.8, 0.7, 0.7); crate.rotation.y = 0.23;
     }
   }
-  label('HELP', 0.215, 2.3, 2.2, Math.PI / 2, 1.6, 0.45);
-  label('YOU MUST ASCEND', 5.6, 2.4, -2.385, 0, 2.7, 0.38);
-  label('FROM DARKNESS', 5.6, 2, -2.385, 0, 2.5, 0.38);
+  label('HELP', px(0.215), 2.3, pz(2.2), Math.PI / 2, 1.6, 0.45);
+  label('YOU MUST ASCEND', px(5.6), 2.4, pz(-2.385), 0, 2.7, 0.38);
+  label('FROM DARKNESS', px(5.6), 2, pz(-2.385), 0, 2.5, 0.38);
   const chalk = new THREE.MeshBasicMaterial({ color: CHALK });
   const wallGuns: Promise<unknown>[] = [];
   for (const weapon of BUNKER_WALL_WEAPONS) {
@@ -194,14 +195,14 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   // Warm practical lights against cold exterior moonlight.
   const practicalLights: THREE.PointLight[] = [];
   for (const [x, y, z] of [[-0.7, 2.35, -2], [5, 2.65, 2], [-0.7, 5.75, 2.5]] as const) {
-    const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(x, y, z); group.add(light);
+    const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(px(x), y, pz(z)); group.add(light);
     practicalLights.push(light);
   }
   // Low rubble stays below the collision step height and out of navigation lanes.
   let seed = 753;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
   for (let i = 0; i < 100; i++) {
-    const x = -5.7 + random() * 4.8, z = -10.5 + random() * 15;
+    const x = px(-5.7 + random() * 4.8), z = pz(-10.5 + random() * 15);
     const y = i % 3 === 0 ? UPPER_HEIGHT : 0;
     const rubble = box(group, i % 3 ? debris : wood, x, y + 0.045, z, 0.12 + random() * 0.3, 0.09, 0.1 + random() * 0.25);
     rubble.rotation.y = random() * Math.PI;
@@ -210,7 +211,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   box(group, environmentMaterial('dirt'), 0, -0.25, 0, 160, 0.1, 160);
   const bark = new THREE.MeshStandardMaterial({ color: 0x1d2422, roughness: 1 });
   for (let i = 0; i < 55; i++) {
-    const angle = random() * Math.PI * 2, radius = 27 + random() * 25;
+    const angle = random() * Math.PI * 2, radius = 34 + random() * 25;
     const tree = new THREE.Group(); tree.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.27, 7 + random() * 6, 5), bark);
     trunk.position.y = 4; tree.add(trunk);

@@ -7,9 +7,11 @@ import type { Vec3 } from '../core/types.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
 import { BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
+import { ps, px, pz } from './bunkerPlan.ts';
 
-// Hand-built from WaW floor plans. Scale is estimated, not extracted game data.
-// HELP wing west (negative x), spawn east, box at the south end of HELP.
+// Hand-built from WaW floor plans, authored in blockout coordinates and mapped out by bunkerPlan
+// (px/pz for positions, ps for the main stair). HELP wing west (negative x), spawn east, box at the
+// south end of HELP.
 export const UPPER_HEIGHT = 3.4;
 export type GreyboxMaterial = 'wall' | 'floor' | 'upperFloor' | 'stair' | 'barrier' | 'metal';
 export interface GreyboxBox {
@@ -24,22 +26,34 @@ export interface MapMarker {
 export interface BunkerWindow {
   id: string; x: number; z: number; y: number; axis: 'x' | 'z'; width: number; outward: Vec3;
 }
+/** A box in built-map coordinates. */
 const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number,
   material: GreyboxMaterial, collides = true): GreyboxBox => ({
   center: { x, y, z }, size: { x: sx, y: sy, z: sz }, material, collides,
 });
+/** A box authored in blockout coordinates: long sides stretch with the plan, thin ones keep their size. */
+function planBox(x: number, y: number, z: number, sx: number, sy: number, sz: number,
+  material: GreyboxMaterial, collides = true): GreyboxBox {
+  const [cx, wx] = sx > 1 ? [(px(x - sx / 2) + px(x + sx / 2)) / 2, px(x + sx / 2) - px(x - sx / 2)] : [px(x), sx];
+  const [cz, wz] = sz > 1 ? [(pz(z - sz / 2) + pz(z + sz / 2)) / 2, pz(z + sz / 2) - pz(z - sz / 2)] : [pz(z), sz];
+  return box(cx, y, cz, wx, sy, wz, material, collides);
+}
 const shell: GreyboxBox[] = [], prisms: GreyboxPrism[] = [], windows: BunkerWindow[] = [];
 export const BUNKER_RAILS: { from: Vec3; to: Vec3 }[] = [];
 const surfaces: WalkSurface[] = [];
 const rect = (minX: number, maxX: number, minZ: number, maxZ: number, height: number): WalkSurface =>
   ({ minX, maxX, minZ, maxZ, startHeight: height, endHeight: height });
+/** A floor rectangle authored in blockout coordinates. */
+const planRect = (minX: number, maxX: number, minZ: number, maxZ: number, height: number): WalkSurface =>
+  rect(px(minX), px(maxX), pz(minZ), pz(maxZ), height);
 function floor(surface: WalkSurface, material: GreyboxMaterial): void {
   surfaces.push(surface);
   if (surface.polygon) prisms.push({ points: surface.polygon, bottom: surface.startHeight - 0.24, top: surface.startHeight, material });
   else shell.push(box((surface.minX + surface.maxX) / 2, surface.startHeight - 0.12,
     (surface.minZ + surface.maxZ) / 2, surface.maxX - surface.minX, 0.24, surface.maxZ - surface.minZ, material, false));
 }
-function wall(axis: 'x' | 'z', fixed: number, from: number, to: number, base: number,
+/** A wall in built-map coordinates; openings are [centre, width, window id]. */
+function wallAt(axis: 'x' | 'z', fixed: number, from: number, to: number, base: number,
   openings: readonly (readonly [number, number, string])[] = [], outward = 1, height = 3.4): void {
   const segment = (a: number, b: number, low: number, h: number) => {
     if (b <= a || h <= 0) return;
@@ -57,6 +71,13 @@ function wall(axis: 'x' | 'z', fixed: number, from: number, to: number, base: nu
   }
   segment(cursor, to, base, height);
 }
+/** A wall authored in blockout coordinates; window centres move with the plan, their widths don't. */
+function wall(axis: 'x' | 'z', fixed: number, from: number, to: number, base: number,
+  openings: readonly (readonly [number, number, string])[] = [], outward = 1, height = 3.4): void {
+  const along = axis === 'x' ? px : pz, across = axis === 'x' ? pz : px;
+  wallAt(axis, across(fixed), along(from), along(to), base,
+    openings.map(([center, width, id]) => [along(center), width, id] as const), outward, height);
+}
 // Five spawn windows and the distinctive recessed south frontage.
 wall('x', -2.6, 0, 18.2, 0, [[12, 1.5, 'start-north']], -1);
 wall('z', 18.2, -2.6, 7.8, 0, [[-1.6, 1.2, 'start-east']], 1);
@@ -68,21 +89,22 @@ wall('x', -11, -6.2, 0, 0, [[-4.2, 1.2, 'help-north']], -1);
 wall('z', 0, -11, -2.6, 0, [[-6, 1.25, 'help-east']], 1);
 wall('z', -6.2, -11, 1.8, 0, [[0.7, 2.2, 'help-cave']], -1);
 wall('z', -8, 1.8, 7.8, 0); wall('x', 1.8, -8, -6.2, 0); wall('x', 7.8, -8, 0, 0);
-wall('z', 0, -2.6, -1.2, 0); wall('z', 0, 1.2, 7.8, 0);
+// The HELP doorway keeps its real 2.4 m width, centred on z = 0.
+wallAt('z', 0, pz(-2.6), -1.2, 0); wallAt('z', 0, 1.2, pz(7.8), 0);
 shell.push(box(0, 3.1, 0, 0.4, 0.6, 2.4, 'wall'));
-floor(rect(-6.2, 0, -11, 7.8, 0), 'floor'); floor(rect(-8, -6.2, 1.8, 7.8, 0), 'floor');
-floor(rect(0, 18.2, -2.6, 5.4, 0), 'floor'); floor(rect(0, 10.4, 5.4, 7.8, 0), 'floor');
-floor(rect(13.8, 18.2, 5.4, 7.8, 0), 'floor');
+floor(planRect(-6.2, 0, -11, 7.8, 0), 'floor'); floor(planRect(-8, -6.2, 1.8, 7.8, 0), 'floor');
+floor(planRect(0, 18.2, -2.6, 5.4, 0), 'floor'); floor(planRect(0, 10.4, 5.4, 7.8, 0), 'floor');
+floor(planRect(13.8, 18.2, 5.4, 7.8, 0), 'floor');
 
 // The upstairs ends short of spawn's east/south edges, with an irregular stair hole.
-floor(rect(-6.2, 0, -11, 5.4, UPPER_HEIGHT), 'upperFloor');
-floor(rect(-8, -6.2, 0.4, 3.1, UPPER_HEIGHT), 'upperFloor');
-floor(rect(-8, -4.8, 6.65, 7.8, UPPER_HEIGHT), 'upperFloor');
-floor(rect(-6.2, -4.8, 5.4, 6.65, UPPER_HEIGHT), 'upperFloor');
-floor(rect(0, 10.4, -4.7, -2.6, UPPER_HEIGHT), 'upperFloor');
-floor({ ...rect(0, 10.4, -2.6, 5.4, UPPER_HEIGHT), polygon: [
+floor(planRect(-6.2, 0, -11, 5.4, UPPER_HEIGHT), 'upperFloor');
+floor(planRect(-8, -6.2, 0.4, 3.1, UPPER_HEIGHT), 'upperFloor');
+floor(planRect(-8, -4.8, 6.65, 7.8, UPPER_HEIGHT), 'upperFloor');
+floor(planRect(-6.2, -4.8, 5.4, 6.65, UPPER_HEIGHT), 'upperFloor');
+floor(planRect(0, 10.4, -4.7, -2.6, UPPER_HEIGHT), 'upperFloor');
+floor({ ...planRect(0, 10.4, -2.6, 5.4, UPPER_HEIGHT), polygon: ([
   [0, -2.6], [4.8, -2.6], [4.8, 0.1], [5.8, 2.8], [8, 3.8], [10.4, 3.8], [10.4, 5.4], [0, 5.4],
-] }, 'upperFloor');
+] as const).map(([x, z]) => [ps(x), ps(z)] as const) }, 'upperFloor');
 wall('x', -11, -6.2, 0, UPPER_HEIGHT);
 wall('z', -6.2, -11, 0.4, UPPER_HEIGHT, [[-9.8, 1.2, 'upper-help-north'], [-1.5, 1.25, 'upper-help-south']], -1);
 wall('z', -8, 0.4, 7.8, UPPER_HEIGHT); wall('x', 0.4, -8, -6.2, UPPER_HEIGHT);
@@ -100,31 +122,34 @@ function parapet(ax: number, az: number, bx: number, bz: number, bottom: number,
   }
 }
 for (const [ax, az, bx, bz] of [[4.8, -0.05, 4.8, 0.1], [4.8, 0.1, 5.8, 2.8],
-  [5.8, 2.8, 8, 3.8], [8, 3.8, 10.4, 3.8]]) parapet(ax, az, bx, bz, UPPER_HEIGHT, 0.9);
+  [5.8, 2.8, 8, 3.8], [8, 3.8, 10.4, 3.8]]) parapet(ps(ax), ps(az), ps(bx), ps(bz), UPPER_HEIGHT, 0.9);
 // Concrete column rows, capitals and beams define the downstairs sightlines.
 for (const x of [3.3, 7]) for (const z of [0.1, 2.9, 5.6]) {
-  shell.push(box(x, 1.58, z, 0.62, 3.16, 0.62, 'wall'), box(x, 2.96, z, 0.95, 0.4, 0.95, 'wall'));
+  shell.push(planBox(x, 1.58, z, 0.62, 3.16, 0.62, 'wall'), planBox(x, 2.96, z, 0.95, 0.4, 0.95, 'wall'));
 }
 for (const z of [-7.4, -3.8, -0.2, 3.4]) {
-  shell.push(box(-3.4, 1.58, z, 0.65, 3.16, 0.65, 'wall'), box(-3.4, 5, z, 0.65, 3.2, 0.65, 'wall'));
-  shell.push(box(-3.1, 3.01, z, 6.2, 0.3, 0.6, 'wall'));
+  shell.push(planBox(-3.4, 1.58, z, 0.65, 3.16, 0.65, 'wall'), planBox(-3.4, 5, z, 0.65, 3.2, 0.65, 'wall'));
+  shell.push(planBox(-3.1, 3.01, z, 6.2, 0.3, 0.6, 'wall'));
 }
-shell.push(box(3.3, 3.01, 2.6, 0.65, 0.3, 10.4, 'wall'));
-shell.push(box(7, 3.01, 4.5, 0.65, 0.3, 6.6, 'wall'));
-shell.push(box(-1.65, 5.1, -7.5, 0.45, 3.4, 4, 'wall'), box(-5.2, 5.1, -9.3, 2, 3.4, 0.28, 'wall'));
-shell.push(box(-3.4, 4.35, -4.5, 1.2, 1.9, 0.55, 'barrier'));
-shell.push(box(2.7, 4.9, -2.2, 0.7, 3, 0.9, 'wall'), box(3.3, 4.95, 3.4, 0.65, 3.1, 0.65, 'wall'));
+shell.push(planBox(3.3, 3.01, 2.6, 0.65, 0.3, 10.4, 'wall'));
+shell.push(planBox(7, 3.01, 4.5, 0.65, 0.3, 6.6, 'wall'));
+shell.push(planBox(-1.65, 5.1, -7.5, 0.45, 3.4, 4, 'wall'), planBox(-5.2, 5.1, -9.3, 2, 3.4, 0.28, 'wall'));
+shell.push(planBox(-3.4, 4.35, -4.5, 1.2, 1.9, 0.55, 'barrier'));
+shell.push(planBox(2.7, 4.9, -2.2, 0.7, 3, 0.9, 'wall'), planBox(3.3, 4.95, 3.4, 0.65, 3.1, 0.65, 'wall'));
 
-// Quarter-turn fan stair, followed by a short westbound straight flight.
-surfaces.push({ ...rect(7.2, 10.1, -1.9, 1, 0), endHeight: 2.2,
-  quarterTurn: { x: 7.2, z: 1, innerRadius: 1.05, outerRadius: 2.9 } },
-  { ...rect(4.8, 7.2, -1.9, -0.05, UPPER_HEIGHT), endHeight: 2.2, slopeAxis: 'x' });
+// Quarter-turn fan stair, followed by a short westbound straight flight (all scaled as one shape).
+const FAN = { x: ps(7.2), z: ps(1), inner: ps(1.05), outer: ps(2.9) };
+const FLIGHT = { minX: ps(4.8), maxX: FAN.x, minZ: ps(-1.9), maxZ: ps(-0.05) };
+const FLIGHT_Z = (FLIGHT.minZ + FLIGHT.maxZ) / 2;
+surfaces.push({ ...rect(FAN.x, FAN.x + FAN.outer, FLIGHT.minZ, FAN.z, 0), endHeight: 2.2,
+  quarterTurn: { x: FAN.x, z: FAN.z, innerRadius: FAN.inner, outerRadius: FAN.outer } },
+  { ...rect(FLIGHT.minX, FLIGHT.maxX, FLIGHT.minZ, FLIGHT.maxZ, UPPER_HEIGHT), endHeight: 2.2, slopeAxis: 'x' });
 for (let i = 0; i < 14; i++) {
   const a = -i / 14 * Math.PI / 2, b = -(i + 1) / 14 * Math.PI / 2;
-  const p = (r: number, angle: number): readonly [number, number] => [7.2 + r * Math.cos(angle), 1 + r * Math.sin(angle)];
+  const p = (r: number, angle: number): readonly [number, number] => [FAN.x + r * Math.cos(angle), FAN.z + r * Math.sin(angle)];
   const top = (i + 0.5) / 14 * 2.2;
-  prisms.push({ points: [p(1.05, a), p(2.9, a), p(2.9, b), p(1.05, b)], bottom: top - 0.18, top, material: 'stair' });
-  for (const r of [1.02, 2.94]) {
+  prisms.push({ points: [p(FAN.inner, a), p(FAN.outer, a), p(FAN.outer, b), p(FAN.inner, b)], bottom: top - 0.18, top, material: 'stair' });
+  for (const r of [FAN.inner - 0.03, FAN.outer + 0.04]) {
     const [x, z] = p(r, (a + b) / 2);
     shell.push({ ...box(x, top + 0.43, z, 0.26, 0.86, 0.26, 'metal'), visible: false });
     const [ax, az] = p(r, a), [bx, bz] = p(r, b);
@@ -132,43 +157,50 @@ for (let i = 0; i < 14; i++) {
       to: { x: bx, y: (i + 1) / 14 * 2.2 + 0.88, z: bz } });
   }
 }
+const FLIGHT_STEP = (FLIGHT.maxX - FLIGHT.minX) / 8;
 for (let i = 0; i < 8; i++) {
-  const x = 4.8 + (i + 0.5) * 0.3, top = UPPER_HEIGHT - (i + 0.5) / 8 * 1.2;
-  shell.push(box(x, top - 0.09, -0.975, 0.3, 0.18, 1.85, 'stair', false));
-  for (const z of [-1.99, 0.04]) shell.push({ ...box(x, top + 0.43, z, 0.3, 0.86, 0.16, 'metal'), visible: false });
+  const x = FLIGHT.minX + (i + 0.5) * FLIGHT_STEP, top = UPPER_HEIGHT - (i + 0.5) / 8 * 1.2;
+  shell.push(box(x, top - 0.09, FLIGHT_Z, FLIGHT_STEP, 0.18, FLIGHT.maxZ - FLIGHT.minZ, 'stair', false));
+  for (const z of [FLIGHT.minZ - 0.09, FLIGHT.maxZ + 0.09]) shell.push({ ...box(x, top + 0.43, z, FLIGHT_STEP, 0.86, 0.16, 'metal'), visible: false });
 }
-for (const z of [-1.99, 0.04]) BUNKER_RAILS.push({ from: { x: 4.8, y: UPPER_HEIGHT + 0.88, z }, to: { x: 7.2, y: 3.08, z } });
+for (const z of [FLIGHT.minZ - 0.09, FLIGHT.maxZ + 0.09]) {
+  BUNKER_RAILS.push({ from: { x: FLIGHT.minX, y: UPPER_HEIGHT + 0.88, z }, to: { x: FLIGHT.maxX, y: 3.08, z } });
+}
 // Compact HELP stair in a projecting west annex; top returns east then north.
-surfaces.push({ ...rect(-7.8, -6.3, 3.1, 6.65, 0), endHeight: UPPER_HEIGHT, slopeAxis: 'z' });
-for (let i = 0; i < 20; i++) shell.push(box(-7.05, (i + 0.5) / 20 * UPPER_HEIGHT - 0.085,
-  3.1 + (i + 0.5) / 20 * 3.55, 1.5, 0.17, 3.55 / 20, 'stair', false));
-shell.push(box(-6.25, 1.7, 4.875, 0.16, 3.4, 3.55, 'wall'), box(-6.25, 3.9, 4.875, 0.16, 1, 3.55, 'wall'));
-const mainRoute: Vec3[] = [{ x: 9.2, y: 0, z: 1.65 }];
+const HELP_STAIR = { minX: px(-7.8), maxX: px(-6.3), minZ: pz(3.1), maxZ: pz(6.65) };
+const HELP_STAIR_X = (HELP_STAIR.minX + HELP_STAIR.maxX) / 2, HELP_STAIR_Z = (HELP_STAIR.minZ + HELP_STAIR.maxZ) / 2;
+const HELP_STAIR_RUN = HELP_STAIR.maxZ - HELP_STAIR.minZ;
+surfaces.push({ ...rect(HELP_STAIR.minX, HELP_STAIR.maxX, HELP_STAIR.minZ, HELP_STAIR.maxZ, 0), endHeight: UPPER_HEIGHT, slopeAxis: 'z' });
+for (let i = 0; i < 20; i++) shell.push(box(HELP_STAIR_X, (i + 0.5) / 20 * UPPER_HEIGHT - 0.085,
+  HELP_STAIR.minZ + (i + 0.5) / 20 * HELP_STAIR_RUN, HELP_STAIR.maxX - HELP_STAIR.minX, 0.17, HELP_STAIR_RUN / 20, 'stair', false));
+shell.push(box(px(-6.25), 1.7, HELP_STAIR_Z, 0.16, 3.4, HELP_STAIR_RUN, 'wall'),
+  box(px(-6.25), 3.9, HELP_STAIR_Z, 0.16, 1, HELP_STAIR_RUN, 'wall'));
+const mainRoute: Vec3[] = [{ x: ps(9.2), y: 0, z: ps(1.65) }];
 for (let i = 0; i <= 14; i++) {
-  const a = -i / 14 * Math.PI / 2;
-  mainRoute.push({ x: 7.2 + 2 * Math.cos(a), y: i / 14 * 2.2, z: 1 + 2 * Math.sin(a) });
+  const a = -i / 14 * Math.PI / 2, r = (FAN.inner + FAN.outer) / 2;
+  mainRoute.push({ x: FAN.x + r * Math.cos(a), y: i / 14 * 2.2, z: FAN.z + r * Math.sin(a) });
 }
-for (let i = 1; i <= 8; i++) mainRoute.push({ x: 7.2 - i * 0.3, y: 2.2 + i / 8 * 1.2, z: -1 });
-mainRoute.push({ x: 4.1, y: UPPER_HEIGHT, z: -1 });
-const helpRoute: Vec3[] = [{ x: -7.05, y: 0, z: 2.5 }];
-for (let i = 0; i <= 16; i++) helpRoute.push({ x: -7.05, y: UPPER_HEIGHT * i / 16, z: 3.1 + 3.55 * i / 16 });
-helpRoute.push({ x: -7.05, y: UPPER_HEIGHT, z: 7.15 }, { x: -5.5, y: UPPER_HEIGHT, z: 7.15 });
+for (let i = 1; i <= 8; i++) mainRoute.push({ x: FLIGHT.maxX - i * FLIGHT_STEP, y: 2.2 + i / 8 * 1.2, z: FLIGHT_Z });
+mainRoute.push({ x: FLIGHT.minX - 0.7, y: UPPER_HEIGHT, z: FLIGHT_Z });
+const helpRoute: Vec3[] = [{ x: HELP_STAIR_X, y: 0, z: HELP_STAIR.minZ - 0.6 }];
+for (let i = 0; i <= 16; i++) helpRoute.push({ x: HELP_STAIR_X, y: UPPER_HEIGHT * i / 16, z: HELP_STAIR.minZ + HELP_STAIR_RUN * i / 16 });
+helpRoute.push({ x: HELP_STAIR_X, y: UPPER_HEIGHT, z: pz(7.15) }, { x: px(-5.5), y: UPPER_HEIGHT, z: pz(7.15) });
 export const BUNKER_STAIRS = [{ id: 'start-stairs', route: mainRoute }, { id: 'help-stairs', route: helpRoute }] as const;
-export const BUNKER_BOX_CENTER: Vec3 = { x: -1.45, y: 0.52, z: 7.12 };
-shell.push(box(-1.45, 0.52, 7.12, 2.35, 1.04, 0.95, 'barrier'));
+export const BUNKER_BOX_CENTER: Vec3 = { x: px(-1.45), y: 0.52, z: pz(7.12) };
+shell.push(box(BUNKER_BOX_CENTER.x, 0.52, BUNKER_BOX_CENTER.z, 2.35, 1.04, 0.95, 'barrier'));
 // Large broken roof apertures, not uniformly repeated slats.
 for (const [x, z, sx, sz] of [[-5.5, -3, 1.2, 16], [-0.6, -7.6, 1.2, 6.8], [-3.1, -10.4, 6.2, 1.2],
   [-3.1, 4.7, 6.2, 1.3], [4.5, 4.9, 9, 1], [0.8, 1.2, 1.5, 7.6], [6, -4.15, 8.8, 1.1]])
-  shell.push(box(x, 6.7, z, sx, 0.26, sz, 'wall'));
-shell.push(box(14.4, 3.27, 1.4, 7.6, 0.26, 8, 'wall'), box(5.2, 3.27, 6.6, 10.4, 0.26, 2.4, 'wall'));
-shell.push(box(-2.4, 3.27, 6.6, 4.8, 0.26, 2.4, 'wall'));
+  shell.push(planBox(x, 6.7, z, sx, 0.26, sz, 'wall'));
+shell.push(planBox(14.4, 3.27, 1.4, 7.6, 0.26, 8, 'wall'), planBox(5.2, 3.27, 6.6, 10.4, 0.26, 2.4, 'wall'));
+shell.push(planBox(-2.4, 3.27, 6.6, 4.8, 0.26, 2.4, 'wall'));
 // Collapsed tunnel outside the HELP breach, visibly separate from the other windows.
-shell.push(box(-9.4, -0.12, 0.7, 6.4, 0.24, 3.6, 'floor', false));
-shell.push(box(-9.4, 1.3, -1.1, 6.4, 2.6, 0.55, 'wall'));
-shell.push(box(-10.35, 1.3, 2.5, 4.3, 2.6, 0.55, 'wall'));
-shell.push(box(-8.25, 1.3, 2.15, 0.3, 2.6, 0.7, 'wall'));
-shell.push(box(-12.5, 1.3, 0.7, 0.5, 2.6, 3.6, 'wall'));
-shell.push(box(-9.4, 2.8, 0.7, 6.4, 0.4, 3.6, 'wall'));
+shell.push(planBox(-9.4, -0.12, 0.7, 6.4, 0.24, 3.6, 'floor', false));
+shell.push(planBox(-9.4, 1.3, -1.1, 6.4, 2.6, 0.55, 'wall'));
+shell.push(planBox(-10.35, 1.3, 2.5, 4.3, 2.6, 0.55, 'wall'));
+shell.push(planBox(-8.25, 1.3, 2.15, 0.3, 2.6, 0.7, 'wall'));
+shell.push(planBox(-12.5, 1.3, 0.7, 0.5, 2.6, 3.6, 'wall'));
+shell.push(planBox(-9.4, 2.8, 0.7, 6.4, 0.4, 3.6, 'wall'));
 
 export const BUNKER_WINDOWS: readonly BunkerWindow[] = windows;
 export const BUNKER_GREYBOX: readonly GreyboxBox[] = shell;
@@ -178,12 +210,13 @@ export const BUNKER_DOORS: readonly DoorDefinition[] = [
   { id: 'help-room', position: { x: 0, y: 0, z: 0 }, cost: 1000,
     prompt: 'E  Open HELP room  [1000]', interactionRange: 2.6, minFacingDot: 0.3,
     blocker: { min: { x: -0.2, y: 0, z: -1.2 }, max: { x: 0.2, y: 2.85, z: 1.2 } } },
-  { id: 'start-stairs', position: { x: 6, y: 2.8, z: -1 }, cost: 1000,
+  { id: 'start-stairs', position: { x: ps(6), y: 2.8, z: FLIGHT_Z }, cost: 1000,
     prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
-    blocker: { min: { x: 5.6, y: 2.2, z: -2 }, max: { x: 6.4, y: 5.7, z: 0.1 } } },
-  { id: 'help-stairs', position: { x: -7.05, y: 1.7, z: 4.875 }, cost: 1000,
+    blocker: { min: { x: ps(6) - 0.4, y: 2.2, z: FLIGHT.minZ - 0.1 }, max: { x: ps(6) + 0.4, y: 5.7, z: FLIGHT.maxZ + 0.15 } } },
+  { id: 'help-stairs', position: { x: HELP_STAIR_X, y: 1.7, z: HELP_STAIR_Z }, cost: 1000,
     prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
-    blocker: { min: { x: -7.85, y: 0, z: 4.5 }, max: { x: -6.25, y: 4.5, z: 5.25 } } },
+    blocker: { min: { x: HELP_STAIR.minX - 0.05, y: 0, z: HELP_STAIR_Z - 0.375 },
+      max: { x: HELP_STAIR.maxX + 0.05, y: 4.5, z: HELP_STAIR_Z + 0.375 } } },
 ];
 // WaW's original chalk: Kar98k in the start room, Thompson and double-barrel in HELP, Trench Gun and BAR upstairs.
 // Ammo costs half the gun.
@@ -192,16 +225,16 @@ const wallBuy = (id: string, weaponId: string, name: string, cost: number, posit
   prompt: `E  ${name} [${cost}] / Ammo [${cost / 2}]`, interactionRange: 2.5, minFacingDot: 0.25,
 });
 export const BUNKER_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
-  wallBuy('start-kar98k', 'kar98k', 'Kar98k', 200, { x: 5.2, y: 1, z: 7.56 }),
-  wallBuy('help-thompson', 'thompson', 'Thompson', 1200, { x: -5.96, y: 1, z: -9.4 }),
-  wallBuy('help-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: -5.96, y: 1, z: -4.6 }),
-  wallBuy('upper-trench-gun', 'trench-gun', 'Trench Gun', 1500, { x: -3.1, y: UPPER_HEIGHT + 1, z: -10.76 }),
-  wallBuy('upper-bar', 'bar', 'BAR', 1800, { x: -5.96, y: UPPER_HEIGHT + 1, z: -5.6 }),
-  wallBuy('start-m1-carbine', 'm1-carbine', 'M1A1 Carbine', 600, { x: 7.4, y: 1, z: 7.56 }),
+  wallBuy('start-kar98k', 'kar98k', 'Kar98k', 200, { x: px(5.2), y: 1, z: pz(7.56) }),
+  wallBuy('help-thompson', 'thompson', 'Thompson', 1200, { x: px(-5.96), y: 1, z: pz(-9.4) }),
+  wallBuy('help-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: px(-5.96), y: 1, z: pz(-4.6) }),
+  wallBuy('upper-trench-gun', 'trench-gun', 'Trench Gun', 1500, { x: px(-3.1), y: UPPER_HEIGHT + 1, z: pz(-10.76) }),
+  wallBuy('upper-bar', 'bar', 'BAR', 1800, { x: px(-5.96), y: UPPER_HEIGHT + 1, z: pz(-5.6) }),
+  wallBuy('start-m1-carbine', 'm1-carbine', 'M1A1 Carbine', 600, { x: px(7.4), y: 1, z: pz(7.56) }),
   // BO1-era chalk alongside the WaW set.
-  wallBuy('start-m14', 'm14', 'M14', 500, { x: 17.96, y: 1, z: 2.5 }),
-  wallBuy('help-mp5k', 'mp5k', 'MP5K', 1000, { x: -1.8, y: 1, z: -10.76 }),
-  wallBuy('upper-ak74u', 'ak74u', 'AK-74u', 1200, { x: -5.96, y: UPPER_HEIGHT + 1, z: -3.3 }),
+  wallBuy('start-m14', 'm14', 'M14', 500, { x: px(17.96), y: 1, z: pz(2.5) }),
+  wallBuy('help-mp5k', 'mp5k', 'MP5K', 1000, { x: px(-1.8), y: 1, z: pz(-10.76) }),
+  wallBuy('upper-ak74u', 'ak74u', 'AK-74u', 1200, { x: px(-5.96), y: UPPER_HEIGHT + 1, z: pz(-3.3) }),
 ];
 /** Presentation: the yaw each chalk outline faces, away from its wall. */
 export const BUNKER_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
@@ -210,7 +243,8 @@ export const BUNKER_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
   'help-mp5k': 0, 'upper-ak74u': Math.PI / 2,
 };
 export const BUNKER_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
-  id: 'help-box', position: { x: -1.45, y: 0.6, z: 6.35 }, cost: 950,
+  // Buyers stand in front of the box, which sits against the HELP room's south wall.
+  id: 'help-box', position: { x: BUNKER_BOX_CENTER.x, y: 0.6, z: BUNKER_BOX_CENTER.z - 0.77 }, cost: 950,
   weapons: ['kar98k', 'springfield', 'mosin', 'm1-garand', 'm1-carbine', 'stg44', 'fg42', 'thompson', 'mp40', 'ppsh41',
     'bar', 'mg42', 'double-barrel', 'trench-gun', 'magnum-357',
     // BO1's version of the map added Cold War guns to the box.
@@ -219,7 +253,7 @@ export const BUNKER_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   // The wonder weapons are rare, as the Ray Gun and Wunderwaffe were.
   weights: { irrlicht: 0.25, molniya: 0.15 },
 }];
-export const BUNKER_PLAYER_SPAWN: Vec3 = { x: 5.2, y: 0, z: 4.2 };
+export const BUNKER_PLAYER_SPAWN: Vec3 = { x: px(5.2), y: 0, z: pz(4.2) };
 /** WaW/BO1 windows hold six boards. */
 export const BUNKER_WINDOW_BOARDS = 6;
 // Upper windows stay decorative until exterior climbing is implemented.
@@ -266,7 +300,7 @@ const nodes: NavigationNode[] = [], collision = greyboxCollisionBoxes();
 function add(id: string, position: Vec3): void {
   if (hasClearNavigationLine(position, position, collision, 0.34)) nodes.push({ id, position, neighbors: [] });
 }
-for (const y of [0, UPPER_HEIGHT]) for (let x = -7; x < 18; x += 1.5) for (let z = -10; z < 7.8; z += 1.5) {
+for (const y of [0, UPPER_HEIGHT]) for (let x = px(-8) + 0.8; x < px(18.2); x += 1.5) for (let z = pz(-11) + 0.8; z < pz(7.8); z += 1.5) {
   if (sampleWalkHeight(x, z, y, surfaces) === y
     && surfaces.some(s => s.startHeight === y && s.endHeight === y && walkSurfaceHeight(s, x, z) === y))
     add(`floor-${y}-${x}-${z}`, { x, y, z });
@@ -274,9 +308,11 @@ for (const y of [0, UPPER_HEIGHT]) for (let x = -7; x < 18; x += 1.5) for (let z
 for (const stair of BUNKER_STAIRS) stair.route.forEach((p, i) => add(`${stair.id}-${i}`, p));
 for (const b of BUNKER_BARRIERS) add(b.id, b.insidePoint);
 for (const [id, p] of Object.entries({ spawn: BUNKER_PLAYER_SPAWN, helpWest: { x: -1, y: 0, z: 0 },
-  helpEast: { x: 1, y: 0, z: 0 }, upperWest: { x: -1, y: UPPER_HEIGHT, z: -0.4 },
-  upperEast: { x: 1, y: UPPER_HEIGHT, z: -0.4 }, annexBase: { x: -5.5, y: 0, z: 2.5 },
-  annexTop: { x: -5.5, y: UPPER_HEIGHT, z: 4.5 } })) add(id, p);
+  helpEast: { x: 1, y: 0, z: 0 }, upperWest: { x: -1, y: UPPER_HEIGHT, z: pz(-0.4) },
+  upperEast: { x: 1, y: UPPER_HEIGHT, z: pz(-0.4) }, annexBase: { x: px(-5.5), y: 0, z: pz(2.5) },
+  annexTop: { x: px(-5.5), y: UPPER_HEIGHT, z: pz(4.5) },
+  // The strip beside the HELP stairwell is narrower than the grid spacing; route through its middle.
+  annexLanding: { x: px(-5.5), y: UPPER_HEIGHT, z: (pz(5.4) + pz(6.65)) / 2 } })) add(id, p);
 for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
   const a = nodes[i], b = nodes[j];
   if (Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z) > 3.2) continue;

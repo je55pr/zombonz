@@ -1,5 +1,6 @@
 import type { CollisionBox } from '../core/collision.ts';
 import type { Vec3 } from '../core/types.ts';
+import { px, pz } from './bunkerPlan.ts';
 
 export interface PropPlacement {
   id: string; asset: string; position: Vec3; size: Vec3; yaw: number; solid: boolean; background?: boolean;
@@ -7,9 +8,24 @@ export interface PropPlacement {
 const prop = (id: string, asset: string, x: number, y: number, z: number,
   sx: number, sy: number, sz: number, yaw = 0, solid = true, background = false): PropPlacement =>
   ({ id, asset, position: { x, y, z }, size: { x: sx, y: sy, z: sz }, yaw, solid, background });
+/** Items resting on another prop move with it, rather than being placed on the plan by themselves. */
+const RESTS_ON: Readonly<Record<string, string>> = {
+  'spawn-ammo': 'spawn-workbench', 'workbench-vice': 'spawn-workbench', 'spawn-crate-b': 'spawn-crate-a',
+  'help-radio': 'help-radio-table', 'help-ammo': 'help-radio-table',
+  'upper-tool': 'upper-table', 'upper-ammo': 'upper-table',
+};
+/** Maps blockout placements onto the built plan (see bunkerPlan). */
+function onPlan(props: readonly PropPlacement[]): PropPlacement[] {
+  const blockout = new Map(props.map(p => [p.id, p.position]));
+  const mapped = (position: Vec3): Vec3 => ({ x: px(position.x), y: position.y, z: pz(position.z) });
+  return props.map(p => {
+    const base = RESTS_ON[p.id] ? blockout.get(RESTS_ON[p.id])! : p.position, at = mapped(base);
+    return { ...p, position: { x: at.x + p.position.x - base.x, y: p.position.y, z: at.z + p.position.z - base.z } };
+  });
+}
 // Fit each model uniformly inside these authored envelopes. Collision is independent
 // of download completion, and props intentionally avoid entry landings / stair lanes.
-export const BUNKER_PROPS: readonly PropPlacement[] = [
+export const BUNKER_PROPS: readonly PropPlacement[] = onPlan([
   prop('spawn-workbench', 'wooden-table', 1.7, 0, -2.02, 1.8, 0.55, 0.66),
   prop('spawn-ammo', 'ammo-box', 1.1, 0.55, -2.02, 0.15, 0.3, 0.44, Math.PI / 2, false),
   prop('workbench-vice', 'bench-vice', 2.15, 0.55, -2.02, 0.2, 0.285, 0.396, 0, false),
@@ -41,7 +57,7 @@ export const BUNKER_PROPS: readonly PropPlacement[] = [
   prop('yard-tank', 'vehicles/t-12', 27, 0, 5, 2.7, 2.8, 6.3, Math.PI / 2, false, true),
   prop('yard-barrel-a', 'explosive-barrel', 15, 0, -8, 0.58, 0.9, 0.58, 0, false, true),
   prop('yard-barrel-b', 'explosive-barrel', 15.7, 0, -8.25, 0.58, 0.9, 0.58, 0, false, true),
-];
+]);
 export function propCollisionBox(prop: PropPlacement): CollisionBox {
   const c = Math.abs(Math.cos(prop.yaw)), s = Math.abs(Math.sin(prop.yaw));
   const halfX = (prop.size.x * c + prop.size.z * s) / 2, halfZ = (prop.size.x * s + prop.size.z * c) / 2;
