@@ -118,6 +118,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   };
   const previewName = new URLSearchParams(location.search).get('preview');
   const previewPowerup = new URLSearchParams(location.search).get('powerup');
+  const forceAim = import.meta.env.DEV && new URLSearchParams(location.search).get('aim') === '1';
   const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
     ? previewViews[previewName as keyof typeof previewViews] : null;
 
@@ -263,7 +264,9 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
         previousPositions.set(entity.id, { ...entity.position });
       }
     }
-    const events = simulation.tick({ [playerId]: input.consume() }, dt);
+    const inputFrame = input.consume();
+    if (forceAim) inputFrame.actions.aim = { held: true, pressed: false, released: false, value: 1 };
+    const events = simulation.tick({ [playerId]: inputFrame }, dt);
     weaponView.events(events, playerId, simulation.state.world.tick);
     grenadeView.events(events, simulation.state.world.tick);
     feedback.consume(events, playerId, simulation.state.world.tick);

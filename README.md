@@ -179,6 +179,6 @@ That preview guarantees a Max Ammo drop when the target dies; add
 `&powerup=doublePoints`, `&powerup=instaKill` or `&powerup=nuke` to inspect the alternate pickups.
 Use `weapon=` with any gun id (for example `thompson`, `stg44`, `ak74u`, `spas12`, `rpg7`,
 `irrlicht` or `molniya`; the full list is `WEAPON_DEFINITIONS` in `src/core/weapon.ts`) on any preview URL
-to inspect that viewmodel. P fires in development previews only (useful in browsers
+to inspect that viewmodel; add `&aim=1` to hold it aimed down the sights (development only). P fires in development previews only (useful in browsers
 without pointer lock); R reloads. Production and normal survival use mouse firing.
 See [map notes](docs/nacht-map.md) for layout and validation details.
