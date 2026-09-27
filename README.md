@@ -48,6 +48,11 @@ for an earlier `dev` commit. To check a Pages build locally, run `npm run build:
 Use Node.js 22.12.0, then `npm ci` and `npm run dev`. Open the local address printed by Vite.
 Run `npm run check` for TypeScript validation, automated tests and a production build.
 
+The game opens on a start menu: **Solo**, **Multiplayer** and **Settings** (mouse or arrow keys,
+Enter to choose, Esc to go back). Multiplayer is a placeholder until online co-op lands. Settings
+holds mouse sensitivity, field of view and volume, saved in this browser. The menu loads no map,
+models or Three.js; choosing Solo downloads the game and Nacht, then waits on CLICK TO START.
+
 Click the canvas to capture the mouse. Move with WASD, hold Shift while moving forward to sprint,
 hold the right mouse button to aim down sights, and fire with the left mouse button.
 Sprint lasts about four seconds, then recharges after a short pause; once exhausted you
