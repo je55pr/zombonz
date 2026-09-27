@@ -4,6 +4,8 @@ import type { GameSimulation } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import type { FeedbackSnapshot } from './feedback.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
+import { PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
+import type { SimulationEvent } from '../core/simulation.ts';
 
 export interface HudSnapshot {
   health: number;
@@ -132,6 +134,11 @@ export class CanvasHud {
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 2);
   private readonly material: THREE.MeshBasicMaterial;
   private readonly bufferSize = new THREE.Vector2();
+  private layout: HudLayout = { width: 1600, height: LAYOUT_HEIGHT, scale: 1 };
+  /** Where the points counter's text starts, so score popups fly off its left edge. */
+  private pointsEdge = { x: 1400, y: LAYOUT_HEIGHT - 178 };
+  private readonly popups: PointsPopups;
+  private readonly roundCounter: RoundCounter;
 
   constructor(private readonly renderer: THREE.WebGLRenderer) {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this.onKeyDown);
@@ -154,6 +161,8 @@ export class CanvasHud {
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.material);
     quad.frustumCulled = false;
     this.scene.add(quad);
+    this.roundCounter = new RoundCounter(this.scene);
+    this.popups = new PointsPopups(this.scene);
     // The first frames draw with fallback fonts; repaint once the bundled ones are ready.
     void loadUiFonts().then(() => { this.previous = null; });
   }
@@ -240,6 +249,7 @@ export class CanvasHud {
     c.clearRect(0, 0, this.canvas.width, this.canvas.height);
     c.setTransform(scale, 0, 0, scale, 0, 0);
     const width = this.canvas.width / scale, height = LAYOUT_HEIGHT, centre = width / 2, right = width - 44;
+    this.layout = { width, height, scale };
     if (snapshot.feedback?.damageVignette || snapshot.health <= 50) {
       const edge = c.createRadialGradient(centre, height / 2, height * 0.24, centre, height / 2, width * 0.67);
       edge.addColorStop(0, 'rgba(80,0,0,0)');
@@ -286,10 +296,9 @@ export class CanvasHud {
       c.shadowColor = 'transparent'; c.shadowBlur = 0;
     }
 
-    // Bottom left: the round in red, as WaW paints it, over health and grenades.
+    // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health and grenades.
     if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 184, { size: 16, color: GOLD, spacing: 4 });
     this.text('ROUND', 44, height - 158, { size: 16, weight: 500, color: DIM, spacing: 5 });
-    this.text(String(snapshot.round), 38, height - 100, { size: 100, font: 'title', color: BLOOD });
     const low = snapshot.health <= 50;
     this.text('HP', 44, height - 36, { size: 15, weight: 500, color: DIM, spacing: 2 });
     this.panel(74, height - 41, 180, 10, 5, 'rgba(0,0,0,0.55)', EDGE);
@@ -304,7 +313,8 @@ export class CanvasHud {
     }
 
     // Bottom right: points in gold over the weapon, its ammunition and the holstered gun.
-    this.text(String(snapshot.points), right, height - 178, { size: 46, color: GOLD, align: 'right' });
+    const pointsWidth = this.text(String(snapshot.points), right, height - 178, { size: 46, color: GOLD, align: 'right' });
+    this.pointsEdge = { x: right - pointsWidth - 10, y: height - 178 };
     if (snapshot.reloading) this.text('RELOADING', right, height - 138, { size: 16, color: DIM, align: 'right', spacing: 3 });
     else if (snapshot.magazineAmmo === 0) {
       this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', right, height - 138,
@@ -387,7 +397,16 @@ export class CanvasHud {
     this.texture.needsUpdate = true;
   }
 
-  render(snapshot: HudSnapshot): void {
+  /** Throws WaW-style score popups for this player's points earned and spent. */
+  events(events: readonly SimulationEvent[], playerId: string, now = performance.now()): void {
+    for (const event of events) {
+      if ((event.type === 'pointsAwarded' || event.type === 'pointsSpent') && event.playerId === playerId) {
+        this.popups.spawn(event.type === 'pointsSpent' ? -event.amount : event.amount, this.pointsEdge, this.layout, now);
+      }
+    }
+  }
+
+  render(snapshot: HudSnapshot, now = performance.now()): void {
     const resized = this.fit();
     if (resized || !this.previous || (Object.keys(snapshot) as (keyof HudSnapshot)[])
       .some(key => key === 'feedback'
@@ -398,6 +417,10 @@ export class CanvasHud {
       this.draw(snapshot);
       this.previous = { ...snapshot, feedback: snapshot.feedback && { ...snapshot.feedback } };
     }
+    // Overlays (pause, game over, credits) cover the HUD, so the animated pieces hide under them.
+    const effects = !snapshot.paused && !snapshot.gameOver && !this.credits;
+    this.roundCounter.update(snapshot.round, snapshot.roundPhase, this.layout, now, effects);
+    this.popups.update(this.layout, now, effects);
     this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);
   }

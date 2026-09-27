@@ -86,9 +86,13 @@ are batched where appropriate, and the HUD texture is redrawn only when its cont
 144 FPS requires a 144 Hz-or-faster active display and enough GPU/CPU headroom;
 the browser or OS may cap presentation to the current display refresh rate.
 
+The HUD follows WaW: the round counter is chalk tally marks for rounds one to five and a red
+numeral after, flashing when a round is cleared, and every hit, kill and purchase throws a gold
+"+10"/"+50"/"+100" (or red "-950") off the score.
+
 The playable solo map, Bunker, follows WaW's first map: starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
-box in the Help room costs 950. It rolls for three seconds, then reserves a random gun you
+box in the Help room costs 950. It rolls for three seconds, with guns flicking past above the open lid, then reserves a random gun you
 don't already carry for the buyer to claim within ten seconds. The box holds every gun except
 the M1911: WaW's WWII arsenal (Kar98k, Springfield, Mosin-Nagant, M1 Garand, M1A1 Carbine, STG-44,
 FG42, Thompson, MP40, PPSh-41, BAR, MG42, double-barrel, Trench Gun, .357 Magnum), the Cold War guns
