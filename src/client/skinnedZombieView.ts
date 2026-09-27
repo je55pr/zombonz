@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import type { BarrierState } from '../core/barrier.ts';
 import type { Vec3, ZombieState } from '../core/types.ts';
+import { ZOMBIE_GAIT_SPEEDS } from '../core/zombie.ts';
 import { cloneZombieModel, type ZombieAnimation, type ZombieAsset } from './runtimeAssets.ts';
 import { interpolatePosition } from './interpolation.ts';
+
+/** Ground speed of the default zombie's run cycle at normal playback, in m/s (measured from foot travel). */
+const RUN_CYCLE_PACE = 1.84;
 
 export function zombieAnimation(zombie: ZombieState): ZombieAnimation {
   if (!zombie.alive) return 'death';
@@ -45,8 +49,9 @@ export class SkinnedZombieView {
       if (name === 'walk' || name === 'run' || name === 'idle') action.time = this.phaseOffset % action.getClip().duration;
       this.current?.fadeOut(0.12); action.fadeIn(0.12); this.current = action;
     }
-    // The pack has no sprint clip; a faster run cycle keeps sprinters' feet planted.
-    if (action && name === 'run') action.timeScale = zombie.gait === 'sprint' ? 1.4 : 1;
+    // The pack has no sprint clip: play the run cycle at the zombie's ground speed so feet stay planted,
+    // capped so sprinters' legs don't blur (they slide a little at full speed).
+    if (action && name === 'run') action.timeScale = Math.min(1.6, ZOMBIE_GAIT_SPEEDS[zombie.gait] / RUN_CYCLE_PACE);
     const dt = this.lastTick === undefined ? 0 : Math.max(0, Math.min(0.1, (tick - this.lastTick) / 60));
     this.lastTick = tick; this.mixer.update(dt);
     this.body.scale.y = this.body.scale.x * (phase === 'vaulting' ? 0.85 : 1);

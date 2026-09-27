@@ -23,18 +23,23 @@ export interface ZombieAttackEvent {
 
 /**
  * Walkers shamble at their walk cycle's own ground pace (about 0.75 m/s), so feet don't slide and an
- * early round is as slow as WaW's. Sprinters sit just under the player's 4.2 m/s walk, so only sprinting
- * opens a gap.
+ * early round is as slow as WaW's. Runners jog at about half the player's 4.2 m/s walk (their run cycle
+ * covers about 1.84 m/s and plays slightly faster). Sprinters sit just under the player's walk, so only
+ * sprinting opens a gap.
  */
-export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 0.8, run: 2.9, sprint: 4.1 };
+export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 0.8, run: 2.2, sprint: 4.1 };
 
-/** WaW/BO1 set_run_speed: roll [speed, speed + 35); up to 35 walks, up to 70 runs, beyond sprints. */
+/**
+ * WaW/BO1 set_run_speed: roll [speed, speed + 35); up to 35 walks, up to 70 runs, beyond sprints.
+ * round_think sets the speed from the round number *before* incrementing it, so round N rolls from
+ * (N - 1) x 8: round 2 is about one runner in five, walkers are gone by round 6, and round 10 is all sprinters.
+ */
 export const ZOMBIE_GAIT_RULES = { speedPerRound: 8, rollRange: 35, walkMax: 35, runMax: 70 } as const;
 
 export function zombieGaitForRound(round: number, rng: SeededRng): ZombieGait {
   const level = Math.max(1, Math.floor(round));
   // Round one keeps the classic initial move speed of 1, so every zombie walks.
-  const speed = level === 1 ? 1 : level * ZOMBIE_GAIT_RULES.speedPerRound;
+  const speed = Math.max(1, (level - 1) * ZOMBIE_GAIT_RULES.speedPerRound);
   const roll = speed + rng.int(0, ZOMBIE_GAIT_RULES.rollRange);
   return roll <= ZOMBIE_GAIT_RULES.walkMax ? 'walk' : roll <= ZOMBIE_GAIT_RULES.runMax ? 'run' : 'sprint';
 }
