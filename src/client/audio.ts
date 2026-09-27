@@ -1,21 +1,9 @@
 import type { EntityId, PlayerState, Vec3, WorldState, ZombieState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 import { WEAPON_DEFINITIONS } from '../core/weapon.ts';
+import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip, type AudioClip } from './audioClips.ts';
 
-const CLIPS = [
-  'gun-pistol', 'gun-kar98k', 'gun-springfield', 'gun-mosin', 'gun-30-06', 'gun-carbine', 'gun-battle-rifle', 'gun-ak',
-  'gun-commando', 'gun-smg-45', 'gun-ppsh', 'gun-mp5k', 'gun-skorpion', 'gun-pump', 'gun-spas', 'gun-double', 'gun-revolver',
-  'irrlicht-fire', 'molniya-fire',
-  'reload-mag', 'reload-round', 'shotgun-rack', 'shotgun-shell', 'mechanical-click', 'mechanical-button', 'buy-denied',
-  'step-stone-1', 'step-stone-2', 'step-stone-3', 'step-stone-4', 'step-dirt-1', 'step-dirt-2', 'step-dirt-3', 'step-dirt-4',
-  'zombie-voice-1', 'zombie-voice-2', 'zombie-voice-3', 'zombie-voice-4', 'zombie-voice-5', 'zombie-voice-6', 'zombie-voice-7',
-  'zombie-voice-8', 'zombie-attack-1', 'zombie-attack-2', 'zombie-attack-3', 'zombie-death-1', 'zombie-death-2', 'zombie-distant',
-  'wood-crack-1', 'wood-crack-2', 'wood-crack-3', 'wood-crack-4', 'wood-impact-1', 'wood-impact-2',
-  'door-unlock', 'door-metal', 'door-open', 'pickup', 'knife', 'flesh-hit', 'electric-hit', 'electric-powerup', 'electric-boom',
-  'explosion-small', 'explosion-large', 'ambience-sting-1', 'ambience-sting-2',
-  'vent-loop', 'wind-loop',
-] as const;
-type Clip = typeof CLIPS[number];
+type Clip = AudioClip;
 
 /** Each gun plays its own family's close-up recording (see scripts/prepare_audio.py). */
 const GUN_CLIPS: Readonly<Record<string, Clip>> = {
@@ -119,21 +107,22 @@ export class GameAudio {
     if (this.context.state === 'suspended') void this.context.resume().catch(() => {});
   }
 
+  /** The start screen has usually decoded every clip already; otherwise (dev previews) decode them now. */
   private async loadClips(): Promise<void> {
     const context = this.context;
     if (!context) return;
-    await Promise.all(CLIPS.map(async clip => {
+    await decodeAudioClips(context);
+    if (this.context !== context) return;
+    for (const clip of AUDIO_CLIPS) {
+      const buffer = decodedAudioClip(clip);
+      if (!buffer) continue;
+      this.clips.set(clip, buffer);
       try {
-        const response = await fetch(`${import.meta.env.BASE_URL}assets/audio/${clip}.mp3`);
-        if (!response.ok) return;
-        const buffer = await context.decodeAudioData(await response.arrayBuffer());
-        if (this.context !== context) return;
-        this.clips.set(clip, buffer);
         // Ambience loops keep their authored bed levels; only one-shots are normalised.
         if (clip === 'vent-loop' || clip === 'wind-loop') this.loopClip(clip);
         else this.trims.set(clip, normalisingGain(loudestWindowDb(buffer.getChannelData(0), buffer.sampleRate)));
-      } catch { /* Missing samples stay silent; audio must never affect gameplay. */ }
-    }));
+      } catch { /* A clip that can't be measured plays at its recorded level. */ }
+    }
   }
 
   private loopClip(clip: Clip): void {

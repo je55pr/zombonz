@@ -13,6 +13,7 @@ import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import { HudFeedback } from './client/feedback.ts';
 import { GameAudio } from './client/audio.ts';
+import { decodeAudioClips } from './client/audioClips.ts';
 import { loadModel, loadZombieAsset, type ZombieAsset, type ZombieAssetId } from './client/runtimeAssets.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView, prepareWeaponModel } from './client/weaponView.ts';
@@ -51,6 +52,8 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
     () => prepareWeaponModel('starter-pistol'),
     // The chalk wall buys hang the real guns.
     ...[...new Set(BUNKER_WALL_WEAPONS.map(wall => wall.weaponId))].map(id => () => prepareWeaponModel(id)),
+    // Every sound, so the first shot and the first moan play on the first frame in Bunker.
+    () => decodeAudioClips(),
   ];
   let done = 0;
   onProgress(done, tasks.length);
