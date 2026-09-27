@@ -3,8 +3,9 @@ import { assetUrl, MATERIAL_IDS, readEnvironmentManifest } from './environmentMa
 import { DECALS } from './environmentProps.ts';
 import { WEAPON_ASSETS, zombieAssetPaths, type ZombieAssetId } from './runtimeAssets.ts';
 import { storeAsset } from './assetStore.ts';
+import { AUDIO_CLIPS } from './audioClips.ts';
 
-/** Every file the solo game fetches: environment maps, props, the zombie rig and all weapon models. */
+/** Every file the solo game fetches: environment maps, props, the zombie rig, all weapon models and every sound. */
 export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<string[]> {
   const manifest = await readEnvironmentManifest();
   const paths = ['/assets/environment/manifest.json'];
@@ -19,6 +20,7 @@ export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<
   for (const asset of new Set(BUNKER_PROPS.map(prop => prop.asset))) paths.push(`/assets/props/${asset}/model.glb`);
   paths.push(...zombieAssetPaths(zombie).map(path => `/assets/${path}`));
   for (const asset of new Set(Object.values(WEAPON_ASSETS))) paths.push(`/assets/weapons/${asset}/model.glb`);
+  for (const clip of AUDIO_CLIPS) paths.push(`/assets/audio/${clip}.mp3`);
   return [...new Set(paths.map(assetUrl))];
 }
 

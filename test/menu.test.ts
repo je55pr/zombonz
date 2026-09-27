@@ -184,7 +184,7 @@ describe('start-screen downloads', () => {
 });
 
 describe('start-screen asset list', () => {
-  it('covers every weapon, prop, zombie file and environment map, and each exists on disk', async () => {
+  it('covers every weapon, prop, zombie file, environment map and sound, and each exists on disk', async () => {
     const { readAssetJson, assetExists } = await import('../scripts/inspect-assets.mjs');
     const manifest = readAssetJson('public/assets/environment/manifest.json');
     const original = globalThis.fetch;
@@ -193,11 +193,13 @@ describe('start-screen asset list', () => {
       const { gameAssetUrls } = await import('../src/client/preload.ts');
       const { WEAPON_ASSETS } = await import('../src/client/runtimeAssets.ts');
       const { BUNKER_PROPS } = await import('../src/maps/bunkerProps.ts');
+      const { AUDIO_CLIPS } = await import('../src/client/audioClips.ts');
       const urls = await gameAssetUrls();
       expect(new Set(urls).size).toBe(urls.length);
       for (const asset of new Set(Object.values(WEAPON_ASSETS))) expect(urls).toContain(`/assets/weapons/${asset}/model.glb`);
       for (const prop of BUNKER_PROPS) expect(urls).toContain(`/assets/props/${prop.asset}/model.glb`);
       for (const clip of ['model', 'idle', 'walk', 'run', 'attack', 'death']) expect(urls).toContain(`/assets/zombies/peter_d/${clip}.glb`);
+      for (const clip of AUDIO_CLIPS) expect(urls).toContain(`/assets/audio/${clip}.mp3`);
       expect(urls.some(url => url.includes('pxltiger'))).toBe(false);
       expect(urls.filter(url => /\.(webp|jpg|png)$/.test(url)).length).toBeGreaterThanOrEqual(9 + 2);
       for (const url of urls) expect(assetExists(`public${url}`), url).toBe(true);
