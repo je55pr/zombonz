@@ -22,3 +22,4 @@ export * from './powerups.ts';
 export * from './grenade.ts';
 export * from './perks.ts';
 export * from './traps.ts';
+export * from './downs.ts';

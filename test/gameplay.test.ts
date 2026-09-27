@@ -14,13 +14,13 @@ import {
 } from '../src/core/index.ts';
 
 describe('player health', () => {
-  it('dies deterministically on the second 50-damage hit', () => {
+  it('goes down deterministically on the second 50-damage hit', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     expect(damagePlayer(player, 50).map((event) => event.type)).toEqual(['playerDamaged']);
     const events = damagePlayer(player, 50);
-    expect(events.map((event) => event.type)).toEqual(['playerDamaged', 'playerDied']);
+    expect(events.map((event) => event.type)).toEqual(['playerDamaged', 'playerDowned']);
     expect(player.health).toBe(0);
-    expect(player.alive).toBe(false);
+    expect(player.downed).not.toBeNull(); // The simulation decides whether anyone can revive them.
   });
 });
 

@@ -9,7 +9,10 @@ export interface BarrierDefinition {
   position: Vec3;
   outward: Vec3;
   width: number;
+  /** Zero for an open climb (such as a balcony railing): nothing to tear down or rebuild. */
   maxBoards: number;
+  /** How long the crossing takes; a climb up a wall takes longer than a vault through a window. */
+  vaultTicks?: number;
   /** Ordered, collision-free exterior waypoints ending at the window. */
   approachPath: readonly Vec3[];
   insidePoint: Vec3;
@@ -39,8 +42,8 @@ export type BarrierEvent =
 export function createBarrier(definition: BarrierDefinition, id: EntityId): {
   state: BarrierState; interactable: InteractableState;
 } {
-  if (!Number.isInteger(definition.maxBoards) || definition.maxBoards < 1 || definition.approachPath.length < 2) {
-    throw new Error('A barrier needs boards and an exterior approach path.');
+  if (!Number.isInteger(definition.maxBoards) || definition.maxBoards < 0 || definition.approachPath.length < 2) {
+    throw new Error('A barrier needs a board count and an exterior approach path.');
   }
   return {
     state: { ...definition, position: { ...definition.position }, outward: { ...definition.outward },
@@ -122,14 +125,16 @@ export function updateZombieEntry(zombie: ZombieState, barrier: BarrierState,
     return [{ type: 'zombieVaultStarted', barrierId: barrier.id, zombieId: zombie.id }];
   }
   entry.phaseTicks += 1;
-  const t = Math.min(1, entry.phaseTicks / BARRIER_RULES.vaultTicks);
+  const t = Math.min(1, entry.phaseTicks / (barrier.vaultTicks ?? BARRIER_RULES.vaultTicks));
   const from = entry.vaultStart!;
-  // Lift outside, traverse at sill height, then land inside (rather than teleporting).
+  // Lift outside, traverse at sill height, then land inside (rather than teleporting). A climb also
+  // rises from where it started to the floor it lands on, over the lift and traverse.
   const traverse = Math.max(0, Math.min(1, (t - 0.2) / 0.6));
   const lift = t < 0.2 ? t / 0.2 : t > 0.8 ? (1 - t) / 0.2 : 1;
+  const rise = Math.min(1, t / 0.7);
   const next = { x: from.x + (barrier.insidePoint.x - from.x) * traverse,
     z: from.z + (barrier.insidePoint.z - from.z) * traverse,
-    y: barrier.position.y + BARRIER_RULES.vaultHeight * lift };
+    y: from.y + (barrier.insidePoint.y - from.y) * rise + BARRIER_RULES.vaultHeight * lift };
   zombie.velocity = { x: (next.x - zombie.position.x) / dt,
     y: (next.y - zombie.position.y) / dt, z: (next.z - zombie.position.z) / dt };
   zombie.position = next;

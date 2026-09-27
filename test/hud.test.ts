@@ -42,6 +42,8 @@ describe('gameplay HUD snapshot', () => {
       grenadeCharges: 2,
       roundPhase: 'waiting',
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
+      lastStand: null,
+      reviveProgress: 0,
       nearbyPowerup: null,
       bonusStatus: null,
       instaKillStatus: null,

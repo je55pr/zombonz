@@ -71,7 +71,9 @@ describe('Asylum follows Verrückt', () => {
     expect(ground).toHaveLength(9);
     // Upstairs: one on the German balcony, two in Left Upstairs, two on the right balcony, one each
     // in the Speed Cola room, kitchen and power room.
-    expect(new Set(map.barriers.filter(b => b.position.y === UP).map(b => b.id))).toEqual(new Set(ASYLUM_UPPER_ENTRIES));
+    expect(new Set(map.barriers.filter(b => b.position.y === UP && b.maxBoards > 0).map(b => b.id))).toEqual(new Set(ASYLUM_UPPER_ENTRIES));
+    // Plus the German balcony's open climb over the railing.
+    expect(map.barriers.filter(b => b.maxBoards === 0).map(b => b.id)).toEqual(['german-balcony-railing']);
     for (const id of ASYLUM_UPPER_ENTRIES) {
       const inside = map.barriers.find(b => b.id === id)!.insidePoint;
       expect(floorAt(inside.x, inside.z, UP), id).toBe(UP);
@@ -118,6 +120,21 @@ describe('Asylum follows Verrückt', () => {
       .toEqual(new Set(['left-upstairs-west', 'left-upstairs-north']));
     expect(entered.length).toBeGreaterThan(0);
     expect(sim.zombies().find(zombie => zombie.id === entered[0])!.position.y).toBeCloseTo(UP);
+  });
+  it('brings zombies up the courtyard wall and over the German balcony railing', () => {
+    const sim = new GameSimulation({ seed: 3, map: simMap, playerSpawns: [{ x: -24, y: UP, z: -16 }],
+      roundConfig: { initialWaitTicks: 1, intermissionTicks: 10 },
+      spawnConfig: { baseZombieCount: 8, additionalPerRound: 0, maxAlive: 8, spawnIntervalTicks: 0 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    player.godMode = true;
+    let climbed: `e:${number}` | undefined;
+    for (let i = 0; i < 60 * 40 && !climbed; i++) {
+      for (const event of sim.tick()) if (event.type === 'zombieEntered' && event.barrierId === 'german-balcony-railing') climbed = event.zombieId;
+    }
+    expect(climbed).toBeDefined();
+    const zombie = sim.state.world.entities[climbed!];
+    expect(zombie.position.y).toBeCloseTo(UP);
+    expect(zombie.position.x).toBeLessThan(map.barriers.find(b => b.id === 'german-balcony-railing')!.position.x);
   });
 });
 

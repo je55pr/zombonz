@@ -1,4 +1,5 @@
 import type { PerkId } from './perks.ts';
+import type { DownedState } from './downs.ts';
 import type { ZombieEntryState } from './barrier.ts';
 
 export type EntityId = `e:${number}`;
@@ -51,6 +52,10 @@ export interface PlayerState extends EntityBase {
   switchTicksRemaining: number;
   /** Perk-a-colas drunk, in the order bought. */
   perks: PerkId[];
+  /** In last stand (still alive), or null when up. */
+  downed: DownedState | null;
+  /** Solo Quick Revive self-revives used, out of three. */
+  selfRevives: number;
   godMode: boolean;
   noclip: boolean;
   noclipAnchor: Vec3 | null;

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BOX_RULES, GameSimulation, PERKS, PLAYER_HEALTH, TRAP_RULES, beginReload, createInputFrame, createMysteryBox,
   createPlayerState, createTrap, createZombieState, damagePlayer, equipWeapon, firePlayerWeapon, rayFromPlayer,
-  sampleWalkHeight, teddyChance, tickMysteryBoxes, tickPlayerRecovery, tickTraps, useMysteryBox, WEAPON_DEFINITIONS,
+  sampleWalkHeight, teddyChance, DOWN_RULES, chooseZombieTarget, tickMysteryBoxes, tickPlayerRecovery, tickTraps, useMysteryBox, WEAPON_DEFINITIONS,
   type InteractionEvent, type MysteryBoxLocation, type PerkId,
 } from '../src/core/index.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
@@ -132,15 +132,16 @@ describe('Asylum box spots', () => {
 describe('perks', () => {
   const drink = (...perks: PerkId[]) => { const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 }); player.perks = perks; return player; };
 
-  it('Jugger-Nog takes five zombie hits to kill instead of two', () => {
+  it('Jugger-Nog takes five zombie hits to put down instead of two', () => {
     const plain = drink(), jugg = drink('juggernog');
     jugg.health = 250;
     let hits = 0;
-    while (plain.alive) { damagePlayer(plain, 50); hits += 1; }
+    while (!plain.downed && hits < 10) { damagePlayer(plain, 50); hits += 1; }
     expect(hits).toBe(2);
     hits = 0;
-    while (jugg.alive) { damagePlayer(jugg, 50); hits += 1; }
+    while (!jugg.downed && hits < 10) { damagePlayer(jugg, 50); hits += 1; }
     expect(hits).toBe(5);
+    expect(jugg.perks).toEqual([]); // Going down costs every perk.
   });
 
   it('Jugger-Nog players recover to 250', () => {
@@ -164,14 +165,6 @@ describe('perks', () => {
     expect(event).toMatchObject({ type: 'weaponReloadStarted', reloadTicks: WEAPON_DEFINITIONS.thompson.reloadTicks / 2 });
   });
 
-  it('Quick Revive cancels one killing blow and costs every perk', () => {
-    const player = drink('juggernog', 'quick-revive');
-    player.health = 40;
-    expect(damagePlayer(player, 50)).toContainEqual({ type: 'playerRevived', playerId: player.id, amount: 0, health: PLAYER_HEALTH.maximum });
-    expect(player).toMatchObject({ alive: true, health: PLAYER_HEALTH.maximum, perks: [] });
-    damagePlayer(player, 50); damagePlayer(player, 50);
-    expect(player.alive).toBe(false);
-  });
 });
 
 describe('electric traps', () => {
@@ -252,5 +245,109 @@ describe('the moving box', () => {
       }
     }
     expect(state.rolls).toBe(15);
+  });
+});
+
+describe('last stand', () => {
+  const flat = { collisionBoxes: [], walkSurfaces: [{ minX: -20, maxX: 20, minZ: -20, maxZ: 20, startHeight: 0, endHeight: 0 }],
+    zombieSpawns: [] };
+  const match = (players: number, perks: PerkId[] = []) => {
+    const sim = new GameSimulation({ seed: 1, map: flat, roundConfig: quiet,
+      playerSpawns: Array.from({ length: players }, (_, i) => ({ x: i * 1.2, y: 0, z: 0 })) });
+    const all = sim.playerIds.map(id => sim.getPlayer(id)!);
+    for (const player of all) player.perks = [...perks];
+    return { sim, all };
+  };
+  const knockDown = (sim: GameSimulation, player: ReturnType<GameSimulation['getPlayer']>) => {
+    player!.health = 1; damagePlayer(player!, 50); return sim.tick();
+  };
+  const holdUse = (sim: GameSimulation, id: `e:${number}`) => {
+    const frame = createInputFrame(0);
+    frame.actions.interact = { pressed: false, held: true, released: false, value: 1 };
+    return sim.tick({ [id]: frame });
+  };
+
+  it('puts a player down with the pistol instead of killing them, and zombies leave them be', () => {
+    const { sim, all: [downed, buddy] } = match(2);
+    equipWeapon(downed, 'thompson');
+    knockDown(sim, downed);
+    expect(downed).toMatchObject({ alive: true, health: 0 });
+    expect(downed.weapon).toMatchObject({ weaponId: DOWN_RULES.pistol, reserveAmmo: DOWN_RULES.pistolReserve });
+    const zombie = createZombieState('e:50', { x: -1, y: 0, z: 0 }, 1);
+    expect(chooseZombieTarget(zombie, [downed, buddy])?.id).toBe(buddy.id);
+    expect(damagePlayer(downed, 50)).toEqual([]);
+  });
+
+  it('is revived by a teammate holding use for three seconds, with their guns back', () => {
+    const { sim, all: [downed, buddy] } = match(2);
+    equipWeapon(downed, 'thompson');
+    knockDown(sim, downed);
+    expect(sim.interactionCandidate(buddy.id)?.prompt).toBe('Hold E to revive');
+    const events = [];
+    for (let i = 0; i < DOWN_RULES.reviveTicks && downed.downed; i++) events.push(...holdUse(sim, buddy.id));
+    expect(events).toContainEqual({ type: 'playerRevived', playerId: downed.id, reviverId: buddy.id });
+    expect(downed).toMatchObject({ downed: null, health: PLAYER_HEALTH.maximum });
+    expect(downed.weapon.weaponId).toBe('thompson');
+  });
+
+  it('revives twice as fast when the reviver has Quick Revive', () => {
+    const { sim, all: [downed, buddy] } = match(2);
+    buddy.perks = ['quick-revive'];
+    knockDown(sim, downed);
+    for (let i = 0; i < DOWN_RULES.quickReviveTicks; i++) holdUse(sim, buddy.id);
+    expect(downed.downed).toBeNull();
+  });
+
+  it('starts the revive over if the reviver lets go, and bleeds out after thirty seconds', () => {
+    const { sim, all: [downed, buddy] } = match(2);
+    knockDown(sim, downed);
+    for (let i = 0; i < 100; i++) holdUse(sim, buddy.id);
+    sim.tick();
+    expect(downed.downed?.reviveTicks).toBe(0);
+    const events = [];
+    for (let i = 0; i < DOWN_RULES.bleedoutTicks + 5; i++) events.push(...sim.tick());
+    expect(events).toContainEqual({ type: 'playerBledOut', playerId: downed.id });
+    expect(downed.alive).toBe(false);
+    expect(sim.state.round.phase).not.toBe('gameOver'); // A teammate still stands.
+  });
+
+  it('brings a bled-out player back at the next round', () => {
+    const sim = new GameSimulation({ seed: 1, map: flat, roundConfig: { initialWaitTicks: 1, intermissionTicks: 5 },
+      spawnConfig: { baseZombieCount: 0, additionalPerRound: 0, maxAlive: 1, spawnIntervalTicks: 0 },
+      playerSpawns: [{ x: 0, y: 0, z: 0 }, { x: 3, y: 0, z: 0 }] });
+    const downed = sim.getPlayer(sim.playerIds[0])!;
+    downed.points = 1234;
+    knockDown(sim, downed);
+    // With no zombies the rounds turn over every few ticks, so the respawn follows soon after.
+    const types: string[] = [];
+    for (let i = 0; i < DOWN_RULES.bleedoutTicks + 60 && !types.includes('playerRespawned'); i++) {
+      for (const event of sim.tick()) if ('playerId' in event && event.playerId === downed.id) types.push(event.type);
+    }
+    expect(types.filter(type => type === 'playerBledOut' || type === 'playerRespawned')).toEqual(['playerBledOut', 'playerRespawned']);
+    expect(downed).toMatchObject({ alive: true, health: 100, points: 1234, downed: null, position: { x: 0, y: 0, z: 0 } });
+  });
+
+  it('ends the game when nobody is left standing to revive', () => {
+    const { sim } = match(1);
+    const events = knockDown(sim, sim.getPlayer(sim.playerIds[0]));
+    expect(events.map(event => event.type)).toContain('playerDied');
+    expect(sim.getPlayer(sim.playerIds[0])!.alive).toBe(false);
+    sim.tick();
+    expect(sim.state.round.phase).toBe('gameOver');
+  });
+
+  it('solo Quick Revive gets the player back up alone, three times at most', () => {
+    const { sim, all: [player] } = match(1, ['quick-revive']);
+    for (let use = 1; use <= DOWN_RULES.soloQuickReviveLimit; use++) {
+      player.perks = ['quick-revive'];
+      knockDown(sim, player);
+      expect(player.downed?.selfRevive).toBe(true);
+      expect(player.selfRevives).toBe(use);
+      for (let i = 0; i <= DOWN_RULES.selfReviveTicks && player.downed; i++) sim.tick();
+      expect(player).toMatchObject({ alive: true, downed: null });
+    }
+    player.perks = ['quick-revive'];
+    knockDown(sim, player);
+    expect(player.alive).toBe(false); // The fourth time there is no self-revive left.
   });
 });

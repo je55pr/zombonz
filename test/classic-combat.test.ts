@@ -17,7 +17,7 @@ describe('classic survival health', () => {
     for (let i = 0; i < 100; i++) tickPlayerRecovery(player);
     expect(player.health).toBe(100);
   });
-  it('resets recovery on another hit and never revives a dead player', () => {
+  it('resets recovery on another hit and never heals a downed player', () => {
     const player = createPlayerState('e:1', origin);
     damagePlayer(player, 20);
     for (let i = 0; i < 290; i++) tickPlayerRecovery(player);
@@ -25,7 +25,7 @@ describe('classic survival health', () => {
     expect(player.recoveryDelayTicks).toBe(300);
     damagePlayer(player, 100);
     for (let i = 0; i < 500; i++) tickPlayerRecovery(player);
-    expect(player.health).toBe(0); expect(player.alive).toBe(false);
+    expect(player.health).toBe(0); expect(player.downed).not.toBeNull();
   });
   it('ramps zombie health through round nine then scales exponentially', () => {
     expect([1, 2, 3, 9, 10, 11].map(zombieHealthForRound)).toEqual([150, 250, 350, 950, 1045, 1150]);

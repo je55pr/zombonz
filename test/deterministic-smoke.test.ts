@@ -68,7 +68,7 @@ describe('deterministic smoke scenario', () => {
       weapon: { magazineAmmo: 5, reserveAmmo: 32 },
     });
     expect(state.round.phase).toBe('intermission');
-    // Includes movement stance, sprint stamina, earned-points and power-up drop tracking, survival timers/reward tracking, zombie gait and walk speed, spread bloom, spawn cadence, an aimed body-shot kill, and (empty) power, perk and trap state.
-    expect(fnv1a(JSON.stringify(state))).toBe('85a0c3e3');
+    // Includes movement stance, sprint stamina, earned-points and power-up drop tracking, survival timers/reward tracking, zombie gait and walk speed, spread bloom, spawn cadence, an aimed body-shot kill, and (empty) power, perk, trap and last-stand state.
+    expect(fnv1a(JSON.stringify(state))).toBe('17a1f3e3');
   });
 });

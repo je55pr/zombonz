@@ -15,7 +15,8 @@ import {
   DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints, awardNukePoints,
   type EconomyConfig, type EconomyEvent,
 } from './economy.ts';
-import { livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
+import { PLAYER_HEALTH, livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
+import { DOWN_RULES, armDowned, bleedOut, reviveTarget, tickDowns, type DownEvent } from './downs.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
 import { GRENADE_RULES, createGrenadePool, tickGrenades, throwGrenade,
   type GrenadeEvent, type GrenadePool } from './grenade.ts';
@@ -42,7 +43,8 @@ import {
   type ZombieAttackEvent,
 } from './zombie.ts';
 import {
-  beginReload, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon, type WeaponEvent,
+  beginReload, createWeaponState, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon,
+  type WeaponEvent,
 } from './weapon.ts';
 import {
   createWallWeaponInteractable, createWallWeaponState, handleWallWeaponInteraction,
@@ -99,7 +101,7 @@ export function nextMatchSeed(seed: number): number {
 }
 
 export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
-  | PowerEvent | PerkEvent | TrapEvent;
+  | PowerEvent | PerkEvent | TrapEvent | DownEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -210,6 +212,11 @@ export class GameSimulation {
     return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors), ...boxes];
   }
 
+  /** Every player entity, dead or alive. */
+  players(): PlayerState[] {
+    return this.playerIds.map(id => this.getPlayer(id)).filter((player): player is PlayerState => !!player);
+  }
+
   zombies(): ZombieState[] {
     return Object.values(this.state.world.entities).filter(
       (entity): entity is ZombieState => entity.kind === 'zombie' && entity.alive,
@@ -224,6 +231,11 @@ export class GameSimulation {
 
   interactionCandidate(playerId: EntityId): InteractionCandidate | null {
     const player = this.getPlayer(playerId);
+    if (player?.downed) return null;
+    const downed = player ? reviveTarget(player, this.players()) : null;
+    if (downed) return { interactableId: downed.id, interactionType: 'revive', actionId: `revive:${downed.id}`,
+      prompt: 'Hold E to revive', distance: Math.hypot(downed.position.x - player!.position.x, downed.position.z - player!.position.z),
+      facingDot: 1 };
     const candidate = player ? findInteractionCandidate(player, this.reachableInteractables(player)) : null;
     const box = this.state.mysteryBoxes.find(box => box.interactableId === candidate?.interactableId);
     return candidate && box ? { ...candidate, prompt: mysteryBoxPrompt(box, playerId) } : candidate;
@@ -251,6 +263,32 @@ export class GameSimulation {
     });
   }
 
+  /**
+   * After this tick's damage: hands the newly downed their pistol (and solo Quick Revive its
+   * self-revive), runs revives and bleed-outs, and ends it for everyone when no one is left standing
+   * to revive the downed.
+   */
+  private resolveDowns(revivers: ReadonlyMap<EntityId, PlayerState>): Array<DownEvent | DamageEvent> {
+    const players = this.players();
+    for (const player of players) {
+      const pistol = createWeaponState(DOWN_RULES.pistol);
+      pistol.reserveAmmo = DOWN_RULES.pistolReserve;
+      if (!armDowned(player, pistol)) continue;
+      if (this.playerIds.length === 1 && player.downed!.lostPerks.includes('quick-revive')
+        && player.selfRevives < DOWN_RULES.soloQuickReviveLimit) {
+        player.downed!.selfRevive = true;
+        player.selfRevives += 1;
+      }
+    }
+    const events: Array<DownEvent | DamageEvent> = tickDowns(players, revivers, PLAYER_HEALTH.maximum);
+    const hope = players.some(player => player.alive && (!player.downed || player.downed.selfRevive));
+    if (!hope) for (const player of players) if (player.alive && player.downed) {
+      bleedOut(player);
+      events.push({ type: 'playerDied', playerId: player.id, amount: 0, health: 0 });
+    }
+    return events;
+  }
+
   tick(inputs: PlayerInputFrames = {}, deltaSeconds = 1 / 60): SimulationEvent[] {
     if (this.state.round.phase === 'gameOver') {
       const restartRequested = Object.values(inputs).some((frame) => frame?.actions.restart?.pressed);
@@ -264,17 +302,33 @@ export class GameSimulation {
     const repairers = new Map<string, EntityId>();
 
     const playerFrames = new Map<EntityId, InputFrame>();
+    /** Downed players, and the teammate holding use beside each this tick. */
+    const revivers = new Map<EntityId, PlayerState>();
     for (const player of livingPlayers(world)) {
       events.push(...tickPlayerRecovery(player));
       if (player.meleeCooldownTicks > 0) player.meleeCooldownTicks -= 1;
       const frame = inputs[player.id] ?? createInputFrame(world.tick);
       playerFrames.set(player.id, frame);
+      if (player.downed) {
+        // In last stand a player can look around, shoot and reload the pistol, and nothing else.
+        player.yaw += frame.look.yaw;
+        player.pitch = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(PLAYER_MOVEMENT.maxPitch, player.pitch + frame.look.pitch));
+        events.push(...tickWeaponState(player));
+        if (frame.actions.reload?.pressed) events.push(...beginReload(player));
+        continue;
+      }
       updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
       events.push(...tickWeaponState(player));
       if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
       if (frame.actions.throwGrenade?.pressed) events.push(...throwGrenade(this.state.grenades, player));
+      // Holding use beside a downed teammate revives them, ahead of anything else in reach.
+      const downedTeammate = frame.actions.interact?.held ? reviveTarget(player, this.players()) : null;
+      if (downedTeammate) {
+        if (!revivers.has(downedTeammate.id)) revivers.set(downedTeammate.id, player);
+        continue;
+      }
       if (frame.actions.interact?.held) {
         const candidate = findInteractionCandidate(player, this.reachableInteractables(player));
         const barrier = this.state.barriers.find(barrier => barrier.interactableId === candidate?.interactableId);
@@ -284,6 +338,10 @@ export class GameSimulation {
         const interactionEvents = triggerInteraction(player, this.reachableInteractables(player), true);
         events.push(...interactionEvents);
         for (const interaction of interactionEvents) {
+          // Solo Quick Revive sells only as many times as it can be used, as in Black Ops.
+          const machine = this.state.perkMachines.find(entry => entry.interactableId === interaction.interactableId);
+          if (machine?.perk === 'quick-revive' && this.playerIds.length === 1
+            && player.selfRevives >= DOWN_RULES.soloQuickReviveLimit) continue;
           events.push(...handleDoorInteraction(player, interaction, this.state.doors, this.interactables()));
           events.push(...handleWallWeaponInteraction(player, interaction, this.state.wallWeapons));
           events.push(...useMysteryBox(player, interaction, this.state.mysteryBoxes, world.seed));
@@ -296,7 +354,7 @@ export class GameSimulation {
 
     for (const player of livingPlayers(world)) {
       const frame = playerFrames.get(player.id)!;
-      if (frame.actions.melee?.pressed) {
+      if (frame.actions.melee?.pressed && !player.downed) {
         const meleeEvents = meleeAttack(player, this.zombies(), [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
           this.state.powerups.instaKillTicksRemaining > 0);
         events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig,
@@ -305,7 +363,7 @@ export class GameSimulation {
       const fire = frame.actions.fire;
       if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
       const weaponEvents = firePlayerWeapon(
-        player, rayFromPlayer(player, PLAYER_MOVEMENT.eyeHeight), this.zombies(),
+        player, rayFromPlayer(player, player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight), this.zombies(),
         [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
         this.state.powerups.instaKillTicksRemaining > 0,
         world.seed ^ world.tick,
@@ -413,6 +471,8 @@ export class GameSimulation {
     }
     syncBarrierInteractables(this.state.barriers, this.interactables());
 
+    events.push(...this.resolveDowns(revivers));
+
     const roundEvents = updateRoundState(this.state.round, {
       livingPlayers: livingPlayers(world).length,
       zombiesAlive: livingEntityCount(world, 'zombie'),
@@ -427,6 +487,15 @@ export class GameSimulation {
         if (event.round > 1) for (const player of livingPlayers(world)) {
           player.grenadeCharges = Math.min(GRENADE_RULES.maximum, player.grenadeCharges + GRENADE_RULES.perRound);
         }
+        // Players who bled out come back at the start of the next round, as in World at War co-op.
+        this.playerIds.forEach((id, index) => {
+          const player = this.getPlayer(id);
+          if (!player || player.alive) return;
+          const fresh = createPlayerState(id, this.playerSpawns[index] ?? this.playerSpawns[0], player.points);
+          Object.assign(player, { ...fresh, pointsEarned: player.pointsEarned, kills: player.kills, headshots: player.headshots,
+            selfRevives: player.selfRevives, godMode: player.godMode });
+          events.push({ type: 'playerRespawned', playerId: id });
+        });
       }
     }
     for (const event of events) if (event.type === 'zombieDied') {
