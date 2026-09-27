@@ -42,21 +42,28 @@ describe('classic round sizes', () => {
 });
 
 describe('zombie gaits', () => {
-  it('walks in round one, mixes in runners, then turns into sprinters', () => {
+  it('walks in round one, then speeds up as slowly as WaW/BO1', () => {
     expect(gaitShare(1)).toEqual({ walk: 1, run: 0, sprint: 0 });
+    // Round N rolls from (N - 1) x 8: round 2 is about one runner in five (7 of 35 rolls).
     const round2 = gaitShare(2);
-    expect(round2.run).toBeGreaterThan(0.3);
+    expect(round2.run).toBeGreaterThan(0.15);
+    expect(round2.run).toBeLessThan(0.25);
     expect(round2.sprint).toBe(0);
-    expect(gaitShare(5).walk).toBe(0);
-    expect(gaitShare(5).sprint).toBeGreaterThan(0);
-    expect(gaitShare(9)).toEqual({ walk: 0, run: 0, sprint: 1 });
+    expect(gaitShare(3).walk).toBeGreaterThan(0.5);
+    expect(gaitShare(5).walk).toBeGreaterThan(0);
+    // Walkers are gone by round 6, where the first sprinters appear.
+    expect(gaitShare(6).walk).toBe(0);
+    expect(gaitShare(6).sprint).toBeLessThan(0.2);
+    expect(gaitShare(7).sprint).toBeGreaterThan(0.25);
+    expect(gaitShare(10)).toEqual({ walk: 0, run: 0, sprint: 1 });
   });
 
   it('lets sprinters nearly match a walking player but not a sprinting one', () => {
     expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeGreaterThan(PLAYER_MOVEMENT.maxSpeed * 0.9);
     expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeLessThan(PLAYER_MOVEMENT.maxSpeed);
-    // Round-one walkers are a slow shamble: a walking player leaves them well behind.
+    // Round-one walkers are a slow shamble and runners a jog: a walking player leaves both behind.
     expect(ZOMBIE_GAIT_SPEEDS.walk).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.2);
+    expect(ZOMBIE_GAIT_SPEEDS.run).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.6);
   });
 
   it('assigns spawned gaits deterministically from the match seed', () => {
@@ -67,7 +74,7 @@ describe('zombie gaits', () => {
         roundConfig: { initialWaitTicks: 1, intermissionTicks: 1 },
         spawnConfig: { baseZombieCount: 12, additionalPerRound: 0, spawnIntervalTicks: 0, maxAlive: 24 },
       });
-      sim.state.round.round = 5; sim.state.round.phase = 'intermission';
+      sim.state.round.round = 7; sim.state.round.phase = 'intermission';
       for (let i = 0; i < 20; i += 1) sim.tick();
       return Object.values(sim.state.world.entities)
         .filter((entity): entity is ZombieState => entity.kind === 'zombie')
