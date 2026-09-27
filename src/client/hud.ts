@@ -14,7 +14,11 @@ export interface HudSnapshot {
   magazineAmmo: number;
   reserveAmmo: number;
   holsteredWeapon: string | null;
-  reloadTicksRemaining: number;
+  /**
+   * Only whether a reload is running: the HUD repaints and re-uploads its whole canvas when any field
+   * changes, so a per-tick countdown here would repaint every frame of every reload.
+   */
+  reloading: boolean;
   grenadeCharges: number;
   roundPhase: string;
   interactionPrompt: string | null;
@@ -52,7 +56,7 @@ export function buildHudSnapshot(
     magazineAmmo: player.weapon.magazineAmmo,
     reserveAmmo: player.weapon.reserveAmmo,
     holsteredWeapon: player.holsteredWeapon?.weaponId ?? null,
-    reloadTicksRemaining: player.weapon.reloadTicksRemaining,
+    reloading: player.weapon.reloadTicksRemaining > 0,
     grenadeCharges: player.grenadeCharges,
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
@@ -186,7 +190,7 @@ export class CanvasHud {
     this.text(weaponLabel(snapshot.weapon), width - 48, height - 50, 26, 'right');
     this.text(`${snapshot.magazineAmmo} / ${snapshot.reserveAmmo}`, width - 48, height - 20, 30, 'right');
     if (snapshot.holsteredWeapon) this.text(`Q  ${weaponLabel(snapshot.holsteredWeapon)}`, width - 48, height - 130, 20, 'right');
-    if (snapshot.reloadTicksRemaining > 0) this.text('RELOADING', width - 48, height - 169, 18, 'right');
+    if (snapshot.reloading) this.text('RELOADING', width - 48, height - 169, 18, 'right');
     else if (snapshot.magazineAmmo === 0) this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', width - 48, height - 169, 18, 'right');
     if (snapshot.feedback?.message && !snapshot.gameOver) this.text(snapshot.feedback.message, width / 2, height * 0.60, 27, 'center');
     this.text('WASD MOVE   •   SHIFT SPRINT   •   RMB AIM   •   V KNIFE   •   T GRENADE   •   R RELOAD   •   Q SWITCH   •   M MUTE', width / 2, height - 22, 15, 'center');

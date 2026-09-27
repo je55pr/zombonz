@@ -36,7 +36,7 @@ describe('gameplay HUD snapshot', () => {
       magazineAmmo: 8,
       reserveAmmo: 32,
       holsteredWeapon: null,
-      reloadTicksRemaining: 0,
+      reloading: false,
       grenadeCharges: 2,
       roundPhase: 'waiting',
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
@@ -72,6 +72,19 @@ describe('gameplay HUD snapshot', () => {
       magazineAmmo: 3,
       reserveAmmo: 17,
     });
+  });
+
+  it('reports a reload as a steady flag, so the canvas is not repainted every tick of it', () => {
+    const sim = simulation();
+    const playerId = sim.playerIds[0];
+    const player = sim.getPlayer(playerId)!;
+    player.weapon.reloadTicksRemaining = 60;
+    const first = buildHudSnapshot(sim, playerId)!;
+    player.weapon.reloadTicksRemaining = 59;
+    expect(buildHudSnapshot(sim, playerId)).toEqual(first);
+    expect(first.reloading).toBe(true);
+    player.weapon.reloadTicksRemaining = 0;
+    expect(buildHudSnapshot(sim, playerId)!.reloading).toBe(false);
   });
 
   it('surfaces game over state for the canvas overlay', () => {
