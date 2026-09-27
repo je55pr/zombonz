@@ -7,6 +7,7 @@ import { BrowserInput } from './client/input.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
+import { px, pz } from './maps/bunkerPlan.ts';
 import { ActorBatch } from './client/actorBatch.ts';
 import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
@@ -84,10 +85,11 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   camera.rotation.order = 'YXZ';
   scene.add(new THREE.HemisphereLight(0xaabfc9, 0x373026, 1.4));
   const keyLight = new THREE.DirectionalLight(0xb4ced7, 2.4);
-  keyLight.position.set(-12, 22, -16);
+  // Aimed at the middle of the building, with a shadow frustum that covers all of it.
+  keyLight.position.set(-12 + 7, 22, -16 - 2); keyLight.target.position.set(7, 0, -2); scene.add(keyLight.target);
   keyLight.castShadow = true;
   keyLight.shadow.mapSize.set(1024, 1024);
-  Object.assign(keyLight.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, far: 65 });
+  Object.assign(keyLight.shadow.camera, { left: -21, right: 21, top: 21, bottom: -21, far: 70 });
   keyLight.shadow.bias = -0.0006;
   scene.add(keyLight);
   scene.add(buildGreybox(BUNKER_GREYBOX, BUNKER_PRISMS));
@@ -108,17 +110,17 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   // Development-only inspection views for iterating on the map without a running wave.
   const previewViews = {
     start: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
-    help: { position: { x: -1.8, y: 0, z: -7.8 }, yaw: Math.PI - 0.12 },
-    upstairs: { position: { x: 2, y: 3.4, z: 3.8 }, yaw: -0.5 },
-    barrier: { position: { x: 12, y: 0, z: -0.8 }, yaw: 0 },
+    help: { position: { x: px(-1.8), y: 0, z: pz(-7.8) }, yaw: Math.PI - 0.12 },
+    upstairs: { position: { x: px(2), y: 3.4, z: pz(3.8) }, yaw: -0.5 },
+    barrier: { position: { x: px(12), y: 0, z: pz(-2.6) + 1.8 }, yaw: 0 },
     stress: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
     assets: { position: BUNKER_PLAYER_SPAWN, yaw: 0 },
     gameOver: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
-    overview: { position: { x: 23, y: 25, z: 28 }, yaw: 0.65 },
+    overview: { position: { x: 30, y: 33, z: 36 }, yaw: 0.65 },
     doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
-    props: { position: { x: -2, y: 0, z: 4.3 }, yaw: Math.PI + 0.15 },
-    wallBuys: { position: { x: 6.3, y: 0, z: 5.9 }, yaw: Math.PI },
-    helpWalls: { position: { x: -3.6, y: 0, z: -5.2 }, yaw: Math.PI / 2 - 0.35 },
+    props: { position: { x: px(-2), y: 0, z: pz(7.8) - 3.5 }, yaw: Math.PI + 0.15 },
+    wallBuys: { position: { x: px(6.3), y: 0, z: pz(7.8) - 2.4 }, yaw: Math.PI },
+    helpWalls: { position: { x: px(-3.6), y: 0, z: pz(-5.2) }, yaw: Math.PI / 2 - 0.35 },
   };
   const previewName = new URLSearchParams(location.search).get('preview');
   const previewPowerup = new URLSearchParams(location.search).get('powerup');

@@ -5,7 +5,11 @@ import { GameSimulation, createInputFrame, createPlayerState, createZombieState,
 } from '../src/core/index.ts';
 import { BUNKER_DOORS, BUNKER_MYSTERY_BOXES, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN,
   BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, BUNKER_STAIRS, BUNKER_SHOT_BLOCKERS,
-  UPPER_HEIGHT, greyboxCollisionBoxes, BUNKER_BARRIERS } from '../src/maps/bunker.ts';
+  UPPER_HEIGHT, greyboxCollisionBoxes, BUNKER_BARRIERS, BUNKER_BOX_CENTER } from '../src/maps/bunker.ts';
+import { ps, px, pz } from '../src/maps/bunkerPlan.ts';
+
+// The HELP stair runs south from blockout z 3.1 to 6.65; place a point part way up it.
+const helpStairAt = (z: number) => ({ x: (px(-7.8) + px(-6.3)) / 2, z: pz(3.1) + (z - 3.1) * (pz(6.65) - pz(3.1)) / 3.55 });
 
 const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: BUNKER_WALK_SURFACES,
   zombieSpawns: BUNKER_ZOMBIE_SPAWNS, navigationGraph: BUNKER_NAVIGATION,
@@ -24,10 +28,10 @@ function interact(sim: GameSimulation) {
 describe('Bunker room routes', () => {
   it.each([
     { id: 'help-room', position: { x: 1.4, y: 0, z: 0 }, yaw: Math.PI / 2 },
-    { id: 'start-stairs', position: { x: 7.3, y: 2.1, z: -1 }, yaw: Math.PI / 2 },
-    { id: 'start-stairs', position: { x: 4.5, y: 3.4, z: -1 }, yaw: -Math.PI / 2 },
-    { id: 'help-stairs', position: { x: -7.05, y: 0.7, z: 3.85 }, yaw: Math.PI },
-    { id: 'help-stairs', position: { x: -7.05, y: 2.7, z: 5.9 }, yaw: 0 },
+    { id: 'start-stairs', position: { x: ps(7.2) + 0.1, y: 2.1, z: ps(-0.975) }, yaw: Math.PI / 2 },
+    { id: 'start-stairs', position: { x: ps(4.8) - 0.3, y: 3.4, z: ps(-0.975) }, yaw: -Math.PI / 2 },
+    { id: 'help-stairs', position: { ...helpStairAt(3.85), y: 0.7 }, yaw: Math.PI },
+    { id: 'help-stairs', position: { ...helpStairAt(5.9), y: 2.7 }, yaw: 0 },
   ])('purchases $id from an accessible approach', approach => {
     const sim = makeSimulation(2000, approach.position);
     sim.getPlayer(sim.playerIds[0])!.yaw = approach.yaw;
@@ -69,7 +73,8 @@ describe('Bunker room routes', () => {
     const zombie = createZombieState('e:2', BUNKER_PLAYER_SPAWN, 1, gait);
     const player = createPlayerState('e:1', { x: -1.5, y: 0, z: 0 });
     const query = createNavigationQuery(BUNKER_NAVIGATION, blockers, 0.32, map.walkSurfaces);
-    for (let i = 0; i < 3600; i++) updateZombiePursuit(zombie, [player], 1 / 60, blockers, map.walkSurfaces, BUNKER_NAVIGATION, query);
+    // Up the main stair, across the upper floor and down the HELP stair: walkers need a few minutes.
+    for (let i = 0; i < (gait === 'walk' ? 12000 : 5400); i++) updateZombiePursuit(zombie, [player], 1 / 60, blockers, map.walkSurfaces, BUNKER_NAVIGATION, query);
     expect(Math.hypot(zombie.position.x - player.position.x, zombie.position.y,
       zombie.position.z - player.position.z)).toBeLessThan(1.1);
   });
@@ -101,7 +106,7 @@ describe('Bunker room routes', () => {
   });
 });
 describe('single fixed mystery box', () => {
-  const front = { x: -1.45, y: 0, z: 5.5 };
+  const front = { x: BUNKER_BOX_CENTER.x, y: 0, z: BUNKER_BOX_CENTER.z - 1.62 };
   it('charges 950 once, rolls before claiming, and respects its cooldown', () => {
     const sim = makeSimulation(3000, front);
     const player = sim.getPlayer(sim.playerIds[0])!; player.yaw = Math.PI;
@@ -124,7 +129,7 @@ describe('single fixed mystery box', () => {
     const poor = makeSimulation(500, front); poor.getPlayer(poor.playerIds[0])!.yaw = Math.PI;
     expect(interact(poor).some(event => event.type === 'pointsSpendRejected')).toBe(true);
     expect(poor.state.mysteryBoxes[0].rolls).toBe(0);
-    const throughWall = makeSimulation(3000, { x: 0.5, y: 0, z: 6.35 });
+    const throughWall = makeSimulation(3000, { x: 0.5, y: 0, z: BUNKER_MYSTERY_BOXES[0].position.z });
     throughWall.getPlayer(throughWall.playerIds[0])!.yaw = Math.PI / 2;
     expect(interact(throughWall).some(event => event.type === 'mysteryBoxUsed')).toBe(false);
   });

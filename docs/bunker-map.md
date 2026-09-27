@@ -17,11 +17,25 @@ No new source textures were generated. See [environment integration](assets/ENVI
 The downstairs plan includes a later Mule Kick annotation; that prop is intentionally
 not included in this WaW-oriented blockout.
 
+## Scale
+
+The plan is authored in its original blockout coordinates (the numbers below) and mapped out by
+`src/maps/bunkerPlan.ts` at **1.35×**. The first blockout felt cramped. WaW's own interior effect
+placements (ceiling lights, god rays and room smoke in the map's createFX file) put the spawn
+room at roughly 23–25 × 10–12 m and the HELP wing at roughly 33 × 9 m. The mapping gives about
+24.6 × 14 m and 8.4 × 25.4 m.
+
+Only the plan grows:
+- Heights, wall thickness, doorways, windows, columns, props, wall buys and the box keep their
+  real sizes.
+- Anything within 0.9 m of a wall keeps its distance from that wall (`px`/`pz`).
+- The main stair and its floor cutout scale as one shape (`ps`).
+
 ## Layout
 
 - L-shaped footprint, replacing the old equal-room 16×14 rectangle.
-- HELP wing: x −6.2…0, z −11…7.8. Narrow, long, with a central column row.
-- Spawn wing: x 0…18.2, z −2.6…7.8, with a recessed south wall at x 10.4…13.8.
+- HELP wing: x −6.2…0, z −11…7.8 (blockout). Narrow, long, with a central column row.
+- Spawn wing: x 0…18.2, z −2.6…7.8 (blockout), with a recessed south wall at x 10.4…13.8.
 - Six spawn-room columns in two rows, with concrete capitals and overhead beams.
 - HELP door at (0, 0, 0), offset along the shared wall rather than centred in it.
 - Main stair: a quarter-turn fan stair with a short westbound upper flight. Visible
