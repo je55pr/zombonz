@@ -7,183 +7,182 @@ import type { GameMap } from './gameMap.ts';
 import { MapBuilder, barriersFromWindows, collisionBoxesFor, compileNavigation, slabShotBlockers } from './mapBuild.ts';
 import { BUNKER_MYSTERY_BOXES } from './bunker.ts';
 
-/**
- * Asylum: an original map in the spirit of WaW's second, the split sanatorium. Authored in metres.
- *
- * Ground floor, west to east along one corridor of rooms (z -10..0), each behind a bought door:
- *   Dining hall (spawn, two storeys) | Kitchen | Main hall (the box) | Surgery | Isolation ward (two storeys)
- * The two tall halls reach x -26..-14 and 14..26 and run south to z 8. Each has a stair up to a
- * mezzanine, and a covered balcony joins the mezzanines across the outside of the building (z 0..3),
- * above the courtyard, so the whole map is one loop: WaW's split-and-rejoin layout for a solo player.
- */
-const UP = 3.4;
-const TALL = 6.8;
-const HALL_WEST = -26, HALL_EAST = 26, CORRIDOR_NORTH = -10, CORRIDOR_SOUTH = 0, HALL_SOUTH = 8;
-const DOOR_Z = -5, DOOR_WIDTH = 2.4;
-/** Room partitions along the corridor, west to east. */
-const PARTITIONS = [-14, -4, 6, 14] as const;
-
+/** Two starting wings wrap an exposed courtyard and meet in the power room opposite the start. */
+const UP = 3.4, OUT = 18, YARD = 8, DOOR_WIDTH = 2.4;
 const b = new MapBuilder({ wall: 'broken-plaster-brick', trim: 'weathered-concrete-a',
   floor: 'cracked-concrete-floor', stair: 'weathered-concrete-b' });
 const door = (at: number) => ({ at, width: DOOR_WIDTH, kind: 'door' as const });
-const window = (id: string, at: number, width = 1.3) => ({ id, at, width, kind: 'window' as const });
+const window = (id: string, at: number) => ({ id, at, width: 1.35, kind: 'window' as const });
 
-// Ground floors.
-b.floor(HALL_WEST, -14, CORRIDOR_NORTH, HALL_SOUTH, 0);
-b.floor(-14, -4, CORRIDOR_NORTH, CORRIDOR_SOUTH, 0);
-b.floor(-4, 6, CORRIDOR_NORTH, CORRIDOR_SOUTH, 0);
-b.floor(6, 14, CORRIDOR_NORTH, CORRIDOR_SOUTH, 0);
-b.floor(14, HALL_EAST, CORRIDOR_NORTH, HALL_SOUTH, 0);
-
-// North frontage: the halls stand two storeys tall, the corridor rooms one.
-b.wall('x', CORRIDOR_NORTH, HALL_WEST, -14, 0, TALL, [window('dining-north', -20)], -1);
-b.wall('x', CORRIDOR_NORTH, -14, 14, 0, UP,
-  [window('kitchen-north', -9), window('hall-north', -2), window('surgery-north', 10)], -1);
-b.wall('x', CORRIDOR_NORTH, 14, HALL_EAST, 0, TALL, [window('ward-north', 20)], -1);
-// Outer end walls, each with two entries.
-b.wall('z', HALL_WEST, CORRIDOR_NORTH, HALL_SOUTH, 0, TALL, [window('dining-west-a', -5), window('dining-west-b', 3)], -1);
-b.wall('z', HALL_EAST, CORRIDOR_NORTH, HALL_SOUTH, 0, TALL, [window('ward-east-a', -5), window('ward-east-b', 3)], 1);
-// The halls' south walls (their stairs run along them) and courtyard-facing sides, where the balcony
-// passes through a doorway on the upper storey.
-b.wall('x', HALL_SOUTH, HALL_WEST, -14, 0, TALL);
-b.wall('x', HALL_SOUTH, 14, HALL_EAST, 0, TALL);
-for (const x of [-14, 14]) {
-  b.wall('z', x, CORRIDOR_NORTH, CORRIDOR_SOUTH, 0, TALL, [door(DOOR_Z)]);
-  b.wall('z', x, CORRIDOR_SOUTH, HALL_SOUTH, 0, UP);
-  b.wall('z', x, CORRIDOR_SOUTH, HALL_SOUTH, UP, TALL - UP, [{ at: 1.5, width: 2.4, kind: 'door' }]);
+// Both storeys are a ring; the courtyard is scenery rather than walkable map.
+for (const y of [0, UP]) {
+  b.floor(-OUT, OUT, -OUT, -YARD, y);
+  b.floor(-OUT, -YARD, -YARD, YARD, y);
+  b.floor(YARD, OUT, -YARD, YARD, y);
+  b.floor(-OUT, OUT, YARD, OUT, y);
 }
-// Inner partitions, and the corridor's courtyard facade (a storey of decorative windows over the balcony).
-for (const x of [-4, 6]) b.wall('z', x, CORRIDOR_NORTH, CORRIDOR_SOUTH, 0, UP, [door(DOOR_Z)]);
-b.wall('x', CORRIDOR_SOUTH, -14, 14, 0, UP,
-  [window('kitchen-courtyard', -9), window('hall-courtyard', 1), window('surgery-courtyard', 10)], 1);
-b.wall('x', CORRIDOR_SOUTH, -14, 14, UP, 3,
-  [window('balcony-a', -9), window('balcony-b', 1), window('balcony-c', 10)], 1);
-// Roofs.
-b.ceiling(-14, 14, CORRIDOR_NORTH, CORRIDOR_SOUTH, UP);
-b.ceiling(HALL_WEST, -14, CORRIDOR_NORTH, HALL_SOUTH, TALL);
-b.ceiling(14, HALL_EAST, CORRIDOR_NORTH, HALL_SOUTH, TALL);
+for (const [x1, x2, z1, z2] of [
+  [-OUT, OUT, -OUT, -YARD], [-OUT, -YARD, -YARD, YARD],
+  [YARD, OUT, -YARD, YARD], [-OUT, OUT, YARD, OUT],
+]) b.ceiling(x1, x2, z1, z2, UP * 2);
+b.box(0, -0.18, 0, YARD * 2, 0.36, YARD * 2, 'floor', false);
+// A simple ruined fountain gives the window views a recognizable central landmark.
+b.box(0, 0.28, 0, 5.3, 0.56, 5.3, 'wall', false);
+b.box(0, 0.58, 0, 3.9, 0.12, 3.9, 'floor', false);
+b.box(0, 1.15, 0, 0.7, 1.2, 0.7, 'wall', false);
 
-// Upper level: the balcony across the courtyard and a mezzanine in each hall.
-const MEZZANINE = 17.5, STAIR_FOOT = 24, STAIR_NORTH = 5.4, STAIR_SOUTH = 7.8;
-b.floor(-MEZZANINE, MEZZANINE, CORRIDOR_SOUTH, 3, UP);
+for (const y of [0, UP]) {
+  const upper = y === UP;
+  b.wall('x', -OUT, -OUT, OUT, y, UP, upper
+    ? [window('north-upper-west', -14), window('north-upper-east', 14)]
+    : [window('power-north', 0), window('north-west', -14), window('north-east', 14)], -1);
+  b.wall('x', OUT, -OUT, OUT, y, UP, upper
+    ? [window('south-upper-west', -14), window('south-upper-east', 14)]
+    : [window('german-south-a', -15), window('german-south-b', -5),
+      window('american-south-a', 5), window('american-south-b', 15)], 1);
+  b.wall('z', -OUT, -OUT, OUT, y, UP, upper ? [window('west-upper', 1)]
+    : [window('german-west', 12), window('west-middle', -2), window('west-north', -13)], -1);
+  b.wall('z', OUT, -OUT, OUT, y, UP, upper ? [window('east-upper', 1)]
+    : [window('american-east', 12), window('east-middle', -2), window('east-north', -13)], 1);
+  for (const [axis, fixed, outward, side] of [
+    ['x', -YARD, 1, 'north'], ['x', YARD, -1, 'south'],
+    ['z', -YARD, 1, 'west'], ['z', YARD, -1, 'east'],
+  ] as const) {
+    const balcony = upper && axis === 'x';
+    b.wall(axis, fixed, -YARD, YARD, y, UP,
+      [window(`courtyard-${side}-a-${y}`, axis === 'z' ? -2.5 : -4),
+        ...(balcony ? [{ at: 0, width: 2.8, kind: 'door' as const }] : []),
+        window(`courtyard-${side}-b-${y}`, 4)], outward);
+    if (balcony) b.parapet('x', fixed, -1.4, 1.4, UP);
+  }
+}
+
+// Split starts and side rooms. Each route reaches the power room from the opposite end.
+ b.wall('z', 0, YARD, OUT, 0, UP, [door(13)]);
+b.wall('x', YARD, -OUT, -YARD, 0, UP, [door(-13)]);
+b.wall('x', YARD, YARD, OUT, 0, UP, [door(13)]);
+for (const z of [-4.5, -8]) {
+  b.wall('x', z, -OUT, -YARD, 0, UP, [door(-13)]);
+  b.wall('x', z, YARD, OUT, 0, UP, [door(13)]);
+}
+for (const x of [-8, 8]) b.wall('z', x, -OUT, -YARD, 0, UP, [door(-13)]);
+for (const x of [-9, 0, 9]) b.wall('z', x, YARD, OUT, UP, UP, [door(13)]);
+for (const x of [-8, 0, 8]) b.wall('z', x, -OUT, -YARD, UP, UP, [door(-13)]);
+for (const z of [-6]) {
+  b.wall('x', z, -OUT, -YARD, UP, UP, [door(-13)]);
+  b.wall('x', z, YARD, OUT, UP, UP, [door(13)]);
+}
+
+// Carve stairwell apertures out of the upper side slabs, then add two steep runs.
+for (let i = b.surfaces.length - 1; i >= 0; i--) {
+  const s = b.surfaces[i];
+  if (s.startHeight === UP && s.endHeight === UP && s.minZ === -YARD && s.maxZ === YARD
+    && (s.maxX === -YARD || s.minX === YARD)) b.surfaces.splice(i, 1);
+}
+for (let i = b.shell.length - 1; i >= 0; i--) {
+  const box = b.shell[i];
+  if (box.material === 'upperFloor' && box.center.y === UP - 0.12 && box.center.z === 0
+    && Math.abs(box.center.x) === (OUT + YARD) / 2) b.shell.splice(i, 1);
+}
 for (const side of [-1, 1]) {
-  const [inner, outer] = side < 0 ? [-MEZZANINE, -14.2] : [14.2, MEZZANINE];
-  b.floor(inner, outer, 3, STAIR_SOUTH, UP);
-  // Rails where the mezzanine overlooks the hall floor below.
-  b.parapet('z', side * MEZZANINE, CORRIDOR_SOUTH, STAIR_NORTH, UP);
-  b.parapet('x', CORRIDOR_SOUTH, inner, outer, UP);
-  // The stair runs along the hall's south wall, climbing toward the mezzanine, with a full-height
-  // banister wall on its open side.
-  const [lowX, highX] = side < 0 ? [-STAIR_FOOT, -MEZZANINE] : [MEZZANINE, STAIR_FOOT];
-  b.stair(lowX, highX, STAIR_NORTH, STAIR_SOUTH, 'x', side < 0, 0, UP);
-  b.box((lowX + highX) / 2, (UP + 0.95) / 2, STAIR_NORTH - 0.1, highX - lowX, UP + 0.95, 0.2, 'wall');
+  const [low, high] = side < 0 ? [-18, -8] : [8, 18];
+  const [stairLow, stairHigh] = side < 0 ? [-16, -13] : [13, 16];
+  b.floor(low, high, -8, -3.2, UP);
+  b.floor(low, high, 3.2, 8, UP);
+  b.floor(side < 0 ? -13 : 8, side < 0 ? -8 : 13, -3.2, 3.2, UP);
+  b.floor(side < 0 ? -18 : 16, side < 0 ? -16 : 18, -3.2, 3.2, UP);
+  b.stair(stairLow, stairHigh, -3.2, 3.2, 'z', false, 0, UP, 18);
+  b.parapet('z', side < 0 ? -13 : 13, -3.2, 3.2, UP);
+  b.parapet('z', side < 0 ? -16 : 16, -3.2, 3.2, UP);
 }
-b.parapet('x', 3, -14, 14, UP);
-// Posts carry the balcony over the courtyard, clear of the windows' approach lanes.
-for (const x of [-12, -5.5, 4.5, 12]) b.box(x, UP / 2, 2.7, 0.4, UP, 0.4, 'wall');
 
 export const ASYLUM_UPPER_HEIGHT = UP;
-export const ASYLUM_BOX_CENTER: Vec3 = { x: 3, y: 0.52, z: CORRIDOR_NORTH + 0.2 + 0.525 };
+export const ASYLUM_BOX_CENTER: Vec3 = { x: 2.8, y: 0.52, z: -16.4 };
 b.box(ASYLUM_BOX_CENTER.x, 0.52, ASYLUM_BOX_CENTER.z, 2.35, 1.04, 0.95, 'barrier');
-
-const planksDoor = (id: string, x: number, cost: number, name: string): DoorDefinition => ({
-  id, position: { x, y: 0, z: DOOR_Z }, cost, prompt: `E  Open ${name}  [${cost}]`, interactionRange: 2.6, minFacingDot: 0.3,
-  blocker: { min: { x: x - 0.2, y: 0, z: DOOR_Z - DOOR_WIDTH / 2 }, max: { x: x + 0.2, y: 2.85, z: DOOR_Z + DOOR_WIDTH / 2 } },
+// A visual power panel reserves its familiar destination; gameplay activation comes later.
+b.box(-6.5, 1.35, -17.73, 0.68, 0.9, 0.16, 'metal', false);
+b.box(-6.5, 1.35, -17.56, 0.14, 0.42, 0.19, 'metal', false);
+const plankDoor = (id: string, x: number, z: number, axis: 'x' | 'z', cost: number, name: string): DoorDefinition => ({
+  id, position: { x, y: 0, z }, cost, prompt: `E  Open ${name}  [${cost}]`, interactionRange: 2.6, minFacingDot: 0.2,
+  blocker: axis === 'z'
+    ? { min: { x: x - 0.2, y: 0, z: z - DOOR_WIDTH / 2 }, max: { x: x + 0.2, y: 2.85, z: z + DOOR_WIDTH / 2 } }
+    : { min: { x: x - DOOR_WIDTH / 2, y: 0, z: z - 0.2 }, max: { x: x + DOOR_WIDTH / 2, y: 2.85, z: z + 0.2 } },
 });
-const stairDebris = (id: string, side: number): DoorDefinition => {
-  const x = side * (STAIR_FOOT - 1.5), z = (STAIR_NORTH + STAIR_SOUTH) / 2;
-  return { id, position: { x, y: 0.8, z }, cost: 1000, prompt: 'E  Clear stair debris  [1000]',
-    interactionRange: 2.8, minFacingDot: 0.2,
-    blocker: { min: { x: x - 0.4, y: 0, z: STAIR_NORTH }, max: { x: x + 0.4, y: 4.5, z: STAIR_SOUTH } } };
-};
 export const ASYLUM_DOORS: readonly DoorDefinition[] = [
-  planksDoor('kitchen-door', PARTITIONS[0], 750, 'kitchen'),
-  planksDoor('hall-door', PARTITIONS[1], 1000, 'main hall'),
-  planksDoor('surgery-door', PARTITIONS[2], 1000, 'surgery'),
-  planksDoor('ward-door', PARTITIONS[3], 750, 'isolation ward'),
-  stairDebris('west-stairs', -1),
-  stairDebris('east-stairs', 1),
+  plankDoor('german-hall', -13, 8, 'x', 750, 'German hall'),
+  plankDoor('american-hall', 13, 8, 'x', 750, 'American hall'),
+  plankDoor('start-gate', 0, 13, 'z', 1500, 'starting gate'),
+  plankDoor('west-wing', -13, -4.5, 'x', 1000, 'west wing'),
+  plankDoor('east-wing', 13, -4.5, 'x', 1000, 'east wing'),
+  plankDoor('west-back', -13, -8, 'x', 750, 'bathroom'),
+  plankDoor('east-back', 13, -8, 'x', 750, 'kitchen'),
+  plankDoor('power-west', -8, -13, 'z', 750, 'power room'),
+  plankDoor('power-east', 8, -13, 'z', 750, 'power room'),
+  ...[-1, 1].map(side => ({
+    id: side < 0 ? 'west-stairs' : 'east-stairs', position: { x: side * 14.5, y: 0.8, z: 2.2 },
+    cost: 1000, prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
+    blocker: { min: { x: side < 0 ? -16 : 13, y: 0, z: 1.85 },
+      max: { x: side < 0 ? -13 : 16, y: 4.5, z: 2.55 } },
+  })),
 ];
-
 const wallBuy = (id: string, weaponId: string, name: string, cost: number, position: Vec3): WallWeaponDefinition => ({
   id, position, weaponId, weaponCost: cost, ammoCost: cost / 2,
   prompt: `E  ${name} [${cost}] / Ammo [${cost / 2}]`, interactionRange: 2.5, minFacingDot: 0.25,
 });
-/** Chalk sits 0.24 m off its wall's centre line (just proud of the 0.4 m wall). */
-const NORTH = CORRIDOR_NORTH + 0.24, SOUTH = CORRIDOR_SOUTH - 0.24;
 export const ASYLUM_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
-  wallBuy('dining-kar98k', 'kar98k', 'Kar98k', 200, { x: -23, y: 1, z: NORTH }),
-  wallBuy('dining-carbine', 'm1-carbine', 'M1A1 Carbine', 600, { x: HALL_WEST + 0.24, y: 1, z: -1 }),
-  wallBuy('kitchen-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: -6.5, y: 1, z: NORTH }),
-  wallBuy('kitchen-thompson', 'thompson', 'Thompson', 1200, { x: -12, y: 1, z: SOUTH }),
-  wallBuy('hall-stg44', 'stg44', 'STG-44', 1200, { x: 4, y: 1, z: SOUTH }),
-  wallBuy('surgery-trench-gun', 'trench-gun', 'Trench Gun', 1500, { x: 7.8, y: 1, z: NORTH }),
-  wallBuy('surgery-mp40', 'mp40', 'MP40', 1000, { x: 12.5, y: 1, z: SOUTH }),
-  wallBuy('ward-garand', 'm1-garand', 'M1 Garand', 1200, { x: 23, y: 1, z: NORTH }),
-  wallBuy('ward-bar', 'bar', 'BAR', 1800, { x: HALL_EAST - 0.24, y: 1, z: -1 }),
-  wallBuy('balcony-m14', 'm14', 'M14', 500, { x: -6, y: UP + 1, z: CORRIDOR_SOUTH + 0.24 }),
+  wallBuy('german-kar98k', 'kar98k', 'Kar98k', 200, { x: -11.5, y: 1, z: 17.76 }),
+  wallBuy('german-gewehr', 'm1-garand', 'Gewehr 43', 600, { x: -3, y: 1, z: 17.76 }),
+  wallBuy('american-carbine', 'm1-carbine', 'M1A1 Carbine', 600, { x: 4, y: 1, z: 17.76 }),
+  wallBuy('west-thompson', 'thompson', 'Thompson', 1200, { x: -17.76, y: 1, z: -5.5 }),
+  wallBuy('east-mp40', 'mp40', 'MP40', 1000, { x: 17.76, y: 1, z: -5.5 }),
+  wallBuy('bathroom-trench', 'trench-gun', 'Trench Gun', 1500, { x: -16, y: 1, z: -17.76 }),
+  wallBuy('kitchen-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: 15, y: 1, z: -17.76 }),
+  wallBuy('power-stg44', 'stg44', 'STG-44', 1200, { x: -4.5, y: 1, z: -17.76 }),
+  wallBuy('upper-bar', 'bar', 'BAR', 1800, { x: -5, y: UP + 1, z: 17.76 }),
+  wallBuy('upper-garand', 'm1-garand', 'M1 Garand', 1200, { x: 5, y: UP + 1, z: -17.76 }),
 ];
-const ASYLUM_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
-  'dining-kar98k': 0, 'dining-carbine': Math.PI / 2, 'kitchen-double-barrel': 0, 'kitchen-thompson': Math.PI,
-  'hall-stg44': Math.PI, 'surgery-trench-gun': 0, 'surgery-mp40': Math.PI, 'ward-garand': 0, 'ward-bar': -Math.PI / 2,
-  'balcony-m14': 0,
-};
 export const ASYLUM_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
-  ...BUNKER_MYSTERY_BOXES[0], id: 'hall-box',
-  // The box sits against the main hall's north wall; buyers stand south of it.
+  ...BUNKER_MYSTERY_BOXES[0], id: 'power-box',
   position: { x: ASYLUM_BOX_CENTER.x, y: 0.6, z: ASYLUM_BOX_CENTER.z + 0.77 },
 }];
-export const ASYLUM_PLAYER_SPAWN: Vec3 = { x: -21, y: 0, z: -3 };
-
+export const ASYLUM_PLAYER_SPAWN: Vec3 = { x: -5, y: 0, z: 12 };
 const prop = (id: string, asset: string, x: number, y: number, z: number,
   sx: number, sy: number, sz: number, yaw = 0, solid = true, background = false): PropPlacement =>
   ({ id, asset, position: { x, y, z }, size: { x: sx, y: sy, z: sz }, yaw, solid, background });
-// Props hug the walls, clear of doorways, stairs and every window's landing.
 export const ASYLUM_PROPS: readonly PropPlacement[] = [
-  prop('dining-table-a', 'wooden-table', -22, 0, -7.2, 1.8, 0.55, 0.66),
-  prop('dining-table-b', 'wooden-table', -18.5, 0, -8.9, 1.8, 0.55, 0.66),
-  prop('dining-crate', 'wooden-crate', -15.2, 0, -9.3, 0.85, 0.24, 0.4),
-  prop('kitchen-stove', 'barrel-stove', -12.9, 0, -9, 0.6, 0.86, 0.6),
-  prop('kitchen-shelf', 'shelf', -4.47, 0, -8.4, 1.01, 2.08, 0.26, -Math.PI / 2),
-  prop('kitchen-carton', 'cardboard-box', -13.3, 0, -1.4, 0.39, 0.35, 0.52),
-  prop('hall-table', 'wooden-table', -2.2, 0, -1.2, 1.8, 0.55, 0.66),
-  prop('hall-radio', 'field-radio', -2.3, 0.55, -1.2, 0.62, 0.44, 0.42, Math.PI, false),
-  prop('surgery-crate', 'wooden-crate', 13, 0, -9.3, 0.85, 0.24, 0.4),
-  prop('surgery-bags', 'cement-bag', 7.2, 0, -1.2, 0.47, 0.18, 0.7, Math.PI / 2, false),
-  prop('ward-hand-truck', 'hand-truck', 25.3, 0, -8.6, 0.6, 1.4, 0.7, -Math.PI / 2),
-  prop('ward-barrel', 'explosive-barrel', 25.2, 0, 4.4, 0.58, 0.9, 0.58),
-  prop('ward-shelf', 'shelf', 14.53, 0, -8.4, 1.01, 2.08, 0.26, Math.PI / 2),
-  prop('balcony-bags', 'cement-bag', -1, UP, 2.4, 0.47, 0.18, 0.7, 0, false),
-  prop('courtyard-jeep', 'vehicles/gaz-67', -3, 0, 10.5, 1.8, 1.65, 3.6, 1.2, false, true),
-  prop('yard-barrel-a', 'explosive-barrel', 8, 0, 11, 0.58, 0.9, 0.58, 0, false, true),
+  prop('german-table', 'wooden-table', -16, 0, 9.3, 1.8, 0.55, 0.66),
+  prop('german-radio', 'field-radio', -16, 0.55, 9.3, 0.62, 0.44, 0.42, 0, false),
+  prop('american-table', 'wooden-table', 16, 0, 9.3, 1.8, 0.55, 0.66),
+  prop('west-shelf', 'shelf', -17.5, 0, -6.3, 1.01, 2.08, 0.26, -Math.PI / 2),
+  prop('east-shelf', 'shelf', 17.5, 0, -6.3, 1.01, 2.08, 0.26, Math.PI / 2),
+  prop('kitchen-stove', 'barrel-stove', 10, 0, -16.5, 0.6, 0.86, 0.6),
+  prop('kitchen-carton', 'cardboard-box', 16, 0, -9.1, 0.39, 0.35, 0.52),
+  prop('bathroom-crate', 'wooden-crate', -10, 0, -16.2, 0.85, 0.24, 0.4),
+  prop('power-bags', 'cement-bag', -6.5, 0, -9.3, 0.47, 0.18, 0.7, 0, false),
+  prop('upper-barrel', 'explosive-barrel', -15, UP, 16, 0.58, 0.9, 0.58),
+  prop('courtyard-jeep', 'vehicles/gaz-67', 4, 0, 4, 1.8, 1.65, 3.6, 0.5, false, true),
 ];
-
 const barriers = barriersFromWindows(b.windows, 6);
 const collision = collisionBoxesFor(b.shell, ASYLUM_PROPS);
 const ASYLUM_NAVIGATION = compileNavigation(b.surfaces, collision,
-  { minX: HALL_WEST + 0.8, maxX: HALL_EAST, minZ: CORRIDOR_NORTH + 0.8, maxZ: HALL_SOUTH }, [0, UP], [
+  { minX: -17.1, maxX: 18, minZ: -17.1, maxZ: 18 }, [0, UP], [
     { id: 'spawn', position: ASYLUM_PLAYER_SPAWN },
-    // Both sides of every ground doorway and of the balcony's doorways into the halls.
-    ...PARTITIONS.flatMap(x => [
-      { id: `door-${x}-west`, position: { x: x - 1, y: 0, z: DOOR_Z } },
-      { id: `door-${x}-east`, position: { x: x + 1, y: 0, z: DOOR_Z } }]),
-    ...[-1, 1].flatMap(side => [
-      { id: `balcony-${side}-in`, position: { x: side * 15.3, y: UP, z: 1.5 } },
-      { id: `balcony-${side}-out`, position: { x: side * 12.7, y: UP, z: 1.5 } },
-      { id: `mezzanine-${side}`, position: { x: side * 15.8, y: UP, z: 4.2 } }]),
-    // The stairs' centre-lines: the foot, eleven points up the flight, and the mezzanine at the top.
-    ...[-1, 1].flatMap(side => {
-      const z = (STAIR_NORTH + STAIR_SOUTH) / 2, foot = side * STAIR_FOOT, head = side * MEZZANINE;
-      return [
-        { id: `stair-${side}-foot`, position: { x: foot + side * 0.8, y: 0, z } },
-        ...Array.from({ length: 11 }, (_, i) => ({ id: `stair-${side}-${i}`,
-          position: { x: foot + (head - foot) * i / 10, y: UP * i / 10, z } })),
-        { id: `stair-${side}-head`, position: { x: head - side * 1.2, y: UP, z } },
-      ];
+    ...ASYLUM_DOORS.filter(d => !d.id.endsWith('stairs')).flatMap(d => {
+      const axis = ['german-hall', 'american-hall', 'west-wing', 'east-wing', 'west-back', 'east-back'].includes(d.id) ? 'x' : 'z';
+      return [-1, 1].map(side => ({ id: `${d.id}-${side}`, position: {
+        x: d.position.x + (axis === 'z' ? side : 0), y: 0,
+        z: d.position.z + (axis === 'x' ? side : 0),
+      } }));
     }),
+    ...[-1, 1].flatMap(side => [
+      { id: `stair-${side}-foot`, position: { x: side * 14.5, y: 0, z: 4 } },
+      ...Array.from({ length: 13 }, (_, i) => ({ id: `stair-${side}-${i}`, position: {
+        x: side * 14.5, y: UP * i / 12, z: 3.2 - 6.4 * i / 12,
+      } })),
+      { id: `stair-${side}-head`, position: { x: side * 14.5, y: UP, z: -4 } },
+    ]),
     ...barriers.map(barrier => ({ id: barrier.id, position: barrier.insidePoint })),
   ]);
-
 export const ASYLUM_MAP: GameMap = {
   id: 'asylum', name: 'Asylum', upperHeight: UP,
   greybox: b.shell, prisms: b.prisms, collisionBoxes: collision,
@@ -191,46 +190,53 @@ export const ASYLUM_MAP: GameMap = {
   playerSpawn: ASYLUM_PLAYER_SPAWN, windows: b.windows, windowBoards: 6,
   barriers, zombieSpawns: barriers.map(barrier => ({ ...barrier.approachPath[0], barrierId: barrier.id })),
   doors: ASYLUM_DOORS,
-  doorStyles: {
-    'kitchen-door': { kind: 'planks', yaw: 0, width: DOOR_WIDTH },
-    'hall-door': { kind: 'planks', yaw: 0, width: DOOR_WIDTH },
-    'surgery-door': { kind: 'planks', yaw: 0, width: DOOR_WIDTH },
-    'ward-door': { kind: 'planks', yaw: 0, width: DOOR_WIDTH },
-    'west-stairs': { kind: 'debris', yaw: Math.PI / 2, width: STAIR_SOUTH - STAIR_NORTH },
-    'east-stairs': { kind: 'debris', yaw: Math.PI / 2, width: STAIR_SOUTH - STAIR_NORTH },
+  doorStyles: Object.fromEntries(ASYLUM_DOORS.map(d => [d.id, d.id.endsWith('stairs')
+    ? { kind: 'debris' as const, yaw: 0, width: 3 }
+    : { kind: 'planks' as const, yaw: ['german-hall', 'american-hall', 'west-wing', 'east-wing', 'west-back', 'east-back'].includes(d.id)
+      ? Math.PI / 2 : 0, width: DOOR_WIDTH }])),
+  wallWeapons: ASYLUM_WALL_WEAPONS,
+  wallWeaponFacing: {
+    'german-kar98k': Math.PI, 'german-gewehr': Math.PI, 'american-carbine': Math.PI,
+    'west-thompson': Math.PI / 2, 'east-mp40': -Math.PI / 2,
+    'bathroom-trench': 0, 'kitchen-double-barrel': 0, 'power-stg44': 0,
+    'upper-bar': Math.PI, 'upper-garand': 0,
   },
-  wallWeapons: ASYLUM_WALL_WEAPONS, wallWeaponFacing: ASYLUM_WALL_WEAPON_FACING,
   mysteryBoxes: ASYLUM_MYSTERY_BOXES, boxCenter: ASYLUM_BOX_CENTER, boxYaw: -Math.PI / 2,
   rails: b.rails, props: ASYLUM_PROPS,
   decals: [
-    { asset: 'leaking-grime', x: -20, y: 2.4, z: CORRIDOR_NORTH + 0.211, width: 2.6, height: 2.5, yaw: 0 },
-    { asset: 'smear-grime', x: -9, y: 1.6, z: CORRIDOR_SOUTH - 0.211, width: 2.4, height: 2.2, yaw: Math.PI },
-    { asset: 'leaking-grime', x: 20, y: 4.5, z: CORRIDOR_NORTH + 0.211, width: 3, height: 2.6, yaw: 0 },
-    { asset: 'smear-grime', x: 9, y: 1.5, z: CORRIDOR_NORTH + 0.211, width: 2.5, height: 2.2, yaw: 0 },
+    { asset: 'leaking-grime', x: -5, y: 2.4, z: 17.79, width: 2.6, height: 2.5, yaw: Math.PI },
+    { asset: 'smear-grime', x: 12, y: 1.6, z: -17.79, width: 2.4, height: 2.2, yaw: 0 },
   ],
   labels: [
-    { text: 'DINING HALL', x: -20, y: 4.4, z: CORRIDOR_NORTH + 0.215, yaw: 0, width: 3, height: 0.5 },
-    { text: 'SANATORIUM', x: -2.6, y: 2.95, z: CORRIDOR_NORTH + 0.215, yaw: 0, width: 2.6, height: 0.42 },
-    { text: 'SURGERY', x: 10, y: 2.95, z: CORRIDOR_NORTH + 0.215, yaw: 0, width: 2, height: 0.42 },
-    { text: 'ISOLATION WARD', x: 20, y: 4.4, z: CORRIDOR_NORTH + 0.215, yaw: 0, width: 3.4, height: 0.5 },
-    { text: 'THEY HEAR EVERYTHING', x: -9, y: 2.35, z: CORRIDOR_NORTH + 0.215, yaw: 0, width: 3.2, height: 0.36, color: '#8f2a22' },
+    { text: 'GERMAN WING', x: -4.5, y: 2.95, z: 17.78, yaw: Math.PI, width: 3.3, height: 0.42 },
+    { text: 'AMERICAN WING', x: 4.5, y: 2.95, z: 17.78, yaw: Math.PI, width: 3.8, height: 0.42 },
+    { text: 'POWER ROOM', x: -3, y: 2.95, z: -17.78, yaw: 0, width: 3, height: 0.42 },
+    { text: 'KITCHEN', x: 13, y: 2.95, z: -17.78, yaw: 0, width: 2.3, height: 0.42 },
+    { text: 'BATHROOM', x: -13, y: 2.95, z: -17.78, yaw: 0, width: 2.7, height: 0.42 },
   ],
-  lights: [{ x: -20, y: 3.2, z: -3 }, { x: -9, y: 2.75, z: -5 }, { x: 1, y: 2.75, z: -5 },
-    { x: 10, y: 2.75, z: -5 }, { x: 20, y: 3.2, z: -3 }, { x: 0, y: 5.3, z: 1.5 }],
+  lights: [
+    { x: -5, y: 2.9, z: 13 }, { x: 5, y: 2.9, z: 13 },
+    { x: -13, y: 2.9, z: 0 }, { x: 13, y: 2.9, z: 0 },
+    { x: -13, y: 2.9, z: -13 }, { x: 13, y: 2.9, z: -13 }, { x: 0, y: 2.9, z: -13 },
+    { x: -13, y: 5.8, z: 0 }, { x: 13, y: 5.8, z: 0 }, { x: 0, y: 5.8, z: 13 },
+  ],
   rubble: [
-    { minX: HALL_WEST + 0.5, maxX: -14.5, minZ: CORRIDOR_NORTH + 0.5, maxZ: STAIR_NORTH - 0.3, y: 0, count: 26 },
-    { minX: -13.5, maxX: 13.5, minZ: CORRIDOR_NORTH + 0.5, maxZ: CORRIDOR_SOUTH - 0.5, y: 0, count: 40 },
-    { minX: 14.5, maxX: HALL_EAST - 0.5, minZ: CORRIDOR_NORTH + 0.5, maxZ: STAIR_NORTH - 0.3, y: 0, count: 26 },
-    { minX: -13.5, maxX: 13.5, minZ: 0.4, maxZ: 2.7, y: UP, count: 18 },
+    { minX: -17, maxX: -1, minZ: 9, maxZ: 17, y: 0, count: 24 },
+    { minX: 1, maxX: 17, minZ: 9, maxZ: 17, y: 0, count: 24 },
+    { minX: -17, maxX: -9, minZ: -7, maxZ: 7, y: 0, count: 20 },
+    { minX: 9, maxX: 17, minZ: -7, maxZ: 7, y: 0, count: 20 },
+    { minX: -17, maxX: 17, minZ: -17, maxZ: -9, y: 0, count: 35 },
+    { minX: -17, maxX: 17, minZ: 9, maxZ: 17, y: UP, count: 25 },
   ],
-  focus: { x: 0, z: -1, radius: 30 },
+  focus: { x: 0, z: 0, radius: 27 },
   previews: {
-    kitchen: { position: { x: -12.5, y: 0, z: -5 }, yaw: -Math.PI / 2 },
-    hall: { position: { x: 1, y: 0, z: -2 }, yaw: 0 },
-    barrier: { position: { x: -9, y: 0, z: -7.5 }, yaw: 0 },
-    balcony: { position: { x: -12, y: UP, z: 1.5 }, yaw: -Math.PI / 2 },
-    courtyard: { position: { x: 0, y: UP, z: 1.8 }, yaw: Math.PI },
-    ward: { position: { x: 16, y: 0, z: -3 }, yaw: -Math.PI / 2 },
-    upstairs: { position: { x: -15.8, y: UP, z: 6.6 }, yaw: Math.PI / 2 },
+    kitchen: { position: { x: 13, y: 0, z: -12 }, yaw: Math.PI / 2 },
+    hall: { position: { x: -5, y: 0, z: 12 }, yaw: -Math.PI / 2 },
+    barrier: { position: { x: -13, y: 0, z: 15 }, yaw: Math.PI },
+    balcony: { position: { x: -13, y: UP, z: 11 }, yaw: Math.PI },
+    courtyard: { position: { x: -2, y: UP, z: 10 }, yaw: -0.35 },
+    ward: { position: { x: 13, y: 0, z: 12 }, yaw: Math.PI },
+    upstairs: { position: { x: -13, y: UP, z: -6 }, yaw: Math.PI },
+    power: { position: { x: 0, y: 0, z: -12 }, yaw: 0 },
   },
 };
