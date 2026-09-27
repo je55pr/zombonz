@@ -201,4 +201,10 @@ Background vehicle conversions are CC0 OpenGameArt assets:
 - Soviet military off-road vehicle: https://opengameart.org/content/soviet-military-off-road-vehicle
 - T-12 Soviet light tank: https://opengameart.org/content/t-12-soviet-light-tank-lowpoly
 
+## Fonts
+
+Bundled with the game code through Fontsource (Latin subset, WOFF2/WOFF), unmodified:
+- Oswald — The Oswald Project Authors. SIL Open Font License 1.1. https://github.com/googlefonts/OswaldFont
+- Special Elite — Astigmatic (Brian J. Bonislawsky). Apache License 2.0. https://fonts.google.com/specimen/Special+Elite
+
 Full intake hashes, API snapshots, source archives and conversion notes are kept outside the repository under C:\ChatGPT\Shared\Cache\ZombonzAssets. Repo documentation under docs/assets records the runtime selection and processing state.

@@ -74,15 +74,16 @@ describe('render performance contracts', () => {
   });
 
   it('redraws and uploads the HUD only when its displayed state changes', () => {
-    const context = { clearRect: vi.fn(), strokeText: vi.fn(), fillText: vi.fn(), fillRect: vi.fn(),
-      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(),
-      measureText: () => ({ width: 100 }) };
+    // Any other drawing call is a no-op; gradients accept colour stops.
+    const calls: Record<string | symbol, unknown> = { clearRect: vi.fn(), measureText: () => ({ width: 100 }) };
+    const context = new Proxy(calls, { get: (target, key) => target[key]
+      ?? (target[key] = vi.fn(() => ({ addColorStop: vi.fn() }))) }) as { clearRect: ReturnType<typeof vi.fn> };
     vi.stubGlobal('document', { createElement: () => ({ width: 0, height: 0, getContext: () => context }) });
     const renderer = { clearDepth: vi.fn(), render: vi.fn() };
     const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
     const state: HudSnapshot = { health: 100, points: 500, kills: 0, headshots: 0,
       round: 1, weapon: 'starter-pistol',
-      magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloadTicksRemaining: 0,
+      magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloading: false,
       grenadeCharges: 2,
       roundPhase: 'waiting', interactionPrompt: null, nearbyPowerup: null, bonusStatus: null, instaKillStatus: null,
       gameOver: false, paused: false, godMode: false, noclip: false,
@@ -94,9 +95,13 @@ describe('render performance contracts', () => {
     hud.render({ ...state, godMode: true });
     hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair' });
     expect(context.clearRect).toHaveBeenCalledTimes(3);
+    // A reload repaints once when it starts and once when it ends, not on every tick in between.
+    for (let tick = 0; tick < 90; tick++) hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair', reloading: true });
+    hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair' });
+    expect(context.clearRect).toHaveBeenCalledTimes(5);
     hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair',
       feedback: { message: 'HEADSHOT', hitMarker: 'kill', damageVignette: false } });
-    expect(context.clearRect).toHaveBeenCalledTimes(4);
+    expect(context.clearRect).toHaveBeenCalledTimes(6);
     hud.dispose();
   });
 });

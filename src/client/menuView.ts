@@ -2,6 +2,7 @@ import {
   createMenuState, menuItems, reduceMenu, setDownload, type DownloadStatus, type MenuAction, type MenuEffect, type MenuState,
 } from './menu.ts';
 import type { GameSettings } from './settings.ts';
+import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
 
 interface Row { index: number; x: number; y: number; width: number; height: number; left?: Box; right?: Box }
 interface Box { x: number; y: number; width: number; height: number }
@@ -17,6 +18,7 @@ export class MenuView {
   private readonly context: CanvasRenderingContext2D;
   private rows: Row[] = [];
   private renderQueued = false;
+  private disposed = false;
   // Layout changes do not always fire window resize (embedded panes, zoom), so watch the canvas itself.
   private readonly resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.render());
 
@@ -36,9 +38,12 @@ export class MenuView {
     canvas.addEventListener('pointerdown', this.onPointerDown);
     this.resizeObserver?.observe(canvas);
     this.render();
+    // Canvas text doesn't wait for web fonts: repaint once the bundled ones load.
+    void loadUiFonts().then(() => { if (!this.disposed) this.render(); });
   }
 
   dispose(): void {
+    this.disposed = true;
     removeEventListener('resize', this.render);
     removeEventListener('keydown', this.onKeyDown);
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
@@ -120,7 +125,7 @@ export class MenuView {
         : `${d.totalFiles} files  ·  ${mb(d.loadedBytes)} MB downloaded`;
     } else { title = 'Download failed'; detail = 'Check your connection, then choose Retry download.'; }
     c.fillStyle = d.phase === 'error' ? '#c4574a' : '#bdb6a1';
-    c.font = `700 ${Math.round(17 * scale)}px Arial, sans-serif`;
+    c.font = `700 ${Math.round(17 * scale)}px ${UI_FONT}`;
     c.fillText(title, centre, y);
     if (d.phase !== 'ready' || d.failedFiles) {
       c.fillStyle = '#2b2925'; c.fillRect(centre - barWidth / 2, y + 16 * scale, barWidth, barHeight);
@@ -128,7 +133,7 @@ export class MenuView {
       c.fillRect(centre - barWidth / 2, y + 16 * scale, barWidth * fraction, barHeight);
     }
     if (detail) {
-      c.fillStyle = '#7d7768'; c.font = `400 ${Math.round(14 * scale)}px Arial, sans-serif`;
+      c.fillStyle = '#7d7768'; c.font = `400 ${Math.round(14 * scale)}px ${UI_FONT}`;
       c.fillText(detail, centre, y + 16 * scale + barHeight + 16 * scale);
     }
   }
@@ -148,23 +153,30 @@ export class MenuView {
     const scale = Math.min(1, width / 900, height / 700);
     const centre = width / 2;
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(92 * scale)}px Georgia, 'Times New Roman', serif`;
+    c.shadowColor = 'rgba(0,0,0,0.8)'; c.shadowBlur = 18 * scale; c.shadowOffsetY = 4 * scale;
+    c.fillStyle = '#e4dcc4'; c.font = `400 ${Math.round(104 * scale)}px ${TITLE_FONT}`;
     c.fillText('ZOMBONZ', centre, height * 0.22);
-    c.fillStyle = '#9b2d22'; c.font = `700 ${Math.round(22 * scale)}px Arial, sans-serif`;
-    c.fillText('NACHT DER UNTOTEN', centre, height * 0.22 + 64 * scale);
+    c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0;
+    const rule = c.createLinearGradient(centre - 260 * scale, 0, centre + 260 * scale, 0);
+    rule.addColorStop(0, 'rgba(0,0,0,0)'); rule.addColorStop(0.5, '#b3281d'); rule.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = rule; c.fillRect(centre - 260 * scale, height * 0.22 + 44 * scale, 520 * scale, 2 * scale);
+    c.fillStyle = '#c8392b'; c.font = `500 ${Math.round(20 * scale)}px ${UI_FONT}`;
+    c.letterSpacing = `${Math.round(8 * scale)}px`;
+    c.fillText('NACHT DER UNTOTEN', centre, height * 0.22 + 70 * scale);
+    c.letterSpacing = '0px';
 
     this.rows = [];
     const screen = this.state.screen;
     let y = height * (screen === 'main' ? 0.52 : 0.47);
     if (screen === 'multiplayer') {
-      c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(30 * scale)}px Arial, sans-serif`;
+      c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(30 * scale)}px ${UI_FONT}`;
       c.fillText('Multiplayer is on the way', centre, y);
-      c.fillStyle = '#a19b88'; c.font = `400 ${Math.round(19 * scale)}px Arial, sans-serif`;
+      c.fillStyle = '#a19b88'; c.font = `400 ${Math.round(19 * scale)}px ${UI_FONT}`;
       c.fillText('Player-hosted online co-op is the next milestone. Play Solo for now.', centre, y + 42 * scale);
       y += 110 * scale;
     }
     if (screen === 'loading') {
-      c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(28 * scale)}px Arial, sans-serif`;
+      c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(28 * scale)}px ${UI_FONT}`;
       c.fillText('Starting Nacht der Untoten…', centre, y);
     }
     if (screen === 'main') this.drawDownload(centre, height * 0.22 + 112 * scale, scale);
@@ -173,11 +185,14 @@ export class MenuView {
       const selected = index === this.state.selected;
       const row: Row = { index, x: centre - rowWidth / 2, y: y - rowHeight / 2, width: rowWidth, height: rowHeight };
       if (selected) {
-        c.fillStyle = 'rgba(155,45,34,0.35)'; c.fillRect(row.x, row.y, row.width, row.height);
-        c.fillStyle = '#9b2d22'; c.fillRect(row.x, row.y, 4, row.height);
+        const band = c.createLinearGradient(row.x, 0, row.x + row.width, 0);
+        band.addColorStop(0, 'rgba(155,45,34,0)'); band.addColorStop(0.5, 'rgba(155,45,34,0.42)'); band.addColorStop(1, 'rgba(155,45,34,0)');
+        c.fillStyle = band; c.fillRect(row.x, row.y, row.width, row.height);
+        c.fillStyle = '#c8392b';
+        c.fillRect(row.x + row.width * 0.2, row.y, row.width * 0.6, 2); c.fillRect(row.x + row.width * 0.2, row.y + row.height - 2, row.width * 0.6, 2);
       }
       c.fillStyle = item.disabled ? '#4d4a42' : selected ? '#f3ecd6' : '#bdb6a1';
-      c.font = `700 ${Math.round(28 * scale)}px Arial, sans-serif`;
+      c.font = `700 ${Math.round(28 * scale)}px ${UI_FONT}`;
       if (item.setting && item.value) {
         c.textAlign = 'left'; c.fillText(item.label, row.x + 24 * scale, y);
         const arrow = 34 * scale, valueRight = row.x + row.width - 16 * scale;
@@ -187,13 +202,14 @@ export class MenuView {
         c.fillText('◀', row.left.x + arrow / 2, y); c.fillText('▶', row.right.x + arrow / 2, y);
         c.fillText(item.value, (row.left.x + arrow + row.right.x) / 2, y);
       } else {
-        c.textAlign = 'center'; c.fillText(item.label.toUpperCase(), centre, y);
+        c.textAlign = 'center'; c.letterSpacing = `${Math.round(4 * scale)}px`;
+        c.fillText(item.label.toUpperCase(), centre, y); c.letterSpacing = '0px';
       }
       this.rows.push(row);
       y += rowHeight + 8 * scale;
     });
 
-    c.textAlign = 'center'; c.fillStyle = '#6f6a5c'; c.font = `400 ${Math.round(15 * scale)}px Arial, sans-serif`;
+    c.textAlign = 'center'; c.fillStyle = '#6f6a5c'; c.font = `400 ${Math.round(15 * scale)}px ${UI_FONT}`;
     const hint = screen === 'settings' ? '↑ ↓ select  ·  ← → or click to adjust  ·  Esc back'
       : screen === 'loading' ? '' : '↑ ↓ select  ·  Enter or click to choose  ·  Esc back';
     c.fillText(hint, centre, height - 48);
