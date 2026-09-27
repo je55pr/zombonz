@@ -4,7 +4,7 @@ import type { GameSimulation } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import type { FeedbackSnapshot } from './feedback.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
-import { PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
+import { Crosshair, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
 export interface HudSnapshot {
@@ -139,6 +139,7 @@ export class CanvasHud {
   private pointsEdge = { x: 1400, y: LAYOUT_HEIGHT - 178 };
   private readonly popups: PointsPopups;
   private readonly roundCounter: RoundCounter;
+  private readonly crosshair: Crosshair;
 
   constructor(private readonly renderer: THREE.WebGLRenderer) {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this.onKeyDown);
@@ -163,6 +164,7 @@ export class CanvasHud {
     this.scene.add(quad);
     this.roundCounter = new RoundCounter(this.scene);
     this.popups = new PointsPopups(this.scene);
+    this.crosshair = new Crosshair(this.scene);
     // The first frames draw with fallback fonts; repaint once the bundled ones are ready.
     void loadUiFonts().then(() => { this.previous = null; });
   }
@@ -289,9 +291,6 @@ export class CanvasHud {
           c.lineTo(x + dx * 18, y + dy * 18);
         }
         c.stroke();
-      } else if (!snapshot.aiming) {
-        c.beginPath(); c.arc(centre, height / 2, 2.5, 0, Math.PI * 2);
-        c.fillStyle = 'rgba(244,241,231,0.85)'; c.fill();
       }
       c.shadowColor = 'transparent'; c.shadowBlur = 0;
     }
@@ -406,7 +405,11 @@ export class CanvasHud {
     }
   }
 
-  render(snapshot: HudSnapshot, now = performance.now()): void {
+  /**
+   * `aim` carries the player's current spread cone and the camera's vertical field of view for the
+   * crosshair; both change every frame, so they stay out of the snapshot (which repaints the canvas).
+   */
+  render(snapshot: HudSnapshot, now = performance.now(), aim?: { spread: number; verticalFov: number }): void {
     const resized = this.fit();
     if (resized || !this.previous || (Object.keys(snapshot) as (keyof HudSnapshot)[])
       .some(key => key === 'feedback'
@@ -421,6 +424,9 @@ export class CanvasHud {
     const effects = !snapshot.paused && !snapshot.gameOver && !this.credits;
     this.roundCounter.update(snapshot.round, snapshot.roundPhase, this.layout, now, effects);
     this.popups.update(this.layout, now, effects);
+    // WaW hides the hip crosshair when aiming down sights and while sprinting.
+    this.crosshair.update(aim?.spread ?? 0, aim?.verticalFov ?? 70, this.layout, now,
+      effects && !!aim && !snapshot.aiming && !snapshot.sprinting);
     this.renderer.clearDepth();
     this.renderer.render(this.scene, this.camera);
   }

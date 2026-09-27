@@ -32,6 +32,8 @@ export interface PlayerState extends EntityBase {
   sprintTicks: number;
   sprintRechargeDelayTicks: number;
   aiming: boolean;
+  /** Extra hip spread from sustained fire, as a multiple of the gun's base spread; recovers each tick. */
+  spreadBloom: number;
   health: number;
   recoveryDelayTicks: number;
   meleeCooldownTicks: number;

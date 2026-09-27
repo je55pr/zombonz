@@ -88,7 +88,8 @@ the browser or OS may cap presentation to the current display refresh rate.
 
 The HUD follows WaW: the round counter is chalk tally marks for rounds one to five and a red
 numeral after, flashing when a round is cleared, and every hit, kill and purchase throws a gold
-"+10"/"+50"/"+100" (or red "-950") off the score.
+"+10"/"+50"/"+100" (or red "-950") off the score. The four-line hip crosshair shows the gun's real spread: it
+opens while moving, sprinting and firing, settles back when you stop, and hides when aiming down sights.
 
 The playable solo map, Bunker, follows WaW's first map: starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery

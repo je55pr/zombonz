@@ -23,7 +23,7 @@ import { buildEnvironmentProps, buildEnvironmentDecals, DECALS, loadDecalTexture
 import { BUNKER_PROPS } from './maps/bunkerProps.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
-  createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity,
+  createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity, currentSpread,
   type EntityId, type ZombieState, type Vec3,
 } from './core/index.ts';
 import {
@@ -349,7 +349,8 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     const hudSnapshot = buildHudSnapshot(simulation, playerId);
     if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused, awaitingStart: !pause.started,
       feedback: feedback.snapshot(simulation.state.world.tick),
-      assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice });
+      assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice }, performance.now(),
+      player ? { spread: currentSpread(player), verticalFov: camera.fov } : undefined);
     performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
       renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
     performanceOverlay.render(renderer);
