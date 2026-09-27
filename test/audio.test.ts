@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assetExists } from '../scripts/inspect-assets.mjs';
-import { gunClip, loudestWindowDb, normalisingGain } from '../src/client/audio.ts';
+import { gunClip, loudestWindowDb, normalisingGain, softCeilingCurve } from '../src/client/audio.ts';
 import { WEAPON_DEFINITIONS } from '../src/core/weapon.ts';
 
 describe('audio mix', () => {
@@ -14,6 +14,15 @@ describe('audio mix', () => {
     expect(20 * Math.log10(normalisingGain(-15))).toBeCloseTo(3);
     expect(20 * Math.log10(normalisingGain(-60))).toBeCloseTo(12);
     expect(normalisingGain(-Infinity)).toBe(1);
+  });
+
+  it('passes normal levels through untouched and caps overlaps just under full scale', () => {
+    const curve = softCeilingCurve(4001);
+    const at = (x: number) => curve[Math.round((x + 1) / 2 * 4000)];
+    expect(at(0.5)).toBeCloseTo(0.5);
+    expect(at(-0.7)).toBeCloseTo(-0.7);
+    expect(at(1)).toBeLessThan(0.95);
+    expect(at(1)).toBeGreaterThan(at(0.85));
   });
 
   it('gives every gun a recorded shot that ships with the game', () => {
