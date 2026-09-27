@@ -30,6 +30,8 @@ import {
 } from './maps/nacht.ts';
 
 import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
+// Re-exported so the start screen can preload through the same chunk it will run.
+export { downloadAssets, gameAssetUrls, type DownloadProgress } from './client/preload.ts';
 
 /**
  * Builds Nacht, the simulation and every view on the given canvas, then runs the frame loop.

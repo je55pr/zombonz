@@ -57,7 +57,7 @@ export async function buildEnvironmentProps(scene: THREE.Scene): Promise<number>
   return failures;
 }
 
-const DECALS = [
+export const DECALS = [
   { asset: 'leaking-grime', x: 15.6, y: 1.8, z: -2.389, width: 2.6, height: 2.5, yaw: 0 },
   { asset: 'leaking-grime', x: -5.989, y: 5.1, z: -6.5, width: 2.5, height: 2.7, yaw: Math.PI / 2 },
   { asset: 'smear-grime', x: 0.211, y: 1.5, z: 5, width: 2.8, height: 2.3, yaw: Math.PI / 2 },

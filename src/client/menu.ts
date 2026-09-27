@@ -13,18 +13,34 @@ export interface MenuItem {
   disabled?: boolean;
 }
 
+/** Start-screen download of the game code and every model/texture; play options unlock when it ends. */
+export interface DownloadStatus {
+  phase: 'code' | 'assets' | 'ready' | 'error';
+  loadedBytes: number;
+  totalBytes: number;
+  doneFiles: number;
+  totalFiles: number;
+  failedFiles: number;
+}
+
+export const INITIAL_DOWNLOAD: Readonly<DownloadStatus> = {
+  phase: 'code', loadedBytes: 0, totalBytes: 0, doneFiles: 0, totalFiles: 0, failedFiles: 0,
+};
+
 export interface MenuState {
   screen: MenuScreen;
   selected: number;
   settings: GameSettings;
+  download: DownloadStatus;
 }
 
 export type MenuAction =
   | { type: 'up' } | { type: 'down' } | { type: 'left' } | { type: 'right' }
   | { type: 'activate'; index?: number } | { type: 'back' } | { type: 'hover'; index: number };
 
-/** What the host should do after an action: start the solo game or persist changed settings. */
-export type MenuEffect = { type: 'startSolo' } | { type: 'saveSettings'; settings: GameSettings } | null;
+/** What the host should do after an action: start the solo game, persist settings or retry the download. */
+export type MenuEffect = { type: 'startSolo' } | { type: 'saveSettings'; settings: GameSettings }
+  | { type: 'retryDownload' } | null;
 
 const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
   sensitivity: 'Mouse sensitivity', fov: 'Field of view', volume: 'Volume',
@@ -32,8 +48,15 @@ const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
 
 export function menuItems(state: MenuState): MenuItem[] {
   switch (state.screen) {
-    case 'main':
-      return [{ id: 'solo', label: 'Solo' }, { id: 'multiplayer', label: 'Multiplayer' }, { id: 'settings', label: 'Settings' }];
+    case 'main': {
+      // Play options stay locked until everything is downloaded (a failed asset still allows play).
+      const locked = state.download.phase !== 'ready';
+      return [
+        { id: 'solo', label: 'Solo', disabled: locked }, { id: 'multiplayer', label: 'Multiplayer', disabled: locked },
+        { id: 'settings', label: 'Settings' },
+        ...(state.download.phase === 'error' ? [{ id: 'retry', label: 'Retry download' }] : []),
+      ];
+    }
     case 'multiplayer':
       return [{ id: 'back', label: 'Back' }];
     case 'settings':
@@ -48,12 +71,27 @@ export function menuItems(state: MenuState): MenuItem[] {
   }
 }
 
-export function createMenuState(settings: GameSettings): MenuState {
-  return { screen: 'main', selected: 0, settings };
+export function createMenuState(settings: GameSettings, download: DownloadStatus = INITIAL_DOWNLOAD): MenuState {
+  const state: MenuState = { screen: 'main', selected: 0, settings, download: { ...download } };
+  state.selected = firstEnabled(state);
+  return state;
+}
+
+function firstEnabled(state: MenuState): number {
+  return Math.max(0, menuItems(state).findIndex(item => !item.disabled));
 }
 
 function open(state: MenuState, screen: MenuScreen): void {
-  state.screen = screen; state.selected = 0;
+  state.screen = screen; state.selected = firstEnabled(state);
+}
+
+/** Applies download progress; finishing moves the highlight to Solo so Enter plays straight away. */
+export function setDownload(state: MenuState, download: DownloadStatus): void {
+  const unlocked = state.download.phase !== 'ready' && download.phase === 'ready';
+  state.download = { ...download };
+  const items = menuItems(state);
+  if (unlocked && state.screen === 'main') state.selected = 0;
+  else if (state.selected >= items.length || items[state.selected]?.disabled) state.selected = firstEnabled(state);
 }
 
 /** Keyboard/mouse intent in, state change plus an effect for the host out. No DOM, so it is unit-testable. */
@@ -61,10 +99,20 @@ export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
   const items = menuItems(state);
   if (state.screen === 'loading') return null;
   const wrap = (index: number) => (index + items.length) % items.length;
+  // Keyboard movement skips locked rows.
+  const step = (direction: number) => {
+    let index = state.selected;
+    for (let tries = 0; tries < items.length; tries++) {
+      index = wrap(index + direction);
+      if (!items[index].disabled) { state.selected = index; return; }
+    }
+  };
   switch (action.type) {
-    case 'up': state.selected = wrap(state.selected - 1); return null;
-    case 'down': state.selected = wrap(state.selected + 1); return null;
-    case 'hover': if (action.index >= 0 && action.index < items.length) state.selected = action.index; return null;
+    case 'up': step(-1); return null;
+    case 'down': step(1); return null;
+    case 'hover':
+      if (action.index >= 0 && action.index < items.length && !items[action.index].disabled) state.selected = action.index;
+      return null;
     case 'back': if (state.screen !== 'main') open(state, 'main'); return null;
     case 'left': case 'right': {
       const setting = items[state.selected]?.setting;
@@ -88,6 +136,7 @@ export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
       if (item.id === 'multiplayer') { open(state, 'multiplayer'); return null; }
       if (item.id === 'settings') { open(state, 'settings'); return null; }
       if (item.id === 'back') { open(state, 'main'); return null; }
+      if (item.id === 'retry') { setDownload(state, { ...INITIAL_DOWNLOAD }); return { type: 'retryDownload' }; }
       return null;
     }
   }

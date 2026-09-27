@@ -50,8 +50,11 @@ Run `npm run check` for TypeScript validation, automated tests and a production 
 
 The game opens on a start menu: **Solo**, **Multiplayer** and **Settings** (mouse or arrow keys,
 Enter to choose, Esc to go back). Multiplayer is a placeholder until online co-op lands. Settings
-holds mouse sensitivity, field of view and volume, saved in this browser. The menu loads no map,
-models or Three.js; choosing Solo downloads the game and Nacht, then waits on CLICK TO START.
+holds mouse sensitivity, field of view and volume, saved in this browser. While the menu is open it
+downloads the game code and every model and texture the game uses (about 159 MB), with a progress
+bar; Solo and Multiplayer unlock when it finishes (Settings works throughout). The files are kept in
+memory and the game reads them from there, so starting Solo makes no further requests. Solo then
+waits on CLICK TO START.
 
 Click the canvas to capture the mouse. Move with WASD, hold Shift while moving forward to sprint,
 hold the right mouse button to aim down sights, and fire with the left mouse button.

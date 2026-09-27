@@ -1,4 +1,6 @@
-import { createMenuState, menuItems, reduceMenu, type MenuAction, type MenuEffect, type MenuState } from './menu.ts';
+import {
+  createMenuState, menuItems, reduceMenu, setDownload, type DownloadStatus, type MenuAction, type MenuEffect, type MenuState,
+} from './menu.ts';
 import type { GameSettings } from './settings.ts';
 
 interface Row { index: number; x: number; y: number; width: number; height: number; left?: Box; right?: Box }
@@ -14,6 +16,7 @@ export class MenuView {
   readonly state: MenuState;
   private readonly context: CanvasRenderingContext2D;
   private rows: Row[] = [];
+  private renderQueued = false;
   // Layout changes do not always fire window resize (embedded panes, zoom), so watch the canvas itself.
   private readonly resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => this.render());
 
@@ -41,6 +44,15 @@ export class MenuView {
     this.canvas.removeEventListener('pointermove', this.onPointerMove);
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     this.resizeObserver?.disconnect();
+  }
+
+  /** Progress arrives per network chunk; redraw at most once per frame. */
+  setDownload(download: DownloadStatus): void {
+    setDownload(this.state, download);
+    if (download.phase === 'ready' || download.phase === 'error') { this.render(); return; }
+    if (this.renderQueued) return;
+    this.renderQueued = true;
+    requestAnimationFrame(() => { this.renderQueued = false; this.render(); });
   }
 
   private dispatch(action: MenuAction): void {
@@ -86,6 +98,36 @@ export class MenuView {
     }
   };
 
+  private drawDownload(centre: number, y: number, scale: number): void {
+    const c = this.context, d = this.state.download;
+    const mb = (bytes: number) => (bytes / 1e6).toFixed(1);
+    const fraction = d.phase === 'ready' ? 1 : d.totalBytes > 0 ? Math.min(1, d.loadedBytes / d.totalBytes) : 0;
+    const barWidth = Math.min(460 * scale, innerWidth - 32), barHeight = Math.max(6, 8 * scale);
+    c.textAlign = 'center';
+    let title: string, detail: string;
+    if (d.phase === 'code') { title = 'Downloading game…'; detail = ''; }
+    else if (d.phase === 'assets') {
+      title = `Downloading models and textures  ${Math.floor(fraction * 100)}%`;
+      detail = `${mb(d.loadedBytes)} / ${mb(d.totalBytes)} MB  ·  ${d.doneFiles} / ${d.totalFiles} files`;
+    } else if (d.phase === 'ready') {
+      title = d.failedFiles ? `Ready, with ${d.failedFiles} file${d.failedFiles > 1 ? 's' : ''} missing` : 'Ready';
+      detail = d.failedFiles ? 'Missing models or textures will show as placeholders.'
+        : `${d.totalFiles} files  ·  ${mb(d.loadedBytes)} MB downloaded`;
+    } else { title = 'Download failed'; detail = 'Check your connection, then choose Retry download.'; }
+    c.fillStyle = d.phase === 'error' ? '#c4574a' : '#bdb6a1';
+    c.font = `700 ${Math.round(17 * scale)}px Arial, sans-serif`;
+    c.fillText(title, centre, y);
+    if (d.phase !== 'ready' || d.failedFiles) {
+      c.fillStyle = '#2b2925'; c.fillRect(centre - barWidth / 2, y + 16 * scale, barWidth, barHeight);
+      c.fillStyle = d.phase === 'error' ? '#6e2a22' : '#9b2d22';
+      c.fillRect(centre - barWidth / 2, y + 16 * scale, barWidth * fraction, barHeight);
+    }
+    if (detail) {
+      c.fillStyle = '#7d7768'; c.font = `400 ${Math.round(14 * scale)}px Arial, sans-serif`;
+      c.fillText(detail, centre, y + 16 * scale + barHeight + 16 * scale);
+    }
+  }
+
   readonly render = () => {
     const ratio = Math.min(devicePixelRatio || 1, 2);
     const width = this.canvas.clientWidth || innerWidth, height = this.canvas.clientHeight || innerHeight;
@@ -108,7 +150,7 @@ export class MenuView {
 
     this.rows = [];
     const screen = this.state.screen;
-    let y = height * 0.47;
+    let y = height * (screen === 'main' ? 0.52 : 0.47);
     if (screen === 'multiplayer') {
       c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(30 * scale)}px Arial, sans-serif`;
       c.fillText('Multiplayer is on the way', centre, y);
@@ -118,8 +160,9 @@ export class MenuView {
     }
     if (screen === 'loading') {
       c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(28 * scale)}px Arial, sans-serif`;
-      c.fillText('Loading Nacht der Untoten…', centre, y);
+      c.fillText('Starting Nacht der Untoten…', centre, y);
     }
+    if (screen === 'main') this.drawDownload(centre, height * 0.22 + 112 * scale, scale);
     const rowHeight = 58 * scale, rowWidth = Math.min(width - 32, (screen === 'settings' ? 560 : 340) * scale);
     menuItems(this.state).forEach((item, index) => {
       const selected = index === this.state.selected;
@@ -128,7 +171,7 @@ export class MenuView {
         c.fillStyle = 'rgba(155,45,34,0.35)'; c.fillRect(row.x, row.y, row.width, row.height);
         c.fillStyle = '#9b2d22'; c.fillRect(row.x, row.y, 4, row.height);
       }
-      c.fillStyle = item.disabled ? '#5e5a50' : selected ? '#f3ecd6' : '#bdb6a1';
+      c.fillStyle = item.disabled ? '#4d4a42' : selected ? '#f3ecd6' : '#bdb6a1';
       c.font = `700 ${Math.round(28 * scale)}px Arial, sans-serif`;
       if (item.setting && item.value) {
         c.textAlign = 'left'; c.fillText(item.label, row.x + 24 * scale, y);

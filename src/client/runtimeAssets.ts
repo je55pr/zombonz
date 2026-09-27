@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { deinterleaveGeometry, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { takeAsset } from './assetStore.ts';
 
 export type ZombieAssetId = 'peter_d' | 'pxltiger';
 export type ZombieAnimation = 'idle' | 'walk' | 'run' | 'attack' | 'death';
@@ -19,7 +20,14 @@ const models = new Map<string, Promise<GLTF>>();
 const normalization = new WeakMap<THREE.Object3D, { scale: number; offset: THREE.Vector3 }>();
 export function loadModel(path: string): Promise<GLTF> {
   let pending = models.get(path);
-  if (!pending) { pending = loader.loadAsync(`${import.meta.env.BASE_URL}assets/${path}`); models.set(path, pending); }
+  if (!pending) {
+    const url = `${import.meta.env.BASE_URL}assets/${path}`;
+    // Parse the start-screen download when there is one; the GLBs are self-contained.
+    const downloaded = takeAsset(url);
+    pending = downloaded ? downloaded.arrayBuffer().then(buffer => loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1)))
+      : loader.loadAsync(url);
+    models.set(path, pending);
+  }
   return pending;
 }
 
@@ -70,11 +78,18 @@ export function inPlaceClip(source: THREE.AnimationClip, model: THREE.Object3D):
   return clip;
 }
 
+function zombieClipNames(id: ZombieAssetId): ZombieAnimation[] {
+  return ['idle', 'walk', 'run', 'attack', ...(id === 'peter_d' ? ['death' as const] : [])];
+}
+
+/** The rig and each clip, relative to assets/; shared with the start-screen preloader. */
+export function zombieAssetPaths(id: ZombieAssetId): string[] {
+  return [`zombies/${id}/model.glb`, ...zombieClipNames(id).map(name => `zombies/${id}/${name}.glb`)];
+}
+
 export async function loadZombieAsset(id: ZombieAssetId): Promise<ZombieAsset> {
-  const names: ZombieAnimation[] = ['idle', 'walk', 'run', 'attack', ...(id === 'peter_d' ? ['death' as const] : [])];
-  const [model, ...animations] = await Promise.all([
-    loadModel(`zombies/${id}/model.glb`), ...names.map(name => loadModel(`zombies/${id}/${name}.glb`)),
-  ]);
+  const names = zombieClipNames(id);
+  const [model, ...animations] = await Promise.all(zombieAssetPaths(id).map(path => loadModel(path)));
   const clips: ZombieAsset['clips'] = {};
   names.forEach((name, index) => {
     if (animations[index].animations[0]) clips[name] = inPlaceClip(animations[index].animations[0], model.scene);
