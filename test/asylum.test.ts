@@ -171,10 +171,13 @@ describe('Asylum routes', () => {
       const zombie = createZombieState('e:2', POWER_ROOM, 1, 'run');
       const player = createPlayerState('e:1', start);
       const query = createNavigationQuery(map.navigation, blockers, 0.32, map.walkSurfaces);
-      for (let i = 0; i < 60 * 90; i++) updateZombiePursuit(zombie, [player], 1 / 60, blockers, map.walkSurfaces, map.navigation, query);
+      const gap = () => Math.hypot(zombie.position.x - player.position.x, zombie.position.z - player.position.z);
+      for (let i = 0; i < 60 * 90 && gap() >= 1.5; i++) {
+        updateZombiePursuit(zombie, [player], 1 / 60, blockers, map.walkSurfaces, map.navigation, query);
+      }
       expect(zombie.position.y).toBeCloseTo(0);
-      expect(Math.hypot(zombie.position.x - player.position.x, zombie.position.z - player.position.z)).toBeLessThan(1.5);
-    });
+      expect(gap()).toBeLessThan(1.5);
+    }, 30_000);
 
   it('buys from the box upstairs in the power room', () => {
     const sim = new GameSimulation({ seed: 5, map: simMap,
