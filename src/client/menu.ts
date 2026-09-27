@@ -1,8 +1,10 @@
 import {
   SETTING_LIMITS, adjustSetting, formatSetting, type GameSettings, type SettingKey,
 } from './settings.ts';
+import { MAP_CATALOG, type MapId } from '../maps/catalog.ts';
 
-export type MenuScreen = 'main' | 'multiplayer' | 'settings' | 'loading';
+/** Solo opens 'maps', where choosing a map starts the game. */
+export type MenuScreen = 'main' | 'maps' | 'multiplayer' | 'settings' | 'loading';
 
 export interface MenuItem {
   id: string;
@@ -35,6 +37,8 @@ export interface MenuState {
   selected: number;
   settings: GameSettings;
   download: DownloadStatus;
+  /** The map being started, once one is chosen. */
+  map?: MapId;
 }
 
 export type MenuAction =
@@ -42,7 +46,7 @@ export type MenuAction =
   | { type: 'activate'; index?: number } | { type: 'back' } | { type: 'hover'; index: number };
 
 /** What the host should do after an action: start the solo game, persist settings or retry the download. */
-export type MenuEffect = { type: 'startSolo' } | { type: 'saveSettings'; settings: GameSettings }
+export type MenuEffect = { type: 'startSolo'; map: MapId } | { type: 'saveSettings'; settings: GameSettings }
   | { type: 'retryDownload' } | null;
 
 const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
@@ -60,6 +64,8 @@ export function menuItems(state: MenuState): MenuItem[] {
         ...(state.download.phase === 'error' ? [{ id: 'retry', label: 'Retry download' }] : []),
       ];
     }
+    case 'maps':
+      return [...MAP_CATALOG.map(map => ({ id: `map:${map.id}`, label: map.name })), { id: 'back', label: 'Back' }];
     case 'multiplayer':
       return [{ id: 'back', label: 'Back' }];
     case 'settings':
@@ -135,7 +141,9 @@ export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
           : adjustSetting(state.settings, item.setting, 1);
         return { type: 'saveSettings', settings: state.settings };
       }
-      if (item.id === 'solo') { open(state, 'loading'); return { type: 'startSolo' }; }
+      if (item.id === 'solo') { open(state, 'maps'); return null; }
+      const chosen = MAP_CATALOG.find(map => `map:${map.id}` === item.id);
+      if (chosen) { state.map = chosen.id; open(state, 'loading'); return { type: 'startSolo', map: chosen.id }; }
       if (item.id === 'multiplayer') { open(state, 'multiplayer'); return null; }
       if (item.id === 'settings') { open(state, 'settings'); return null; }
       if (item.id === 'back') { open(state, 'main'); return null; }

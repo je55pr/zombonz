@@ -1,6 +1,7 @@
 import type { CollisionBox } from '../core/collision.ts';
 import type { Vec3 } from '../core/types.ts';
 import { px, pz } from './bunkerPlan.ts';
+import type { MapDecal } from './gameMap.ts';
 
 export interface PropPlacement {
   id: string; asset: string; position: Vec3; size: Vec3; yaw: number; solid: boolean; background?: boolean;
@@ -64,3 +65,12 @@ export function propCollisionBox(prop: PropPlacement): CollisionBox {
   return { min: { x: prop.position.x - halfX, y: prop.position.y, z: prop.position.z - halfZ },
     max: { x: prop.position.x + halfX, y: prop.position.y + prop.size.y, z: prop.position.z + halfZ } };
 }
+
+/** Grime decals on Bunker's walls. */
+export const BUNKER_DECALS: readonly MapDecal[] = [
+  { asset: 'leaking-grime', x: px(15.6), y: 1.8, z: pz(-2.389), width: 2.6, height: 2.5, yaw: 0 },
+  { asset: 'leaking-grime', x: px(-5.989), y: 5.1, z: pz(-6.5), width: 2.5, height: 2.7, yaw: Math.PI / 2 },
+  { asset: 'smear-grime', x: px(0.211), y: 1.5, z: pz(5), width: 2.8, height: 2.3, yaw: Math.PI / 2 },
+  { asset: 'smear-grime', x: px(-0.211), y: 1.5, z: pz(-8.1), width: 2.5, height: 2.3, yaw: -Math.PI / 2 },
+  { asset: 'leaking-grime', x: px(6.8), y: 5.15, z: pz(5.189), width: 3.1, height: 2.5, yaw: Math.PI },
+];

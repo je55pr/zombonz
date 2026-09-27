@@ -8,24 +8,15 @@ import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
 import { BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
 import { ps, px, pz } from './bunkerPlan.ts';
+import { BUNKER_DECALS } from './bunkerProps.ts';
+import type { GameMap, GreyboxBox, GreyboxMaterial, GreyboxPrism, MapMarker, MapWindow } from './gameMap.ts';
 
 // Hand-built from WaW floor plans, authored in blockout coordinates and mapped out by bunkerPlan
 // (px/pz for positions, ps for the main stair). HELP wing west (negative x), spawn east, box at the
 // south end of HELP.
 export const UPPER_HEIGHT = 3.4;
-export type GreyboxMaterial = 'wall' | 'floor' | 'upperFloor' | 'stair' | 'barrier' | 'metal';
-export interface GreyboxBox {
-  center: Vec3; size: Vec3; material: GreyboxMaterial; collides?: boolean; rotationZ?: number; visible?: boolean;
-}
-export interface GreyboxPrism {
-  points: readonly (readonly [number, number])[]; bottom: number; top: number; material: GreyboxMaterial;
-}
-export interface MapMarker {
-  id: string; type: 'zombieSpawn' | 'door' | 'wallBuy' | 'mysteryBox'; position: Vec3; label: string;
-}
-export interface BunkerWindow {
-  id: string; x: number; z: number; y: number; axis: 'x' | 'z'; width: number; outward: Vec3;
-}
+export type { GreyboxBox, GreyboxMaterial, GreyboxPrism, MapMarker } from './gameMap.ts';
+export type BunkerWindow = MapWindow;
 /** A box in built-map coordinates. */
 const box = (x: number, y: number, z: number, sx: number, sy: number, sz: number,
   material: GreyboxMaterial, collides = true): GreyboxBox => ({
@@ -201,6 +192,8 @@ shell.push(planBox(-10.35, 1.3, 2.5, 4.3, 2.6, 0.55, 'wall'));
 shell.push(planBox(-8.25, 1.3, 2.15, 0.3, 2.6, 0.7, 'wall'));
 shell.push(planBox(-12.5, 1.3, 0.7, 0.5, 2.6, 3.6, 'wall'));
 shell.push(planBox(-9.4, 2.8, 0.7, 6.4, 0.4, 3.6, 'wall'));
+// Short exposed reinforcing bars hang across the surviving roof edge over HELP.
+for (let i = 0; i < 12; i++) shell.push(box(px(-4.7) + i * 0.34, 6.66, pz(-9.2), 0.025, 0.035, 1.5, 'metal', false));
 
 export const BUNKER_WINDOWS: readonly BunkerWindow[] = windows;
 export const BUNKER_GREYBOX: readonly GreyboxBox[] = shell;
@@ -322,3 +315,42 @@ for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++
   }
 }
 export const BUNKER_NAVIGATION: NavigationGraph = { nodes };
+
+/** Bunker as a whole, for the game and the map menu. The BUNKER_* exports above remain for tests. */
+export const BUNKER_MAP: GameMap = {
+  id: 'bunker', name: 'Bunker', upperHeight: UPPER_HEIGHT,
+  greybox: BUNKER_GREYBOX, prisms: BUNKER_PRISMS, collisionBoxes: greyboxCollisionBoxes(),
+  shotBlockers: BUNKER_SHOT_BLOCKERS, walkSurfaces: BUNKER_WALK_SURFACES, navigation: BUNKER_NAVIGATION,
+  playerSpawn: BUNKER_PLAYER_SPAWN, windows: BUNKER_WINDOWS, windowBoards: BUNKER_WINDOW_BOARDS,
+  barriers: BUNKER_BARRIERS, zombieSpawns: BUNKER_ZOMBIE_SPAWNS,
+  doors: BUNKER_DOORS,
+  doorStyles: {
+    'help-room': { kind: 'planks', yaw: 0, width: 2.4, label: 'HELP' },
+    // A sofa and stacked crates across each stair, matching the silhouette of the original map's debris.
+    'start-stairs': { kind: 'debris', yaw: Math.PI / 2, width: FLIGHT.maxZ - FLIGHT.minZ },
+    'help-stairs': { kind: 'debris', yaw: 0, width: HELP_STAIR.maxX - HELP_STAIR.minX },
+  },
+  wallWeapons: BUNKER_WALL_WEAPONS, wallWeaponFacing: BUNKER_WALL_WEAPON_FACING,
+  mysteryBoxes: BUNKER_MYSTERY_BOXES, boxCenter: BUNKER_BOX_CENTER, boxYaw: Math.PI / 2,
+  rails: BUNKER_RAILS, props: BUNKER_PROPS, decals: BUNKER_DECALS,
+  labels: [
+    { text: 'HELP', x: px(0.215), y: 2.3, z: pz(2.2), yaw: Math.PI / 2, width: 1.6, height: 0.45 },
+    { text: 'YOU MUST ASCEND', x: px(5.6), y: 2.4, z: pz(-2.385), yaw: 0, width: 2.7, height: 0.38 },
+    { text: 'FROM DARKNESS', x: px(5.6), y: 2, z: pz(-2.385), yaw: 0, width: 2.5, height: 0.38 },
+  ],
+  lights: [{ x: px(-0.7), y: 2.35, z: pz(-2) }, { x: px(5), y: 2.65, z: pz(2) }, { x: px(-0.7), y: 5.75, z: pz(2.5) }],
+  rubble: [
+    { minX: px(-5.7), maxX: px(-0.9), minZ: pz(-10.5), maxZ: pz(4.5), y: 0, count: 67 },
+    { minX: px(-5.7), maxX: px(-0.9), minZ: pz(-10.5), maxZ: pz(4.5), y: UPPER_HEIGHT, count: 33 },
+  ],
+  focus: { x: 7, z: -2, radius: 21 },
+  previews: {
+    help: { position: { x: px(-1.8), y: 0, z: pz(-7.8) }, yaw: Math.PI - 0.12 },
+    upstairs: { position: { x: px(2), y: UPPER_HEIGHT, z: pz(3.8) }, yaw: -0.5 },
+    barrier: { position: { x: px(12), y: 0, z: pz(-2.6) + 1.8 }, yaw: 0 },
+    doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
+    props: { position: { x: px(-2), y: 0, z: pz(7.8) - 3.5 }, yaw: Math.PI + 0.15 },
+    wallBuys: { position: { x: px(6.3), y: 0, z: pz(7.8) - 2.4 }, yaw: Math.PI },
+    helpWalls: { position: { x: px(-3.6), y: 0, z: pz(-5.2) }, yaw: Math.PI / 2 - 0.35 },
+  },
+};

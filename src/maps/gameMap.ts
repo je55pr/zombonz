@@ -1,0 +1,84 @@
+import type { CollisionBox, WalkSurface } from '../core/collision.ts';
+import type { NavigationGraph } from '../core/navigation.ts';
+import type { DoorDefinition } from '../core/door.ts';
+import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
+import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
+import type { BarrierDefinition } from '../core/barrier.ts';
+import type { ZombieSpawnPoint } from '../core/spawning.ts';
+import type { Vec3 } from '../core/types.ts';
+import type { PropPlacement } from './bunkerProps.ts';
+
+export type GreyboxMaterial = 'wall' | 'floor' | 'upperFloor' | 'stair' | 'barrier' | 'metal';
+/** The environment pack's texture sets; a map can pin one on a box instead of the default for its role. */
+export const SURFACE_LOOKS = ['weathered-concrete-a', 'weathered-concrete-b', 'cracked-concrete-floor',
+  'broken-plaster-brick', 'concrete-rubble', 'cave-rock', 'dirt', 'splintered-wood', 'rusted-metal', 'sofa-upholstery'] as const;
+export type SurfaceLook = typeof SURFACE_LOOKS[number];
+
+export interface GreyboxBox {
+  center: Vec3; size: Vec3; material: GreyboxMaterial; collides?: boolean; rotationZ?: number; visible?: boolean;
+  look?: SurfaceLook;
+}
+export interface GreyboxPrism {
+  points: readonly (readonly [number, number])[]; bottom: number; top: number; material: GreyboxMaterial;
+}
+export interface MapMarker {
+  id: string; type: 'zombieSpawn' | 'door' | 'wallBuy' | 'mysteryBox'; position: Vec3; label: string;
+}
+export interface MapWindow {
+  id: string; x: number; z: number; y: number; axis: 'x' | 'z'; width: number; outward: Vec3;
+}
+export interface MapRail { from: Vec3; to: Vec3 }
+export interface MapDecal { asset: string; x: number; y: number; z: number; width: number; height: number; yaw: number }
+/** Text painted on a wall (presentation only). */
+export interface MapLabel { text: string; x: number; y: number; z: number; yaw: number; width: number; height: number; color?: string }
+/**
+ * How a purchasable blocker looks: a boarded door (its width runs along the view's local z, and a label
+ * faces local +x) or a pile of sofa and crate debris across a stairway.
+ */
+export interface DoorStyle { kind: 'planks' | 'debris'; yaw: number; width: number; label?: string }
+/** A floor area scattered with low rubble (below the step height, so it never blocks anyone). */
+export interface ScatterArea { minX: number; maxX: number; minZ: number; maxZ: number; y: number; count: number }
+export interface PreviewView { position: Vec3; yaw: number }
+
+/**
+ * Everything the game needs to build and run one map: shared simulation data (collision, navigation,
+ * entries, purchases, spawns) and presentation anchors (labels, lights, props, decals). Core systems
+ * read only the first group, so the simulation stays deterministic and renderer-independent.
+ */
+export interface GameMap {
+  id: string;
+  name: string;
+  upperHeight: number;
+  greybox: readonly GreyboxBox[];
+  prisms: readonly GreyboxPrism[];
+  collisionBoxes: readonly CollisionBox[];
+  /** Upper floors that stop bullets from below. */
+  shotBlockers: readonly CollisionBox[];
+  walkSurfaces: readonly WalkSurface[];
+  navigation: NavigationGraph;
+  playerSpawn: Vec3;
+  windows: readonly MapWindow[];
+  windowBoards: number;
+  barriers: readonly BarrierDefinition[];
+  zombieSpawns: readonly ZombieSpawnPoint[];
+  doors: readonly DoorDefinition[];
+  doorStyles: Readonly<Record<string, DoorStyle>>;
+  wallWeapons: readonly WallWeaponDefinition[];
+  /** The yaw each chalk outline faces, away from its wall. */
+  wallWeaponFacing: Readonly<Record<string, number>>;
+  mysteryBoxes: readonly MysteryBoxDefinition[];
+  boxCenter: Vec3;
+  /** The box's front (where buyers stand) faces (cos yaw, -sin yaw) in x/z. */
+  boxYaw: number;
+  rails: readonly MapRail[];
+  props: readonly PropPlacement[];
+  decals: readonly MapDecal[];
+  labels: readonly MapLabel[];
+  /** Warm practical lamps. */
+  lights: readonly Vec3[];
+  rubble: readonly ScatterArea[];
+  /** Middle and half-size of the building, for the key light's shadow frustum and the treeline. */
+  focus: { x: number; z: number; radius: number };
+  /** Development inspection views (`?preview=`), beyond the ones every map gets at its player spawn. */
+  previews: Readonly<Record<string, PreviewView>>;
+}

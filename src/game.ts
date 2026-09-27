@@ -1,13 +1,12 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
-import { buildBunkerDetails } from './client/bunker.ts';
+import { buildMapDetails } from './client/mapDetails.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
-import { px, pz } from './maps/bunkerPlan.ts';
 import { ActorBatch } from './client/actorBatch.ts';
 import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
@@ -20,17 +19,13 @@ import { WeaponView, prepareWeaponModel } from './client/weaponView.ts';
 import { PowerupView } from './client/powerupView.ts';
 import { GrenadeView } from './client/grenadeView.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
-import { buildEnvironmentProps, buildEnvironmentDecals, DECALS, loadDecalTextures } from './client/environmentProps.ts';
-import { BUNKER_PROPS } from './maps/bunkerProps.ts';
+import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from './client/environmentProps.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
   createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity, currentSpread,
   type EntityId, type ZombieState, type Vec3,
 } from './core/index.ts';
-import {
-  BUNKER_DOORS, BUNKER_GREYBOX, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN, BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, BUNKER_WALL_WEAPONS, BUNKER_MYSTERY_BOXES,
-  greyboxCollisionBoxes, BUNKER_SHOT_BLOCKERS, BUNKER_BARRIERS, BUNKER_PRISMS,
-} from './maps/bunker.ts';
+import { MAPS, isMapId, type MapId } from './maps/index.ts';
 
 import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
 // Re-exported so the start screen can preload through the same chunk it will run.
@@ -43,16 +38,18 @@ export { downloadAssets, gameAssetUrls, type DownloadProgress } from './client/p
  */
 export async function prepareGameAssets(onProgress: (done: number, total: number) => void,
   zombie: ZombieAssetId = 'peter_d'): Promise<void> {
+  // Warm every map's assets: the map is chosen after this, on the Solo screen.
+  const allMaps = Object.values(MAPS);
   const manifest = await readEnvironmentManifest().catch(() => null);
   const tasks: Array<() => Promise<unknown> | null> = [
     ...(manifest ? [() => loadEnvironmentMaterials(manifest),
-      ...[...new Set(DECALS.map(decal => decal.asset))].map(id => () => loadDecalTextures(manifest, id))] : []),
-    ...[...new Set(BUNKER_PROPS.map(prop => prop.asset))].map(asset => () => loadModel(`props/${asset}/model.glb`)),
+      ...[...new Set(allMaps.flatMap(map => map.decals.map(decal => decal.asset)))].map(id => () => loadDecalTextures(manifest, id))] : []),
+    ...[...new Set(allMaps.flatMap(map => map.props.map(prop => prop.asset)))].map(asset => () => loadModel(`props/${asset}/model.glb`)),
     () => loadZombieAsset(zombie),
     () => prepareWeaponModel('starter-pistol'),
     // The chalk wall buys hang the real guns.
-    ...[...new Set(BUNKER_WALL_WEAPONS.map(wall => wall.weaponId))].map(id => () => prepareWeaponModel(id)),
-    // Every sound, so the first shot and the first moan play on the first frame in Bunker.
+    ...[...new Set(allMaps.flatMap(map => map.wallWeapons.map(wall => wall.weaponId)))].map(id => () => prepareWeaponModel(id)),
+    // Every sound, so the first shot and the first moan play on the first frame of the map.
     () => decodeAudioClips(),
   ];
   let done = 0;
@@ -64,12 +61,16 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
 }
 
 /**
- * Builds Bunker, the simulation and every view on the given canvas, then runs the frame loop.
+ * Builds the chosen map, the simulation and every view on the given canvas, then runs the frame loop.
  * Loaded on demand (dynamic import) when Solo is chosen, so the menu never pays for the map.
  * Resolves once the map, props, zombie and starting gun are in place, textures are uploaded and shaders
- * compiled, so the caller can keep the canvas hidden until then and never show a half-loaded Bunker.
+ * compiled, so the caller can keep the canvas hidden until then and never show a half-loaded map.
  */
-export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DEFAULT_SETTINGS): Promise<void> {
+export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DEFAULT_SETTINGS,
+  mapId: MapId = 'bunker'): Promise<void> {
+  // Development previews (`?preview=`) pick their map with `&map=`.
+  const previewMap = import.meta.env.DEV ? new URLSearchParams(location.search).get('map') : null;
+  const map = MAPS[isMapId(previewMap) ? previewMap : mapId];
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1));
@@ -89,21 +90,25 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   scene.add(new THREE.HemisphereLight(0xaabfc9, 0x373026, 1.4));
   const keyLight = new THREE.DirectionalLight(0xb4ced7, 2.4);
   // Aimed at the middle of the building, with a shadow frustum that covers all of it.
-  keyLight.position.set(-12 + 7, 22, -16 - 2); keyLight.target.position.set(7, 0, -2); scene.add(keyLight.target);
+  const { focus } = map;
+  keyLight.position.set(focus.x - 12, 22, focus.z - 16); keyLight.target.position.set(focus.x, 0, focus.z); scene.add(keyLight.target);
   keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(1024, 1024);
-  Object.assign(keyLight.shadow.camera, { left: -21, right: 21, top: 21, bottom: -21, far: 70 });
+  // A larger building spreads the same shadow map further, so give it more texels.
+  const shadowSize = focus.radius > 24 ? 2048 : 1024;
+  keyLight.shadow.mapSize.set(shadowSize, shadowSize);
+  Object.assign(keyLight.shadow.camera, { left: -focus.radius, right: focus.radius, top: focus.radius, bottom: -focus.radius,
+    far: 45 + focus.radius * 1.2 });
   keyLight.shadow.bias = -0.0006;
   scene.add(keyLight);
-  scene.add(buildGreybox(BUNKER_GREYBOX, BUNKER_PRISMS));
-  const bunker = buildBunkerDetails(scene);
+  scene.add(buildGreybox(map.greybox, map.prisms));
+  const details = buildMapDetails(scene, map);
   batchStaticMeshes(scene);
-  let environmentNotice: string | null = 'Loading bunker materials and props…';
+  let environmentNotice: string | null = 'Loading map materials and props…';
   const environmentReady = (async () => {
     // Prop proxies/collision must stay visible even when the texture manifest fails.
-    const props = buildEnvironmentProps(scene);
+    const props = buildEnvironmentProps(scene, map.props);
     const surfaces = readEnvironmentManifest().then(manifest =>
-      Promise.all([loadEnvironmentMaterials(manifest), buildEnvironmentDecals(scene, manifest)]))
+      Promise.all([loadEnvironmentMaterials(manifest), buildEnvironmentDecals(scene, manifest, map.decals)]))
       .catch(error => { console.warn('Environment manifest unavailable', error); return [1]; });
     const [propFailures, surfaceFailures] = await Promise.all([props, surfaces]);
     environmentNotice = propFailures > 0 || surfaceFailures.some(n => n > 0) ? 'Some environment assets failed to load; check console' : null;
@@ -111,20 +116,15 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   })().catch(error => { environmentNotice = 'Environment pack unavailable; using plain fallback'; console.warn(error); });
 
   // Development-only inspection views for iterating on the map without a running wave.
-  const previewViews = {
-    start: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
-    help: { position: { x: px(-1.8), y: 0, z: pz(-7.8) }, yaw: Math.PI - 0.12 },
-    upstairs: { position: { x: px(2), y: 3.4, z: pz(3.8) }, yaw: -0.5 },
-    barrier: { position: { x: px(12), y: 0, z: pz(-2.6) + 1.8 }, yaw: 0 },
-    stress: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
-    assets: { position: BUNKER_PLAYER_SPAWN, yaw: 0 },
-    gameOver: { position: BUNKER_PLAYER_SPAWN, yaw: -0.35 },
-    overview: { position: { x: 30, y: 33, z: 36 }, yaw: 0.65 },
-    doorway: { position: { x: 1.2, y: 0, z: 1.6 }, yaw: -Math.PI / 2 },
-    props: { position: { x: px(-2), y: 0, z: pz(7.8) - 3.5 }, yaw: Math.PI + 0.15 },
-    wallBuys: { position: { x: px(6.3), y: 0, z: pz(7.8) - 2.4 }, yaw: Math.PI },
-    helpWalls: { position: { x: px(-3.6), y: 0, z: pz(-5.2) }, yaw: Math.PI / 2 - 0.35 },
+  const previewViews: Record<string, { position: Vec3; yaw: number }> = {
+    start: { position: map.playerSpawn, yaw: -0.35 },
+    stress: { position: map.playerSpawn, yaw: -0.35 },
+    assets: { position: map.playerSpawn, yaw: 0 },
+    gameOver: { position: map.playerSpawn, yaw: -0.35 },
+    overview: { position: { x: map.focus.x + map.focus.radius, y: map.focus.radius * 1.3, z: map.focus.z + map.focus.radius * 1.4 }, yaw: 0.65 },
+    ...map.previews,
   };
+
   const previewName = new URLSearchParams(location.search).get('preview');
   const previewPowerup = new URLSearchParams(location.search).get('powerup');
   const forceAim = import.meta.env.DEV && new URLSearchParams(location.search).get('aim') === '1';
@@ -134,17 +134,17 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
   const simulation = new GameSimulation({
     seed: 0x5a0b0a2,
     map: {
-      collisionBoxes: greyboxCollisionBoxes(),
-      shotBlockers: BUNKER_SHOT_BLOCKERS,
-      walkSurfaces: BUNKER_WALK_SURFACES,
-      zombieSpawns: preview && previewName === 'barrier' ? [BUNKER_ZOMBIE_SPAWNS[0]] : BUNKER_ZOMBIE_SPAWNS,
-      barriers: BUNKER_BARRIERS,
-      navigationGraph: BUNKER_NAVIGATION,
-      doors: BUNKER_DOORS,
-      wallWeapons: BUNKER_WALL_WEAPONS,
-      mysteryBoxes: BUNKER_MYSTERY_BOXES,
+      collisionBoxes: [...map.collisionBoxes],
+      shotBlockers: map.shotBlockers,
+      walkSurfaces: map.walkSurfaces,
+      zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns,
+      barriers: map.barriers,
+      navigationGraph: map.navigation,
+      doors: map.doors,
+      wallWeapons: map.wallWeapons,
+      mysteryBoxes: map.mysteryBoxes,
     },
-    playerSpawns: [preview?.position ?? BUNKER_PLAYER_SPAWN],
+    playerSpawns: [preview?.position ?? map.playerSpawn],
     ...(previewName === 'stress' && preview ? { spawnConfig: {
       baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
     } } : {}),
@@ -182,7 +182,8 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
       simulation.getPlayer(playerId)!.weapon = createWeaponState(testWeapon);
     }
     if (previewName === 'assets') {
-      const target = createZombieState(allocateEntityId(simulation.state.world), { x: 5.2, y: 0, z: 0 }, 1);
+      const target = createZombieState(allocateEntityId(simulation.state.world),
+        { x: map.playerSpawn.x, y: 0, z: map.playerSpawn.z - 5 }, 1);
       target.moveSpeed = 0; addEntity(simulation.state.world, target);
     }
   }
@@ -258,7 +259,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     if (paused) input.clear();
     audio.setPaused(paused);
   }, !preview, () => simulation.state.round.phase !== 'gameOver', !preview);
-  const hud = new CanvasHud(renderer);
+  const hud = new CanvasHud(renderer, map.name);
   const feedback = new HudFeedback();
   const performanceOverlay = new PerformanceOverlay();
   renderer.info.autoReset = false;
@@ -337,7 +338,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     syncZombieViews(alpha);
     powerupView.update(simulation.state.powerups.drops, simulation.state.world.tick - 1 + alpha);
     grenadeView.update(simulation.state.grenades.active, simulation.state.world.tick - 1 + alpha);
-    bunker.update(simulation.state);
+    details.update(simulation.state);
     renderer.clear();
     renderer.info.reset();
     // The moon/camera are independent: expensive skinned shadow passes only need
@@ -367,7 +368,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
 
   const startingWeapon = simulation.getPlayer(playerId)?.weapon.weaponId ?? 'starter-pistol';
   return (async () => {
-    await Promise.allSettled([environmentReady, zombieReady, bunker.ready, prepareWeaponModel(startingWeapon)]);
+    await Promise.allSettled([environmentReady, zombieReady, details.ready, prepareWeaponModel(startingWeapon)]);
     // Upload every texture and compile every shader now, rather than stuttering on the first frames.
     await renderer.compileAsync(scene, camera);
     scene.traverse(object => {
@@ -384,7 +385,7 @@ export function startGame(canvas: HTMLCanvasElement, settings: GameSettings = DE
     // Then unpack the rest of the box's guns one at a time in the background, so the box's roll can
     // flick through real models without one long stall.
     void (async () => {
-      for (const id of BUNKER_MYSTERY_BOXES[0].weapons) {
+      for (const id of map.mysteryBoxes[0].weapons) {
         await prepareWeaponModel(id)?.catch(() => {});
         await new Promise(resolve => setTimeout(resolve, 60));
       }
