@@ -116,7 +116,6 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     view.rotation.y = style.yaw;
     if (style.kind === 'planks') {
       // Vertical boards across the doorway, two iron straps, and an optional painted word.
-      view.position.y = 0;
       const boards = Math.max(2, Math.round(style.width / 0.4));
       for (let i = 0; i < boards; i++) box(view, wood, 0, 1.4, -style.width / 2 + (i + 0.5) * style.width / boards, 0.24, 2.8, style.width / boards - 0.02);
       box(view, iron, -0.14, 0.65, 0, 0.06, 0.12, style.width - 0.1);
@@ -157,7 +156,8 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     name.position.set(0, -0.38, 0.03); sign.add(name);
   }
   // One fixed, iron-bound random box. Its authoritative state drives the lid.
-  const chest = new THREE.Group(); chest.position.set(map.boxCenter.x, 0, map.boxCenter.z);
+  // The chest stands on its floor: boxCenter is the middle of its 1.04 m-tall collision box.
+  const chest = new THREE.Group(); chest.position.set(map.boxCenter.x, map.boxCenter.y - 0.52, map.boxCenter.z);
   chest.rotation.y = map.boxYaw; group.add(chest);
   for (const z of [-0.8, 0.8]) box(chest, iron, 0, 0.55, z, 1.01, 1.12, 0.12);
   const lid = new THREE.Group(); lid.position.set(-0.49, 1.06, 0); chest.add(lid);

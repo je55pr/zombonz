@@ -9,7 +9,7 @@ Browser-based, round-driven co-op zombie survival game built with Three.js.
 - Strongly target the grounded, weighty **World at War / Black Ops 1 Zombies** feel rather than modern movement-heavy FPS design.
 - Support **1-N players** architecturally. Classic small co-op is the first target; larger player counts are an explicit scalability experiment rather than a promise.
 - Use handcrafted maps. **Bunker** is the first development/reference map for validating the classic loop;
-  **Asylum**, a two-sided sanatorium joined by a balcony, is the second. Choose one after Solo.
+  **Asylum**, a two-storey sanatorium around a courtyard laid out after Verrückt, is the second. Choose one after Solo.
 - Preserve match purity for now: players start each run fresh rather than bringing persistent power/loadouts into a match.
 - Mirror the classic loop closely: escalating rounds, points, doors, wall weapons, random weapon box, barriers, revives, perks, power, power-ups, ammo pressure and game-over survival.
 - Stay close to the original WWII / occult-horror flavour while the project identity develops.

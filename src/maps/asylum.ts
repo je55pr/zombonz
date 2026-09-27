@@ -4,185 +4,240 @@ import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { PropPlacement } from './bunkerProps.ts';
 import type { GameMap } from './gameMap.ts';
-import { MapBuilder, barriersFromWindows, collisionBoxesFor, compileNavigation, slabShotBlockers } from './mapBuild.ts';
+import { MapBuilder, barriersFromWindows, collisionBoxesFor, compileNavigation, slabShotBlockers, type Opening } from './mapBuild.ts';
 import { BUNKER_MYSTERY_BOXES } from './bunker.ts';
 
-/** Two starting wings wrap an exposed courtyard and meet in the power room opposite the start. */
-const UP = 3.4, OUT = 18, YARD = 8, DOOR_WIDTH = 2.4;
+/**
+ * Asylum follows WaW Verrückt's plan (docs/asylum-map.md): a two-storey sanatorium on four sides of an
+ * open courtyard, about 60 x 51 m, authored in metres with x east and z south.
+ *
+ *   South, ground:  the German (west) and American (east) starts side by side, split by the power door,
+ *                   each with an alcove reaching into the courtyard.
+ *   West, upper:    the German stair climbs from the start to the German balcony, a gallery over the
+ *                   courtyard (trap, Double Tap), then Left Upstairs (toilets) in the north-west corner.
+ *   East:           the American start opens onto a long ground hallway (and a BAR back room); its stair
+ *                   climbs to the right balcony above the hallway (trap), then the Speed Cola room.
+ *   North, upper:   Left Upstairs -> Power Room <- Kitchen <- Speed Cola room. The box starts by the switch.
+ *
+ * Both routes climb early and meet in the power room at the far end, as in the original.
+ */
+const UP = 4, HIGH = 3.6;
+const WEST = -30, EAST = 30, NORTH = -32, SOUTH = 19;
+/** The courtyard: open to the sky, a fountain in the middle. */
+const YARD = { minX: -19, maxX: 16, minZ: -20, maxZ: -3 };
+const DOOR_WIDTH = 2.4;
+
 const b = new MapBuilder({ wall: 'broken-plaster-brick', trim: 'weathered-concrete-a',
   floor: 'cracked-concrete-floor', stair: 'weathered-concrete-b' });
-const door = (at: number) => ({ at, width: DOOR_WIDTH, kind: 'door' as const });
-const window = (id: string, at: number) => ({ id, at, width: 1.35, kind: 'window' as const });
+const door = (at: number): Opening => ({ at, width: DOOR_WIDTH, kind: 'door' });
+const window = (id: string, at: number): Opening => ({ id, at, width: 1.35, kind: 'window' });
 
-// Both storeys are a ring; the courtyard is scenery rather than walkable map.
-for (const y of [0, UP]) {
-  b.floor(-OUT, OUT, -OUT, -YARD, y);
-  b.floor(-OUT, -YARD, -YARD, YARD, y);
-  b.floor(YARD, OUT, -YARD, YARD, y);
-  b.floor(-OUT, OUT, YARD, OUT, y);
-}
-for (const [x1, x2, z1, z2] of [
-  [-OUT, OUT, -OUT, -YARD], [-OUT, -YARD, -YARD, YARD],
-  [YARD, OUT, -YARD, YARD], [-OUT, OUT, YARD, OUT],
-]) b.ceiling(x1, x2, z1, z2, UP * 2);
-b.box(0, -0.18, 0, YARD * 2, 0.36, YARD * 2, 'floor', false);
-// A simple ruined fountain gives the window views a recognizable central landmark.
-b.box(0, 0.28, 0, 5.3, 0.56, 5.3, 'wall', false);
-b.box(0, 0.58, 0, 3.9, 0.12, 3.9, 'floor', false);
-b.box(0, 1.15, 0, 0.7, 1.2, 0.7, 'wall', false);
+// ---- Ground floor: the two starts, their courtyard alcoves, the American hallway and the BAR room.
+// German start, with no floor in the dead space under its stair.
+b.floor(-25.8, 3, 3, SOUTH, 0);
+b.floor(WEST, -25.8, 12, SOUTH, 0);
+b.floor(WEST, -25.8, 3, 4, 0);
+b.floor(3, 16, 3, SOUTH, 0); // American start
+b.floor(-19, -11, -3, 3, 0); // German alcove
+b.floor(-6, 11, -3, 3, 0); // shared alcove, split by the power door's wall
+b.floor(16, 25, 9, 14, 0); // BAR back room
+b.floor(16, EAST, YARD.minZ, 9, 0); // American hallway
 
-for (const y of [0, UP]) {
-  const upper = y === UP;
-  b.wall('x', -OUT, -OUT, OUT, y, UP, upper
-    ? [window('north-upper-west', -14), window('north-upper-east', 14)]
-    : [window('power-north', 0), window('north-west', -14), window('north-east', 14)], -1);
-  b.wall('x', OUT, -OUT, OUT, y, UP, upper
-    ? [window('south-upper-west', -14), window('south-upper-east', 14)]
-    : [window('german-south-a', -15), window('german-south-b', -5),
-      window('american-south-a', 5), window('american-south-b', 15)], 1);
-  b.wall('z', -OUT, -OUT, OUT, y, UP, upper ? [window('west-upper', 1)]
-    : [window('german-west', 12), window('west-middle', -2), window('west-north', -13)], -1);
-  b.wall('z', OUT, -OUT, OUT, y, UP, upper ? [window('east-upper', 1)]
-    : [window('american-east', 12), window('east-middle', -2), window('east-north', -13)], 1);
-  for (const [axis, fixed, outward, side] of [
-    ['x', -YARD, 1, 'north'], ['x', YARD, -1, 'south'],
-    ['z', -YARD, 1, 'west'], ['z', YARD, -1, 'east'],
-  ] as const) {
-    const balcony = upper && axis === 'x';
-    b.wall(axis, fixed, -YARD, YARD, y, UP,
-      [window(`courtyard-${side}-a-${y}`, axis === 'z' ? -2.5 : -4),
-        ...(balcony ? [{ at: 0, width: 2.8, kind: 'door' as const }] : []),
-        window(`courtyard-${side}-b-${y}`, 4)], outward);
-    if (balcony) b.parapet('x', fixed, -1.4, 1.4, UP);
-  }
-}
+// Outer walls, two storeys; only ground windows take zombies.
+b.wall('z', WEST, NORTH, SOUTH, 0, UP, [window('german-west', 14)], -1);
+b.wall('z', WEST, NORTH, SOUTH, UP, HIGH, [window('upper-left-upstairs-west', -24), window('upper-balcony-west', -8)], -1);
+b.wall('x', NORTH, WEST, EAST, 0, UP);
+b.wall('x', NORTH, WEST, EAST, UP, HIGH, [window('upper-left-upstairs-north', -27), window('upper-power-north', -8),
+  window('upper-kitchen-north', 8), window('upper-speed-cola-north', 23)], -1);
+b.wall('z', EAST, NORTH, 9, 0, UP, [window('hallway-east', -4)], 1);
+b.wall('z', EAST, NORTH, 8, UP, HIGH, [window('upper-speed-cola-east', -25), window('upper-right-balcony-east', -9)], 1);
+b.wall('x', SOUTH, WEST, 16, 0, UP, [window('german-south', -7), window('american-south-a', 8), window('american-south-b', 13)], 1);
+b.wall('x', SOUTH, WEST, 16, UP, HIGH, [window('upper-south-a', -20), window('upper-south-b', 6)], 1);
+b.wall('x', 9, 25, EAST, 0, UP);
+b.wall('z', 25, 9, 14, 0, UP);
+b.wall('x', 14, 16, 25, 0, UP);
+b.wall('x', 8, 16, EAST, UP, HIGH, [window('upper-right-balcony-south', 27)], 1);
 
-// Split starts and side rooms. Each route reaches the power room from the opposite end.
- b.wall('z', 0, YARD, OUT, 0, UP, [door(13)]);
-b.wall('x', YARD, -OUT, -YARD, 0, UP, [door(-13)]);
-b.wall('x', YARD, YARD, OUT, 0, UP, [door(13)]);
-for (const z of [-4.5, -8]) {
-  b.wall('x', z, -OUT, -YARD, 0, UP, [door(-13)]);
-  b.wall('x', z, YARD, OUT, 0, UP, [door(13)]);
-}
-for (const x of [-8, 8]) b.wall('z', x, -OUT, -YARD, 0, UP, [door(-13)]);
-for (const x of [-9, 0, 9]) b.wall('z', x, YARD, OUT, UP, UP, [door(13)]);
-for (const x of [-8, 0, 8]) b.wall('z', x, -OUT, -YARD, UP, UP, [door(-13)]);
-for (const z of [-6]) {
-  b.wall('x', z, -OUT, -YARD, UP, UP, [door(-13)]);
-  b.wall('x', z, YARD, OUT, UP, UP, [door(13)]);
-}
+// The courtyard's walls. Its ground north and west sides are blind: the rooms above them start upstairs.
+b.wall('x', YARD.minZ, YARD.minX, EAST, 0, UP); // also closes the hallway's north end
+b.wall('z', YARD.minX, YARD.minZ, 3, 0, UP);
+b.wall('x', YARD.minZ, WEST, EAST, UP, HIGH, [door(-24), window('upper-power-courtyard', -9),
+  window('upper-kitchen-courtyard', 8), door(18.5)], 1);
+// The starts' alcoves push into the courtyard, each with a window.
+b.wall('x', -3, -19, -11, 0, UP, [window('german-alcove', -15)], -1);
+b.wall('z', -11, -3, 3, 0, UP);
+b.wall('x', 3, -11, -6, 0, UP);
+b.wall('z', -6, -3, 3, 0, UP);
+b.wall('x', -3, -6, 11, 0, UP, [window('german-courtyard', -2), window('american-courtyard', 7)], -1);
+b.wall('z', 11, -3, 3, 0, UP);
+b.wall('x', 3, 11, 16, 0, UP);
+b.wall('x', 3, -19, 16, UP, HIGH, [window('upper-south-courtyard-a', -12), window('upper-south-courtyard-b', 5)], -1);
+b.wall('x', 3, WEST, -19, 0, UP); // the German start's north wall, behind the balcony's blind ground floor
+// The power door between the starts, the hallway and BAR doors, and a partition in the German start.
+b.wall('z', 3, -3, SOUTH, 0, UP, [door(6)]);
+b.wall('z', 16, YARD.minZ, SOUTH, 0, UP, [window('hallway-courtyard', -12), door(6), door(11.5)], -1);
+b.wall('x', 9, 16, 25, 0, UP);
+b.wall('z', -11, 11, SOUTH, 0, UP);
 
-// Carve stairwell apertures out of the upper side slabs, then add two steep runs.
-for (let i = b.surfaces.length - 1; i >= 0; i--) {
-  const s = b.surfaces[i];
-  if (s.startHeight === UP && s.endHeight === UP && s.minZ === -YARD && s.maxZ === YARD
-    && (s.maxX === -YARD || s.minX === YARD)) b.surfaces.splice(i, 1);
-}
-for (let i = b.shell.length - 1; i >= 0; i--) {
-  const box = b.shell[i];
-  if (box.material === 'upperFloor' && box.center.y === UP - 0.12 && box.center.z === 0
-    && Math.abs(box.center.x) === (OUT + YARD) / 2) b.shell.splice(i, 1);
-}
-for (const side of [-1, 1]) {
-  const [low, high] = side < 0 ? [-18, -8] : [8, 18];
-  const [stairLow, stairHigh] = side < 0 ? [-16, -13] : [13, 16];
-  b.floor(low, high, -8, -3.2, UP);
-  b.floor(low, high, 3.2, 8, UP);
-  b.floor(side < 0 ? -13 : 8, side < 0 ? -8 : 13, -3.2, 3.2, UP);
-  b.floor(side < 0 ? -18 : 16, side < 0 ? -16 : 18, -3.2, 3.2, UP);
-  b.stair(stairLow, stairHigh, -3.2, 3.2, 'z', false, 0, UP, 18);
-  b.parapet('z', side < 0 ? -13 : 13, -3.2, 3.2, UP);
-  b.parapet('z', side < 0 ? -16 : 16, -3.2, 3.2, UP);
-}
+// ---- Upper floor.
+b.floor(WEST, YARD.minX, YARD.minZ, 4, UP); // German balcony
+b.floor(WEST, -18, NORTH, YARD.minZ, UP); // Left Upstairs
+b.floor(-18, 0, NORTH, YARD.minZ, UP); // Power Room
+b.floor(0, 16, NORTH, YARD.minZ, UP); // Kitchen
+b.floor(16, EAST, NORTH, YARD.minZ, UP); // Speed Cola room
+// The right balcony over the hallway, around the American stairwell.
+b.floor(16, 21, YARD.minZ, 8, UP);
+b.floor(26, EAST, YARD.minZ, 8, UP);
+b.floor(21, 26, YARD.minZ, -16, UP);
+b.floor(21, 26, -8, 8, UP);
+for (const x of [-18, 0, 16]) b.wall('z', x, NORTH, YARD.minZ, UP, HIGH, [door(-26)]);
+b.wall('z', 16, -3, SOUTH, UP, HIGH); // above the American start
+// Balconies are open to the courtyard behind a parapet.
+b.parapet('z', YARD.minX, YARD.minZ, 4, UP);
+b.parapet('x', 4, -25.7, YARD.minX, UP);
+b.parapet('z', 16, YARD.minZ, -3, UP);
+b.parapet('x', -8, 21, 26, UP);
 
+// ---- Stairs, each with a banister wall on its open side.
+b.stair(-29.8, -25.8, 4, 12, 'z', false, 0, UP, 24); // German: climbs north to the balcony
+b.box(-25.7, (UP + 0.95) / 2, 8, 0.2, UP + 0.95, 8, 'wall');
+b.stair(21, 26, -16, -8, 'z', false, 0, UP, 24); // American: climbs north to the right balcony
+for (const x of [20.9, 26.1]) b.box(x, (UP + 0.95) / 2, -12, 0.2, UP + 0.95, 8, 'wall');
+
+// ---- Roofs and ceilings (visual only).
+b.ceiling(-25.7, 3, 4, SOUTH, UP); // clear of the German stair and the balcony above
+b.ceiling(YARD.minX, 3, 3, 4, UP);
+b.ceiling(WEST, -25.7, 12, SOUTH, UP);
+b.ceiling(3, 16, 3, SOUTH, UP);
+b.ceiling(-19, -11, -3, 3, UP);
+b.ceiling(-6, 11, -3, 3, UP);
+b.ceiling(16, 25, 9, 14, UP);
+b.ceiling(WEST, EAST, NORTH, YARD.minZ, UP + HIGH);
+b.ceiling(WEST, YARD.minX, YARD.minZ, 4, UP + HIGH);
+b.ceiling(16, EAST, YARD.minZ, 8, UP + HIGH);
+b.ceiling(WEST, 16, 3, SOUTH, UP + HIGH);
+
+// ---- The courtyard: paving and the fountain.
+const FOUNTAIN = { x: (YARD.minX + YARD.maxX) / 2, z: (YARD.minZ + YARD.maxZ) / 2 };
+b.box(FOUNTAIN.x, -0.1, FOUNTAIN.z, YARD.maxX - YARD.minX, 0.2, YARD.maxZ - YARD.minZ, 'floor', false);
+b.box(FOUNTAIN.x, 0.28, FOUNTAIN.z, 5.3, 0.56, 5.3, 'wall', false);
+b.box(FOUNTAIN.x, 0.58, FOUNTAIN.z, 3.9, 0.12, 3.9, 'floor', false);
+b.box(FOUNTAIN.x, 1.15, FOUNTAIN.z, 0.7, 1.2, 0.7, 'wall', false);
+
+// ---- The box starts in the power room, by the switch (a visual panel until power is implemented).
 export const ASYLUM_UPPER_HEIGHT = UP;
-export const ASYLUM_BOX_CENTER: Vec3 = { x: 2.8, y: 0.52, z: -16.4 };
-b.box(ASYLUM_BOX_CENTER.x, 0.52, ASYLUM_BOX_CENTER.z, 2.35, 1.04, 0.95, 'barrier');
-// A visual power panel reserves its familiar destination; gameplay activation comes later.
-b.box(-6.5, 1.35, -17.73, 0.68, 0.9, 0.16, 'metal', false);
-b.box(-6.5, 1.35, -17.56, 0.14, 0.42, 0.19, 'metal', false);
-const plankDoor = (id: string, x: number, z: number, axis: 'x' | 'z', cost: number, name: string): DoorDefinition => ({
-  id, position: { x, y: 0, z }, cost, prompt: `E  Open ${name}  [${cost}]`, interactionRange: 2.6, minFacingDot: 0.2,
-  blocker: axis === 'z'
-    ? { min: { x: x - 0.2, y: 0, z: z - DOOR_WIDTH / 2 }, max: { x: x + 0.2, y: 2.85, z: z + DOOR_WIDTH / 2 } }
-    : { min: { x: x - DOOR_WIDTH / 2, y: 0, z: z - 0.2 }, max: { x: x + DOOR_WIDTH / 2, y: 2.85, z: z + 0.2 } },
+export const ASYLUM_BOX_CENTER: Vec3 = { x: -12, y: UP + 0.52, z: NORTH + 0.2 + 0.525 };
+b.box(ASYLUM_BOX_CENTER.x, ASYLUM_BOX_CENTER.y, ASYLUM_BOX_CENTER.z, 2.35, 1.04, 0.95, 'barrier');
+b.box(-4, UP + 1.35, NORTH + 0.27, 0.68, 0.9, 0.16, 'metal', false);
+b.box(-4, UP + 1.35, NORTH + 0.44, 0.14, 0.42, 0.19, 'metal', false);
+
+/** A boarded door in a wall along z (at x) or along x (at z). */
+const plankDoor = (id: string, x: number, y: number, z: number, along: 'x' | 'z', cost: number, name: string): DoorDefinition => ({
+  id, position: { x, y, z }, cost, prompt: `E  Open ${name}  [${cost}]`, interactionRange: 2.6, minFacingDot: 0.2,
+  blocker: along === 'z'
+    ? { min: { x: x - 0.2, y, z: z - DOOR_WIDTH / 2 }, max: { x: x + 0.2, y: y + 2.85, z: z + DOOR_WIDTH / 2 } }
+    : { min: { x: x - DOOR_WIDTH / 2, y, z: z - 0.2 }, max: { x: x + DOOR_WIDTH / 2, y: y + 2.85, z: z + 0.2 } },
+});
+const stairDebris = (id: string, minX: number, maxX: number, z: number, height: number): DoorDefinition => ({
+  id, position: { x: (minX + maxX) / 2, y: height, z }, cost: 1000, prompt: 'E  Clear stair debris  [1000]',
+  interactionRange: 2.8, minFacingDot: 0.2,
+  blocker: { min: { x: minX, y: 0, z: z - 0.4 }, max: { x: maxX, y: UP + 1, z: z + 0.4 } },
 });
 export const ASYLUM_DOORS: readonly DoorDefinition[] = [
-  plankDoor('german-hall', -13, 8, 'x', 750, 'German hall'),
-  plankDoor('american-hall', 13, 8, 'x', 750, 'American hall'),
-  plankDoor('start-gate', 0, 13, 'z', 1500, 'starting gate'),
-  plankDoor('west-wing', -13, -4.5, 'x', 1000, 'west wing'),
-  plankDoor('east-wing', 13, -4.5, 'x', 1000, 'east wing'),
-  plankDoor('west-back', -13, -8, 'x', 750, 'bathroom'),
-  plankDoor('east-back', 13, -8, 'x', 750, 'kitchen'),
-  plankDoor('power-west', -8, -13, 'z', 750, 'power room'),
-  plankDoor('power-east', 8, -13, 'z', 750, 'power room'),
-  ...[-1, 1].map(side => ({
-    id: side < 0 ? 'west-stairs' : 'east-stairs', position: { x: side * 14.5, y: 0.8, z: 2.2 },
-    cost: 1000, prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
-    blocker: { min: { x: side < 0 ? -16 : 13, y: 0, z: 1.85 },
-      max: { x: side < 0 ? -13 : 16, y: 4.5, z: 2.55 } },
-  })),
+  // Verrückt's electric door between the starts; it will open with the power switch.
+  plankDoor('start-gate', 3, 0, 6, 'z', 1500, 'power door'),
+  stairDebris('german-stairs', -29.8, -25.8, 10.8, 0.6),
+  plankDoor('left-upstairs', -24, UP, YARD.minZ, 'x', 750, 'Left Upstairs'),
+  plankDoor('power-west', -18, UP, -26, 'z', 1000, 'power room'),
+  plankDoor('american-hallway', 16, 0, 6, 'z', 750, 'hallway'),
+  plankDoor('bar-room', 16, 0, 11.5, 'z', 750, 'back room'),
+  stairDebris('american-stairs', 21, 26, -9, 0.5),
+  plankDoor('right-upstairs', 18.5, UP, YARD.minZ, 'x', 750, 'Right Upstairs'),
+  plankDoor('kitchen', 16, UP, -26, 'z', 1000, 'kitchen'),
+  plankDoor('power-east', 0, UP, -26, 'z', 750, 'power room'),
 ];
+
 const wallBuy = (id: string, weaponId: string, name: string, cost: number, position: Vec3): WallWeaponDefinition => ({
   id, position, weaponId, weaponCost: cost, ammoCost: cost / 2,
   prompt: `E  ${name} [${cost}] / Ammo [${cost / 2}]`, interactionRange: 2.5, minFacingDot: 0.25,
 });
+/** Chalk sits 0.24 m off its wall's centre line; y is 1 m above the floor it serves. */
+const G = 1, U = UP + 1;
 export const ASYLUM_WALL_WEAPONS: readonly WallWeaponDefinition[] = [
-  wallBuy('german-kar98k', 'kar98k', 'Kar98k', 200, { x: -11.5, y: 1, z: 17.76 }),
-  wallBuy('german-gewehr', 'm1-garand', 'Gewehr 43', 600, { x: -3, y: 1, z: 17.76 }),
-  wallBuy('american-carbine', 'm1-carbine', 'M1A1 Carbine', 600, { x: 4, y: 1, z: 17.76 }),
-  wallBuy('west-thompson', 'thompson', 'Thompson', 1200, { x: -17.76, y: 1, z: -5.5 }),
-  wallBuy('east-mp40', 'mp40', 'MP40', 1000, { x: 17.76, y: 1, z: -5.5 }),
-  wallBuy('bathroom-trench', 'trench-gun', 'Trench Gun', 1500, { x: -16, y: 1, z: -17.76 }),
-  wallBuy('kitchen-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: 15, y: 1, z: -17.76 }),
-  wallBuy('power-stg44', 'stg44', 'STG-44', 1200, { x: -4.5, y: 1, z: -17.76 }),
-  wallBuy('upper-bar', 'bar', 'BAR', 1800, { x: -5, y: UP + 1, z: 17.76 }),
-  wallBuy('upper-garand', 'm1-garand', 'M1 Garand', 1200, { x: 5, y: UP + 1, z: -17.76 }),
+  wallBuy('german-kar98k', 'kar98k', 'Kar98k', 200, { x: -16, y: G, z: SOUTH - 0.24 }),
+  // No Gewehr 43 model yet; the Garand stands in, at Verrückt's price.
+  wallBuy('german-gewehr', 'm1-garand', 'Gewehr 43', 600, { x: -11.24, y: G, z: 15 }),
+  wallBuy('american-garand', 'm1-garand', 'M1 Garand', 600, { x: 10.76, y: G, z: 0 }),
+  wallBuy('american-springfield', 'springfield', 'Springfield', 200, { x: 3.24, y: G, z: 14 }),
+  wallBuy('hallway-thompson', 'thompson', 'Thompson', 1200, { x: EAST - 0.24, y: G, z: -13 }),
+  wallBuy('hallway-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: EAST - 0.24, y: G, z: 3 }),
+  wallBuy('back-room-bar', 'bar', 'BAR', 2500, { x: 21, y: G, z: 13.76 }),
+  wallBuy('german-balcony-mp40', 'mp40', 'MP40', 1000, { x: WEST + 0.24, y: U, z: -2 }),
+  wallBuy('german-balcony-double-barrel', 'double-barrel', 'Double-Barreled Shotgun', 1200, { x: WEST + 0.24, y: U, z: -13 }),
+  wallBuy('left-upstairs-stg44', 'stg44', 'STG-44', 1200, { x: WEST + 0.24, y: U, z: -29 }),
+  wallBuy('left-upstairs-trench-gun', 'trench-gun', 'Trench Gun', 1500, { x: -22, y: U, z: NORTH + 0.24 }),
+  wallBuy('right-balcony-trench-gun', 'trench-gun', 'Trench Gun', 1500, { x: EAST - 0.24, y: U, z: 2 }),
+  wallBuy('right-balcony-bar', 'bar', 'BAR', 2500, { x: EAST - 0.24, y: U, z: -17.5 }),
+  // No sawed-off model yet; the double-barrel stands in, at Verrückt's price.
+  wallBuy('speed-cola-sawed-off', 'double-barrel', 'Sawed-Off Shotgun', 1200, { x: EAST - 0.24, y: U, z: -29.5 }),
 ];
+const ASYLUM_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
+  'german-kar98k': Math.PI, 'german-gewehr': -Math.PI / 2, 'american-garand': -Math.PI / 2,
+  'american-springfield': Math.PI / 2, 'hallway-thompson': -Math.PI / 2, 'hallway-double-barrel': -Math.PI / 2,
+  'back-room-bar': Math.PI, 'german-balcony-mp40': Math.PI / 2, 'german-balcony-double-barrel': Math.PI / 2,
+  'left-upstairs-stg44': Math.PI / 2, 'left-upstairs-trench-gun': 0, 'right-balcony-trench-gun': -Math.PI / 2,
+  'right-balcony-bar': -Math.PI / 2, 'speed-cola-sawed-off': -Math.PI / 2,
+};
 export const ASYLUM_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   ...BUNKER_MYSTERY_BOXES[0], id: 'power-box',
-  position: { x: ASYLUM_BOX_CENTER.x, y: 0.6, z: ASYLUM_BOX_CENTER.z + 0.77 },
+  // Buyers stand south of the box, which sits against the power room's north wall.
+  position: { x: ASYLUM_BOX_CENTER.x, y: UP + 0.6, z: ASYLUM_BOX_CENTER.z + 0.77 },
 }];
-export const ASYLUM_PLAYER_SPAWN: Vec3 = { x: -5, y: 0, z: 12 };
+/** Solo starts on the German side, as in WaW. */
+export const ASYLUM_PLAYER_SPAWN: Vec3 = { x: -18, y: 0, z: 9 };
+
 const prop = (id: string, asset: string, x: number, y: number, z: number,
   sx: number, sy: number, sz: number, yaw = 0, solid = true, background = false): PropPlacement =>
   ({ id, asset, position: { x, y, z }, size: { x: sx, y: sy, z: sz }, yaw, solid, background });
+// Props hug the walls, clear of doorways, stairs, wall buys and every window's landing.
 export const ASYLUM_PROPS: readonly PropPlacement[] = [
-  prop('german-table', 'wooden-table', -16, 0, 9.3, 1.8, 0.55, 0.66),
-  prop('german-radio', 'field-radio', -16, 0.55, 9.3, 0.62, 0.44, 0.42, 0, false),
-  prop('american-table', 'wooden-table', 16, 0, 9.3, 1.8, 0.55, 0.66),
-  prop('west-shelf', 'shelf', -17.5, 0, -6.3, 1.01, 2.08, 0.26, -Math.PI / 2),
-  prop('east-shelf', 'shelf', 17.5, 0, -6.3, 1.01, 2.08, 0.26, Math.PI / 2),
-  prop('kitchen-stove', 'barrel-stove', 10, 0, -16.5, 0.6, 0.86, 0.6),
-  prop('kitchen-carton', 'cardboard-box', 16, 0, -9.1, 0.39, 0.35, 0.52),
-  prop('bathroom-crate', 'wooden-crate', -10, 0, -16.2, 0.85, 0.24, 0.4),
-  prop('power-bags', 'cement-bag', -6.5, 0, -9.3, 0.47, 0.18, 0.7, 0, false),
-  prop('upper-barrel', 'explosive-barrel', -15, UP, 16, 0.58, 0.9, 0.58),
-  prop('courtyard-jeep', 'vehicles/gaz-67', 4, 0, 4, 1.8, 1.65, 3.6, 0.5, false, true),
+  prop('german-table', 'wooden-table', -4, 0, 17.9, 1.8, 0.55, 0.66),
+  prop('german-radio', 'field-radio', -4.1, 0.55, 17.9, 0.62, 0.44, 0.42, Math.PI, false),
+  prop('american-carton', 'cardboard-box', 4, 0, 18.3, 0.39, 0.35, 0.52),
+  prop('hallway-crate', 'wooden-crate', 29.2, 0, -18.8, 0.85, 0.24, 0.4, Math.PI / 2),
+  prop('back-room-barrel', 'explosive-barrel', 24.3, 0, 9.7, 0.58, 0.9, 0.58),
+  prop('kitchen-stove', 'barrel-stove', 12, UP, -31.2, 0.6, 0.86, 0.6),
+  prop('kitchen-table', 'wooden-table', 4, UP, -31.3, 1.8, 0.55, 0.66),
+  prop('power-bags', 'cement-bag', -16.5, UP, -21, 0.47, 0.18, 0.7, 0, false),
+  prop('left-upstairs-shelf', 'shelf', -18.47, UP, -30.5, 1.01, 2.08, 0.26, -Math.PI / 2),
 ];
+
 const barriers = barriersFromWindows(b.windows, 6);
 const collision = collisionBoxesFor(b.shell, ASYLUM_PROPS);
+/** Both sides of every boarded door, for navigation through narrow doorways. */
+const doorSides = ASYLUM_DOORS.filter(d => d.id !== 'german-stairs' && d.id !== 'american-stairs').flatMap(d => {
+  const alongZ = d.blocker.max.x - d.blocker.min.x < 1;
+  return [-1, 1].map(side => ({ id: `${d.id}-${side}`, position: {
+    x: d.position.x + (alongZ ? side : 0), y: d.position.y, z: d.position.z + (alongZ ? 0 : side) } }));
+});
+/** A stair's centre-line: the foot, points up the flight, and the landing at the top. */
+const stairRoute = (id: string, x: number, bottomZ: number, topZ: number) => [
+  { id: `${id}-foot`, position: { x, y: 0, z: bottomZ + Math.sign(bottomZ - topZ) * 0.8 } },
+  ...Array.from({ length: 11 }, (_, i) => ({ id: `${id}-${i}`, position: { x, y: UP * i / 10, z: bottomZ + (topZ - bottomZ) * i / 10 } })),
+  { id: `${id}-head`, position: { x, y: UP, z: topZ - Math.sign(bottomZ - topZ) * 0.8 } },
+];
+export const ASYLUM_STAIR_ROUTES = {
+  german: stairRoute('german-stair', -27.8, 12, 4),
+  american: stairRoute('american-stair', 23.5, -8, -16),
+};
 const ASYLUM_NAVIGATION = compileNavigation(b.surfaces, collision,
-  { minX: -17.1, maxX: 18, minZ: -17.1, maxZ: 18 }, [0, UP], [
+  { minX: WEST + 0.8, maxX: EAST, minZ: NORTH + 0.8, maxZ: SOUTH }, [0, UP], [
     { id: 'spawn', position: ASYLUM_PLAYER_SPAWN },
-    ...ASYLUM_DOORS.filter(d => !d.id.endsWith('stairs')).flatMap(d => {
-      const axis = ['german-hall', 'american-hall', 'west-wing', 'east-wing', 'west-back', 'east-back'].includes(d.id) ? 'x' : 'z';
-      return [-1, 1].map(side => ({ id: `${d.id}-${side}`, position: {
-        x: d.position.x + (axis === 'z' ? side : 0), y: 0,
-        z: d.position.z + (axis === 'x' ? side : 0),
-      } }));
-    }),
-    ...[-1, 1].flatMap(side => [
-      { id: `stair-${side}-foot`, position: { x: side * 14.5, y: 0, z: 4 } },
-      ...Array.from({ length: 13 }, (_, i) => ({ id: `stair-${side}-${i}`, position: {
-        x: side * 14.5, y: UP * i / 12, z: 3.2 - 6.4 * i / 12,
-      } })),
-      { id: `stair-${side}-head`, position: { x: side * 14.5, y: UP, z: -4 } },
-    ]),
+    ...doorSides,
+    ...ASYLUM_STAIR_ROUTES.german, ...ASYLUM_STAIR_ROUTES.american,
     ...barriers.map(barrier => ({ id: barrier.id, position: barrier.insidePoint })),
   ]);
+
 export const ASYLUM_MAP: GameMap = {
   id: 'asylum', name: 'Asylum', upperHeight: UP,
   greybox: b.shell, prisms: b.prisms, collisionBoxes: collision,
@@ -191,52 +246,44 @@ export const ASYLUM_MAP: GameMap = {
   barriers, zombieSpawns: barriers.map(barrier => ({ ...barrier.approachPath[0], barrierId: barrier.id })),
   doors: ASYLUM_DOORS,
   doorStyles: Object.fromEntries(ASYLUM_DOORS.map(d => [d.id, d.id.endsWith('stairs')
-    ? { kind: 'debris' as const, yaw: 0, width: 3 }
-    : { kind: 'planks' as const, yaw: ['german-hall', 'american-hall', 'west-wing', 'east-wing', 'west-back', 'east-back'].includes(d.id)
-      ? Math.PI / 2 : 0, width: DOOR_WIDTH }])),
-  wallWeapons: ASYLUM_WALL_WEAPONS,
-  wallWeaponFacing: {
-    'german-kar98k': Math.PI, 'german-gewehr': Math.PI, 'american-carbine': Math.PI,
-    'west-thompson': Math.PI / 2, 'east-mp40': -Math.PI / 2,
-    'bathroom-trench': 0, 'kitchen-double-barrel': 0, 'power-stg44': 0,
-    'upper-bar': Math.PI, 'upper-garand': 0,
-  },
+    ? { kind: 'debris' as const, yaw: 0, width: d.blocker.max.x - d.blocker.min.x }
+    : { kind: 'planks' as const, yaw: d.blocker.max.x - d.blocker.min.x < 1 ? 0 : Math.PI / 2, width: DOOR_WIDTH }])),
+  wallWeapons: ASYLUM_WALL_WEAPONS, wallWeaponFacing: ASYLUM_WALL_WEAPON_FACING,
   mysteryBoxes: ASYLUM_MYSTERY_BOXES, boxCenter: ASYLUM_BOX_CENTER, boxYaw: -Math.PI / 2,
   rails: b.rails, props: ASYLUM_PROPS,
   decals: [
-    { asset: 'leaking-grime', x: -5, y: 2.4, z: 17.79, width: 2.6, height: 2.5, yaw: Math.PI },
-    { asset: 'smear-grime', x: 12, y: 1.6, z: -17.79, width: 2.4, height: 2.2, yaw: 0 },
+    { asset: 'leaking-grime', x: -20, y: 2.4, z: SOUTH - 0.211, width: 2.6, height: 2.5, yaw: Math.PI },
+    { asset: 'smear-grime', x: 8, y: UP + 1.6, z: NORTH + 0.211, width: 2.4, height: 2.2, yaw: 0 },
+    { asset: 'smear-grime', x: 29.79, y: 1.6, z: -8, width: 2.4, height: 2.2, yaw: -Math.PI / 2 },
   ],
   labels: [
-    { text: 'GERMAN WING', x: -4.5, y: 2.95, z: 17.78, yaw: Math.PI, width: 3.3, height: 0.42 },
-    { text: 'AMERICAN WING', x: 4.5, y: 2.95, z: 17.78, yaw: Math.PI, width: 3.8, height: 0.42 },
-    { text: 'POWER ROOM', x: -3, y: 2.95, z: -17.78, yaw: 0, width: 3, height: 0.42 },
-    { text: 'KITCHEN', x: 13, y: 2.95, z: -17.78, yaw: 0, width: 2.3, height: 0.42 },
-    { text: 'BATHROOM', x: -13, y: 2.95, z: -17.78, yaw: 0, width: 2.7, height: 0.42 },
+    { text: 'POWER ROOM', x: -9, y: UP + 2.9, z: NORTH + 0.215, yaw: 0, width: 3, height: 0.42 },
+    { text: 'KITCHEN', x: 12, y: UP + 2.9, z: NORTH + 0.215, yaw: 0, width: 2.3, height: 0.42 },
+    { text: 'GEFAHR', x: 3.24, y: 3.2, z: 6, yaw: Math.PI / 2, width: 1.8, height: 0.42, color: '#8f2a22' },
+    { text: 'GEFAHR', x: 2.76, y: 3.2, z: 6, yaw: -Math.PI / 2, width: 1.8, height: 0.42, color: '#8f2a22' },
   ],
   lights: [
-    { x: -5, y: 2.9, z: 13 }, { x: 5, y: 2.9, z: 13 },
-    { x: -13, y: 2.9, z: 0 }, { x: 13, y: 2.9, z: 0 },
-    { x: -13, y: 2.9, z: -13 }, { x: 13, y: 2.9, z: -13 }, { x: 0, y: 2.9, z: -13 },
-    { x: -13, y: 5.8, z: 0 }, { x: 13, y: 5.8, z: 0 }, { x: 0, y: 5.8, z: 13 },
+    { x: -20, y: 3.4, z: 11 }, { x: -3, y: 3.4, z: 12 }, { x: 9, y: 3.4, z: 11 },
+    { x: 23, y: 3.4, z: -4 }, { x: -24, y: UP + 3, z: -8 }, { x: -24, y: UP + 3, z: -26 },
+    { x: -9, y: UP + 3, z: -26 }, { x: 8, y: UP + 3, z: -26 }, { x: 23, y: UP + 3, z: -26 }, { x: 23, y: UP + 3, z: -2 },
   ],
   rubble: [
-    { minX: -17, maxX: -1, minZ: 9, maxZ: 17, y: 0, count: 24 },
-    { minX: 1, maxX: 17, minZ: 9, maxZ: 17, y: 0, count: 24 },
-    { minX: -17, maxX: -9, minZ: -7, maxZ: 7, y: 0, count: 20 },
-    { minX: 9, maxX: 17, minZ: -7, maxZ: 7, y: 0, count: 20 },
-    { minX: -17, maxX: 17, minZ: -17, maxZ: -9, y: 0, count: 35 },
-    { minX: -17, maxX: 17, minZ: 9, maxZ: 17, y: UP, count: 25 },
+    { minX: -25, maxX: 2, minZ: 4, maxZ: 18, y: 0, count: 26 },
+    { minX: 4, maxX: 15, minZ: 4, maxZ: 18, y: 0, count: 14 },
+    { minX: 17, maxX: 29, minZ: -19, maxZ: 8, y: 0, count: 22 },
+    { minX: -29, maxX: -20, minZ: -19, maxZ: 3, y: UP, count: 16 },
+    { minX: -29, maxX: 29, minZ: -31, maxZ: -21, y: UP, count: 30 },
   ],
-  focus: { x: 0, z: 0, radius: 27 },
+  focus: { x: 0, z: -6.5, radius: 32 },
   previews: {
-    kitchen: { position: { x: 13, y: 0, z: -12 }, yaw: Math.PI / 2 },
-    hall: { position: { x: -5, y: 0, z: 12 }, yaw: -Math.PI / 2 },
-    barrier: { position: { x: -13, y: 0, z: 15 }, yaw: Math.PI },
-    balcony: { position: { x: -13, y: UP, z: 11 }, yaw: Math.PI },
-    courtyard: { position: { x: -2, y: UP, z: 10 }, yaw: -0.35 },
-    ward: { position: { x: 13, y: 0, z: 12 }, yaw: Math.PI },
-    upstairs: { position: { x: -13, y: UP, z: -6 }, yaw: Math.PI },
-    power: { position: { x: 0, y: 0, z: -12 }, yaw: 0 },
+    american: { position: { x: 9, y: 0, z: 12 }, yaw: 0 },
+    hallway: { position: { x: 18, y: 0, z: 5 }, yaw: 0 },
+    balcony: { position: { x: -24, y: UP, z: 2 }, yaw: 0 },
+    upstairs: { position: { x: -24, y: UP, z: -24 }, yaw: -Math.PI / 2 },
+    power: { position: { x: -9, y: UP, z: -23 }, yaw: 0 },
+    kitchen: { position: { x: 8, y: UP, z: -23 }, yaw: Math.PI / 2 },
+    rightBalcony: { position: { x: 18, y: UP, z: 4 }, yaw: 0 },
+    courtyard: { position: { x: 17.5, y: UP, z: -12 }, yaw: Math.PI / 2 },
+    barrier: { position: { x: -15, y: 0, z: 1.5 }, yaw: 0 },
   },
 };
