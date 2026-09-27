@@ -4,7 +4,7 @@ import {
   closedDoorBlockers, createDoorState, createNavigationQuery, hasWalkableConnection, navigationWaypoint, resolveHitscan,
   sampleWalkHeight,
 } from '../src/core/index.ts';
-import { ASYLUM_MAP, ASYLUM_STAIR_ROUTES } from '../src/maps/asylum.ts';
+import { ASYLUM_MAP, ASYLUM_STAIR_ROUTES, ASYLUM_UPPER_ENTRIES } from '../src/maps/asylum.ts';
 import { MAPS, MAP_CATALOG } from '../src/maps/index.ts';
 
 const map = ASYLUM_MAP;
@@ -64,11 +64,18 @@ describe('Asylum follows Verrückt', () => {
   });
 
   it('has the original entries, unlocks and wall buys', () => {
-    const entries = map.barriers.map(b => b.id);
-    expect(entries.filter(id => id.startsWith('german-'))).toHaveLength(4);
-    expect(entries.filter(id => id.startsWith('american-'))).toHaveLength(3);
-    expect(entries.filter(id => id.startsWith('hallway-'))).toHaveLength(2);
-    expect(entries).toHaveLength(9);
+    const ground = map.barriers.filter(b => b.position.y === 0).map(b => b.id);
+    expect(ground.filter(id => id.startsWith('german-'))).toHaveLength(4);
+    expect(ground.filter(id => id.startsWith('american-'))).toHaveLength(3);
+    expect(ground.filter(id => id.startsWith('hallway-'))).toHaveLength(2);
+    expect(ground).toHaveLength(9);
+    // Upstairs: one on the German balcony, two in Left Upstairs, two on the right balcony, one each
+    // in the Speed Cola room, kitchen and power room.
+    expect(new Set(map.barriers.filter(b => b.position.y === UP).map(b => b.id))).toEqual(new Set(ASYLUM_UPPER_ENTRIES));
+    for (const id of ASYLUM_UPPER_ENTRIES) {
+      const inside = map.barriers.find(b => b.id === id)!.insidePoint;
+      expect(floorAt(inside.x, inside.z, UP), id).toBe(UP);
+    }
     expect(Object.fromEntries(map.doors.map(d => [d.id, d.cost]))).toEqual({
       'start-gate': 1500, 'german-stairs': 1000, 'left-upstairs': 750, 'power-west': 1000,
       'american-hallway': 750, 'bar-room': 750, 'american-stairs': 1000, 'right-upstairs': 750, kitchen: 1000, 'power-east': 750,
@@ -96,6 +103,21 @@ describe('Asylum follows Verrückt', () => {
     expect(sim.zombies()).toHaveLength(16);
     expect(new Set(sim.zombies().map(zombie => zombie.entry!.barrierId))).toEqual(
       new Set(['german-west', 'german-south', 'german-alcove', 'german-courtyard']));
+  });
+  it('brings zombies in through the upstairs windows of the rooms players reach', () => {
+    const sim = new GameSimulation({ seed: 11, map: simMap, playerSpawns: [{ x: -24, y: UP, z: -26 }],
+      roundConfig: { initialWaitTicks: 1, intermissionTicks: 10 },
+      spawnConfig: { baseZombieCount: 6, additionalPerRound: 0, maxAlive: 6, spawnIntervalTicks: 0 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    const entered: string[] = [];
+    for (let i = 0; i < 60 * 40 && entered.length === 0; i++) {
+      player.godMode = true;
+      for (const event of sim.tick()) if (event.type === 'zombieEntered') entered.push(event.zombieId);
+    }
+    expect(new Set(sim.zombies().map(zombie => zombie.entry?.barrierId).filter(Boolean)))
+      .toEqual(new Set(['left-upstairs-west', 'left-upstairs-north']));
+    expect(entered.length).toBeGreaterThan(0);
+    expect(sim.zombies().find(zombie => zombie.id === entered[0])!.position.y).toBeCloseTo(UP);
   });
 });
 

@@ -43,20 +43,20 @@ b.floor(-6, 11, -3, 3, 0); // shared alcove, split by the power door's wall
 b.floor(16, 25, 9, 14, 0); // BAR back room
 b.floor(16, EAST, YARD.minZ, 9, 0); // American hallway
 
-// Outer walls, two storeys; only ground windows take zombies.
+// Outer walls, two storeys. Ground windows take zombies, and so do the upstairs ones in ASYLUM_UPPER_ENTRIES.
 b.wall('z', WEST, NORTH, SOUTH, 0, UP, [window('german-west', 14)], -1);
-b.wall('z', WEST, NORTH, SOUTH, UP, HIGH, [window('upper-left-upstairs-west', -24), window('upper-balcony-west', -8)], -1);
+b.wall('z', WEST, NORTH, SOUTH, UP, HIGH, [window('left-upstairs-west', -24), window('german-balcony-west', -8)], -1);
 b.wall('x', NORTH, WEST, EAST, 0, UP);
-b.wall('x', NORTH, WEST, EAST, UP, HIGH, [window('upper-left-upstairs-north', -27), window('upper-power-north', -8),
-  window('upper-kitchen-north', 8), window('upper-speed-cola-north', 23)], -1);
+b.wall('x', NORTH, WEST, EAST, UP, HIGH, [window('left-upstairs-north', -27), window('power-north', -8),
+  window('kitchen-north', 8), window('upper-speed-cola-north', 23)], -1);
 b.wall('z', EAST, NORTH, 9, 0, UP, [window('hallway-east', -4)], 1);
-b.wall('z', EAST, NORTH, 8, UP, HIGH, [window('upper-speed-cola-east', -25), window('upper-right-balcony-east', -9)], 1);
+b.wall('z', EAST, NORTH, 8, UP, HIGH, [window('speed-cola-east', -25), window('right-balcony-east', -9)], 1);
 b.wall('x', SOUTH, WEST, 16, 0, UP, [window('german-south', -7), window('american-south-a', 8), window('american-south-b', 13)], 1);
 b.wall('x', SOUTH, WEST, 16, UP, HIGH, [window('upper-south-a', -20), window('upper-south-b', 6)], 1);
 b.wall('x', 9, 25, EAST, 0, UP);
 b.wall('z', 25, 9, 14, 0, UP);
 b.wall('x', 14, 16, 25, 0, UP);
-b.wall('x', 8, 16, EAST, UP, HIGH, [window('upper-right-balcony-south', 27)], 1);
+b.wall('x', 8, 16, EAST, UP, HIGH, [window('right-balcony-south', 27)], 1);
 
 // The courtyard's walls. Its ground north and west sides are blind: the rooms above them start upstairs.
 b.wall('x', YARD.minZ, YARD.minX, EAST, 0, UP); // also closes the hallway's north end
@@ -212,7 +212,17 @@ export const ASYLUM_PROPS: readonly PropPlacement[] = [
   prop('left-upstairs-shelf', 'shelf', -18.47, UP, -30.5, 1.01, 2.08, 0.26, -Math.PI / 2),
 ];
 
-const barriers = barriersFromWindows(b.windows, 6);
+// Verrückt's upstairs entries, where zombies climb in off the roofs: one on the German balcony, two
+// in Left Upstairs, two on the right balcony, and one each in the Speed Cola room, kitchen and power room.
+export const ASYLUM_UPPER_ENTRIES = ['german-balcony-west', 'left-upstairs-west', 'left-upstairs-north', 'power-north',
+  'kitchen-north', 'speed-cola-east', 'right-balcony-east', 'right-balcony-south'];
+for (const w of b.windows.filter(w => ASYLUM_UPPER_ENTRIES.includes(w.id))) {
+  // A roof ledge outside the window for the climbers to stand on.
+  const along = w.axis === 'x' ? 2.8 : 3, depth = 3;
+  const cx = w.x + w.outward.x * (depth / 2 + 0.12), cz = w.z + w.outward.z * (depth / 2 + 0.12);
+  b.box(cx, UP - 0.15, cz, w.axis === 'x' ? along : depth, 0.3, w.axis === 'x' ? depth : along, 'upperFloor', false);
+}
+const barriers = barriersFromWindows(b.windows, 6, ASYLUM_UPPER_ENTRIES);
 const collision = collisionBoxesFor(b.shell, ASYLUM_PROPS);
 /** Both sides of every boarded door, for navigation through narrow doorways. */
 const doorSides = ASYLUM_DOORS.filter(d => d.id !== 'german-stairs' && d.id !== 'american-stairs').flatMap(d => {
@@ -285,5 +295,6 @@ export const ASYLUM_MAP: GameMap = {
     rightBalcony: { position: { x: 18, y: UP, z: 4 }, yaw: 0 },
     courtyard: { position: { x: 17.5, y: UP, z: -12 }, yaw: Math.PI / 2 },
     barrier: { position: { x: -15, y: 0, z: 1.5 }, yaw: 0 },
+    upperEntry: { position: { x: -26.8, y: UP, z: -24 }, yaw: Math.PI / 2 },
   },
 };
