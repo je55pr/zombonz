@@ -1,14 +1,17 @@
 // Re-encodes an existing runtime GLB's textures as WebP without touching its geometry or node names.
 // Colour and normal maps stay at most 2K; packed ORM maps drop to 1K, matching convert.mjs.
+// Textures no material uses are dropped (only textures: nodes, skins and animations are untouched).
 // Usage: node recompress.mjs <in.glb> [out.glb]   (overwrites in place when out is omitted)
-import { NodeIO } from '@gltf-transform/core';
+import { NodeIO, PropertyType } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
+import { prune } from '@gltf-transform/functions';
 import sharp from 'sharp';
 
 const [input, output = input] = process.argv.slice(2);
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
 const doc = await io.read(input);
 doc.createExtension(EXTTextureWebP).setRequired(true);
+await doc.transform(prune({ propertyTypes: [PropertyType.TEXTURE] }));
 for (const texture of doc.getRoot().listTextures()) {
   const slots = new Set(doc.getGraph().listParentEdges(texture).map(edge => edge.getName()));
   const packed = slots.has('metallicRoughnessTexture') || slots.has('occlusionTexture');

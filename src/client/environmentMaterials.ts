@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { getAsset } from './assetStore.ts';
 import type { GreyboxBox, GreyboxMaterial } from '../maps/nacht.ts';
 
 export const MATERIAL_IDS = ['weathered-concrete-a', 'weathered-concrete-b', 'cracked-concrete-floor',
@@ -36,6 +37,8 @@ export function materialForBox(entry: GreyboxBox): EnvironmentMaterialId {
 
 export function assetUrl(path: string): string { return `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`; }
 export async function readEnvironmentManifest(): Promise<EnvironmentManifest> {
+  const downloaded = getAsset(assetUrl('/assets/environment/manifest.json'));
+  if (downloaded) return JSON.parse(await downloaded.text()) as EnvironmentManifest;
   const response = await fetch(assetUrl('/assets/environment/manifest.json'));
   if (!response.ok) throw new Error(`Environment manifest: ${response.status}`);
   return response.json();
@@ -46,9 +49,13 @@ export function loadEnvironmentTexture(path: string, color = false, repeat = tru
   if (!pending) {
     // Decode at 1K before GPU upload. The original 2K files are preserved on disk.
     // ImageBitmap ignores Texture.flipY, so flip during decoding instead.
-    const loader = new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none',
-      colorSpaceConversion: 'none', resizeWidth: ENVIRONMENT_TEXTURE_SIZE, resizeHeight: ENVIRONMENT_TEXTURE_SIZE, resizeQuality: 'high' });
-    pending = loader.loadAsync(assetUrl(path)).then(bitmap => {
+    const options: ImageBitmapOptions = { imageOrientation: 'flipY', premultiplyAlpha: 'none',
+      colorSpaceConversion: 'none', resizeWidth: ENVIRONMENT_TEXTURE_SIZE, resizeHeight: ENVIRONMENT_TEXTURE_SIZE, resizeQuality: 'high' };
+    // Decode the start-screen download directly when there is one.
+    const downloaded = getAsset(assetUrl(path));
+    const decoding = downloaded ? createImageBitmap(downloaded, options)
+      : new THREE.ImageBitmapLoader().setOptions(options).loadAsync(assetUrl(path));
+    pending = decoding.then(bitmap => {
       const texture = new THREE.Texture(bitmap);
       texture.name = path; texture.colorSpace = color ? THREE.SRGBColorSpace : THREE.NoColorSpace;
       texture.wrapS = texture.wrapT = repeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;

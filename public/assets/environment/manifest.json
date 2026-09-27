@@ -6,7 +6,7 @@
       "purpose": "Weathered concrete wall/columns",
       "basecolor": "/assets/environment/materials/weathered-concrete-a/basecolor.webp",
       "normal": "/assets/environment/materials/weathered-concrete-a/normal.webp",
-      "arm": "/assets/environment/materials/weathered-concrete-a/arm.jpg",
+      "arm": "/assets/environment/materials/weathered-concrete-a/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -20,7 +20,7 @@
       "purpose": "Alternate weathered concrete wall",
       "basecolor": "/assets/environment/materials/weathered-concrete-b/basecolor.webp",
       "normal": "/assets/environment/materials/weathered-concrete-b/normal.webp",
-      "arm": "/assets/environment/materials/weathered-concrete-b/arm.jpg",
+      "arm": "/assets/environment/materials/weathered-concrete-b/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -34,7 +34,7 @@
       "purpose": "Cracked/damaged concrete floor",
       "basecolor": "/assets/environment/materials/cracked-concrete-floor/basecolor.webp",
       "normal": "/assets/environment/materials/cracked-concrete-floor/normal.webp",
-      "arm": "/assets/environment/materials/cracked-concrete-floor/arm.jpg",
+      "arm": "/assets/environment/materials/cracked-concrete-floor/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -48,7 +48,7 @@
       "purpose": "Broken plaster with exposed brick",
       "basecolor": "/assets/environment/materials/broken-plaster-brick/basecolor.webp",
       "normal": "/assets/environment/materials/broken-plaster-brick/normal.webp",
-      "arm": "/assets/environment/materials/broken-plaster-brick/arm.jpg",
+      "arm": "/assets/environment/materials/broken-plaster-brick/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -62,7 +62,7 @@
       "purpose": "Concrete/plaster/brick rubble",
       "basecolor": "/assets/environment/materials/concrete-rubble/basecolor.webp",
       "normal": "/assets/environment/materials/concrete-rubble/normal.webp",
-      "arm": "/assets/environment/materials/concrete-rubble/arm.jpg",
+      "arm": "/assets/environment/materials/concrete-rubble/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -76,7 +76,7 @@
       "purpose": "Dark fractured cave rock",
       "basecolor": "/assets/environment/materials/cave-rock/basecolor.webp",
       "normal": "/assets/environment/materials/cave-rock/normal.webp",
-      "arm": "/assets/environment/materials/cave-rock/arm.jpg",
+      "arm": "/assets/environment/materials/cave-rock/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -90,7 +90,7 @@
       "purpose": "Dusty dirt/ground",
       "basecolor": "/assets/environment/materials/dirt/basecolor.webp",
       "normal": "/assets/environment/materials/dirt/normal.webp",
-      "arm": "/assets/environment/materials/dirt/arm.jpg",
+      "arm": "/assets/environment/materials/dirt/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -104,7 +104,7 @@
       "purpose": "Weathered/splintered wooden planks",
       "basecolor": "/assets/environment/materials/splintered-wood/basecolor.webp",
       "normal": "/assets/environment/materials/splintered-wood/normal.webp",
-      "arm": "/assets/environment/materials/splintered-wood/arm.jpg",
+      "arm": "/assets/environment/materials/splintered-wood/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -118,7 +118,7 @@
       "purpose": "Rusted metal rails/frames material",
       "basecolor": "/assets/environment/materials/rusted-metal/basecolor.webp",
       "normal": "/assets/environment/materials/rusted-metal/normal.webp",
-      "arm": "/assets/environment/materials/rusted-metal/arm.jpg",
+      "arm": "/assets/environment/materials/rusted-metal/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -132,7 +132,7 @@
       "purpose": "Aged leather couch/seat upholstery",
       "basecolor": "/assets/environment/materials/sofa-upholstery/basecolor.webp",
       "normal": "/assets/environment/materials/sofa-upholstery/normal.webp",
-      "arm": "/assets/environment/materials/sofa-upholstery/arm.jpg",
+      "arm": "/assets/environment/materials/sofa-upholstery/arm.webp",
       "armChannels": {
         "r": "ao",
         "g": "roughness",
@@ -149,8 +149,8 @@
       "maps": {
         "basecolor": "/assets/environment/decals/graffiti/basecolor.webp",
         "normal": "/assets/environment/decals/graffiti/normal.webp",
-        "opacity": "/assets/environment/decals/graffiti/opacity.jpg",
-        "roughness": "/assets/environment/decals/graffiti/roughness.jpg"
+        "opacity": "/assets/environment/decals/graffiti/opacity.webp",
+        "roughness": "/assets/environment/decals/graffiti/roughness.webp"
       },
       "source": "https://ambientcg.com/a/GraffitiSet001",
       "sourceId": "GraffitiSet001",
@@ -161,8 +161,8 @@
       "maps": {
         "basecolor": "/assets/environment/decals/surface-imperfections/basecolor.webp",
         "normal": "/assets/environment/decals/surface-imperfections/normal.webp",
-        "opacity": "/assets/environment/decals/surface-imperfections/opacity.jpg",
-        "roughness": "/assets/environment/decals/surface-imperfections/roughness.jpg"
+        "opacity": "/assets/environment/decals/surface-imperfections/opacity.webp",
+        "roughness": "/assets/environment/decals/surface-imperfections/roughness.webp"
       },
       "source": "https://ambientcg.com/a/SurfaceImperfections017",
       "sourceId": "SurfaceImperfections017",
@@ -173,8 +173,8 @@
       "maps": {
         "basecolor": "/assets/environment/decals/leaking-grime/basecolor.webp",
         "normal": "/assets/environment/decals/leaking-grime/normal.webp",
-        "opacity": "/assets/environment/decals/leaking-grime/opacity.jpg",
-        "roughness": "/assets/environment/decals/leaking-grime/roughness.jpg"
+        "opacity": "/assets/environment/decals/leaking-grime/opacity.webp",
+        "roughness": "/assets/environment/decals/leaking-grime/roughness.webp"
       },
       "source": "https://ambientcg.com/a/Leaking006",
       "sourceId": "Leaking006",
@@ -185,9 +185,9 @@
       "maps": {
         "basecolor": "/assets/environment/decals/rust-decal/basecolor.webp",
         "normal": "/assets/environment/decals/rust-decal/normal.webp",
-        "opacity": "/assets/environment/decals/rust-decal/opacity.jpg",
-        "roughness": "/assets/environment/decals/rust-decal/roughness.jpg",
-        "ao": "/assets/environment/decals/rust-decal/ao.jpg"
+        "opacity": "/assets/environment/decals/rust-decal/opacity.webp",
+        "roughness": "/assets/environment/decals/rust-decal/roughness.webp",
+        "ao": "/assets/environment/decals/rust-decal/ao.webp"
       },
       "source": "https://ambientcg.com/a/Rust001",
       "sourceId": "Rust001",
@@ -198,7 +198,7 @@
       "maps": {
         "basecolor": "/assets/environment/decals/smear-grime/basecolor.webp",
         "normal": "/assets/environment/decals/smear-grime/normal.webp",
-        "opacity": "/assets/environment/decals/smear-grime/opacity.jpg"
+        "opacity": "/assets/environment/decals/smear-grime/opacity.webp"
       },
       "source": "https://ambientcg.com/a/Smear005",
       "sourceId": "Smear005",
