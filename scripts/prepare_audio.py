@@ -17,31 +17,48 @@ import py7zr
 
 
 # (download, member or None for a loose file, runtime name, maximum seconds)
+LIB = "Prepared SFX Library.7z"
+L = "Prepared SFX Library"
+WOOD = "independent_nu_ljudbank-wood_crack_hit_destruction.7z"
 CLIPS = [
-    ("Prepared SFX Library.7z", "Prepared SFX Library/1911/A_34P.wav", "gun-pistol", 1.5),
-    ("Prepared SFX Library.7z", "Prepared SFX Library/Mosin Nagant/M_21P.wav", "gun-bolt", 2.0),
-    ("Prepared SFX Library.7z", "Prepared SFX Library/SKS/U_14P.wav", "gun-rifle", 1.6),
-    ("Prepared SFX Library.7z", "Prepared SFX Library/PPSh/P_16P.wav", "gun-smg", 0.6),
-    ("Prepared SFX Library.7z", "Prepared SFX Library/AK-47/C_27P.wav", "gun-auto", 0.6),
-    ("Prepared SFX Library.7z", "Prepared SFX Library/Mossberg/N_26P.wav", "gun-shotgun", 2.0),
-    ("Prepared SFX Library.7z", "Prepared SFX Library/Ruger Single Six/S_11P.wav", "gun-magnum", 1.7),
+    # Guns: the library's "near distance" take of each gun (the first shot, which starts the file),
+    # one per gun family. Its "mid distance" takes are recorded down range and open with handling noise.
+    (LIB, f"{L}/1911/A_42P.wav", "gun-pistol", 1.1),
+    (LIB, f"{L}/Arisaka/E_25P.wav", "gun-kar98k", 1.2),
+    (LIB, f"{L}/1917/B_24P.wav", "gun-springfield", 1.2),
+    (LIB, f"{L}/Mosin Nagant/M_21P.wav", "gun-mosin", 1.2),
+    (LIB, f"{L}/Tikka/W_29P.wav", "gun-30-06", 1.1),
+    (LIB, f"{L}/SKS/U_14P.wav", "gun-carbine", 1.0),
+    (LIB, f"{L}/Savage 10 .300 Blackout/T_27P.wav", "gun-battle-rifle", 1.0),
+    (LIB, f"{L}/AK-47/C_28P.wav", "gun-ak", 0.8),
+    (LIB, f"{L}/AR-15/D_32P.wav", "gun-commando", 0.8),
+    (LIB, f"{L}/Carl Gustav M45/G_31P.wav", "gun-smg-45", 0.7),
+    (LIB, f"{L}/PPSh/P_30P.wav", "gun-ppsh", 0.6),
+    (LIB, f"{L}/Walther PPQ/X_39P.wav", "gun-mp5k", 0.6),
+    (LIB, f"{L}/Bersa/F_47P.wav", "gun-skorpion", 0.6),
+    (LIB, f"{L}/Model 12/K_22P.wav", "gun-pump", 1.3),
+    (LIB, f"{L}/Nova/O_21P.wav", "gun-spas", 1.2),
+    (LIB, f"{L}/Mossberg/N_30P.wav", "gun-double", 1.3),
+    (LIB, f"{L}/Smith & Wesson 642/V_27P.wav", "gun-revolver", 1.2),
+    ("teleport.wav", None, "irrlicht-fire", 0.8),
+    ("shieldhit.wav", None, "molniya-fire", 1.2),
     ("clipload1.wav", None, "reload-mag", 0.8),
     ("singlebullet1.wav", None, "reload-round", 0.8),
     ("shotgunsounds.zip", "ShotgunSounds/Rack.mp3", "shotgun-rack", 1.1),
     ("shotgunsounds.zip", "ShotgunSounds/First Shell.mp3", "shotgun-shell", 1.1),
     ("mechanical.7z", "mechanical/mechanical_clicks-01.flac", "mechanical-click", 0.9),
     ("mechanical.7z", "mechanical/mechanical_button-01.flac", "mechanical-button", 0.9),
-    ("Fantozzi-footsteps.7z", "Fantozzi-footsteps/ogg/Fantozzi-StoneL1.ogg", "step-stone-1", 0.55),
-    ("Fantozzi-footsteps.7z", "Fantozzi-footsteps/ogg/Fantozzi-StoneR2.ogg", "step-stone-2", 0.55),
-    ("Fantozzi-footsteps.7z", "Fantozzi-footsteps/ogg/Fantozzi-SandL1.ogg", "step-dirt-1", 0.55),
-    ("Fantozzi-footsteps.7z", "Fantozzi-footsteps/ogg/Fantozzi-SandR2.ogg", "step-dirt-2", 0.55),
-    ("zombies.zip", "zombies/zombie-1.wav", "zombie-voice-1", 2.4),
-    ("zombies.zip", "zombies/zombie-4.wav", "zombie-voice-2", 2.4),
-    ("zombies.zip", "zombies/zombie-10.wav", "zombie-voice-3", 2.4),
+    ("mechanical.7z", "mechanical/buzzerr-01.flac", "buy-denied", 0.6),
+    *[("Fantozzi-footsteps.7z", f"Fantozzi-footsteps/ogg/Fantozzi-{source}.ogg", f"step-{kind}-{index}", 0.55)
+      for kind, material in (("stone", "Stone"), ("dirt", "Sand"))
+      for index, source in enumerate((f"{material}L1", f"{material}R1", f"{material}L2", f"{material}R2"), 1)],
+    *[("zombies.zip", f"zombies/zombie-{source}.wav", f"zombie-voice-{index}", 2.4)
+      for index, source in enumerate((1, 4, 8, 12, 15, 17, 20, 21), 1)],
+    *[("zombies.zip", f"zombies/zombie-{source}.wav", f"zombie-attack-{index}", 1.2) for index, source in enumerate((5, 7, 13), 1)],
+    *[("zombies.zip", f"zombies/zombie-{source}.wav", f"zombie-death-{index}", 1.2) for index, source in enumerate((10, 14), 1)],
     ("darsycho__zombie-moans.ogg", None, "zombie-distant", 3.0),
-    ("independent_nu_ljudbank-wood_crack_hit_destruction.7z", "wood_impact/crack01.mp3.flac", "wood-crack-1", 0.9),
-    ("independent_nu_ljudbank-wood_crack_hit_destruction.7z", "wood_impact/crack03.mp3.flac", "wood-crack-2", 0.9),
-    ("independent_nu_ljudbank-wood_crack_hit_destruction.7z", "wood_impact/impactwood01.mp3.flac", "wood-impact", 0.9),
+    *[(WOOD, f"wood_impact/crack{source:02d}.mp3.flac", f"wood-crack-{index}", 0.9) for index, source in enumerate((1, 3, 5, 7), 1)],
+    *[(WOOD, f"wood_impact/impactwood{source:02d}.mp3.flac", f"wood-impact-{index}", 0.9) for index, source in enumerate((1, 4), 1)],
     ("80-CC0-RPG-SFX.zip", "lock_01.ogg", "door-unlock", 1.0),
     ("80-CC0-RPG-SFX.zip", "metal_01.ogg", "door-metal", 1.5),
     ("80-CC0-RPG-SFX.zip", "item_misc_01.ogg", "pickup", 1.3),
@@ -53,6 +70,8 @@ CLIPS = [
     ("hit.wav", None, "electric-hit", 1.2),
     ("powerup.wav", None, "electric-powerup", 1.6),
     ("deathboom.wav", None, "electric-boom", 2.0),
+    ("dark_ambiences.zip", "dark_ambiences/ambience-1.wav", "ambience-sting-1", 4.6),
+    ("dark_ambiences.zip", "dark_ambiences/ambience-5.wav", "ambience-sting-2", 3.4),
     ("airvent-large-loop.wav", None, "vent-loop", 9.0),
     ("wind1.wav", None, "wind-loop", 9.0),
 ]
@@ -61,8 +80,10 @@ CLIPS = [
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--downloads", required=True, type=Path)
-    parser.add_argument("--extras", required=True, type=Path)
+    parser.add_argument("--extras", type=Path, help="folder holding qubodup-DoorSet.7z and 25-CC0-bang-sfx.zip")
+    parser.add_argument("--only", nargs="*", help="rebuild just these runtime names (default: all)")
     args = parser.parse_args()
+    rows = [row for row in CLIPS if not args.only or row[2] in args.only]
     target = Path(__file__).resolve().parents[1] / "public/assets/audio"
     target.mkdir(parents=True, exist_ok=True)
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
@@ -71,8 +92,8 @@ def main() -> None:
         return (args.extras if name in extras else args.downloads) / name
     with tempfile.TemporaryDirectory(prefix="zombonz-audio-") as scratch:
         staging = Path(scratch)
-        for archive_name in sorted({row[0] for row in CLIPS}):
-            members = [row[1] for row in CLIPS if row[0] == archive_name and row[1]]
+        for archive_name in sorted({row[0] for row in rows}):
+            members = [row[1] for row in rows if row[0] == archive_name and row[1]]
             if not members:
                 continue
             archive = archive_path(archive_name)
@@ -83,7 +104,7 @@ def main() -> None:
                 with zipfile.ZipFile(archive) as packed:
                     for member in members:
                         packed.extract(member, staging)
-        for archive_name, member, name, seconds in CLIPS:
+        for archive_name, member, name, seconds in rows:
             source = staging / member if member else archive_path(archive_name)
             if not source.is_file():
                 raise FileNotFoundError(source)
@@ -93,7 +114,10 @@ def main() -> None:
                        "-t", str(seconds), "-ac", "1", "-ar", "24000" if ambience else "32000",
                        "-b:a", "48k" if ambience else "64k", "-codec:a", "libmp3lame"]
             if not ambience:
-                command += ["-af", "highpass=f=45,silenceremove=start_periods=1:start_threshold=-55dB"]
+                # Fade the last 0.25 s so a clip cut short of its tail never ends on a click.
+                fade = max(0.0, seconds - 0.25)
+                command += ["-af", "highpass=f=45,silenceremove=start_periods=1:start_threshold=-55dB,"
+                            f"afade=t=out:st={fade}:d=0.25"]
             command.append(str(output))
             subprocess.run(command, check=True)
             subprocess.run([ffmpeg, "-v", "error", "-i", str(output), "-f", "null", "-"],
