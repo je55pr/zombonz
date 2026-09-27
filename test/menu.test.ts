@@ -36,15 +36,22 @@ describe('settings', () => {
 const READY: DownloadStatus = { phase: 'ready', loadedBytes: 100, totalBytes: 100, doneFiles: 3, totalFiles: 3, failedFiles: 0 };
 
 describe('start menu', () => {
-  it('offers Solo, Multiplayer and Settings, and only Solo starts the game', () => {
+  it('offers Solo, Multiplayer and Settings, and Solo starts the game on the chosen map', () => {
     const state = createMenuState({ ...DEFAULT_SETTINGS }, READY);
     expect(menuItems(state).map(item => item.label)).toEqual(['Solo', 'Multiplayer', 'Settings']);
     expect(reduceMenu(state, { type: 'activate', index: 1 })).toBeNull();
     expect(state.screen).toBe('multiplayer');
     reduceMenu(state, { type: 'back' });
     expect(state.screen).toBe('main');
-    expect(reduceMenu(state, { type: 'activate', index: 0 })).toEqual({ type: 'startSolo' });
+    expect(reduceMenu(state, { type: 'activate', index: 0 })).toBeNull();
+    expect(state.screen).toBe('maps');
+    expect(menuItems(state).map(item => item.label)).toEqual(['Bunker', 'Asylum', 'Back']);
+    reduceMenu(state, { type: 'back' });
+    expect(state.screen).toBe('main');
+    reduceMenu(state, { type: 'activate', index: 0 });
+    expect(reduceMenu(state, { type: 'activate', index: 1 })).toEqual({ type: 'startSolo', map: 'asylum' });
     expect(state.screen).toBe('loading');
+    expect(state.map).toBe('asylum');
     // Once loading, input is ignored so the game cannot be started twice.
     expect(reduceMenu(state, { type: 'activate' })).toBeNull();
   });
@@ -74,7 +81,8 @@ describe('start menu', () => {
     setDownload(state, READY);
     expect(menuItems(state)[0].disabled).toBe(false);
     expect(state.selected).toBe(0);
-    expect(reduceMenu(state, { type: 'activate' })).toEqual({ type: 'startSolo' });
+    reduceMenu(state, { type: 'activate' });
+    expect(reduceMenu(state, { type: 'activate' })).toEqual({ type: 'startSolo', map: 'bunker' });
   });
 
   it('keeps play locked while downloaded files are unpacked', () => {

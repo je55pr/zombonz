@@ -3,6 +3,7 @@ import {
 } from './menu.ts';
 import type { GameSettings } from './settings.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
+import { MAP_CATALOG } from '../maps/catalog.ts';
 
 interface Row { index: number; x: number; y: number; width: number; height: number; left?: Box; right?: Box }
 interface Box { x: number; y: number; width: number; height: number }
@@ -117,7 +118,7 @@ export class MenuView {
       title = `Downloading models and textures  ${Math.floor(fraction * 100)}%`;
       detail = `${mb(d.loadedBytes)} / ${mb(d.totalBytes)} MB  ·  ${d.doneFiles} / ${d.totalFiles} files`;
     } else if (d.phase === 'preparing') {
-      title = `Preparing Bunker  ${Math.floor(fraction * 100)}%`;
+      title = `Preparing maps  ${Math.floor(fraction * 100)}%`;
       detail = `Unpacking models and textures  ·  ${d.preparedSteps ?? 0} / ${d.totalSteps ?? 0}`;
     } else if (d.phase === 'ready') {
       title = d.failedFiles ? `Ready, with ${d.failedFiles} file${d.failedFiles > 1 ? 's' : ''} missing` : 'Ready';
@@ -177,7 +178,7 @@ export class MenuView {
     }
     if (screen === 'loading') {
       c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(28 * scale)}px ${UI_FONT}`;
-      c.fillText('Starting Bunker…', centre, y);
+      c.fillText(`Starting ${MAP_CATALOG.find(map => map.id === this.state.map)?.name ?? 'the map'}…`, centre, y);
     }
     if (screen === 'main') this.drawDownload(centre, height * 0.22 + 112 * scale, scale);
     const rowHeight = 58 * scale, rowWidth = Math.min(width - 32, (screen === 'settings' ? 560 : 340) * scale);

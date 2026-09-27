@@ -8,7 +8,8 @@ Browser-based, round-driven co-op zombie survival game built with Three.js.
 
 - Strongly target the grounded, weighty **World at War / Black Ops 1 Zombies** feel rather than modern movement-heavy FPS design.
 - Support **1-N players** architecturally. Classic small co-op is the first target; larger player counts are an explicit scalability experiment rather than a promise.
-- Use handcrafted maps. **Bunker** is the first development/reference map for validating the classic loop.
+- Use handcrafted maps. **Bunker** is the first development/reference map for validating the classic loop;
+  **Asylum**, a two-sided sanatorium joined by a balcony, is the second. Choose one after Solo.
 - Preserve match purity for now: players start each run fresh rather than bringing persistent power/loadouts into a match.
 - Mirror the classic loop closely: escalating rounds, points, doors, wall weapons, random weapon box, barriers, revives, perks, power, power-ups, ammo pressure and game-over survival.
 - Stay close to the original WWII / occult-horror flavour while the project identity develops.
@@ -174,6 +175,7 @@ Press F2 for asset credits. Full source links, licences and conversion notes are
 For map development, `/?preview=start`, `/?preview=help` and `/?preview=upstairs`
 open inspection views with waves disabled, routes open and 10000 test points.
 These overrides are development-only; the normal URL starts the standard survival game.
+Add `&map=asylum` to any preview URL to open Asylum instead of Bunker (see [Asylum](docs/asylum-map.md)).
 `/?preview=wallBuys` and `/?preview=helpWalls` face the start-room and HELP-room chalk wall buys.
 `/?preview=barrier` runs a live wave at the first window for entry-animation checks.
 `/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and

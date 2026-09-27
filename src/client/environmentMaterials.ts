@@ -1,9 +1,8 @@
 import * as THREE from 'three';
 import { getAsset } from './assetStore.ts';
-import type { GreyboxBox, GreyboxMaterial } from '../maps/bunker.ts';
+import { SURFACE_LOOKS, type GreyboxBox, type GreyboxMaterial } from '../maps/gameMap.ts';
 
-export const MATERIAL_IDS = ['weathered-concrete-a', 'weathered-concrete-b', 'cracked-concrete-floor',
-  'broken-plaster-brick', 'concrete-rubble', 'cave-rock', 'dirt', 'splintered-wood', 'rusted-metal', 'sofa-upholstery'] as const;
+export const MATERIAL_IDS = SURFACE_LOOKS;
 export type EnvironmentMaterialId = typeof MATERIAL_IDS[number];
 export interface EnvironmentManifest {
   materials: Record<EnvironmentMaterialId, { basecolor: string; normal: string; arm: string }>;
@@ -28,6 +27,8 @@ export function bunkerMaterial(kind: GreyboxMaterial): THREE.MeshStandardMateria
 
 // Keep structural concrete on piers/beams; plaster belongs on large vertical wall panels.
 export function materialForBox(entry: GreyboxBox): EnvironmentMaterialId {
+  // Maps built with MapBuilder choose each box's look; these rules are tuned to Bunker's layout.
+  if (entry.look) return entry.look;
   if (entry.center.x < -8 && entry.material === 'wall') return 'cave-rock';
   if (entry.material === 'floor' && entry.center.x < -8) return 'dirt';
   if (entry.material !== 'wall') return roles[entry.material];

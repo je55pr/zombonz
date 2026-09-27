@@ -141,7 +141,7 @@ export class CanvasHud {
   private readonly roundCounter: RoundCounter;
   private readonly crosshair: Crosshair;
 
-  constructor(private readonly renderer: THREE.WebGLRenderer) {
+  constructor(private readonly renderer: THREE.WebGLRenderer, private readonly mapName = 'Bunker') {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this.onKeyDown);
     this.canvas.width = 1600;
     this.canvas.height = 900;
@@ -260,7 +260,7 @@ export class CanvasHud {
     }
 
     // Top: the map, the credits key and the controls, kept quiet.
-    this.text('BUNKER', 40, 40, { size: 22, font: 'title', color: DIM });
+    this.text(this.mapName.toUpperCase(), 40, 40, { size: 22, font: 'title', color: DIM });
     this.text('F2  CREDITS', 42, 66, { size: 13, weight: 500, color: FAINT, spacing: 2 });
     // The controls line only fits clear of the map name on wider screens; the pause screen always lists them.
     const controls: TextStyle = { size: 13, weight: 500, color: FAINT, align: 'center', spacing: 1.5 };
@@ -363,7 +363,7 @@ export class CanvasHud {
     }
     if (snapshot.paused && !snapshot.gameOver) {
       this.overlay(width, height, 0.66);
-      this.text(snapshot.awaitingStart ? 'BUNKER' : 'PAUSED', centre, height * 0.41,
+      this.text(snapshot.awaitingStart ? this.mapName.toUpperCase() : 'PAUSED', centre, height * 0.41,
         { size: 76, font: 'title', align: 'center' });
       this.rule(centre, height * 0.48, 560, 'rgba(216,56,43,0.8)');
       this.text(snapshot.awaitingStart ? 'CLICK TO START' : 'CLICK TO RESUME', centre, height * 0.54,

@@ -1,15 +1,12 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
 import { environmentMaterial, projectWorldUvs } from './environmentMaterials.ts';
-import { BUNKER_DOORS, BUNKER_WINDOWS, BUNKER_WALL_WEAPONS, BUNKER_WALL_WEAPON_FACING, BUNKER_BOX_CENTER, BUNKER_RAILS,
-  BUNKER_WINDOW_BOARDS,
-  UPPER_HEIGHT } from '../maps/bunker.ts';
+import type { GameMap } from '../maps/gameMap.ts';
 import type { SimulationState } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
 import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
 import { BOX_RULES } from '../core/mysteryBox.ts';
-import { px, pz } from '../maps/bunkerPlan.ts';
 
 // Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
 const PLANK_TILT = [0.07, -0.16, 0.12, -0.08, 0.17, -0.05] as const;
@@ -44,9 +41,14 @@ function mountWallGun(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Ma
   place(outline, new THREE.Vector3(0.002, (size.y * WALL_GUN_SCALE + 0.05) / size.y, rim), 0.004);
 }
 
-export function buildBunkerDetails(scene: THREE.Scene): { update(state: SimulationState): void; ready: Promise<unknown> } {
+/**
+ * Everything drawn on top of a map's greybox from its definition: window boards and frames, stair
+ * rails, purchasable doors and debris, painted labels, chalk wall guns, the mystery box, practical
+ * lamps, rubble and the surrounding treeline. `update` follows the authoritative simulation state.
+ */
+export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(state: SimulationState): void; ready: Promise<unknown> } {
   const group = new THREE.Group();
-  group.name = 'bunker-details';
+  group.name = `${map.id}-details`;
   scene.add(group);
   const wood = bunkerMaterial('barrier');
   const concrete = bunkerMaterial('wall');
@@ -77,7 +79,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   }
   // Broken wooden window boards, deep frames, and projecting stone sills.
   const barrierViews = new Map<string, THREE.Mesh[]>();
-  for (const opening of BUNKER_WINDOWS) {
+  for (const opening of map.windows) {
     const frame = new THREE.Group();
     frame.position.set(opening.x, opening.y, opening.z);
     if (opening.axis === 'z') frame.rotation.y = Math.PI / 2;
@@ -87,7 +89,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     box(frame, iron, opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
     const planks: THREE.Mesh[] = [];
     barrierViews.set(opening.id, planks);
-    for (let i = 0; i < BUNKER_WINDOW_BOARDS; i++) {
+    for (let i = 0; i < map.windowBoards; i++) {
       const plank = box(frame, wood, 0, plankHeight(i), 0.03, opening.width + 0.1, 0.16, 0.09);
       plank.rotation.z = PLANK_TILT[i % PLANK_TILT.length];
       plank.userData.dynamic = true;
@@ -95,9 +97,7 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     }
   }
   // Architecture lives in shared map data, so the visuals and collision agree.
-  // Short exposed reinforcing bars hang across the surviving roof edges.
-  for (let i = 0; i < 12; i++) box(group, iron, px(-4.7) + i * 0.34, 6.66, pz(-9.2), 0.025, 0.035, 1.5);
-  for (const rail of BUNKER_RAILS) {
+  for (const rail of map.rails) {
     const a = new THREE.Vector3(rail.from.x, rail.from.y, rail.from.z);
     const b = new THREE.Vector3(rail.to.x, rail.to.y, rail.to.z);
     const direction = b.clone().sub(a);
@@ -108,36 +108,39 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     box(group, iron, a.x, a.y - 0.44, a.z, 0.035, 0.88, 0.035);
   }
   const doorViews = new Map<string, THREE.Group>();
-  for (const door of BUNKER_DOORS) {
+  for (const door of map.doors) {
     const view = new THREE.Group(); group.add(view); doorViews.set(door.id, view);
     view.userData.dynamic = true;
-    if (door.id === 'help-room') {
-      for (let i = 0; i < 6; i++) box(view, wood, 0, 1.4, -1 + i * 0.4, 0.24, 2.8, 0.38);
-      box(view, iron, -0.14, 0.65, 0, 0.06, 0.12, 2.3);
-      box(view, iron, -0.14, 2.05, 0, 0.06, 0.12, 2.3);
-      const help = writing('HELP', 1.7, 0.62, '#d9d0ba');
-      help.rotation.y = Math.PI / 2; help.position.set(0.17, 1.5, 0); view.add(help);
+    const style = map.doorStyles[door.id] ?? { kind: 'planks', yaw: 0, width: 2.4 };
+    view.position.set(door.position.x, door.position.y, door.position.z);
+    view.rotation.y = style.yaw;
+    if (style.kind === 'planks') {
+      // Vertical boards across the doorway, two iron straps, and an optional painted word.
+      view.position.y = 0;
+      const boards = Math.max(2, Math.round(style.width / 0.4));
+      for (let i = 0; i < boards; i++) box(view, wood, 0, 1.4, -style.width / 2 + (i + 0.5) * style.width / boards, 0.24, 2.8, style.width / boards - 0.02);
+      box(view, iron, -0.14, 0.65, 0, 0.06, 0.12, style.width - 0.1);
+      box(view, iron, -0.14, 2.05, 0, 0.06, 0.12, style.width - 0.1);
+      if (style.label) {
+        const label = writing(style.label, 1.7, 0.62, '#d9d0ba');
+        label.rotation.y = Math.PI / 2; label.position.set(0.17, 1.5, 0); view.add(label);
+      }
     } else {
-      const { x, y, z } = door.position;
-      view.position.set(x, y, z);
-      if (door.id === 'start-stairs') view.rotation.y = Math.PI / 2;
-      // A sofa and stacked crates, matching the silhouette of the original map's debris.
-      const width = door.id === 'start-stairs' ? 1.85 : 1.45;
+      // A sofa and stacked crates across the stair.
+      const width = style.width;
       box(view, upholstery, 0, 0.35, 0, width, 0.55, 0.75);
       box(view, upholstery, 0, 0.85, 0.3, width, 0.7, 0.25);
       for (const side of [-1, 1]) box(view, upholstery, side * (width / 2 - 0.12), 0.8, 0, 0.24, 0.65, 0.75);
       const crate = box(view, wood, 0.2, 1.4, 0, 0.8, 0.7, 0.7); crate.rotation.y = 0.23;
     }
   }
-  label('HELP', px(0.215), 2.3, pz(2.2), Math.PI / 2, 1.6, 0.45);
-  label('YOU MUST ASCEND', px(5.6), 2.4, pz(-2.385), 0, 2.7, 0.38);
-  label('FROM DARKNESS', px(5.6), 2, pz(-2.385), 0, 2.5, 0.38);
+  for (const text of map.labels) label(text.text, text.x, text.y, text.z, text.yaw, text.width, text.height, text.color);
   const chalk = new THREE.MeshBasicMaterial({ color: CHALK });
   const wallGuns: Promise<unknown>[] = [];
-  for (const weapon of BUNKER_WALL_WEAPONS) {
+  for (const weapon of map.wallWeapons) {
     const sign = new THREE.Group();
     sign.position.set(weapon.position.x, weapon.position.y + 0.4, weapon.position.z);
-    sign.rotation.y = BUNKER_WALL_WEAPON_FACING[weapon.id] ?? 0;
+    sign.rotation.y = map.wallWeaponFacing[weapon.id] ?? 0;
     group.add(sign);
     // The real gun over its chalk outline; a chalk bar with a blocky rifle only if the model can't load.
     const pending = prepareWeaponModel(weapon.weaponId);
@@ -154,8 +157,8 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
     name.position.set(0, -0.38, 0.03); sign.add(name);
   }
   // One fixed, iron-bound random box. Its authoritative state drives the lid.
-  const chest = new THREE.Group(); chest.position.set(BUNKER_BOX_CENTER.x, 0, BUNKER_BOX_CENTER.z);
-  chest.rotation.y = Math.PI / 2; group.add(chest);
+  const chest = new THREE.Group(); chest.position.set(map.boxCenter.x, 0, map.boxCenter.z);
+  chest.rotation.y = map.boxYaw; group.add(chest);
   for (const z of [-0.8, 0.8]) box(chest, iron, 0, 0.55, z, 1.01, 1.12, 0.12);
   const lid = new THREE.Group(); lid.position.set(-0.49, 1.06, 0); chest.add(lid);
   lid.userData.dynamic = true;
@@ -194,25 +197,25 @@ export function buildBunkerDetails(scene: THREE.Scene): { update(state: Simulati
   };
   // Warm practical lights against cold exterior moonlight.
   const practicalLights: THREE.PointLight[] = [];
-  for (const [x, y, z] of [[-0.7, 2.35, -2], [5, 2.65, 2], [-0.7, 5.75, 2.5]] as const) {
-    const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(px(x), y, pz(z)); group.add(light);
+  for (const { x, y, z } of map.lights) {
+    const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(x, y, z); group.add(light);
     practicalLights.push(light);
   }
   // Low rubble stays below the collision step height and out of navigation lanes.
   let seed = 753;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-  for (let i = 0; i < 100; i++) {
-    const x = px(-5.7 + random() * 4.8), z = pz(-10.5 + random() * 15);
-    const y = i % 3 === 0 ? UPPER_HEIGHT : 0;
-    const rubble = box(group, i % 3 ? debris : wood, x, y + 0.045, z, 0.12 + random() * 0.3, 0.09, 0.1 + random() * 0.25);
+  for (const area of map.rubble) for (let i = 0; i < area.count; i++) {
+    const x = area.minX + random() * (area.maxX - area.minX), z = area.minZ + random() * (area.maxZ - area.minZ);
+    const rubble = box(group, i % 3 ? debris : wood, x, area.y + 0.045, z, 0.12 + random() * 0.3, 0.09, 0.1 + random() * 0.25);
     rubble.rotation.y = random() * Math.PI;
   }
   // A foggy treeline is visible through every opening, with no external assets.
-  box(group, environmentMaterial('dirt'), 0, -0.25, 0, 160, 0.1, 160);
+  box(group, environmentMaterial('dirt'), map.focus.x, -0.25, map.focus.z, 180, 0.1, 180);
   const bark = new THREE.MeshStandardMaterial({ color: 0x1d2422, roughness: 1 });
   for (let i = 0; i < 55; i++) {
-    const angle = random() * Math.PI * 2, radius = 34 + random() * 25;
-    const tree = new THREE.Group(); tree.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    const angle = random() * Math.PI * 2, radius = map.focus.radius * 1.62 + random() * 25;
+    const tree = new THREE.Group();
+    tree.position.set(map.focus.x + Math.cos(angle) * radius, 0, map.focus.z + Math.sin(angle) * radius);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.27, 7 + random() * 6, 5), bark);
     trunk.position.y = 4; tree.add(trunk);
     for (let j = 0; j < 3; j++) {

@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { MenuView } from './client/menuView.ts';
+import type { MapId } from './maps/catalog.ts';
 import { INITIAL_DOWNLOAD } from './client/menu.ts';
 import { loadSettings, saveSettings } from './client/settings.ts';
 
@@ -18,8 +19,8 @@ let menuCanvas: HTMLCanvasElement | undefined;
  * Builds the game behind the menu and only swaps canvases once it reports the map, zombie and starting
  * gun ready (or after a timeout, so a stalled warm-up can never trap the player on the menu).
  */
-async function startSolo(module: GameModule): Promise<void> {
-  const ready = module.startGame(gameCanvas!, loadSettings());
+async function startSolo(module: GameModule, map: MapId): Promise<void> {
+  const ready = module.startGame(gameCanvas!, loadSettings(), map);
   await Promise.race([ready.catch(error => console.warn('Game warm-up failed', error)),
     new Promise(resolve => setTimeout(resolve, 20000))]);
   menuCanvas?.remove();
@@ -71,7 +72,7 @@ if (import.meta.env.DEV && new URLSearchParams(location.search).has('preview')) 
     if (effect.type === 'saveSettings') saveSettings(effect.settings);
     if (effect.type === 'retryDownload') void downloadGame(view);
     // Solo is only selectable once the download has finished, so the module is loaded.
-    if (effect.type === 'startSolo' && game) void startSolo(game);
+    if (effect.type === 'startSolo' && game) void startSolo(game, effect.map);
   }, buildId);
   menu = view;
   void downloadGame(view);

@@ -1,11 +1,10 @@
-import { BUNKER_PROPS } from '../maps/bunkerProps.ts';
+import { MAPS } from '../maps/index.ts';
 import { assetUrl, MATERIAL_IDS, readEnvironmentManifest } from './environmentMaterials.ts';
-import { DECALS } from './environmentProps.ts';
 import { WEAPON_ASSETS, zombieAssetPaths, type ZombieAssetId } from './runtimeAssets.ts';
 import { storeAsset } from './assetStore.ts';
 import { AUDIO_CLIPS } from './audioClips.ts';
 
-/** Every file the solo game fetches: environment maps, props, the zombie rig, all weapon models and every sound. */
+/** Every file the solo game fetches, for every map: environment maps, props, the zombie rig, all weapon models and every sound. */
 export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<string[]> {
   const manifest = await readEnvironmentManifest();
   const paths = ['/assets/environment/manifest.json'];
@@ -13,11 +12,11 @@ export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<
     const item = manifest.materials[id];
     paths.push(item.basecolor, item.normal, item.arm);
   }
-  for (const id of new Set(DECALS.map(decal => decal.asset))) {
+  for (const id of new Set(Object.values(MAPS).flatMap(map => map.decals.map(decal => decal.asset)))) {
     const maps = manifest.decals[id].maps;
     paths.push(maps.basecolor, maps.opacity);
   }
-  for (const asset of new Set(BUNKER_PROPS.map(prop => prop.asset))) paths.push(`/assets/props/${asset}/model.glb`);
+  for (const asset of new Set(Object.values(MAPS).flatMap(map => map.props.map(prop => prop.asset)))) paths.push(`/assets/props/${asset}/model.glb`);
   paths.push(...zombieAssetPaths(zombie).map(path => `/assets/${path}`));
   for (const asset of new Set(Object.values(WEAPON_ASSETS))) paths.push(`/assets/weapons/${asset}/model.glb`);
   for (const clip of AUDIO_CLIPS) paths.push(`/assets/audio/${clip}.mp3`);
