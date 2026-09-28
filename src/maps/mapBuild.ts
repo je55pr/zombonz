@@ -1,6 +1,7 @@
 import { sampleWalkHeight, walkSurfaceHeight, type CollisionBox, type WalkSurface } from '../core/collision.ts';
 import { hasClearNavigationLine, hasWalkableConnection, type NavigationGraph, type NavigationNode } from '../core/navigation.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
+import type { ZombieSpawnPoint } from '../core/spawning.ts';
 import type { Vec3 } from '../core/types.ts';
 import { propCollisionBox, type PropPlacement } from './bunkerProps.ts';
 import type { GreyboxBox, GreyboxMaterial, GreyboxPrism, MapRail, MapWindow, SurfaceLook } from './gameMap.ts';
@@ -135,22 +136,43 @@ export class MapBuilder {
   }
 }
 
+/** A point `distance` out from a window and `sideways` along it, at the window's floor. */
+export function windowPoint(w: Pick<MapWindow, 'x' | 'y' | 'z' | 'outward'>, distance: number, sideways = 0): Vec3 {
+  return { x: w.x + w.outward.x * distance + w.outward.z * sideways, y: w.y,
+    z: w.z + w.outward.z * distance - w.outward.x * sideways };
+}
+
 /**
- * Ground-floor windows become zombie entries: a path in from five metres outside, a landing just
- * inside. Upper windows stay decorative unless listed in `upperEntries`; zombies reach those along a
- * short outside ledge (the map draws it) instead.
+ * Ground-floor windows become zombie entries, and so do the upper windows listed in `upperEntries`.
+ * `routes` gives an entry's way in, from where its zombies appear (out in the fog, or across the
+ * courtyard) to 2.4 m out, where every route ends the same way: to the sill, then a landing just inside.
+ * An entry without a route is approached from five metres straight out. The landing 2.4 m out is 0.6 m
+ * along the window unless `sideways` moves it (to keep zombies' lanes off a wall beside the window).
  */
 export function barriersFromWindows(windows: readonly MapWindow[], boards: number,
-  upperEntries: readonly string[] = []): BarrierDefinition[] {
+  upperEntries: readonly string[] = [], routes: Readonly<Record<string, readonly Vec3[]>> = {},
+  sideways: Readonly<Record<string, number>> = {}): BarrierDefinition[] {
   return windows.filter(w => w.y === 0 || upperEntries.includes(w.id)).map(w => {
-    const point = (distance: number, sideways = 0): Vec3 => ({
-      x: w.x + w.outward.x * distance + w.outward.z * sideways, y: w.y,
-      z: w.z + w.outward.z * distance - w.outward.x * sideways,
-    });
-    const approachPath = w.y === 0 ? [point(5, 0.6), point(2.4, 0.6), point(0.85)] : [point(2.6, 0.6), point(1.8, 0.6), point(0.85)];
+    const point = (distance: number, along = 0) => windowPoint(w, distance, along);
+    const approachPath = [...routes[w.id] ?? [point(5, 0.6)], point(2.4, sideways[w.id] ?? 0.6), point(0.85)];
     return { id: w.id, position: { x: w.x, y: w.y, z: w.z }, outward: w.outward, width: w.width, maxBoards: boards,
       approachPath, insidePoint: point(-0.95) };
   });
+}
+
+/**
+ * Where an entry's zombies appear: the start of its route, and a spot either side of it a little further
+ * out (or the given `others`), so a round's zombies shamble in scattered rather than single file. Each
+ * walks straight from where it appears to the route's second waypoint. Every entry gets three spots, so
+ * the spawn director still picks between entries evenly.
+ */
+export function entrySpawns(barrier: BarrierDefinition, others?: readonly Vec3[], spread = 2.4): ZombieSpawnPoint[] {
+  const [start, next] = barrier.approachPath;
+  const length = Math.hypot(start.x - next.x, start.z - next.z) || 1;
+  const away = { x: (start.x - next.x) / length, z: (start.z - next.z) / length };
+  const aside = (sideways: number, further: number): Vec3 => ({ x: start.x - away.z * sideways + away.x * further, y: start.y,
+    z: start.z + away.x * sideways + away.z * further });
+  return [start, ...others ?? [aside(spread, 1), aside(-spread, 1.6)]].map(point => ({ ...point, barrierId: barrier.id }));
 }
 
 export function collisionBoxesFor(shell: readonly GreyboxBox[], props: readonly PropPlacement[]): CollisionBox[] {

@@ -2,8 +2,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // Bake world transforms once, retaining material/shadow flags and local culling.
-// Mark animated objects (or their parents) dynamic before calling this.
-export function batchStaticMeshes(root: THREE.Object3D): void {
+// Mark animated objects (or their parents) dynamic before calling this. Meshes merge within cells of
+// `cellSize` metres: smaller cells cull better, larger ones make fewer draws.
+export function batchStaticMeshes(root: THREE.Object3D, cellSize = 12): void {
   root.updateMatrixWorld(true);
   const inverse = root.matrixWorld.clone().invert();
   const buckets = new Map<string, THREE.Mesh<THREE.BufferGeometry, THREE.Material>[]>();
@@ -15,7 +16,7 @@ export function batchStaticMeshes(root: THREE.Object3D): void {
       if (parent === root) break;
     }
     object.getWorldPosition(position);
-    const cell = [position.x, position.y, position.z].map(value => Math.floor(value / 12)).join(',');
+    const cell = [position.x, position.y, position.z].map(value => Math.floor(value / cellSize)).join(',');
     // Shared environment materials now span indexed boxes, non-indexed slabs and
     // imported GLBs. Only merge compatible vertex layouts; never drop tangents/UVs.
     const attributes = Object.entries((object.geometry as THREE.BufferGeometry).attributes).sort(([a], [b]) => a.localeCompare(b))

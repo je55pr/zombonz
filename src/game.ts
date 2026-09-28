@@ -137,6 +137,12 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   /** Whether the moon's shadow map is out of date: it is redrawn only when the building changes. */
   let shadowsDirty = true;
   batchStaticMeshes(scene);
+  // Scenery beyond the building is a few hundred plain boxes: one batch per material costs fewer draws
+  // than culling it in pieces would save.
+  if (map.scenery?.length) {
+    const scenery = buildGreybox(map.scenery); scenery.name = 'map-scenery';
+    batchStaticMeshes(scenery, Infinity); scene.add(scenery);
+  }
   let environmentNotice: string | null = 'Loading map materials and props…';
   const environmentReady = (async () => {
     // Prop proxies/collision must stay visible even when the texture manifest fails.
@@ -144,7 +150,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const surfaces = readEnvironmentManifest().then(manifest =>
       Promise.all([loadEnvironmentMaterials(manifest), buildEnvironmentDecals(scene, manifest, map.decals),
         applySky(scene, manifest, keyLight).then(() => 0, error => { console.warn('Night sky unavailable', error); return 1; }),
-        buildTreeline(scene, map.focus).then(() => 0)]))
+        buildTreeline(scene, map).then(() => 0)]))
       .catch(error => { console.warn('Environment manifest unavailable', error); return [1]; });
     const [propFailures, surfaceFailures] = await Promise.all([props, surfaces]);
     environmentNotice = propFailures > 0 || surfaceFailures.some(n => n > 0) ? 'Some environment assets failed to load; check console' : null;
