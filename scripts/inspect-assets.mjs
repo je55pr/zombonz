@@ -1,8 +1,22 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { closeSync, existsSync, openSync, readdirSync, readFileSync, readSync } from 'node:fs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { Box3, Vector3 } from 'three';
 export function readAssetJson(path) { return JSON.parse(readFileSync(path, 'utf8')); }
 export function assetExists(path) { return existsSync(path); }
+/** Every GLB under a folder. */
+export function glbFiles(dir) {
+  return readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? glbFiles(`${dir}/${entry.name}`)
+    : entry.name.endsWith('.glb') ? [`${dir}/${entry.name}`] : []);
+}
+/** A GLB's JSON chunk, read without loading its binary payload. */
+export function readGlbJson(path) {
+  const file = openSync(path, 'r');
+  try {
+    const header = Buffer.alloc(20); readSync(file, header, 0, 20, 0);
+    const json = Buffer.alloc(header.readUInt32LE(12)); readSync(file, json, 0, json.length, 20);
+    return JSON.parse(json.toString('utf8'));
+  } finally { closeSync(file); }
+}
 
 // Geometry/rig inspection without decoding textures or requiring a GPU.
 globalThis.ProgressEvent ??= class { constructor(type, properties) { Object.assign(this, { type }, properties); } };

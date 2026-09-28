@@ -10,6 +10,7 @@ import { ALL_EXTENSIONS, EXTTextureWebP } from '@gltf-transform/extensions';
 import { dedup, prune, simplify, weld } from '@gltf-transform/functions';
 import { MeshoptSimplifier } from 'meshoptimizer';
 import sharp from 'sharp';
+import { plainGlass } from './plain-glass.mjs';
 
 const CACHE = 'C:/ChatGPT/Shared/Cache/ZombonzAssets';
 const publicRoot = fileURLToPath(new URL('../../public', import.meta.url));
@@ -62,6 +63,8 @@ async function importProp([id, source, purpose, triangles]) {
     await doc.transform(weld(), simplify({ simplifier: MeshoptSimplifier, ratio: triangles / before, error: 0.01, lockBorder: false }));
   }
   await doc.transform(dedup(), prune());
+  // Transmissive glass would make three.js redraw the scene for it every frame.
+  plainGlass(doc);
   for (const texture of doc.getRoot().listTextures()) {
     const slots = new Set(doc.getGraph().listParentEdges(texture).map(edge => edge.getName()));
     const normal = slots.has('normalTexture');

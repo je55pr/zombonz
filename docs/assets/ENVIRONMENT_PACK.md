@@ -31,7 +31,9 @@ Decals expose whichever of base colour, normal, opacity, roughness, and AO the s
 runtime assets:
 
 - **15 props**, as 1K WebP GLBs. Heavy meshes are simplified to a triangle budget; the dead tree
-  trunk went from 83k to 6k triangles.
+  trunk went from 83k to 6k triangles. Transmissive glass (the clock face, the generator's gauge,
+  the lamps) becomes plain see-through glass through `plain-glass.mjs`, which also fixed the older
+  wall lamp and bulb: while transmissive glass is on screen, three.js draws the whole scene twice.
 - **7 materials**, in the convention above. The salmon painted plaster, maroon tiles and orange
   linoleum are colour-graded at import into sage paint, grimy white tiles and a faded floor.
 - **A night-sky panorama** (`/assets/environment/sky/moonlit-night.webp`), listed under `sky` in the
