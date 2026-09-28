@@ -10,6 +10,11 @@ Creator: Peter_D (@better_peter)
 Source: https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f
 Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; animation clips separated for runtime use. Textures later re-encoded as WebP (colour/normal kept at full size, packed maps at most 1K) and an embedded texture no material used was removed.
 
+WW2 US Army Ranger (the teammate figure)
+Creator: Tactical_Beard
+Source: https://sketchfab.com/3d-models/dcbe89cd5de243af8e4677b769a831c6
+Changes: rigged and animated with Adobe Mixamo (Rifle Idle, Rifle Walk, Rifle Run and Dying, the walk and run made to play in place); converted to one glTF with 512 px to 1K WebP textures.
+
 Vintage Vending Machine (the perk machines)
 Creator: cansuaydin
 Source: https://sketchfab.com/3d-models/fba2e698ba294ab688cb3643b772f20f

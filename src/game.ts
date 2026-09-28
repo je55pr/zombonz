@@ -30,7 +30,7 @@ import { createMatch, simulationMap } from './maps/match.ts';
 import type { NetHost } from './net/host.ts';
 import type { NetClient, StartInfo } from './net/client.ts';
 import type { LobbyPlayer } from './net/protocol.ts';
-import { PlayerView } from './client/playerView.ts';
+import { PlayerView, TEAMMATE_MODEL } from './client/playerView.ts';
 import { applySky } from './client/sky.ts';
 import { TREELINE_ASSETS, buildTreeline } from './client/treeline.ts';
 
@@ -72,6 +72,7 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
     ...[...new Set([...allMaps.flatMap(map => map.props.map(prop => prop.asset)), ...TREELINE_ASSETS])]
       .map(asset => () => loadModel(`props/${asset}/model.glb`)),
     () => loadModel(VENDING_MODEL),
+    () => loadModel(TEAMMATE_MODEL),
     () => loadZombieAsset(zombie),
     () => prepareWeaponModel('starter-pistol'),
     // The chalk wall buys hang the real guns.
@@ -158,6 +159,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const previewName = new URLSearchParams(location.search).get('preview');
   const previewPowerup = new URLSearchParams(location.search).get('powerup');
   const forceAim = import.meta.env.DEV && new URLSearchParams(location.search).get('aim') === '1';
+  const previewTeammate = import.meta.env.DEV ? new URLSearchParams(location.search).get('teammate') : null;
   const preview = import.meta.env.DEV && !net && previewName && Object.hasOwn(previewViews, previewName)
     ? previewViews[previewName as keyof typeof previewViews] : null;
 
@@ -166,7 +168,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const simulation = net ? createMatch(map, lobbyPlayers.length, net.role === 'host' ? net.seed : net.start.seed) : new GameSimulation({
     seed: 0x5a0b0a2,
     map: { ...simulationMap(map), zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns },
-    playerSpawns: [preview?.position ?? map.playerSpawn],
+    // `&teammate=idle|run|down` adds a teammate three metres ahead, to inspect their figure.
+    playerSpawns: [preview?.position ?? map.playerSpawn, ...(previewTeammate && preview ? [{
+      x: preview.position.x - Math.sin(preview.yaw) * 3, y: preview.position.y, z: preview.position.z - Math.cos(preview.yaw) * 3 }] : [])],
     ...(previewName === 'stress' && preview ? { spawnConfig: {
       baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
     } } : {}),
@@ -184,6 +188,12 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   if (!simulation.getPlayer(playerId)) throw new Error('Simulation failed to create local player.');
   /** Every player's name by entity id, in a co-op game. */
   const names = new Map<EntityId, string>(lobbyPlayers.map(player => [simulation.playerIds[player.slot], player.name]));
+  const previewMate = previewTeammate && preview ? simulation.getPlayer(simulation.playerIds[1]) : null;
+  if (previewMate) {
+    names.set(previewMate.id, 'Teammate');
+    previewMate.yaw = preview!.yaw + Math.PI + (previewTeammate === 'run' ? Math.PI / 2 : 0);
+    if (previewTeammate === 'down') { previewMate.health = 1; damagePlayer(previewMate, 50); }
+  }
   const playerViews = new Map<EntityId, PlayerView>();
   if (preview) {
     simulation.getPlayer(playerId)!.yaw = preview.yaw;
@@ -294,7 +304,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     zombieBatch.update(Array.from(zombieViews.values(), view => view.root));
   }
   /** Teammates' figures, in a co-op game. */
-  function syncPlayerViews(alpha: number, previous: ReadonlyMap<EntityId, Vec3>): void {
+  function syncPlayerViews(alpha: number, tick: number, previous: ReadonlyMap<EntityId, Vec3>): void {
     for (const [id, name] of names) {
       if (id === playerId) continue;
       const player = simulation.getPlayer(id);
@@ -303,7 +313,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
         view = new PlayerView(name, simulation.playerIds.indexOf(id));
         playerViews.set(id, view); scene.add(view.root);
       }
-      if (player && !simulation.state.leftPlayers.includes(id)) view.update(player, previous.get(id), alpha);
+      if (player && !simulation.state.leftPlayers.includes(id)) view.update(player, previous.get(id), alpha, tick);
       else view.root.visible = false;
     }
   }
@@ -360,7 +370,13 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     let events: SimulationEvent[];
     if (net?.role === 'client') events = net.client.step(inputFrame);
     else {
-      events = simulation.tick({ ...(net?.role === 'host' ? net.host.inputs() : {}), [playerId]: inputFrame }, dt);
+      const mate = previewMate && previewTeammate === 'run' ? createInputFrame(0) : null;
+      if (mate) mate.actions.moveForward = { held: true, pressed: false, released: false, value: 1 };
+      const matePosition = mate ? { ...previewMate!.position } : null;
+      events = simulation.tick({ ...(net?.role === 'host' ? net.host.inputs() : {}), ...(mate ? { [previewMate!.id]: mate } : {}),
+        [playerId]: inputFrame }, dt);
+      // The running preview teammate runs on the spot, to show the run cycle.
+      if (matePosition) previewMate!.position = matePosition;
       if (net?.role === 'host') net.host.publish(events);
     }
     present(events);
@@ -439,7 +455,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
     if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
     syncZombieViews(remote.alpha, remote.tick, remote.previous);
-    syncPlayerViews(remote.alpha, remote.previous);
+    syncPlayerViews(remote.alpha, remote.tick, remote.previous);
     powerupView.update(simulation.state.powerups.drops, remote.tick);
     grenadeView.update(simulation.state.grenades.active, remote.tick);
     details.update(simulation.state);

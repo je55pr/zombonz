@@ -132,7 +132,7 @@ export const MODEL_CREDITS: readonly string[] = [
   'XM177E1 — Bazylonator', 'AKS-74u — dan741vlasov', 'MP5K — davidthe19th', 'Vz.61 Skorpion — Maxim_Van_Daele',
   'RPK-74M — petresco', 'SPAS-12 — FameProductions', 'Ithaca 37 — I.sln', 'Colt Python — HYQQM',
   'RPG-7 — javadbayat', 'Signal flare pistol (Irrlicht) — ChickenHatMan', 'Diesel punk USSR gun (Molniya) — Silversem',
-  'Vintage Vending Machine (perk machines) — cansuaydin',
+  'Vintage Vending Machine (perk machines) — cansuaydin', 'WW2 US Army Ranger (teammates) — Tactical_Beard',
 ];
 
 const INK = '#ece4cf';

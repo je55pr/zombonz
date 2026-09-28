@@ -1,9 +1,15 @@
 import * as THREE from 'three';
+import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import type { PlayerState, Vec3 } from '../core/types.ts';
 import { interpolatePosition } from './interpolation.ts';
+import { loadModel } from './runtimeAssets.ts';
 import { readyWeaponModel } from './weaponView.ts';
 
-/** Uniform colours by slot, so teammates are easy to tell apart. */
+/** The teammate model: a rigged WWII Ranger with idle, walk, run and death clips (import-teammate.mjs). */
+export const TEAMMATE_MODEL = 'players/ranger/model.glb';
+/** Ground speed of the walk and run cycles at normal playback, in m/s (from their root motion). */
+const WALK_PACE = 1.19, RUN_PACE = 3.14;
+/** Uniform colours by slot for the fallback figure, until the model loads. */
 const UNIFORMS = [0x4b5a36, 0x3e4a5c, 0x7a6a48, 0x55443d];
 
 function label(text: string, color: string, height: number, depthTest: boolean): THREE.Sprite {
@@ -19,63 +25,91 @@ function label(text: string, color: string, height: number, depthTest: boolean):
   return sprite;
 }
 
+type Clip = 'idle' | 'walk' | 'run' | 'death';
+
 /**
- * A teammate: a helmeted soldier built from simple shapes, carrying a copy of their current gun, with
- * their name overhead. Downed, they lie on the floor under a red REVIVE marker seen through walls.
+ * A teammate: the Ranger model, walking or running at their pace and carrying a copy of their current
+ * gun, with their name overhead. Downed, they fall and lie under a red REVIVE marker seen through
+ * walls. A simple figure stands in until the model has loaded.
  */
 export class PlayerView {
   readonly root = new THREE.Group();
-  private readonly body = new THREE.Group();
-  private readonly legs: THREE.Mesh[] = [];
-  private readonly gunMount = new THREE.Group();
+  private readonly fallback = new THREE.Group();
   private readonly revive: THREE.Sprite;
+  private readonly gunMount = new THREE.Group();
   private gunId: string | null = null;
-  private stride = 0;
-  private last: Vec3 | null = null;
+  private mixer: THREE.AnimationMixer | null = null;
+  private readonly actions = new Map<Clip, THREE.AnimationAction>();
+  private current: Clip | null = null;
+  private lastTick: number | null = null;
+  private hand: THREE.Object3D | null = null;
+  private readonly handPoint = new THREE.Vector3();
 
   constructor(name: string, slot: number) {
     const uniform = new THREE.MeshStandardMaterial({ color: UNIFORMS[slot % UNIFORMS.length], roughness: 0.9 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2a26, roughness: 0.8 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc49a7c, roughness: 0.8 });
-    const part = (material: THREE.Material, geometry: THREE.BufferGeometry, x: number, y: number, z: number, parent: THREE.Object3D = this.body) => {
-      const mesh = new THREE.Mesh(geometry, material); mesh.position.set(x, y, z); mesh.castShadow = true; parent.add(mesh); return mesh;
-    };
-    for (const side of [-0.11, 0.11]) {
-      // Legs hang from the hip so they can swing.
-      const hip = new THREE.Group(); hip.position.set(side, 0.86, 0); this.body.add(hip);
-      this.legs.push(part(dark, new THREE.BoxGeometry(0.17, 0.84, 0.2), 0, -0.42, 0, hip));
-    }
-    part(uniform, new THREE.BoxGeometry(0.5, 0.62, 0.3), 0, 1.18, 0);
-    part(skin, new THREE.SphereGeometry(0.13, 12, 10), 0, 1.62, 0);
-    part(uniform, new THREE.SphereGeometry(0.16, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.66, 0);
-    // Both arms reach forward to the gun.
-    for (const side of [-0.2, 0.2]) {
-      const arm = part(uniform, new THREE.BoxGeometry(0.12, 0.12, 0.5), side * 0.8, 1.32, -0.22);
-      arm.rotation.y = side * -0.5;
-    }
-    this.gunMount.position.set(0.1, 1.32, -0.42); this.body.add(this.gunMount);
-    this.root.add(this.body);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 1.2, 4, 8), uniform);
+    body.position.y = 0.85; this.fallback.add(body);
+    this.root.add(this.fallback);
+    this.root.add(this.gunMount);
     const nameTag = label(name, '#e5ddc8', 0.22, true); nameTag.position.y = 2.05; this.root.add(nameTag);
     this.revive = label('REVIVE', '#e0402f', 0.3, false); this.revive.position.y = 1.1; this.revive.visible = false;
     this.root.add(this.revive);
+    void loadModel(TEAMMATE_MODEL).then(gltf => this.attach(gltf.scene, gltf.animations),
+      error => console.warn('Teammate model unavailable', error));
   }
 
-  update(player: PlayerState, previous: Vec3 | undefined, alpha: number): void {
+  private attach(source: THREE.Object3D, clips: THREE.AnimationClip[]): void {
+    const model = clone(source);
+    // The model faces +z; a player looks toward -z at yaw 0.
+    model.rotation.y = Math.PI;
+    model.traverse(object => {
+      if (object instanceof THREE.Mesh) { object.castShadow = true; object.receiveShadow = true; object.frustumCulled = false; }
+    });
+    this.root.add(model);
+    this.fallback.visible = false;
+    this.mixer = new THREE.AnimationMixer(model);
+    for (const clip of clips) {
+      const action = this.mixer.clipAction(clip);
+      if (clip.name === 'death') { action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; }
+      this.actions.set(clip.name as Clip, action);
+    }
+    // The gun follows the right hand, pointing where the player faces (as the rifle poses hold it).
+    this.hand = model.getObjectByName('mixamorigRightHand') ?? null;
+  }
+
+  private play(name: Clip, timeScale: number): void {
+    const action = this.actions.get(name);
+    if (!action) return;
+    action.timeScale = timeScale;
+    if (this.current === name) return;
+    const previous = this.current ? this.actions.get(this.current) : undefined;
+    action.reset().play();
+    if (previous) { previous.fadeOut(name === 'death' ? 0.1 : 0.2); action.fadeIn(name === 'death' ? 0.1 : 0.2); }
+    this.current = name;
+  }
+
+  update(player: PlayerState, previous: Vec3 | undefined, alpha: number, tick: number): void {
     this.root.visible = player.alive;
     if (!player.alive) return;
     const position = interpolatePosition(previous, player.position, alpha);
     this.root.position.set(position.x, position.y, position.z);
     this.root.rotation.y = player.yaw;
     const downed = player.downed !== null;
-    // Down: flat on the floor, facing up; the marker shows where to go.
-    this.body.rotation.x = downed ? -Math.PI / 2 : 0;
-    this.body.position.set(0, downed ? 0.2 : 0, downed ? 0.9 : 0);
     this.revive.visible = downed;
-    const moved = this.last ? Math.hypot(position.x - this.last.x, position.z - this.last.z) : 0;
-    this.last = { ...position };
-    this.stride = downed || moved < 0.001 ? this.stride * 0.8 : this.stride + moved * 4.2;
-    const swing = Math.sin(this.stride) * Math.min(0.6, moved * 40);
-    this.legs[0].parent!.rotation.x = swing; this.legs[1].parent!.rotation.x = -swing;
+    const speed = Math.hypot(player.velocity.x, player.velocity.z);
+    if (downed) this.play('death', 1);
+    else if (speed > 1.6) this.play('run', Math.max(0.7, Math.min(2, speed / RUN_PACE)));
+    else if (speed > 0.2) this.play('walk', Math.max(0.6, Math.min(1.4, speed / WALK_PACE)));
+    else this.play('idle', 1);
+    const dt = this.lastTick === null ? 0 : Math.max(0, Math.min(0.1, (tick - this.lastTick) / 60));
+    this.lastTick = tick;
+    this.mixer?.update(dt);
+    this.gunMount.visible = !downed;
+    if (this.hand) {
+      this.root.updateMatrixWorld(true);
+      this.gunMount.position.copy(this.root.worldToLocal(this.hand.getWorldPosition(this.handPoint)));
+      this.gunMount.position.z -= 0.12;
+    } else this.gunMount.position.set(0.12, 1.25, -0.35);
     if (this.gunId !== player.weapon.weaponId) {
       const model = readyWeaponModel(player.weapon.weaponId);
       if (model) {
@@ -88,11 +122,10 @@ export class PlayerView {
   }
 
   dispose(): void {
+    this.mixer?.stopAllAction();
     this.root.traverse(object => {
-      if (object instanceof THREE.Mesh || object instanceof THREE.Sprite) {
-        object.geometry.dispose();
-        const material = object.material as THREE.Material & { map?: THREE.Texture | null };
-        material.map?.dispose(); material.dispose();
+      if (object instanceof THREE.Sprite) {
+        (object.material as THREE.SpriteMaterial).map?.dispose(); object.material.dispose();
       }
     });
     this.root.removeFromParent();
