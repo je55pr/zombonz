@@ -8,6 +8,7 @@ import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
 import { BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
 import { ps, px, pz } from './bunkerPlan.ts';
+import { STAIR_DEPTH } from './gameMap.ts';
 import { BUNKER_DECALS } from './bunkerProps.ts';
 import type { GameMap, GreyboxBox, GreyboxMaterial, GreyboxPrism, MapMarker, MapWindow } from './gameMap.ts';
 
@@ -139,7 +140,7 @@ for (let i = 0; i < 14; i++) {
   const a = -i / 14 * Math.PI / 2, b = -(i + 1) / 14 * Math.PI / 2;
   const p = (r: number, angle: number): readonly [number, number] => [FAN.x + r * Math.cos(angle), FAN.z + r * Math.sin(angle)];
   const top = (i + 0.5) / 14 * 2.2;
-  prisms.push({ points: [p(FAN.inner, a), p(FAN.outer, a), p(FAN.outer, b), p(FAN.inner, b)], bottom: top - 0.18, top, material: 'stair' });
+  prisms.push({ points: [p(FAN.inner, a), p(FAN.outer, a), p(FAN.outer, b), p(FAN.inner, b)], bottom: top - STAIR_DEPTH, top, material: 'stair' });
   for (const r of [FAN.inner - 0.03, FAN.outer + 0.04]) {
     const [x, z] = p(r, (a + b) / 2);
     shell.push({ ...box(x, top + 0.43, z, 0.26, 0.86, 0.26, 'metal'), visible: false });
@@ -151,7 +152,7 @@ for (let i = 0; i < 14; i++) {
 const FLIGHT_STEP = (FLIGHT.maxX - FLIGHT.minX) / 8;
 for (let i = 0; i < 8; i++) {
   const x = FLIGHT.minX + (i + 0.5) * FLIGHT_STEP, top = UPPER_HEIGHT - (i + 0.5) / 8 * 1.2;
-  shell.push(box(x, top - 0.09, FLIGHT_Z, FLIGHT_STEP, 0.18, FLIGHT.maxZ - FLIGHT.minZ, 'stair', false));
+  shell.push(box(x, top - STAIR_DEPTH / 2, FLIGHT_Z, FLIGHT_STEP, STAIR_DEPTH, FLIGHT.maxZ - FLIGHT.minZ, 'stair', false));
   for (const z of [FLIGHT.minZ - 0.09, FLIGHT.maxZ + 0.09]) shell.push({ ...box(x, top + 0.43, z, FLIGHT_STEP, 0.86, 0.16, 'metal'), visible: false });
 }
 for (const z of [FLIGHT.minZ - 0.09, FLIGHT.maxZ + 0.09]) {
@@ -162,8 +163,8 @@ const HELP_STAIR = { minX: px(-7.8), maxX: px(-6.3), minZ: pz(3.1), maxZ: pz(6.6
 const HELP_STAIR_X = (HELP_STAIR.minX + HELP_STAIR.maxX) / 2, HELP_STAIR_Z = (HELP_STAIR.minZ + HELP_STAIR.maxZ) / 2;
 const HELP_STAIR_RUN = HELP_STAIR.maxZ - HELP_STAIR.minZ;
 surfaces.push({ ...rect(HELP_STAIR.minX, HELP_STAIR.maxX, HELP_STAIR.minZ, HELP_STAIR.maxZ, 0), endHeight: UPPER_HEIGHT, slopeAxis: 'z' });
-for (let i = 0; i < 20; i++) shell.push(box(HELP_STAIR_X, (i + 0.5) / 20 * UPPER_HEIGHT - 0.085,
-  HELP_STAIR.minZ + (i + 0.5) / 20 * HELP_STAIR_RUN, HELP_STAIR.maxX - HELP_STAIR.minX, 0.17, HELP_STAIR_RUN / 20, 'stair', false));
+for (let i = 0; i < 20; i++) shell.push(box(HELP_STAIR_X, (i + 0.5) / 20 * UPPER_HEIGHT - STAIR_DEPTH / 2,
+  HELP_STAIR.minZ + (i + 0.5) / 20 * HELP_STAIR_RUN, HELP_STAIR.maxX - HELP_STAIR.minX, STAIR_DEPTH, HELP_STAIR_RUN / 20, 'stair', false));
 shell.push(box(px(-6.25), 1.7, HELP_STAIR_Z, 0.16, 3.4, HELP_STAIR_RUN, 'wall'),
   box(px(-6.25), 3.9, HELP_STAIR_Z, 0.16, 1, HELP_STAIR_RUN, 'wall'));
 const mainRoute: Vec3[] = [{ x: ps(9.2), y: 0, z: ps(1.65) }];

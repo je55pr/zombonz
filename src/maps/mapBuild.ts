@@ -4,6 +4,7 @@ import type { BarrierDefinition } from '../core/barrier.ts';
 import type { Vec3 } from '../core/types.ts';
 import { propCollisionBox, type PropPlacement } from './bunkerProps.ts';
 import type { GreyboxBox, GreyboxMaterial, GreyboxPrism, MapRail, MapWindow, SurfaceLook } from './gameMap.ts';
+import { STAIR_DEPTH } from './gameMap.ts';
 
 /**
  * Helpers for authoring a map in real metres: walls with window and door openings, floors, stairs,
@@ -22,7 +23,13 @@ export interface Opening {
   id?: string;
 }
 
-export interface MapLooks { wall: SurfaceLook; trim: SurfaceLook; floor: SurfaceLook; stair: SurfaceLook }
+export interface MapLooks {
+  wall: SurfaceLook; trim: SurfaceLook; floor: SurfaceLook; stair: SurfaceLook;
+  /** Ceilings, and the undersides of upper floors. */
+  ceiling?: SurfaceLook;
+  /** A lower band on full-height walls (tiles, panelling), this tall above each wall's base. */
+  wainscot?: { look: SurfaceLook; height: number };
+}
 
 export class MapBuilder {
   readonly shell: GreyboxBox[] = [];
@@ -52,14 +59,17 @@ export class MapBuilder {
   floor(minX: number, maxX: number, minZ: number, maxZ: number, height: number): WalkSurface {
     const surface: WalkSurface = { minX, maxX, minZ, maxZ, startHeight: height, endHeight: height };
     this.surfaces.push(surface);
-    this.box((minX + maxX) / 2, height - 0.12, (minZ + maxZ) / 2, maxX - minX, 0.24, maxZ - minZ,
+    const slab = this.box((minX + maxX) / 2, height - 0.12, (minZ + maxZ) / 2, maxX - minX, 0.24, maxZ - minZ,
       height > 0 ? 'upperFloor' : 'floor', false);
+    // An upper floor is also the ceiling of the room below.
+    if (height > 0 && this.looks.ceiling) slab.underside = this.looks.ceiling;
     return surface;
   }
 
   /** A slab nobody stands on: a ceiling or roof. */
   ceiling(minX: number, maxX: number, minZ: number, maxZ: number, height: number): void {
-    this.box((minX + maxX) / 2, height + 0.12, (minZ + maxZ) / 2, maxX - minX, 0.24, maxZ - minZ, 'upperFloor', false);
+    this.box((minX + maxX) / 2, height + 0.12, (minZ + maxZ) / 2, maxX - minX, 0.24, maxZ - minZ, 'upperFloor', false,
+      this.looks.ceiling);
   }
 
   /**
@@ -69,10 +79,18 @@ export class MapBuilder {
    */
   wall(axis: 'x' | 'z', fixed: number, from: number, to: number, base: number, height: number,
     openings: readonly Opening[] = [], outward = 1): void {
-    const segment = (a: number, b: number, low: number, h: number) => {
+    const piece = (a: number, b: number, low: number, h: number, look?: SurfaceLook) => {
       if (b - a <= 1e-6 || h <= 1e-6) return;
-      if (axis === 'x') this.box((a + b) / 2, low + h / 2, fixed, b - a, h, WALL_THICKNESS, 'wall');
-      else this.box(fixed, low + h / 2, (a + b) / 2, WALL_THICKNESS, h, b - a, 'wall');
+      if (axis === 'x') this.box((a + b) / 2, low + h / 2, fixed, b - a, h, WALL_THICKNESS, 'wall', true, look);
+      else this.box(fixed, low + h / 2, (a + b) / 2, WALL_THICKNESS, h, b - a, 'wall', true, look);
+    };
+    const wainscot = this.looks.wainscot;
+    const segment = (a: number, b: number, low: number, h: number) => {
+      // A full-height piece splits at the wainscot line; the upper part keeps the wall look.
+      const line = base + (wainscot?.height ?? 0);
+      if (!wainscot || h <= 2 || low >= line || low + h <= line) { piece(a, b, low, h); return; }
+      piece(a, b, low, line - low, wainscot.look);
+      piece(a, b, line, low + h - line, b - a > 2.4 ? this.looks.wall : undefined);
     };
     let cursor = from;
     for (const opening of [...openings].sort((a, b) => a.at - b.at)) {
@@ -98,7 +116,8 @@ export class MapBuilder {
 
   /**
    * A straight stair climbing from `bottom` to `top` along its axis; `risesTowardMax` says which end is
-   * high. Treads are drawn; the walk surface is a continuous slope, as in Bunker.
+   * high. Treads are drawn as blocks reaching STAIR_DEPTH below each step, so together they form one
+   * stepped slab rather than floating boards; the walk surface is a continuous slope, as in Bunker.
    */
   stair(minX: number, maxX: number, minZ: number, maxZ: number, axis: 'x' | 'z', risesTowardMax: boolean,
     bottom: number, top: number, treads = 20): WalkSurface {
@@ -109,8 +128,8 @@ export class MapBuilder {
     for (let i = 0; i < treads; i++) {
       const along = (axis === 'x' ? minX : minZ) + (i + 0.5) * step;
       const t = (i + 0.5) / treads, height = bottom + (top - bottom) * (risesTowardMax ? t : 1 - t);
-      if (axis === 'x') this.box(along, height - 0.085, (minZ + maxZ) / 2, step, 0.17, maxZ - minZ, 'stair', false);
-      else this.box((minX + maxX) / 2, height - 0.085, along, maxX - minX, 0.17, step, 'stair', false);
+      if (axis === 'x') this.box(along, height - STAIR_DEPTH / 2, (minZ + maxZ) / 2, step, STAIR_DEPTH, maxZ - minZ, 'stair', false);
+      else this.box((minX + maxX) / 2, height - STAIR_DEPTH / 2, along, maxX - minX, STAIR_DEPTH, step, 'stair', false);
     }
     return surface;
   }

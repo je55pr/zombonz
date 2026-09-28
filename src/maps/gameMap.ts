@@ -14,12 +14,26 @@ import type { PropPlacement } from './bunkerProps.ts';
 export type GreyboxMaterial = 'wall' | 'floor' | 'upperFloor' | 'stair' | 'barrier' | 'metal';
 /** The environment pack's texture sets; a map can pin one on a box instead of the default for its role. */
 export const SURFACE_LOOKS = ['weathered-concrete-a', 'weathered-concrete-b', 'cracked-concrete-floor',
-  'broken-plaster-brick', 'concrete-rubble', 'cave-rock', 'dirt', 'splintered-wood', 'rusted-metal', 'sofa-upholstery'] as const;
+  'broken-plaster-brick', 'concrete-rubble', 'cave-rock', 'dirt', 'splintered-wood', 'rusted-metal', 'sofa-upholstery',
+  'peeling-paint-wall', 'dirty-tiles', 'old-linoleum', 'cobblestone', 'old-planks', 'old-wood-floor',
+  'forest-floor'] as const;
+/**
+ * Metres per texture repeat, by look (2 m unless listed). Wall textures span a storey, so a
+ * plaster-over-brick or tiled texture reads once per wall rather than as repeating stripes.
+ */
+export const LOOK_SCALE: Partial<Record<SurfaceLook, number>> = {
+  'broken-plaster-brick': 4, 'peeling-paint-wall': 3, 'dirty-tiles': 1.2, 'cobblestone': 2.5,
+  'forest-floor': 3, 'old-linoleum': 2.5, 'old-planks': 1.5, 'old-wood-floor': 1.5,
+};
 export type SurfaceLook = typeof SURFACE_LOOKS[number];
+/** How far a stair's steps reach down, so neighbouring steps join into one stepped slab. */
+export const STAIR_DEPTH = 0.5;
 
 export interface GreyboxBox {
   center: Vec3; size: Vec3; material: GreyboxMaterial; collides?: boolean; rotationZ?: number; visible?: boolean;
   look?: SurfaceLook;
+  /** A floor slab's other faces (the ceiling below it), when they differ from its walked-on top. */
+  underside?: SurfaceLook;
 }
 export interface GreyboxPrism {
   points: readonly (readonly [number, number])[]; bottom: number; top: number; material: GreyboxMaterial;
@@ -70,6 +84,8 @@ export interface GameMap {
   /** The yaw each chalk outline faces, away from its wall. */
   wallWeaponFacing: Readonly<Record<string, number>>;
   mysteryBoxes: readonly MysteryBoxDefinition[];
+  /** A stone fountain, drawn round, on this spot of ground (presentation only). */
+  fountain?: { x: number; z: number };
   /** A map with a switch starts with the power off; its electric doors, perks and traps wait for it. */
   powerSwitch?: PowerSwitchDefinition;
   perkMachines?: readonly PerkMachineDefinition[];

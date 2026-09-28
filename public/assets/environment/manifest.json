@@ -141,6 +141,104 @@
       "source": "https://polyhaven.com/a/fabric_leather_01",
       "sourceId": "fabric_leather_01",
       "license": "CC0"
+    },
+    "peeling-paint-wall": {
+      "purpose": "Peeling painted plaster, graded sage-grey (sanatorium walls)",
+      "basecolor": "/assets/environment/materials/peeling-paint-wall/basecolor.webp",
+      "normal": "/assets/environment/materials/peeling-paint-wall/normal.webp",
+      "arm": "/assets/environment/materials/peeling-paint-wall/arm.webp",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/peeling_painted_wall",
+      "sourceId": "peeling_painted_wall",
+      "license": "CC0"
+    },
+    "dirty-tiles": {
+      "purpose": "Grimy ceramic tiles, graded off-white (sanatorium wainscot)",
+      "basecolor": "/assets/environment/materials/dirty-tiles/basecolor.webp",
+      "normal": "/assets/environment/materials/dirty-tiles/normal.webp",
+      "arm": "/assets/environment/materials/dirty-tiles/arm.webp",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/dirty_tiles",
+      "sourceId": "dirty_tiles",
+      "license": "CC0"
+    },
+    "old-linoleum": {
+      "purpose": "Worn tiled floor, colours faded (sanatorium)",
+      "basecolor": "/assets/environment/materials/old-linoleum/basecolor.webp",
+      "normal": "/assets/environment/materials/old-linoleum/normal.webp",
+      "arm": "/assets/environment/materials/old-linoleum/arm.webp",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/old_linoleum_flooring_01",
+      "sourceId": "old_linoleum_flooring_01",
+      "license": "CC0"
+    },
+    "cobblestone": {
+      "purpose": "Dirty cobblestones (courtyard)",
+      "basecolor": "/assets/environment/materials/cobblestone/basecolor.webp",
+      "normal": "/assets/environment/materials/cobblestone/normal.webp",
+      "arm": "/assets/environment/materials/cobblestone/arm.webp",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/cobblestone_floor_03",
+      "sourceId": "cobblestone_floor_03",
+      "license": "CC0"
+    },
+    "old-planks": {
+      "purpose": "Old weathered planks (beams, boards)",
+      "basecolor": "/assets/environment/materials/old-planks/basecolor.webp",
+      "normal": "/assets/environment/materials/old-planks/normal.webp",
+      "arm": "/assets/environment/materials/old-planks/arm.webp",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/old_planks_02",
+      "sourceId": "old_planks_02",
+      "license": "CC0"
+    },
+    "old-wood-floor": {
+      "purpose": "Old wooden floorboards (stair treads)",
+      "basecolor": "/assets/environment/materials/old-wood-floor/basecolor.webp",
+      "normal": "/assets/environment/materials/old-wood-floor/normal.webp",
+      "arm": "/assets/environment/materials/old-wood-floor/arm.webp",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/old_wooden_floor_02",
+      "sourceId": "old_wooden_floor_02",
+      "license": "CC0"
+    },
+    "forest-floor": {
+      "purpose": "Leaf-strewn forest floor (outside)",
+      "basecolor": "/assets/environment/materials/forest-floor/basecolor.webp",
+      "normal": "/assets/environment/materials/forest-floor/normal.webp",
+      "arm": "/assets/environment/materials/forest-floor/arm.webp",
+      "armChannels": {
+        "r": "ao",
+        "g": "roughness",
+        "b": "metallic"
+      },
+      "source": "https://polyhaven.com/a/leaves_forest_ground",
+      "sourceId": "leaves_forest_ground",
+      "license": "CC0"
     }
   },
   "decals": {
@@ -217,5 +315,14 @@
       "roughness": "linear",
       "ao": "linear"
     }
+  },
+  "sky": {
+    "image": "/assets/environment/sky/moonlit-night.webp",
+    "moon": {
+      "u": 0.600341796875,
+      "v": 0.33251953125
+    },
+    "source": "https://polyhaven.com/a/rogland_moonlit_night",
+    "license": "CC0"
   }
 }

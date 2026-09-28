@@ -132,6 +132,119 @@
       "geometry": "Zombonz simple cuboid, 1.8m x 0.18m x 0.035m",
       "textureSource": "Poly Haven worn_planks",
       "bytes": 887060
+    },
+    "dead-tree": {
+      "model": "/assets/props/dead-tree/model.glb",
+      "purpose": "Bare dead tree for the foggy treeline",
+      "source": "https://polyhaven.com/a/dead_tree_trunk_02",
+      "license": "CC0",
+      "bytes": 1077948
+    },
+    "tree-stump": {
+      "model": "/assets/props/tree-stump/model.glb",
+      "purpose": "Broken tree stump",
+      "source": "https://polyhaven.com/a/tree_stump_01",
+      "license": "CC0",
+      "bytes": 1047064
+    },
+    "hospital-bed": {
+      "model": "/assets/props/hospital-bed/model.glb",
+      "purpose": "Rusted iron bed frame (sanatorium ward)",
+      "source": "https://polyhaven.com/a/old_bed_frame",
+      "license": "CC0",
+      "bytes": 950884
+    },
+    "wheelchair": {
+      "model": "/assets/props/wheelchair/model.glb",
+      "purpose": "Old wheelchair",
+      "source": "https://polyhaven.com/a/wheelchair_01",
+      "license": "CC0",
+      "bytes": 778180
+    },
+    "crutches": {
+      "model": "/assets/props/crutches/model.glb",
+      "purpose": "Wooden crutches",
+      "source": "https://polyhaven.com/a/vintage_crutches_01",
+      "license": "CC0",
+      "bytes": 615900
+    },
+    "steel-shelves": {
+      "model": "/assets/props/steel-shelves/model.glb",
+      "purpose": "Steel storage shelves",
+      "source": "https://polyhaven.com/a/steel_frame_shelves_01",
+      "license": "CC0",
+      "bytes": 365976
+    },
+    "office-desk": {
+      "model": "/assets/props/office-desk/model.glb",
+      "purpose": "Metal office desk",
+      "source": "https://polyhaven.com/a/metal_office_desk",
+      "license": "CC0",
+      "bytes": 423648
+    },
+    "wooden-chair": {
+      "model": "/assets/props/wooden-chair/model.glb",
+      "purpose": "Plain wooden chair",
+      "source": "https://polyhaven.com/a/WoodenChair_01",
+      "license": "CC0",
+      "bytes": 612380
+    },
+    "drawer-cabinet": {
+      "model": "/assets/props/drawer-cabinet/model.glb",
+      "purpose": "Wooden drawer cabinet",
+      "source": "https://polyhaven.com/a/drawer_cabinet",
+      "license": "CC0",
+      "bytes": 589436
+    },
+    "wall-clock": {
+      "model": "/assets/props/wall-clock/model.glb",
+      "purpose": "Wall clock",
+      "source": "https://polyhaven.com/a/wall_clock",
+      "license": "CC0",
+      "bytes": 324308
+    },
+    "power-box": {
+      "model": "/assets/props/power-box/model.glb",
+      "purpose": "Lever power box (the power switch)",
+      "source": "https://polyhaven.com/a/power_box_01",
+      "license": "CC0",
+      "bytes": 833240
+    },
+    "utility-box": {
+      "model": "/assets/props/utility-box/model.glb",
+      "purpose": "Metal utility box (trap switches)",
+      "source": "https://polyhaven.com/a/utility_box_02",
+      "license": "CC0",
+      "bytes": 504432
+    },
+    "generator": {
+      "model": "/assets/props/generator/model.glb",
+      "purpose": "Portable generator (power room)",
+      "source": "https://polyhaven.com/a/portable_generator",
+      "license": "CC0",
+      "bytes": 1092976
+    },
+    "industrial-pipes": {
+      "model": "/assets/props/industrial-pipes/model.glb",
+      "purpose": "Industrial wall pipes",
+      "source": "https://polyhaven.com/a/modular_industrial_pipes_01",
+      "license": "CC0",
+      "bytes": 1467148
+    },
+    "hanging-lamp": {
+      "model": "/assets/props/hanging-lamp/model.glb",
+      "purpose": "Hanging industrial lamp",
+      "source": "https://polyhaven.com/a/hanging_industrial_lamp",
+      "license": "CC0",
+      "bytes": 1009072
+    },
+    "vending-machine": {
+      "model": "/assets/props/vending-machine/model.glb",
+      "purpose": "Perk-a-cola machine (repainted per perk; source branding painted out)",
+      "source": "https://sketchfab.com/3d-models/fba2e698ba294ab688cb3643b772f20f",
+      "author": "cansuaydin",
+      "license": "CC BY 4.0",
+      "bytes": 608108
     }
   },
   "vehicles": {

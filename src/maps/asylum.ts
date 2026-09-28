@@ -30,8 +30,10 @@ const WEST = -30, EAST = 30, NORTH = -32, SOUTH = 19;
 const YARD = { minX: -19, maxX: 16, minZ: -20, maxZ: -3 };
 const DOOR_WIDTH = 2.4;
 
-const b = new MapBuilder({ wall: 'broken-plaster-brick', trim: 'weathered-concrete-a',
-  floor: 'cracked-concrete-floor', stair: 'weathered-concrete-b' });
+// A sanatorium: grimy tiles to shoulder height, peeling paint above and overhead, worn linoleum
+// underfoot, old boards on the stairs and weathered concrete for sills, ledges and railings.
+const b = new MapBuilder({ wall: 'peeling-paint-wall', trim: 'weathered-concrete-a', floor: 'old-linoleum',
+  stair: 'old-wood-floor', ceiling: 'peeling-paint-wall', wainscot: { look: 'dirty-tiles', height: 1.35 } });
 const door = (at: number): Opening => ({ at, width: DOOR_WIDTH, kind: 'door' });
 const window = (id: string, at: number): Opening => ({ id, at, width: 1.35, kind: 'window' });
 
@@ -120,18 +122,13 @@ b.ceiling(WEST, YARD.minX, YARD.minZ, 4, UP + HIGH);
 b.ceiling(16, EAST, YARD.minZ, 8, UP + HIGH);
 b.ceiling(WEST, 16, 3, SOUTH, UP + HIGH);
 
-// ---- The courtyard: paving and the fountain.
+// ---- The courtyard: cobbles, and a stone fountain (drawn round by the renderer).
 const FOUNTAIN = { x: (YARD.minX + YARD.maxX) / 2, z: (YARD.minZ + YARD.maxZ) / 2 };
-b.box(FOUNTAIN.x, -0.1, FOUNTAIN.z, YARD.maxX - YARD.minX, 0.2, YARD.maxZ - YARD.minZ, 'floor', false);
-b.box(FOUNTAIN.x, 0.28, FOUNTAIN.z, 5.3, 0.56, 5.3, 'wall', false);
-b.box(FOUNTAIN.x, 0.58, FOUNTAIN.z, 3.9, 0.12, 3.9, 'floor', false);
-b.box(FOUNTAIN.x, 1.15, FOUNTAIN.z, 0.7, 1.2, 0.7, 'wall', false);
+b.box(FOUNTAIN.x, -0.1, FOUNTAIN.z, YARD.maxX - YARD.minX, 0.2, YARD.maxZ - YARD.minZ, 'floor', false, 'cobblestone');
 
 // ---- The box starts in the power room, by the power switch's panel.
 export const ASYLUM_UPPER_HEIGHT = UP;
 export const ASYLUM_BOX_CENTER: Vec3 = { x: -12, y: UP + 0.52, z: NORTH + 0.2 + 0.525 };
-b.box(-4, UP + 1.35, NORTH + 0.27, 0.68, 0.9, 0.16, 'metal', false);
-b.box(-4, UP + 1.35, NORTH + 0.44, 0.14, 0.42, 0.19, 'metal', false);
 
 /** A boarded door in a wall along z (at x) or along x (at z). */
 const plankDoor = (id: string, x: number, y: number, z: number, along: 'x' | 'z', cost: number, name: string): DoorDefinition => ({
@@ -213,7 +210,8 @@ export const ASYLUM_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
 }];
 
 // ---- Power, perks and traps: the switch sits on the power room's panel.
-export const ASYLUM_POWER_SWITCH: PowerSwitchDefinition = { position: { x: -4, y: UP + 1.1, z: NORTH + 0.6 } };
+// The switch is a lever on the power box, which stands out 0.64 m from the wall.
+export const ASYLUM_POWER_SWITCH: PowerSwitchDefinition = { position: { x: -4, y: UP + 1.1, z: NORTH + 0.95 } };
 /** A perk machine's buy point, a metre in front of the 1.2 x 0.9 m body that stands against a wall. */
 const perkSpots: Array<{ id: string; perk: PerkId; x: number; y: number; z: number; facing: number }> = [
   { id: 'juggernog', perk: 'juggernog', x: -22, y: 0, z: 3 + 0.65, facing: 0 }, // German start, north wall
@@ -223,7 +221,8 @@ const perkSpots: Array<{ id: string; perk: PerkId; x: number; y: number; z: numb
 ];
 for (const spot of perkSpots) {
   const across = Math.abs(Math.sin(spot.facing)) > 0.5;
-  b.box(spot.x, spot.y + 1.05, spot.z, across ? 0.9 : 1.2, 2.1, across ? 1.2 : 0.9, 'metal');
+  // The machine's solid body; the renderer draws the vending machine model in it.
+  b.box(spot.x, spot.y + 1.05, spot.z, across ? 0.9 : 1.2, 2.1, across ? 1.2 : 0.9, 'metal').visible = false;
 }
 export const ASYLUM_PERK_MACHINES: readonly PerkMachineDefinition[] = perkSpots.map(spot => ({
   id: spot.id, perk: spot.perk,
@@ -254,6 +253,28 @@ export const ASYLUM_PROPS: readonly PropPlacement[] = [
   prop('kitchen-table', 'wooden-table', 4, UP, -31.3, 1.8, 0.55, 0.66),
   prop('power-bags', 'cement-bag', -16.5, UP, -21, 0.47, 0.18, 0.7, 0, false),
   prop('left-upstairs-shelf', 'shelf', -18.47, UP, -30.5, 1.01, 2.08, 0.26, -Math.PI / 2),
+  // Sanatorium furniture. Iron beds lie along walls, clear of every window landing and chalk.
+  prop('german-bed', 'hospital-bed', -8.5, 0, 3.7, 0.9, 1.2, 2, Math.PI / 2),
+  prop('german-cabinet', 'drawer-cabinet', -29.5, 0, 17.5, 1.14, 1.88, 0.49, Math.PI / 2),
+  prop('german-clock', 'wall-clock', -19, 2.5, 18.76, 0.32, 0.32, 0.05, Math.PI, false),
+  prop('american-bed-a', 'hospital-bed', 3.7, 0, 10.5, 0.9, 1.2, 2),
+  prop('american-bed-b', 'hospital-bed', 10.5, 0, 18.3, 0.9, 1.2, 2, Math.PI / 2),
+  prop('hallway-wheelchair', 'wheelchair', 16.75, 0, -19.3, 0.82, 1.1, 1.09, Math.PI / 2),
+  prop('hallway-crutches', 'crutches', 29.7, 0, -6.5, 0.38, 1.6, 0.2, -Math.PI / 2 + 0.25, false),
+  prop('hallway-shelves', 'steel-shelves', 29.5, 0, -9.5, 1.1, 2.15, 0.5, Math.PI / 2),
+  prop('back-room-shelves', 'steel-shelves', 24.5, 0, 12.2, 1.1, 2.15, 0.5, -Math.PI / 2),
+  prop('left-upstairs-bed', 'hospital-bed', -24.5, UP, -31.3, 0.9, 1.2, 2, Math.PI / 2),
+  prop('power-box', 'power-box', -4, UP + 0.8, -31.48, 0.74, 0.8, 0.64, 0, false),
+  prop('power-generator', 'generator', -1.5, UP, -31.1, 1.2, 0.85, 0.82),
+  prop('power-pipes', 'industrial-pipes', -6, UP + 0.4, -31.65, 1.4, 1.95, 0.31, 0, false),
+  prop('kitchen-chair-a', 'wooden-chair', 3.3, UP, -30.4, 0.46, 1.0, 0.44, Math.PI, false),
+  prop('kitchen-chair-b', 'wooden-chair', 4.8, UP, -30.4, 0.46, 1.0, 0.44, Math.PI, false),
+  prop('kitchen-cabinet', 'drawer-cabinet', 10, UP, -20.45, 1.14, 1.88, 0.49, Math.PI),
+  prop('speed-cola-desk', 'office-desk', 22.5, UP, -31.3, 2, 0.79, 0.95),
+  prop('speed-cola-chair', 'wooden-chair', 22.5, UP, -30.3, 0.46, 1.0, 0.44, 0, false),
+  // The traps' switches: a small utility box on the wall under each status lamp.
+  prop('german-trap-box', 'utility-box', WEST + 0.31, UP + 0.9, 1.2, 0.46, 0.56, 0.22, Math.PI / 2, false),
+  prop('right-trap-box', 'utility-box', EAST - 0.31, UP + 0.9, -5.5, 0.46, 0.56, 0.22, -Math.PI / 2, false),
 ];
 
 // Verrückt's upstairs entries, where zombies climb in off the roofs: one on the German balcony, two
@@ -316,6 +337,7 @@ export const ASYLUM_MAP: GameMap = {
     : { kind: 'planks' as const, yaw: d.blocker.max.x - d.blocker.min.x < 1 ? 0 : Math.PI / 2, width: DOOR_WIDTH }])),
   wallWeapons: ASYLUM_WALL_WEAPONS, wallWeaponFacing: ASYLUM_WALL_WEAPON_FACING,
   mysteryBoxes: ASYLUM_MYSTERY_BOXES, boxCenter: ASYLUM_BOX_CENTER, boxYaw: -Math.PI / 2,
+  fountain: FOUNTAIN,
   powerSwitch: ASYLUM_POWER_SWITCH, perkMachines: ASYLUM_PERK_MACHINES, perkMachineFacing: ASYLUM_PERK_FACING, traps: ASYLUM_TRAPS,
   rails: b.rails, props: ASYLUM_PROPS,
   decals: [

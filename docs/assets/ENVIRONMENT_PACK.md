@@ -25,6 +25,25 @@ In Three.js the same ARM texture can be assigned to `aoMap`, `roughnessMap`, and
 
 Decals expose whichever of base colour, normal, opacity, roughness, and AO the source provides. Treat opacity/roughness/AO as linear data. The graffiti, leaks, rust, smears and grime are intended as overlays rather than baked wall variants.
 
+## Realism pass additions (2026-09-28)
+
+`scripts/weapon-convert/import-polyhaven.mjs` turns Poly Haven downloads in the external cache into
+runtime assets:
+
+- **15 props**, as 1K WebP GLBs. Heavy meshes are simplified to a triangle budget; the dead tree
+  trunk went from 83k to 6k triangles.
+- **7 materials**, in the convention above. The salmon painted plaster, maroon tiles and orange
+  linoleum are colour-graded at import into sage paint, grimy white tiles and a faded floor.
+- **A night-sky panorama** (`/assets/environment/sky/moonlit-night.webp`), listed under `sky` in the
+  environment manifest.
+  - It is tone-mapped from the 2K HDR, with everything below the moon faded to the scene's fog
+    colour, because the photo's own desert ground does not belong behind the maps.
+  - The moon's position is recorded, so the renderer can turn the sky to put it behind the moonlight.
+
+Poly Haven's full-size pine and fir trees (0.5–1 GB, millions of triangles) were skipped. The
+standing dead trees are grown procedurally (`src/client/treeline.ts`) and wear the dead trunk's bark.
+The trunk itself lies around as fallen logs.
+
 ## Prop convention
 
 Every prop path in `/assets/props/manifest.json` points to a self-contained GLB. The main prop set uses 1K textures to keep environment dressing inexpensive. On 2026-09-27 their high-quality JPEG textures were re-encoded as WebP at the same 1K size, and textures no material used were dropped (`recompress.mjs`): 43 MB to 19 MB.

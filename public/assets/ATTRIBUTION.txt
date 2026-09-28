@@ -10,6 +10,16 @@ Creator: Peter_D (@better_peter)
 Source: https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f
 Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; animation clips separated for runtime use. Textures later re-encoded as WebP (colour/normal kept at full size, packed maps at most 1K) and an embedded texture no material used was removed.
 
+WW2 US Army Ranger (the teammate figure)
+Creator: Tactical_Beard
+Source: https://sketchfab.com/3d-models/dcbe89cd5de243af8e4677b769a831c6
+Changes: rigged and animated with Adobe Mixamo (Rifle Idle, Rifle Walk, Rifle Run and Dying, the walk and run made to play in place); converted to one glTF with 512 px to 1K WebP textures.
+
+Vintage Vending Machine (the perk machines)
+Creator: cansuaydin
+Source: https://sketchfab.com/3d-models/fba2e698ba294ab688cb3643b772f20f
+Changes: converted from OBJ to a 2.1 m glTF with 1K WebP textures; the source's Dr Pepper roundel and branded bottle decal painted out; the green paint regraded into four perk colours (red, amber, green, blue); the glass split into its own transparent material.
+
 Zombie
 Creator: pxltiger
 Source: https://sketchfab.com/3d-models/zombie-73ef58af341e46afba1da53366ed79cf
@@ -181,6 +191,14 @@ Poly Haven:
 - splintered-wood: https://polyhaven.com/a/worn_planks
 - rusted-metal: https://polyhaven.com/a/rusty_metal_sheet
 - sofa-upholstery: https://polyhaven.com/a/fabric_leather_01
+- peeling-paint-wall (colour-graded): https://polyhaven.com/a/peeling_painted_wall
+- dirty-tiles (colour-graded): https://polyhaven.com/a/dirty_tiles
+- old-linoleum (colour-graded): https://polyhaven.com/a/old_linoleum_flooring_01
+- cobblestone: https://polyhaven.com/a/cobblestone_floor_03
+- old-planks: https://polyhaven.com/a/old_planks_02
+- old-wood-floor: https://polyhaven.com/a/old_wooden_floor_02
+- forest-floor: https://polyhaven.com/a/leaves_forest_ground
+- night sky (tone-mapped, ground faded to fog): https://polyhaven.com/a/rogland_moonlit_night
 
 ambientCG:
 - graffiti: https://ambientcg.com/a/GraffitiSet001
@@ -196,7 +214,12 @@ The primary prop models in /assets/props are CC0 Poly Haven derivatives. Exact s
 The wooden-plank geometry was created for Zombonz and uses the CC0 Poly Haven worn_planks material:
 https://polyhaven.com/a/worn_planks
 
-Background vehicle conversions are CC0 OpenGameArt assets:
+The realism pass (2026-09-28) added more CC0 Poly Haven props, simplified where heavy: dead tree trunk,
+tree stump, iron bed frame, wheelchair, crutches, steel shelves, office desk, wooden chair, drawer
+cabinet, wall clock, power box, utility box, portable generator, industrial pipes and hanging lamp.
+Their source pages are in /assets/props/manifest.json.
+
+Background vehicle conversions are CC0 OpenGameArt assets (no longer placed in either map):
 - GAZ-67: https://opengameart.org/content/lowpoly-soviet-jeep
 - Soviet military off-road vehicle: https://opengameart.org/content/soviet-military-off-road-vehicle
 - T-12 Soviet light tank: https://opengameart.org/content/t-12-soviet-light-tank-lowpoly
