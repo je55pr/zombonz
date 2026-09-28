@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
-import { buildMapDetails } from './client/mapDetails.ts';
+import { VENDING_MODEL, buildMapDetails } from './client/mapDetails.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { SoloPauseController } from './client/pause.ts';
@@ -71,6 +71,7 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
       ...[...new Set(allMaps.flatMap(map => map.decals.map(decal => decal.asset)))].map(id => () => loadDecalTextures(manifest, id))] : []),
     ...[...new Set([...allMaps.flatMap(map => map.props.map(prop => prop.asset)), ...TREELINE_ASSETS])]
       .map(asset => () => loadModel(`props/${asset}/model.glb`)),
+    () => loadModel(VENDING_MODEL),
     () => loadZombieAsset(zombie),
     () => prepareWeaponModel('starter-pistol'),
     // The chalk wall buys hang the real guns.

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
-import { environmentMaterial, lookScale, projectWorldUvs } from './environmentMaterials.ts';
+import { assetUrl, environmentMaterial, lookScale, projectWorldUvs } from './environmentMaterials.ts';
+import { getAsset } from './assetStore.ts';
+import { loadModel } from './runtimeAssets.ts';
 import type { GameMap } from '../maps/gameMap.ts';
 import type { SimulationState } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
@@ -40,6 +42,30 @@ function mountWallGun(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Ma
   // Flattened onto the wall, and grown so a chalk rim shows around the gun.
   const rim = (size.z * WALL_GUN_SCALE + 0.07) / size.z;
   place(outline, new THREE.Vector3(0.002, (size.y * WALL_GUN_SCALE + 0.05) / size.y, rim), 0.004);
+}
+
+/** The perk machine model, and each perk's paint for it (see scripts/weapon-convert/import-vending.mjs). */
+export const VENDING_MODEL = 'props/vending-machine/model.glb';
+export const VENDING_PAINTS: Record<PerkId, string> = {
+  juggernog: '/assets/props/vending-machine/paint-juggernog.webp', 'double-tap': '/assets/props/vending-machine/paint-double-tap.webp',
+  'speed-cola': '/assets/props/vending-machine/paint-speed-cola.webp', 'quick-revive': '/assets/props/vending-machine/paint-quick-revive.webp',
+};
+const paints = new Map<string, Promise<THREE.Texture>>();
+/** A glTF base-colour replacement: sRGB, and not flipped, as glTF textures aren't. */
+function loadPaint(path: string): Promise<THREE.Texture> {
+  let pending = paints.get(path);
+  if (!pending) {
+    const options: ImageBitmapOptions = { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' };
+    const downloaded = getAsset(assetUrl(path));
+    pending = (downloaded ? createImageBitmap(downloaded, options)
+      : new THREE.ImageBitmapLoader().setOptions(options).loadAsync(assetUrl(path))).then(bitmap => {
+      const texture = new THREE.Texture(bitmap);
+      texture.colorSpace = THREE.SRGBColorSpace; texture.flipY = false; texture.needsUpdate = true;
+      return texture;
+    });
+    paints.set(path, pending);
+  }
+  return pending;
 }
 
 /** The box's beam: brightest low down and in the middle, fading overhead and to both sides. */
@@ -246,24 +272,41 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), powerLamp);
     lamp.position.set(x - 0.2, y + 0.35, z); group.add(lamp);
   }
-  // Perk-a-cola machines: a coloured front and name on the machine's metal body, lit once powered.
+  // Perk-a-cola machines: a vintage vending machine painted in each perk's colour, with its name on a
+  // sign across the top and a glow, lit once the power is on.
   const PERK_COLOURS: Record<PerkId, number> = { juggernog: 0xa01818, 'double-tap': 0xb86e14, 'speed-cola': 0x1f9038, 'quick-revive': 0x2860c0 };
-  const perkLights: { material: THREE.MeshStandardMaterial; light: THREE.PointLight }[] = [];
-  for (const machine of map.perkMachines ?? []) {
+  const perkLights: { materials: THREE.MeshStandardMaterial[]; light: THREE.PointLight; colour: number }[] = [];
+  const machines = (map.perkMachines ?? []).map(machine => {
     const facing = map.perkMachineFacing?.[machine.id] ?? 0;
     const view = new THREE.Group(); group.add(view);
     view.position.set(machine.position.x - Math.sin(facing), machine.position.y - 1, machine.position.z - Math.cos(facing));
     view.rotation.y = facing;
-    const material = new THREE.MeshStandardMaterial({ color: PERK_COLOURS[machine.perk], emissive: PERK_COLOURS[machine.perk],
-      emissiveIntensity: 0, roughness: 0.6 });
-    box(view, material, 0, 1.15, 0.46, 1.05, 1.6, 0.04);
-    box(view, material, 0, 2.2, 0.1, 1.2, 0.22, 0.95);
-    const name = writing(PERKS[machine.perk].name.toUpperCase(), 1, 0.25, '#fff4dc');
-    name.position.set(0, 1.55, 0.49); view.add(name);
+    const sign = new THREE.MeshStandardMaterial({ color: 0x1a1512, emissive: PERK_COLOURS[machine.perk], emissiveIntensity: 0, roughness: 0.5 });
+    box(view, sign, 0, 2.2, 0.28, 1.0, 0.24, 0.1);
+    const name = writing(PERKS[machine.perk].name.toUpperCase(), 0.95, 0.22, '#fff4dc');
+    name.position.set(0, 2.2, 0.34); view.add(name);
     const light = new THREE.PointLight(PERK_COLOURS[machine.perk], 0, 5, 2); light.position.set(0, 1.4, 1); view.add(light);
     view.userData.dynamic = true;
-    perkLights.push({ material, light });
-  }
+    const lights = { materials: [sign], light, colour: PERK_COLOURS[machine.perk] };
+    perkLights.push(lights);
+    return { machine, view, lights };
+  });
+  const vending = machines.length ? loadModel(VENDING_MODEL).then(async gltf => {
+    for (const { machine, view, lights } of machines) {
+      const model = gltf.scene.clone(true);
+      const paint = await loadPaint(VENDING_PAINTS[machine.perk]).catch(() => null);
+      model.traverse(object => {
+        if (!(object instanceof THREE.Mesh) || !(object.material instanceof THREE.MeshStandardMaterial)) return;
+        object.castShadow = true; object.receiveShadow = true;
+        if (object.material.transparent) return;
+        const material = object.material.clone();
+        if (paint) material.map = paint;
+        material.emissive.setHex(lights.colour); material.emissiveIntensity = 0;
+        object.material = material; lights.materials.push(material);
+      });
+      view.add(model);
+    }
+  }).catch(error => console.warn('Perk machine model unavailable', error)) : Promise.resolve();
   // Electric traps: iron pylons at either end of the live strip, a grate between, and a switch box.
   const trapViews = new Map<string, { arcs: THREE.LineSegments; light: THREE.PointLight; lamp: THREE.MeshBasicMaterial;
     from: THREE.Vector3; to: THREE.Vector3 }>();
@@ -342,7 +385,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     water.rotation.x = -Math.PI / 2; water.position.y = 0.42; fountain.add(water);
     lathe([[0.3, 0.3], [0.24, 0.6], [0.2, 1.3], [0.28, 1.4], [0.75, 1.45], [0.8, 1.6], [0.7, 1.62], [0.25, 1.55], [0.18, 1.9], [0.1, 2.1], [0, 2.12]]);
   }
-  return { ready: Promise.allSettled(wallGuns), update(state) {
+  return { ready: Promise.allSettled([...wallGuns, vending]), update(state) {
     // On a map with a switch, the lamps burn low until the power comes on.
     const lampLevel = map.powerSwitch && !state.power.on ? 0.4 : 1;
     for (let i = 0; i < practicalLights.length; i++) {
@@ -350,8 +393,9 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     }
     lever.rotation.z = state.power.on ? -2.3 : 0;
     powerLamp.color.setHex(state.power.on ? 0x30e060 : 0xc02010);
-    for (const { material, light } of perkLights) {
-      material.emissiveIntensity = state.power.on ? 0.55 : 0;
+    for (const { materials, light } of perkLights) {
+      // The sign lights up fully; the machine's paint only takes a faint glow of its colour.
+      materials.forEach((material, index) => { material.emissiveIntensity = state.power.on ? index === 0 ? 0.9 : 0.06 : 0; });
       light.intensity = state.power.on ? 3 : 0;
     }
     for (const trap of state.traps) {

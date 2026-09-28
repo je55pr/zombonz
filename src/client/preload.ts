@@ -1,6 +1,7 @@
 import { MAPS } from '../maps/index.ts';
 import { assetUrl, MATERIAL_IDS, readEnvironmentManifest } from './environmentMaterials.ts';
 import { TREELINE_ASSETS } from './treeline.ts';
+import { VENDING_MODEL, VENDING_PAINTS } from './mapDetails.ts';
 import { WEAPON_ASSETS, zombieAssetPaths, type ZombieAssetId } from './runtimeAssets.ts';
 import { storeAsset } from './assetStore.ts';
 import { AUDIO_CLIPS } from './audioClips.ts';
@@ -21,6 +22,7 @@ export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<
     paths.push(`/assets/props/${asset}/model.glb`);
   }
   if (manifest.sky) paths.push(manifest.sky.image);
+  if (Object.values(MAPS).some(map => map.perkMachines?.length)) paths.push(`/assets/${VENDING_MODEL}`, ...Object.values(VENDING_PAINTS));
   paths.push(...zombieAssetPaths(zombie).map(path => `/assets/${path}`));
   for (const asset of new Set(Object.values(WEAPON_ASSETS))) paths.push(`/assets/weapons/${asset}/model.glb`);
   for (const clip of AUDIO_CLIPS) paths.push(`/assets/audio/${clip}.mp3`);

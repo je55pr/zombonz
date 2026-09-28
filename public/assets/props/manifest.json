@@ -237,6 +237,14 @@
       "source": "https://polyhaven.com/a/hanging_industrial_lamp",
       "license": "CC0",
       "bytes": 1009072
+    },
+    "vending-machine": {
+      "model": "/assets/props/vending-machine/model.glb",
+      "purpose": "Perk-a-cola machine (repainted per perk; source branding painted out)",
+      "source": "https://sketchfab.com/3d-models/fba2e698ba294ab688cb3643b772f20f",
+      "author": "cansuaydin",
+      "license": "CC BY 4.0",
+      "bytes": 608108
     }
   },
   "vehicles": {

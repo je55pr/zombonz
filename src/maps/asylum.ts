@@ -221,7 +221,8 @@ const perkSpots: Array<{ id: string; perk: PerkId; x: number; y: number; z: numb
 ];
 for (const spot of perkSpots) {
   const across = Math.abs(Math.sin(spot.facing)) > 0.5;
-  b.box(spot.x, spot.y + 1.05, spot.z, across ? 0.9 : 1.2, 2.1, across ? 1.2 : 0.9, 'metal');
+  // The machine's solid body; the renderer draws the vending machine model in it.
+  b.box(spot.x, spot.y + 1.05, spot.z, across ? 0.9 : 1.2, 2.1, across ? 1.2 : 0.9, 'metal').visible = false;
 }
 export const ASYLUM_PERK_MACHINES: readonly PerkMachineDefinition[] = perkSpots.map(spot => ({
   id: spot.id, perk: spot.perk,

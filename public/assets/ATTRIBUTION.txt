@@ -10,6 +10,11 @@ Creator: Peter_D (@better_peter)
 Source: https://sketchfab.com/3d-models/zombie-soldier-176e930e63d144cc8f615b8dd3a8c74f
 Changes: converted/prepared for glTF/Three.js runtime; PBR textures embedded; animation clips separated for runtime use. Textures later re-encoded as WebP (colour/normal kept at full size, packed maps at most 1K) and an embedded texture no material used was removed.
 
+Vintage Vending Machine (the perk machines)
+Creator: cansuaydin
+Source: https://sketchfab.com/3d-models/fba2e698ba294ab688cb3643b772f20f
+Changes: converted from OBJ to a 2.1 m glTF with 1K WebP textures; the source's Dr Pepper roundel and branded bottle decal painted out; the green paint regraded into four perk colours (red, amber, green, blue); the glass split into its own transparent material.
+
 Zombie
 Creator: pxltiger
 Source: https://sketchfab.com/3d-models/zombie-73ef58af341e46afba1da53366ed79cf
