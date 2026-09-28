@@ -10,10 +10,7 @@ import { lampFlicker } from './atmosphere.ts';
 import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
 import { BOX_RULES } from '../core/mysteryBox.ts';
 import { PERKS, type PerkId } from '../core/perks.ts';
-
-// Six planks fill the frame between the sill and the lintel, nailed at slightly uneven angles.
-const PLANK_TILT = [0.05, -0.09, 0.07, -0.04, 0.1, -0.03] as const;
-function plankHeight(index: number): number { return 1.02 + index * 0.27; }
+import { WindowBoards } from './windowBoards.ts';
 
 // Wall guns are shown life-size; viewmodels are modelled at roughly 0.86x.
 const WALL_GUN_SCALE = 1.15;
@@ -124,7 +121,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     const mesh = writing(text, width, height, color); mesh.position.set(x, y, z); mesh.rotation.y = rotation; group.add(mesh);
   }
   // Broken wooden window boards, deep frames, and projecting stone sills.
-  const barrierViews = new Map<string, THREE.Mesh[]>();
+  const barrierViews = new Map<string, WindowBoards>();
   for (const opening of map.windows) {
     const frame = new THREE.Group();
     frame.position.set(opening.x, opening.y, opening.z);
@@ -133,19 +130,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     box(frame, concrete, 0, 0.83, 0, opening.width + 0.25, 0.15, 0.65);
     box(frame, iron, -opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
     box(frame, iron, opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
-    const planks: THREE.Mesh[] = [];
-    barrierViews.set(opening.id, planks);
-    for (let i = 0; i < map.windowBoards; i++) {
-      // A plank is 2.5 cm thick with a nail head at each end, into the frame.
-      const plank = box(frame, boards, 0, plankHeight(i), 0.03, opening.width + 0.14, 0.17, 0.025);
-      plank.rotation.z = PLANK_TILT[i % PLANK_TILT.length];
-      for (const end of [-1, 1]) {
-        const nail = new THREE.Mesh(nailGeometry, iron);
-        nail.position.set(end * (opening.width / 2 + 0.01), 0, 0.015); nail.rotation.x = Math.PI / 2; plank.add(nail);
-      }
-      plank.userData.dynamic = true;
-      planks.push(plank);
-    }
+    barrierViews.set(opening.id, new WindowBoards(frame, opening.width, map.windowBoards, boards, iron, nailGeometry));
   }
   // Architecture lives in shared map data, so the visuals and collision agree.
   for (const rail of map.rails) {
@@ -427,17 +412,8 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     for (const barrier of state.barriers) {
       const planks = barrierViews.get(barrier.id);
       if (!planks) continue;
-      for (let i = 0; i < planks.length; i++) {
-        const plank = planks[i];
-        const intact = i < barrier.boards;
-        // The newest torn plank tumbles out before disappearing; repairs restore it.
-        const elapsed = (state.world.tick - barrier.lastTornTick) / 60;
-        const falling = !intact && i === barrier.boards && barrier.lastTornTick >= 0 && elapsed < 0.8;
-        plank.visible = intact || falling;
-        plank.position.y = plankHeight(i) - (falling ? elapsed * elapsed * 4 : 0);
-        plank.rotation.z = PLANK_TILT[i % PLANK_TILT.length] + (falling ? elapsed * 2 : 0);
-        plank.rotation.x = falling ? elapsed * 1.5 : 0;
-      }
+      const elapsed = barrier.lastTornTick >= 0 ? (state.world.tick - barrier.lastTornTick) / 60 : null;
+      planks.setState(barrier.boards, elapsed);
     }
     for (const door of state.doors) { const view = doorViews.get(door.id); if (view) view.visible = !door.open; }
     const currentBox = state.mysteryBoxes[0];

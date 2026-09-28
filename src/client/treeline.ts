@@ -14,17 +14,18 @@ function seeded(seed: number): () => number {
  * One bare dead tree: a crooked, tapering trunk that forks into branches three times over. Each limb is
  * a short cylinder bent at its joints; the bark texture repeats about every metre and a half.
  */
-function deadTreeGeometry(random: () => number): THREE.BufferGeometry {
+export function deadTreeGeometry(random: () => number, radialSegments = 7, heightSegments = 3, maxDepth = 3): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   const up = new THREE.Vector3(0, 1, 0);
   const limb = (start: THREE.Vector3, direction: THREE.Vector3, length: number, radius: number, depth: number) => {
-    const geometry = new THREE.CylinderGeometry(radius * 0.62, radius, length, 7, 3, true);
+    const geometry = new THREE.CylinderGeometry(radius * 0.62, radius, length, radialSegments, heightSegments, true);
     geometry.translate(0, length / 2, 0);
     // Kink the middle rings sideways so no limb is ruler-straight.
     const position = geometry.attributes.position;
-    const kinks = [0, (random() - 0.5) * radius * 1.6, (random() - 0.5) * radius * 1.6, 0];
+    const kinks = Array.from({ length: heightSegments + 1 }, (_, index) =>
+      index === 0 || index === heightSegments ? 0 : (random() - 0.5) * radius * 1.6);
     for (let i = 0; i < position.count; i++) {
-      const ring = Math.round(position.getY(i) / length * 3);
+      const ring = Math.max(0, Math.min(heightSegments, Math.round(position.getY(i) / length * heightSegments)));
       position.setX(i, position.getX(i) + kinks[ring]);
     }
     const uv = geometry.attributes.uv;
@@ -36,7 +37,7 @@ function deadTreeGeometry(random: () => number): THREE.BufferGeometry {
     parts.push(geometry);
     if (depth === 0) return;
     const end = start.clone().addScaledVector(direction, length);
-    const children = depth === 3 ? 3 : 2 + Math.floor(random() * 2);
+    const children = depth === maxDepth ? 3 : 2 + Math.floor(random() * 2);
     for (let child = 0; child < children; child++) {
       // Branches lean out from their parent and a little upward; the first carries the trunk on.
       const leader = child === 0 && depth >= 2;
@@ -46,7 +47,7 @@ function deadTreeGeometry(random: () => number): THREE.BufferGeometry {
       limb(end, next, length * (leader ? 0.78 : 0.55 + random() * 0.2), radius * (leader ? 0.72 : 0.5), depth - 1);
     }
   };
-  limb(new THREE.Vector3(0, -0.3, 0), up.clone(), 3 + random() * 1.5, 0.22 + random() * 0.1, 3);
+  limb(new THREE.Vector3(0, -0.3, 0), up.clone(), 3 + random() * 1.5, 0.22 + random() * 0.1, maxDepth);
   const merged = mergeGeometries(parts, false)!;
   parts.forEach(part => part.dispose());
   return merged;
@@ -64,13 +65,26 @@ function modelParts(root: THREE.Object3D): Array<{ geometry: THREE.BufferGeometr
   return parts;
 }
 
-function scatter(group: THREE.Group, geometry: THREE.BufferGeometry, material: THREE.Material,
-  placements: THREE.Matrix4[]): void {
-  const mesh = new THREE.InstancedMesh(geometry, material, placements.length);
-  placements.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
-  mesh.computeBoundingSphere();
-  mesh.receiveShadow = true;
-  group.add(mesh);
+/** Partition each ring into local arcs so an off-camera arc does not draw every instance. */
+export function scatterTreeSectors(group: THREE.Group, geometry: THREE.BufferGeometry, material: THREE.Material,
+  placements: readonly THREE.Matrix4[], focus: { x: number; z: number }): void {
+  const sectors: THREE.Matrix4[][] = Array.from({ length: 4 }, () => []);
+  const position = new THREE.Vector3();
+  for (const matrix of placements) {
+    position.setFromMatrixPosition(matrix);
+    const angle = Math.atan2(position.z - focus.z, position.x - focus.x);
+    const index = Math.min(3, Math.floor((angle + Math.PI) / (2 * Math.PI) * sectors.length));
+    sectors[index].push(matrix);
+  }
+  sectors.forEach((matrices, sector) => {
+    if (!matrices.length) return;
+    const mesh = new THREE.InstancedMesh(geometry, material, matrices.length);
+    mesh.name = `treeline-sector-${sector}`;
+    matrices.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+    mesh.computeBoundingSphere();
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  });
 }
 
 /**
@@ -100,16 +114,20 @@ export async function buildTreeline(scene: THREE.Scene, focus: { x: number; z: n
   };
   // A close ring where trees show through windows, and a deep one that fades into the fog.
   const variants = Array.from({ length: 5 }, () => deadTreeGeometry(random));
-  const trees: THREE.Matrix4[][] = variants.map(() => []);
-  for (let i = 0; i < 18; i++) trees[i % variants.length].push(place(focus.radius * 1.3, 10, 1.1));
-  for (let i = 0; i < 60; i++) trees[i % variants.length].push(place(focus.radius * 1.62, 28, 1.25));
-  variants.forEach((geometry, index) => scatter(group, geometry, bark, trees[index]));
+  const near: THREE.Matrix4[][] = variants.map(() => []);
+  for (let i = 0; i < 18; i++) near[i % variants.length].push(place(focus.radius * 1.3, 10, 1.1));
+  // The deep ring is seen through fog: retain its placement/silhouette but use fewer limb faces.
+  const far: THREE.Matrix4[][] = [[], []];
+  for (let i = 0; i < 60; i++) far[i % far.length].push(place(focus.radius * 1.62, 28, 1.25));
+  variants.forEach((geometry, index) => scatterTreeSectors(group, geometry, bark, near[index], focus));
+  far.forEach((placements, index) => scatterTreeSectors(group,
+    deadTreeGeometry(seeded(0x7ee6 + index), 5, 2, 2), bark, placements, focus));
   if (logParts.length) {
     const logs = Array.from({ length: 12 }, () => place(focus.radius * 1.25, 30, 1.2, true));
-    for (const part of logParts) scatter(group, part.geometry, part.material, logs);
+    for (const part of logParts) scatterTreeSectors(group, part.geometry, part.material, logs, focus);
   }
   if (stump.status === 'fulfilled') {
     const stumps = Array.from({ length: 14 }, () => place(focus.radius * 1.2, 30, 1.1, true));
-    for (const part of modelParts(stump.value.scene)) scatter(group, part.geometry, part.material, stumps);
+    for (const part of modelParts(stump.value.scene)) scatterTreeSectors(group, part.geometry, part.material, stumps, focus);
   }
 }
