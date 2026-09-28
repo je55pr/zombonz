@@ -23,9 +23,14 @@ import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
   createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity, currentSpread,
-  type EntityId, type ZombieState, type Vec3, DOWN_RULES, damagePlayer,
+  type EntityId, type ZombieState, type Vec3, DOWN_RULES, damagePlayer, createInputFrame, type SimulationEvent,
 } from './core/index.ts';
 import { MAPS, isMapId, type MapId } from './maps/index.ts';
+import { createMatch, simulationMap } from './maps/match.ts';
+import type { NetHost } from './net/host.ts';
+import type { NetClient, StartInfo } from './net/client.ts';
+import type { LobbyPlayer } from './net/protocol.ts';
+import { PlayerView } from './client/playerView.ts';
 
 import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
 // Re-exported so the start screen can preload through the same chunk it will run.
@@ -39,7 +44,15 @@ export interface GameSession {
   updateSettings(settings: GameSettings): void;
   dispose(): void;
 }
-export interface GameHooks { onPauseChange?(paused: boolean): void }
+export interface GameHooks {
+  onPauseChange?(paused: boolean): void;
+  /** A co-op game ended from the other side: the host left, or the connection dropped. */
+  onDisconnected?(reason: string): void;
+}
+/** A co-op game, as its host or as a player who joined. */
+export type NetPlay =
+  | { role: 'host'; host: NetHost; players: LobbyPlayer[]; seed: number }
+  | { role: 'client'; client: NetClient; start: StartInfo };
 
 /**
  * Start-screen warm-up after the download: decode every environment texture and parse the props, the
@@ -77,10 +90,10 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
  * compiled, so the caller can keep the canvas hidden until then and never show a half-loaded map.
  */
 export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettings = DEFAULT_SETTINGS,
-  mapId: MapId = 'bunker', hooks: GameHooks = {}): GameSession {
+  mapId: MapId = 'bunker', hooks: GameHooks = {}, net?: NetPlay): GameSession {
   let settings = { ...initialSettings };
   // Development previews (`?preview=`) pick their map with `&map=`.
-  const previewMap = import.meta.env.DEV ? new URLSearchParams(location.search).get('map') : null;
+  const previewMap = import.meta.env.DEV && !net ? new URLSearchParams(location.search).get('map') : null;
   const map = MAPS[isMapId(previewMap) ? previewMap : mapId];
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -139,25 +152,14 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const previewName = new URLSearchParams(location.search).get('preview');
   const previewPowerup = new URLSearchParams(location.search).get('powerup');
   const forceAim = import.meta.env.DEV && new URLSearchParams(location.search).get('aim') === '1';
-  const preview = import.meta.env.DEV && previewName && Object.hasOwn(previewViews, previewName)
+  const preview = import.meta.env.DEV && !net && previewName && Object.hasOwn(previewViews, previewName)
     ? previewViews[previewName as keyof typeof previewViews] : null;
 
-  const simulation = new GameSimulation({
+  // Everyone in a co-op game builds the same match; the host's runs it, clients' copies follow it.
+  const lobbyPlayers = net ? net.role === 'host' ? net.players : net.start.players : [];
+  const simulation = net ? createMatch(map, lobbyPlayers.length, net.role === 'host' ? net.seed : net.start.seed) : new GameSimulation({
     seed: 0x5a0b0a2,
-    map: {
-      collisionBoxes: [...map.collisionBoxes],
-      shotBlockers: map.shotBlockers,
-      walkSurfaces: map.walkSurfaces,
-      zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns,
-      barriers: map.barriers,
-      navigationGraph: map.navigation,
-      doors: map.doors,
-      wallWeapons: map.wallWeapons,
-      mysteryBoxes: map.mysteryBoxes,
-      powerSwitch: map.powerSwitch,
-      perkMachines: map.perkMachines,
-      traps: map.traps,
-    },
+    map: { ...simulationMap(map), zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns },
     playerSpawns: [preview?.position ?? map.playerSpawn],
     ...(previewName === 'stress' && preview ? { spawnConfig: {
       baseZombieCount: 24, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 24,
@@ -172,8 +174,11 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } }
       : { roundConfig: { initialWaitTicks: 1, intermissionTicks: 600 } }),
   });
-  const playerId = simulation.playerIds[0];
+  const playerId = simulation.playerIds[net?.role === 'client' ? net.start.slot : 0];
   if (!simulation.getPlayer(playerId)) throw new Error('Simulation failed to create local player.');
+  /** Every player's name by entity id, in a co-op game. */
+  const names = new Map<EntityId, string>(lobbyPlayers.map(player => [simulation.playerIds[player.slot], player.name]));
+  const playerViews = new Map<EntityId, PlayerView>();
   if (preview) {
     simulation.getPlayer(playerId)!.yaw = preview.yaw;
     if (previewName === 'overview') {
@@ -243,9 +248,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   function zombies(): ZombieState[] {
     return simulation.zombies();
   }
-  function syncZombieViews(alpha: number): void {
+  function syncZombieViews(alpha: number, tick: number, previous: ReadonlyMap<EntityId, Vec3>): void {
     if (zombieAsset) {
-      const tick = simulation.state.world.tick - 1 + alpha;
       for (const [id, view] of skinnedViews) if (!simulation.state.world.entities[id]) {
         view.dispose(); skinnedViews.delete(id);
       }
@@ -258,7 +262,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
           skinnedViews.set(entity.id, view); scene.add(view.root);
         }
         view.update(entity, tick, simulation.state.barriers.find(barrier => barrier.id === entity.entry?.barrierId),
-          previousPositions.get(entity.id), alpha);
+          previous.get(entity.id), alpha);
         if (view.expired(tick)) { view.dispose(); skinnedViews.delete(entity.id); }
       }
       // Corpse presentation must not accumulate unbounded skeleton work over a match.
@@ -274,14 +278,28 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
         view = createZombieView();
         zombieViews.set(zombie.id, view);
       }
-      view.update(zombie, simulation.state.world.tick - 1 + alpha,
-        simulation.state.barriers.find(barrier => barrier.id === zombie.entry?.barrierId), previousPositions.get(zombie.id), alpha);
+      view.update(zombie, tick,
+        simulation.state.barriers.find(barrier => barrier.id === zombie.entry?.barrierId), previous.get(zombie.id), alpha);
     }
     for (const id of zombieViews.keys()) {
       if (liveIds.has(id)) continue;
       zombieViews.delete(id);
     }
     zombieBatch.update(Array.from(zombieViews.values(), view => view.root));
+  }
+  /** Teammates' figures, in a co-op game. */
+  function syncPlayerViews(alpha: number, previous: ReadonlyMap<EntityId, Vec3>): void {
+    for (const [id, name] of names) {
+      if (id === playerId) continue;
+      const player = simulation.getPlayer(id);
+      let view = playerViews.get(id);
+      if (!view) {
+        view = new PlayerView(name, simulation.playerIds.indexOf(id));
+        playerViews.set(id, view); scene.add(view.root);
+      }
+      if (player && !simulation.state.leftPlayers.includes(id)) view.update(player, previous.get(id), alpha);
+      else view.root.visible = false;
+    }
   }
 
   const clock = new FixedStepClock({ tickRate: 60 });
@@ -291,13 +309,30 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   if (!preview) audio.startFromGesture();
   audio.setVolume(settings.volume);
   const pause = new SoloPauseController(canvas, window, document, paused => {
-    clock.reset(); previousPositions.clear();
     if (paused) input.clear();
-    audio.setPaused(paused);
+    if (!net) { clock.reset(); previousPositions.clear(); audio.setPaused(paused); }
     hooks.onPauseChange?.(paused);
   }, !preview, () => !preview, !preview);
   const hud = new CanvasHud(renderer, map.name);
   const feedback = new HudFeedback();
+  const netCleanup: Array<() => void> = [];
+  if (net?.role === 'host') net.host.attach(simulation);
+  if (net?.role === 'client') net.client.attach(simulation, playerId, {
+    collision: () => simulation.collisionBoxes(), walkSurfaces: map.walkSurfaces, shotBlockers: map.shotBlockers,
+  });
+  // Development builds expose the running match for inspection from the browser console.
+  if (import.meta.env.DEV) Object.assign(window, { zombonz: { simulation, playerId, net } });
+  /** The host holds the first wave until every player has loaded. */
+  let hostRunning = net?.role !== 'host';
+  if (net) {
+    feedback.setNames(names);
+    const stops = net.role === 'host'
+      ? [net.host.notices.add(notice => feedback.notice(`${notice.name.toUpperCase()} ${notice.kind === 'left' ? 'LEFT THE GAME' : 'JOINED'}`,
+        simulation.state.world.tick))]
+      : [net.client.notices.add(notice => feedback.notice(notice.toUpperCase(), simulation.state.world.tick)),
+        net.client.closed.add(reason => hooks.onDisconnected?.(reason))];
+    netCleanup.push(...stops);
+  }
   const performanceOverlay = new PerformanceOverlay();
   renderer.info.autoReset = false;
   let previousSeconds: number | undefined;
@@ -313,26 +348,40 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
         previousPositions.set(entity.id, { ...entity.position });
       }
     }
-    const inputFrame = input.consume();
+    // With the menu open in a shared game, the player just stands still.
+    const inputFrame = pause.paused && net ? createInputFrame(0) : input.consume();
     if (forceAim) inputFrame.actions.aim = { held: true, pressed: false, released: false, value: 1 };
-    const events = simulation.tick({ [playerId]: inputFrame }, dt);
-    weaponView.events(events, playerId, simulation.state.world.tick);
-    grenadeView.events(events, simulation.state.world.tick);
-    feedback.consume(events, playerId, simulation.state.world.tick);
-    hud.events(events, playerId);
-    audio.consume(events, playerId, simulation.state.world);
-    if (simulation.state.world !== world) {
-      previousPositions.clear();
-      for (const view of skinnedViews.values()) view.dispose();
-      skinnedViews.clear(); zombieViews.clear();
+    let events: SimulationEvent[];
+    if (net?.role === 'client') events = net.client.step(inputFrame);
+    else {
+      events = simulation.tick({ ...(net?.role === 'host' ? net.host.inputs() : {}), [playerId]: inputFrame }, dt);
+      if (net?.role === 'host') net.host.publish(events);
     }
+    present(events);
+    if (simulation.state.world !== world) resetMatchViews();
+  }
+  function present(events: readonly SimulationEvent[]): void {
+    if (!events.length) return;
+    weaponView.events(events as SimulationEvent[], playerId, simulation.state.world.tick);
+    grenadeView.events(events as SimulationEvent[], simulation.state.world.tick);
+    feedback.consume(events, playerId, simulation.state.world.tick);
+    hud.events(events as SimulationEvent[], playerId);
+    audio.consume(events as SimulationEvent[], playerId, simulation.state.world);
+  }
+  function resetMatchViews(): void {
+    previousPositions.clear();
+    for (const view of skinnedViews.values()) view.dispose();
+    skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
   }
   function syncCamera(alpha = 1): void {
     const player = simulation.getPlayer(playerId);
     if (!player) return;
     const position = interpolatePosition(previousPositions.get(playerId), player.position, alpha);
     // In last stand the view drops to the floor and lists to one side.
-    camera.position.set(position.x, position.y + (player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight), position.z);
+    // A client's view eases out of any correction from the host rather than jumping.
+    const correction = net?.role === 'client' ? net.client.correction : { x: 0, y: 0, z: 0 };
+    camera.position.set(position.x + correction.x,
+      position.y + correction.y + (player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight), position.z + correction.z);
     const look = input.pendingLook();
     camera.rotation.x = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(PLAYER_MOVEMENT.maxPitch, player.pitch + look.pitch));
     camera.rotation.y = player.yaw + look.yaw;
@@ -355,20 +404,27 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     if (wall) prepareWeaponModel(wall.weaponId);
     const holstered = simulation.getPlayer(playerId)?.holsteredWeapon;
     if (holstered) prepareWeaponModel(holstered.weaponId);
+    // Teammates carry real guns too.
+    for (const id of names.keys()) { const weapon = simulation.getPlayer(id)?.weapon.weaponId; if (weapon) prepareWeaponModel(weapon); }
   }
 
-  function frame(nowMs: number): void {
+  let lastFrameSeconds: number | undefined;
+  function frame(): void {
     if (disposed) return;
     const started = performance.now();
     if (++lastWarmFrame % 20 === 0) warmUpcomingWeapons();
-    const nowSeconds = nowMs / 1000;
-    if (previousSeconds === undefined) previousSeconds = nowSeconds;
-    const interval = (nowSeconds - previousSeconds) * 1000;
-    if (pause.paused) { input.clear(); clock.reset(); }
-    else clock.advance(nowSeconds - previousSeconds, simulate);
+    // One time base for animation frames and the background timer, so neither can step the clock back.
+    const nowSeconds = started / 1000;
+    const interval = lastFrameSeconds === undefined ? 0 : (nowSeconds - lastFrameSeconds) * 1000;
+    lastFrameSeconds = nowSeconds;
+    advance(nowSeconds);
     const simulationMs = performance.now() - started;
-    previousSeconds = nowSeconds;
     const alpha = clock.interpolationAlpha();
+    // A client draws everything but itself from the host's snapshots, slightly in the past.
+    const netFrame = net?.role === 'client' ? net.client.frame(interval / 1000) : null;
+    if (netFrame?.restarted) { resetMatchViews(); for (const view of playerViews.values()) view.root.visible = false; }
+    if (netFrame) present(netFrame.events);
+    const remote = netFrame ?? { alpha, tick: simulation.state.world.tick - 1 + alpha, previous: previousPositions };
     syncCamera(alpha);
     const playerForCamera = simulation.getPlayer(playerId);
     // Aiming narrows and sprinting widens the player's chosen field of view, as the defaults 54/67/71 did.
@@ -376,9 +432,10 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const fovBlend = 1 - Math.exp(-12 * Math.min(0.1, Math.max(0, interval / 1000)));
     const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
     if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
-    syncZombieViews(alpha);
-    powerupView.update(simulation.state.powerups.drops, simulation.state.world.tick - 1 + alpha);
-    grenadeView.update(simulation.state.grenades.active, simulation.state.world.tick - 1 + alpha);
+    syncZombieViews(remote.alpha, remote.tick, remote.previous);
+    syncPlayerViews(remote.alpha, remote.previous);
+    powerupView.update(simulation.state.powerups.drops, remote.tick);
+    grenadeView.update(simulation.state.grenades.active, remote.tick);
     details.update(simulation.state);
     renderer.clear();
     renderer.info.reset();
@@ -391,15 +448,35 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const player = simulation.getPlayer(playerId);
     if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha, interval / 1000); weaponView.render(renderer, camera.aspect); }
     const hudStarted = performance.now();
-    const hudSnapshot = buildHudSnapshot(simulation, playerId);
-    if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused,
+    const hudSnapshot = buildHudSnapshot(simulation, playerId, net ? names : undefined);
+    const waiting = !hostRunning ? 'Waiting for everyone to load…' : null;
+    if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused && !net,
+      pingMs: net?.role === 'client' && net.client.pingMs !== null ? Math.round(net.client.pingMs / 10) * 10 : null,
+      canRestart: net?.role !== 'client',
       feedback: feedback.snapshot(simulation.state.world.tick),
-      assetNotice: zombieAssetNotice ?? weaponView.notice ?? environmentNotice }, performance.now(),
+      assetNotice: waiting ?? zombieAssetNotice ?? weaponView.notice ?? environmentNotice }, performance.now(),
       player ? { spread: currentSpread(player), verticalFov: camera.fov } : undefined);
     performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
       renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
     performanceOverlay.render(renderer);
     frameId = requestAnimationFrame(frame);
+  }
+
+  /** Runs the fixed-step clock up to now (unless a solo game is paused, or the host is still waiting). */
+  function advance(nowSeconds: number): void {
+    if (previousSeconds === undefined) previousSeconds = nowSeconds;
+    if (!hostRunning && net?.role === 'host' && net.host.everyoneReady()) hostRunning = true;
+    const elapsed = Math.max(0, nowSeconds - previousSeconds);
+    if ((pause.paused && !net) || !hostRunning) { input.clear(); clock.reset(); }
+    else clock.advance(elapsed, simulate);
+    previousSeconds = Math.max(previousSeconds, nowSeconds);
+  }
+  // A background tab gets no animation frames. A shared game must keep running there, so a worker's
+  // timer (which browsers throttle far less) drives the clock while the page is hidden.
+  let pump: Worker | null = null;
+  if (net && typeof Worker !== 'undefined') {
+    pump = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 1000 / 60);'], { type: 'text/javascript' })));
+    pump.onmessage = () => { if (document.hidden && !disposed) advance(performance.now() / 1000); };
   }
 
   addEventListener('resize', resize);
@@ -436,12 +513,15 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   return {
     ready,
     start: () => {
+      if (net?.role === 'client') net.client.ready();
       pause.resume();
       if (pause.paused) hooks.onPauseChange?.(true);
     },
     resume: () => pause.resume(),
     restart: () => {
+      if (net?.role === 'client') return; // Only the host restarts a shared game.
       const event = simulation.restart();
+      if (net?.role === 'host') net.host.publish([event]);
       input.clear(); clock.reset(); previousPositions.clear(); previousSeconds = undefined; lastShadowTick = -Infinity;
       for (const view of skinnedViews.values()) view.dispose();
       skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
@@ -462,6 +542,11 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       disposed = true;
       cancelAnimationFrame(frameId);
       removeEventListener('resize', resize);
+      pump?.terminate();
+      for (const stop of netCleanup) stop();
+      if (net?.role === 'host') net.host.close();
+      if (net?.role === 'client') net.client.leave();
+      for (const view of playerViews.values()) view.dispose();
       pause.dispose(); input.dispose(); audio.dispose(); hud.dispose();
       performanceOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose();
       for (const view of skinnedViews.values()) view.dispose();

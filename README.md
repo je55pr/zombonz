@@ -17,8 +17,8 @@ Browser-based, round-driven co-op zombie survival game built with Three.js.
 
 ## Multiplayer direction
 
-- Player-hosted authoritative multiplayer is the first implementation target, using WebRTC DataChannels for small co-op sessions.
-- A tiny signalling service handles room discovery / WebRTC negotiation; STUN is expected, with TURN fallback where direct connectivity fails.
+- Player-hosted authoritative multiplayer, using WebRTC DataChannels for small co-op sessions, is playable now: players connect by swapping short copy-paste codes, with no server (see [online co-op](docs/networking.md)).
+- A tiny signalling service for short room codes, and TURN fallback where direct connectivity fails, are still to come.
 - Gameplay/protocol code must not assume four players even if 1-4 is the first practical test target.
 - Large sessions such as 16/32/64 players are a later architecture/performance investigation and may require a server/relay topology rather than one browser maintaining a classic small-lobby host star.
 - Dedicated/headless hosting remains a later option rather than a requirement for the first playable.
@@ -50,7 +50,8 @@ Use Node.js 22.12.0, then `npm ci` and `npm run dev`. Open the local address pri
 Run `npm run check` for TypeScript validation, automated tests and a production build.
 
 The game opens on a start menu: **Solo**, **Multiplayer** and **Settings** (mouse or arrow keys,
-Enter to choose, Esc to go back). Multiplayer is a placeholder until online co-op lands. Settings
+Enter to choose, Esc to go back). Multiplayer hosts or joins online co-op for up to four players:
+players connect by swapping short codes over chat or text ([how it works](docs/networking.md)). Settings
 holds mouse sensitivity, field of view and volume, saved in this browser. While the menu is open it
 downloads the game code and every model and texture the game uses (about 88 MB), with a progress
 bar, then unpacks them (decodes the textures and parses the props, zombie and starting pistol).
@@ -170,7 +171,7 @@ demand; loading failures leave a playable placeholder and a visible notice.
 There are no animated player hands.
 Weapon stats are WaW-inspired approximations. Full hand/bolt/round-by-round reload animation,
 authentic box weapon silhouettes/roulette animation, original weapon behaviour,
-recorded sounds and online co-op remain future work.
+and recorded sounds remain future work.
 
 Press F2 for asset credits. Full source links, licences and conversion notes are in
 [runtime attribution](public/assets/ATTRIBUTION.txt) and [asset provenance](docs/assets/THIRD_PARTY_ASSETS.md).

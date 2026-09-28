@@ -7,6 +7,7 @@ import { PauseMenuView } from './client/pauseMenu.ts';
 import type { DownloadStatus } from './client/menu.ts';
 
 type GameModule = typeof import('./game.ts');
+type NetPlay = import('./game.ts').NetPlay;
 
 const gameCanvas = document.querySelector<HTMLCanvasElement>('#game');
 if (!gameCanvas) throw new Error('Missing #game canvas.');
@@ -19,6 +20,15 @@ let menuCanvas: HTMLCanvasElement | undefined;
 let session: ReturnType<GameModule['startGame']> | undefined;
 let pauseMenu: PauseMenuView | undefined;
 let readyDownload: DownloadStatus | undefined;
+let lobby: { dispose(): void } | undefined;
+
+/** A short message over whatever is showing, such as why a co-op game ended. */
+function showNotice(text: string): void {
+  const notice = document.createElement('div');
+  notice.className = 'notice'; notice.setAttribute('role', 'status'); notice.textContent = text;
+  document.body.append(notice);
+  setTimeout(() => notice.remove(), 7000);
+}
 
 function captureMouse(): void {
   if (document.pointerLockElement !== gameCanvas) {
@@ -27,6 +37,7 @@ function captureMouse(): void {
 }
 
 function showMenu(): void {
+  lobby?.dispose(); lobby = undefined;
   session?.dispose(); session = undefined;
   pauseMenu?.dispose(); pauseMenu = undefined;
   if (document.pointerLockElement === gameCanvas) document.exitPointerLock();
@@ -38,34 +49,57 @@ function showMenu(): void {
   const view = new MenuView(menuCanvas, loadSettings(), effect => {
     if (effect.type === 'saveSettings') saveSettings(effect.settings);
     if (effect.type === 'retryDownload') void downloadGame(view);
-    if (effect.type === 'startSolo' && game) void startSolo(game, effect.map);
+    if (effect.type === 'startSolo' && game) void startSession(game, effect.map);
+    if (effect.type === 'hostGame') void openLobby({ kind: 'host', map: effect.map });
+    if (effect.type === 'joinGame') void openLobby({ kind: 'join' });
   }, buildId);
   menu = view;
   if (readyDownload) view.setDownload(readyDownload);
   else void downloadGame(view);
 }
 
+/** The co-op lobby, over the menu: hosting on the chosen map, or joining someone's game. */
+async function openLobby(mode: { kind: 'host'; map: MapId } | { kind: 'join' }): Promise<void> {
+  if (lobby) return;
+  const { LobbyView } = await import('./client/lobby.ts');
+  if (lobby || !game) return;
+  const module = game;
+  lobby = new LobbyView(mode, {
+    hostStarted: (host, players, seed, map) => {
+      lobby = undefined;
+      void startSession(module, map, { role: 'host', host, players, seed });
+    },
+    clientStarted: (client, start) => {
+      lobby = undefined;
+      void startSession(module, start.map, { role: 'client', client, start });
+    },
+    back: () => { lobby = undefined; },
+  });
+}
+
 /**
  * Builds the game behind the menu and only swaps canvases once it reports the map, zombie and starting
  * gun ready (or after a timeout, so a stalled warm-up can never trap the player on the menu).
  */
-async function startSolo(module: GameModule, map: MapId): Promise<void> {
-  // This runs inside the map-selection click/key gesture. Capture before awaiting asset warm-up.
+async function startSession(module: GameModule, map: MapId, net?: NetPlay): Promise<void> {
+  // Solo and hosting start from a click or key press, so the mouse can be captured straight away.
+  // A joining player starts when the host does, with no gesture of their own to capture it.
   gameCanvas!.hidden = false;
-  captureMouse();
+  if (net?.role !== 'client') captureMouse();
   pauseMenu = new PauseMenuView(loadSettings(), {
     resume: () => { captureMouse(); session?.resume(); pauseMenu?.setOpen(false); },
     restart: () => { captureMouse(); session?.restart(); pauseMenu?.setOpen(false); },
     quit: showMenu,
     settings: settings => { saveSettings(settings); session?.updateSettings(settings); },
-  });
+  }, document.body, { online: !!net, canRestart: net?.role !== 'client' });
   try {
     session = module.startGame(gameCanvas!, loadSettings(), map, {
       onPauseChange: paused => {
         if (paused && document.pointerLockElement === gameCanvas) document.exitPointerLock();
         pauseMenu?.setOpen(paused);
       },
-    });
+      onDisconnected: reason => { showMenu(); showNotice(reason); },
+    }, net);
   } catch (error) {
     console.error('Unable to start the game', error);
     showMenu();
@@ -77,6 +111,8 @@ async function startSolo(module: GameModule, map: MapId): Promise<void> {
   menu?.dispose();
   menuCanvas = undefined; menu = undefined;
   session?.start();
+  // Without the mouse captured, offer the menu so one click on Resume captures it.
+  if (net?.role === 'client' && document.pointerLockElement !== gameCanvas) pauseMenu?.setOpen(true);
 }
 
 /**

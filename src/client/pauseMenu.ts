@@ -15,7 +15,8 @@ export class PauseMenuView {
   private settings: GameSettings;
   private screen: 'main' | 'settings' = 'main';
 
-  constructor(settings: GameSettings, private readonly actions: PauseMenuActions, host: HTMLElement = document.body) {
+  constructor(settings: GameSettings, private readonly actions: PauseMenuActions, host: HTMLElement = document.body,
+    options: { online?: boolean; canRestart?: boolean } = {}) {
     this.settings = { ...settings };
     this.element = document.createElement('div');
     this.element.className = 'pause-menu';
@@ -30,18 +31,19 @@ export class PauseMenuView {
         <input type="range" data-setting="${key}" min="${limit.min}" max="${limit.max}" step="${limit.step}"></label>`;
     }).join('');
     this.element.innerHTML = `<div class="pause-panel">
-      <h1>PAUSED</h1><div class="pause-rule"></div>
+      <h1>${options.online ? 'MENU' : 'PAUSED'}</h1><div class="pause-rule"></div>
+      ${options.online ? '<p class="pause-note">The game keeps running while this menu is open.</p>' : ''}
       <div class="pause-main">
         <button type="button" data-action="resume">Resume</button>
-        <button type="button" data-action="restart">Restart</button>
+        ${options.canRestart === false ? '' : '<button type="button" data-action="restart">Restart</button>'}
         <button type="button" data-action="settings">Settings</button>
-        <button type="button" data-action="quit">Quit to Main Menu</button>
+        <button type="button" data-action="quit">${options.online ? 'Leave Game' : 'Quit to Main Menu'}</button>
       </div>
       <div class="pause-settings" hidden>
         ${rows}
         <button type="button" data-action="back">Back</button>
       </div>
-      <p>ESC TO RESUME · TAB TO NAVIGATE</p>
+      <p data-hint>ESC TO RESUME · TAB TO NAVIGATE</p>
     </div>`;
     host.append(this.element);
     this.updateSettings(settings);
@@ -72,7 +74,7 @@ export class PauseMenuView {
     this.screen = screen;
     this.element.querySelector<HTMLElement>('.pause-main')!.hidden = screen !== 'main';
     this.element.querySelector<HTMLElement>('.pause-settings')!.hidden = screen !== 'settings';
-    this.element.querySelector('p')!.textContent = screen === 'main'
+    this.element.querySelector('[data-hint]')!.textContent = screen === 'main'
       ? 'ESC TO RESUME · TAB TO NAVIGATE' : 'ESC TO GO BACK · SETTINGS SAVE AUTOMATICALLY';
     if (screen === 'settings') this.element.querySelector<HTMLInputElement>('input')?.focus();
     else this.element.querySelector<HTMLButtonElement>('[data-action="resume"]')?.focus();

@@ -30,6 +30,8 @@ export interface HostTransport extends TransportSubscriptions {
   sendUnreliable(peerId: PeerId, payload: TransportPayload): void;
   broadcastReliable(payload: TransportPayload): void;
   broadcastUnreliable(payload: TransportPayload): void;
+  /** Drops one peer, where the transport supports it. */
+  disconnect?(peerId: PeerId, reason?: string): void;
 }
 
 export interface ClientTransport extends TransportSubscriptions {

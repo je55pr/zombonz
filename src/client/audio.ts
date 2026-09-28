@@ -246,6 +246,12 @@ export class GameAudio {
       this.playClip(variant('ambience-sting', 2, world.tick), MIX.sting, ((world.tick * 104729) % 200) / 100 - 1);
     }
     for (const event of events) {
+      if ('playerId' in event && event.playerId !== playerId && event.type === 'weaponFired') {
+        // A teammate's shot, from where they stand.
+        const shooter = world.entities[event.playerId];
+        if (shooter) this.playAt(gunClip(event.weaponId).clip, MIX.gunfire * 0.8, shooter.position, player);
+        continue;
+      }
       if ('playerId' in event && event.playerId !== playerId && event.type !== 'powerupCollected'
         && event.type !== 'powerActivated') continue;
       switch (event.type) {
