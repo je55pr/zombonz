@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
 import { VENDING_MODEL, buildMapDetails } from './client/mapDetails.ts';
+import { LightPool } from './client/lightPool.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { SoloPauseController } from './client/pause.ts';
@@ -130,7 +131,11 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   keyLight.shadow.bias = -0.0006;
   scene.add(keyLight);
   scene.add(buildGreybox(map.greybox, map.prisms));
-  const details = buildMapDetails(scene, map);
+  // The map's lamps, perk machines, traps and box glow share a few real point lights.
+  const lightPool = new LightPool(scene);
+  const details = buildMapDetails(scene, map, lightPool);
+  /** Whether the moon's shadow map is out of date: it is redrawn only when the building changes. */
+  let shadowsDirty = true;
   batchStaticMeshes(scene);
   let environmentNotice: string | null = 'Loading map materials and props…';
   const environmentReady = (async () => {
@@ -143,7 +148,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       .catch(error => { console.warn('Environment manifest unavailable', error); return [1]; });
     const [propFailures, surfaceFailures] = await Promise.all([props, surfaces]);
     environmentNotice = propFailures > 0 || surfaceFailures.some(n => n > 0) ? 'Some environment assets failed to load; check console' : null;
-    renderer.shadowMap.needsUpdate = true;
+    shadowsDirty = true;
   })().catch(error => { environmentNotice = 'Environment pack unavailable; using plain fallback'; console.warn(error); });
 
   // Development-only inspection views for iterating on the map without a running wave.
@@ -352,7 +357,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const performanceOverlay = new PerformanceOverlay(renderer);
   renderer.info.autoReset = false;
   let previousSeconds: number | undefined;
-  let lastShadowTick = -Infinity;
+  let lastShadowSeconds = -Infinity;
   let disposed = false;
   let frameId = 0;
 
@@ -463,17 +468,18 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     powerupView.update(simulation.state.powerups.drops, remote.tick);
     grenadeView.update(simulation.state.grenades.active, remote.tick);
     const actorsEnded = profiling ? performance.now() : 0;
-    details.update(simulation.state);
+    if (details.update(simulation.state)) shadowsDirty = true;
+    lightPool.update(camera, interval / 1000);
     const detailsEnded = profiling ? performance.now() : 0;
     performanceOverlay.beginGpu();
     renderer.clear();
     renderer.info.reset();
-    // The moon/camera are independent: expensive skinned shadow passes only need
-    // 15 Hz updates. Models and camera still render at the display's full rate.
-    const shadowFrame = simulation.state.world.tick - lastShadowTick >= 4 || simulation.state.world.tick < lastShadowTick;
-    if (shadowFrame) {
-      renderer.shadowMap.needsUpdate = true; lastShadowTick = simulation.state.world.tick;
-    }
+    // The moon's shadows are the building's (actors cast none), so the shadow map is only redrawn when
+    // a door, board, the box or the lever moves, or scenery finishes loading: at most 15 times a
+    // second while something is moving (by the clock, so it still happens while paused or loading),
+    // and not at all otherwise.
+    const shadowFrame = shadowsDirty && nowSeconds - lastShadowSeconds >= 1 / 15;
+    if (shadowFrame) { renderer.shadowMap.needsUpdate = true; lastShadowSeconds = nowSeconds; shadowsDirty = false; }
     renderer.render(scene, camera);
     const sceneEnded = profiling ? performance.now() : 0;
     const player = simulation.getPlayer(playerId);
@@ -534,6 +540,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const startingWeapon = simulation.getPlayer(playerId)?.weapon.weaponId ?? 'starter-pistol';
   const ready = (async () => {
     await Promise.allSettled([environmentReady, zombieReady, details.ready, prepareWeaponModel(startingWeapon)]);
+    shadowsDirty = true; // the wall guns and perk machines are in place now
     // Upload every texture and compile every shader now, rather than stuttering on the first frames.
     await renderer.compileAsync(scene, camera);
     scene.traverse(object => {
@@ -569,7 +576,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       if (net?.role === 'client') return; // Only the host restarts a shared game.
       const event = simulation.restart();
       if (net?.role === 'host') net.host.publish([event]);
-      input.clear(); clock.reset(); previousPositions.clear(); previousSeconds = undefined; lastShadowTick = -Infinity;
+      input.clear(); clock.reset(); previousPositions.clear(); previousSeconds = undefined; shadowsDirty = true;
       for (const view of skinnedViews.values()) view.dispose();
       skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
       grenadeView.events([event], simulation.state.world.tick);

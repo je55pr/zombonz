@@ -35,12 +35,12 @@ export class WindowBoards {
     this.setState(maxBoards, null);
   }
 
-  /** `fallElapsed` is null outside the 0.8-second falling animation. */
-  setState(boards: number, fallElapsed: number | null): void {
+  /** `fallElapsed` is null outside the 0.8-second falling animation. Returns whether any board moved. */
+  setState(boards: number, fallElapsed: number | null): boolean {
     const count = Math.max(0, Math.min(this.planks.instanceMatrix.count, boards));
     const fall = count < this.planks.instanceMatrix.count && fallElapsed !== null
       && fallElapsed >= 0 && fallElapsed < 0.8 ? fallElapsed : null;
-    if (count === this.lastBoards && (fall ?? -1) === this.lastFall) return;
+    if (count === this.lastBoards && (fall ?? -1) === this.lastFall) return false;
     this.lastBoards = count; this.lastFall = fall ?? -1;
     const visible = count + (fall === null ? 0 : 1);
     this.planks.count = visible; this.nails.count = visible * 2;
@@ -58,5 +58,6 @@ export class WindowBoards {
     }
     this.planks.instanceMatrix.needsUpdate = true;
     this.nails.instanceMatrix.needsUpdate = true;
+    return true;
   }
 }

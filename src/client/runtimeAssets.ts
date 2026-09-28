@@ -146,7 +146,9 @@ export function cloneZombieModel(asset: ZombieAsset): { body: THREE.Group; model
   model.position.add(transform.offset);
   model.traverse(object => {
     if (object instanceof THREE.Mesh) {
-      object.castShadow = true; object.receiveShadow = true;
+      // Zombies take the building's moon shadows but cast none: the shadow map is only redrawn when the
+      // building changes (see game.ts).
+      object.castShadow = false; object.receiveShadow = true;
       if (object instanceof THREE.SkinnedMesh) {
         // Conservative fixed animated bounds: cull off-camera actors without a
         // CPU skinning pass over every vertex to recompute bounds every frame.

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
-import { readAssetGeometry, readAssetJson, assetExists } from '../scripts/inspect-assets.mjs';
+import { readAssetGeometry, readAssetJson, assetExists, glbFiles, readGlbJson } from '../scripts/inspect-assets.mjs';
 import { BUNKER_PROPS, propCollisionBox } from '../src/maps/bunkerProps.ts';
 import { BUNKER_BARRIERS, BUNKER_STAIRS, BUNKER_PLAYER_SPAWN, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
 import { hasClearNavigationLine } from '../src/core/navigation.ts';
@@ -9,6 +9,13 @@ import { applyPbrMaps, environmentMaterial, bunkerMaterial, MATERIAL_IDS, projec
 import { batchStaticMeshes } from '../src/client/staticBatch.ts';
 
 describe('environment pack integration', () => {
+  it('ships no transmissive glass (three.js would redraw the whole scene for it every frame)', () => {
+    const files = glbFiles('public/assets');
+    expect(files.length).toBeGreaterThan(20);
+    const transmissive = files.filter(path => readGlbJson(path).extensionsUsed?.includes('KHR_materials_transmission'));
+    expect(transmissive, 'run scripts/weapon-convert/plain-glass.mjs').toEqual([]);
+  });
+
   it('uses only checked-in materials and props from the pack manifests', () => {
     const environment = readAssetJson('public/assets/environment/manifest.json');
     const props = readAssetJson('public/assets/props/manifest.json');

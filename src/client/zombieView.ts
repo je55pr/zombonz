@@ -21,7 +21,7 @@ export function createZombieView(): ZombieView {
     x: number, y: number, z: number, sx: number, sy: number, sz: number) => {
     const mesh = new THREE.Mesh(cube, material);
     mesh.position.set(x, y, z); mesh.scale.set(sx, sy, sz);
-    mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
+    mesh.receiveShadow = true; parent.add(mesh); return mesh;
   };
   part(body, cloth, 0, 1.1, 0, 0.48, 0.61, 0.3);
   part(body, skin, 0, 1.53, 0, 0.3, 0.34, 0.3);

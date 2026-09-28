@@ -63,7 +63,8 @@ export class PlayerView {
     // The model faces +z; a player looks toward -z at yaw 0.
     model.rotation.y = Math.PI;
     model.traverse(object => {
-      if (object instanceof THREE.Mesh) { object.castShadow = true; object.receiveShadow = true; object.frustumCulled = false; }
+      // Like zombies, teammates take the moon's shadows but cast none.
+      if (object instanceof THREE.Mesh) { object.receiveShadow = true; object.frustumCulled = false; }
     });
     this.root.add(model);
     this.fallback.visible = false;

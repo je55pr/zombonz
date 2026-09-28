@@ -90,7 +90,14 @@ when the browser supports asynchronous timer queries; it excludes browser presen
 so CPU and GPU times should not be added together. The panel stays dormant while hidden.
 Rendering follows the display refresh rate, with interpolated movement and immediate
 mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
-1x pixel density, no MSAA, and 1024px shadows refreshed at 15 Hz. Static scenery and fallback zombie body parts
+1x pixel density and no MSAA. The moon's shadow map (1024px, 2048px on the larger Asylum) holds only the
+building: zombies and teammates take its shadows but cast none, so it is redrawn only when a door,
+window board, the box or the power lever moves (at most 15 times a second while one is moving). A map's
+lamps, perk machines, traps and box glow share four real point lights (`src/client/lightPool.ts`), given
+to the nearest of them each frame, because every lit pixel pays for every point light in the scene.
+Runtime models may not use transmissive glass: three.js redraws the whole scene for it every frame, so
+`scripts/weapon-convert/plain-glass.mjs` turns it into plain see-through glass (a test enforces this).
+Static scenery and fallback zombie body parts
 are batched where appropriate, and the HUD texture is redrawn only when its content changes.
 144 FPS requires a 144 Hz-or-faster active display and enough GPU/CPU headroom;
 the browser or OS may cap presentation to the current display refresh rate.

@@ -16,7 +16,7 @@
       "purpose": "Bare incandescent light bulb",
       "source": "https://polyhaven.com/a/lightbulb_01",
       "license": "CC0",
-      "bytes": 1939764
+      "bytes": 420412
     },
     "metal-jerrycan": {
       "model": "/assets/props/metal-jerrycan/model.glb",
@@ -93,7 +93,7 @@
       "purpose": "Rusted caged bunker wall lamp",
       "source": "https://polyhaven.com/a/industrial_wall_lamp",
       "license": "CC0",
-      "bytes": 3776052
+      "bytes": 840356
     },
     "caged-ceiling-light": {
       "model": "/assets/props/caged-ceiling-light/model.glb",
@@ -201,7 +201,7 @@
       "purpose": "Wall clock",
       "source": "https://polyhaven.com/a/wall_clock",
       "license": "CC0",
-      "bytes": 324308
+      "bytes": 324196
     },
     "power-box": {
       "model": "/assets/props/power-box/model.glb",
@@ -222,7 +222,7 @@
       "purpose": "Portable generator (power room)",
       "source": "https://polyhaven.com/a/portable_generator",
       "license": "CC0",
-      "bytes": 1092976
+      "bytes": 1092908
     },
     "industrial-pipes": {
       "model": "/assets/props/industrial-pipes/model.glb",
@@ -236,7 +236,7 @@
       "purpose": "Hanging industrial lamp",
       "source": "https://polyhaven.com/a/hanging_industrial_lamp",
       "license": "CC0",
-      "bytes": 1009072
+      "bytes": 1008996
     },
     "vending-machine": {
       "model": "/assets/props/vending-machine/model.glb",

@@ -11,6 +11,7 @@ import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './wea
 import { BOX_RULES } from '../core/mysteryBox.ts';
 import { PERKS, type PerkId } from '../core/perks.ts';
 import { WindowBoards } from './windowBoards.ts';
+import { LightSource, type LightPool } from './lightPool.ts';
 
 // Wall guns are shown life-size; viewmodels are modelled at roughly 0.86x.
 const WALL_GUN_SCALE = 1.15;
@@ -85,9 +86,12 @@ function beamFade(): THREE.Texture {
 /**
  * Everything drawn on top of a map's greybox from its definition: window boards and frames, stair
  * rails, purchasable doors and debris, painted labels, chalk wall guns, the mystery box, practical
- * lamps, rubble and the surrounding treeline. `update` follows the authoritative simulation state.
+ * lamps, rubble and the surrounding treeline. `update` follows the authoritative simulation state, and
+ * says whether anything that casts a moon shadow moved (a door, a board, the box or the power lever).
+ * The map's lights are sources for the shared light pool, which draws the nearest of them.
  */
-export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(state: SimulationState): void; ready: Promise<unknown> } {
+export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: LightPool):
+  { update(state: SimulationState): boolean; ready: Promise<unknown> } {
   const group = new THREE.Group();
   group.name = `${map.id}-details`;
   scene.add(group);
@@ -216,7 +220,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
   box(lid, wood, 0.49, 0, 0, 1.06, 0.13, 2.4);
   const question = writing('?  ?  ?', 1.9, 0.6, '#f6d893');
   question.position.set(0.5, 0.075, 0); question.rotation.x = -Math.PI / 2; question.rotation.z = Math.PI / 2; lid.add(question);
-  const glow = new THREE.PointLight(0xffbf57, 4, 6, 2); glow.position.set(0, 1.3, 0); chest.add(glow);
+  const glow = lightPool.add(new LightSource(0xffbf57, 4, 6, 2)); glow.position.set(0, 1.3, 0); chest.add(glow);
   let rewardLabel = writing('MYSTERY BOX', 2, 0.3, '#f6d893');
   rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2; chest.add(rewardLabel);
   let rewardText = 'MYSTERY BOX';
@@ -260,7 +264,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
   // Perk-a-cola machines: a vintage vending machine painted in each perk's colour, with its name on a
   // sign across the top and a glow, lit once the power is on.
   const PERK_COLOURS: Record<PerkId, number> = { juggernog: 0xa01818, 'double-tap': 0xb86e14, 'speed-cola': 0x1f9038, 'quick-revive': 0x2860c0 };
-  const perkLights: { materials: THREE.MeshStandardMaterial[]; light: THREE.PointLight; colour: number }[] = [];
+  const perkLights: { materials: THREE.MeshStandardMaterial[]; light: LightSource; colour: number }[] = [];
   const machines = (map.perkMachines ?? []).map(machine => {
     const facing = map.perkMachineFacing?.[machine.id] ?? 0;
     const view = new THREE.Group(); group.add(view);
@@ -270,7 +274,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     box(view, sign, 0, 2.2, 0.28, 1.0, 0.24, 0.1);
     const name = writing(PERKS[machine.perk].name.toUpperCase(), 0.95, 0.22, '#fff4dc');
     name.position.set(0, 2.2, 0.34); view.add(name);
-    const light = new THREE.PointLight(PERK_COLOURS[machine.perk], 0, 5, 2); light.position.set(0, 1.4, 1); view.add(light);
+    const light = lightPool.add(new LightSource(PERK_COLOURS[machine.perk], 0, 5, 2)); light.position.set(0, 1.4, 1); view.add(light);
     view.userData.dynamic = true;
     const lights = { materials: [sign], light, colour: PERK_COLOURS[machine.perk] };
     perkLights.push(lights);
@@ -293,7 +297,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     }
   }).catch(error => console.warn('Perk machine model unavailable', error)) : Promise.resolve();
   // Electric traps: iron pylons at either end of the live strip, a grate between, and a switch box.
-  const trapViews = new Map<string, { arcs: THREE.LineSegments; light: THREE.PointLight; lamp: THREE.MeshBasicMaterial;
+  const trapViews = new Map<string, { arcs: THREE.LineSegments; light: LightSource; lamp: THREE.MeshBasicMaterial;
     from: THREE.Vector3; to: THREE.Vector3 }>();
   for (const trap of map.traps ?? []) {
     const { min, max } = trap.zone;
@@ -308,16 +312,16 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     box(group, iron, mid.x, floor + 0.01, mid.z, alongX ? max.x - min.x - 0.3 : 0.5, 0.02, alongX ? 0.5 : max.z - min.z - 0.3);
     const arcs = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xbfe4ff }));
     arcs.visible = false; arcs.userData.dynamic = true; group.add(arcs);
-    const light = new THREE.PointLight(0x8fc8ff, 0, 9, 2); light.position.set(mid.x, floor + 1.4, mid.z); group.add(light);
+    const light = lightPool.add(new LightSource(0x8fc8ff, 0, 9, 2)); light.position.set(mid.x, floor + 1.4, mid.z); group.add(light);
     const lamp = new THREE.MeshBasicMaterial({ color: 0x401010 });
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), lamp);
     bulb.position.set(trap.switchPosition.x, trap.switchPosition.y + 0.28, trap.switchPosition.z); group.add(bulb);
     trapViews.set(trap.id, { arcs, light, lamp, from, to });
   }
   // Warm practical lights against cold exterior moonlight.
-  const practicalLights: THREE.PointLight[] = [];
+  const practicalLights: LightSource[] = [];
   for (const { x, y, z } of map.lights) {
-    const light = new THREE.PointLight(0xffc38b, 11, 10, 1.6); light.position.set(x, y, z); group.add(light);
+    const light = lightPool.add(new LightSource(0xffc38b, 11, 10, 1.6)); light.position.set(x, y, z); group.add(light);
     practicalLights.push(light);
   }
   // Low rubble stays below the collision step height and out of navigation lanes.
@@ -370,7 +374,9 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     water.rotation.x = -Math.PI / 2; water.position.y = 0.42; fountain.add(water);
     lathe([[0.3, 0.3], [0.24, 0.6], [0.2, 1.3], [0.28, 1.4], [0.75, 1.45], [0.8, 1.6], [0.7, 1.62], [0.25, 1.55], [0.18, 1.9], [0.1, 2.1], [0, 2.12]]);
   }
+  let shadowPose = '';
   return { ready: Promise.allSettled([...wallGuns, vending]), update(state) {
+    let moved = false;
     // On a map with a switch, the lamps burn low until the power comes on.
     const lampLevel = map.powerSwitch && !state.power.on ? 0.4 : 1;
     for (let i = 0; i < practicalLights.length; i++) {
@@ -413,9 +419,12 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
       const planks = barrierViews.get(barrier.id);
       if (!planks) continue;
       const elapsed = barrier.lastTornTick >= 0 ? (state.world.tick - barrier.lastTornTick) / 60 : null;
-      planks.setState(barrier.boards, elapsed);
+      if (planks.setState(barrier.boards, elapsed)) moved = true;
     }
-    for (const door of state.doors) { const view = doorViews.get(door.id); if (view) view.visible = !door.open; }
+    for (const door of state.doors) {
+      const view = doorViews.get(door.id);
+      if (view && view.visible === door.open) { view.visible = !door.open; moved = true; }
+    }
     const currentBox = state.mysteryBoxes[0];
     const spot = currentBox?.locations[currentBox.locationIndex];
     // The bear rises out of the open box, then the box lifts away and is gone until it lands elsewhere.
@@ -459,5 +468,9 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
       rewardLabel.position.set(0.7, 1.8, 0); rewardLabel.rotation.y = Math.PI / 2;
       chest.add(rewardLabel); rewardText = nextText; rewardLabel.visible = currentBox?.phase !== 'rolling';
     }
+    // The chest, its lid and the lever cast shadows too.
+    const pose = `${chest.visible && chest.position.toArray().join()},${chest.rotation.y},${lid.rotation.z},${lever.rotation.z}`;
+    if (pose !== shadowPose) { shadowPose = pose; moved = true; }
+    return moved;
   } };
 }
