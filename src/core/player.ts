@@ -52,6 +52,8 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     holsteredWeapon: null,
     switchTicksRemaining: 0,
     perks: [],
+    downed: null,
+    selfRevives: 0,
     godMode: false,
     noclip: false,
     noclipAnchor: null,

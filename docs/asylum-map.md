@@ -44,8 +44,10 @@ The fourteen wall buys follow the original's rooms: Kar98k and Gewehr 43 in the 
 M1 Garand and Springfield in the American start, Thompson and double-barrel in the hallway, BAR
 in the back room, MP40 and double-barrel on the German balcony, STG-44 and Trench Gun in Left
 Upstairs, Trench Gun and BAR on the right balcony, and the sawed-off in the Speed Cola room.
-There are seventeen zombie windows, as in the original's room guides:
+There are seventeen zombie windows and one open climb, as in the original's room guides:
 
+- **German balcony railing:** zombies also climb the courtyard wall by a drainpipe and over the
+  balcony railing. There are no boards there to rebuild.
 - **Ground floor (nine):** four in the German start, three in the American start and two in the hallway.
 - **Upstairs (eight):** one on the German balcony, two in Left Upstairs, two on the right balcony,
   and one each in the Speed Cola room, the kitchen and the power room.
@@ -63,11 +65,11 @@ once players can reach the room behind it. The other upstairs windows are decora
   | --- | --- | --- | --- |
   | Jugger-Nog | German start | 2500 | 250 health: zombies need five hits instead of two |
   | Double Tap Root Beer | German balcony | 2000 | Fire rate a third faster |
-  | Quick Revive | American start | 1500 | Saves the player from one killing blow |
+  | Quick Revive | American start | 1500 | Revives teammates twice as fast; solo, gets you back up |
   | Speed Cola | Speed Cola room | 3000 | Reloads take half as long |
 
-  The game has no downed state yet, so Quick Revive works like Black Ops' solo Quick Revive: a killing
-  blow brings the player straight back at full health, and every perk is lost.
+  Solo, Quick Revive works as in Black Ops: after going down, the player gets back up alone after ten
+  seconds, at most three times (the machine stops selling it after that).
 - **Electric traps:** one across each balcony, 1000 points once the power is on. A trap runs for
   25 seconds and then recharges for 25. It kills zombies that walk into it, for no points, and
   hurts players standing in it.
@@ -78,10 +80,21 @@ once players can reach the room behind it. The other upstairs windows are decora
   30% after eight rolls and 50% after thirteen. The bear refunds the roll, then the box leaves and
   lands at another spot.
 
-## Not yet implemented
+## Last stand
 
-- The German balcony's second entry, where zombies climb over the railing from the courtyard.
-- A downed state and reviving, which Quick Revive would speed up in co-op.
+A killing blow puts a player down instead of killing them, as in World at War:
+
+- They keep the view from the floor with an M1911 and spare ammo, and can shoot and reload.
+- Going down costs every perk.
+- Zombies leave them alone.
+- A teammate holding use beside them for three seconds revives them, or a second and a half with
+  Quick Revive. The revive starts over if the reviver lets go.
+- They get their guns back when revived.
+- Otherwise they bleed out after 30 seconds and come back at the start of the next round.
+- When no one is left standing to revive, the game is over. Solo without Quick Revive, that is
+  straight away.
+
+These rules are core game rules, so they apply on Bunker too.
 
 ## Checks
 
@@ -106,7 +119,9 @@ once players can reach the room behind it. The other upstairs windows are decora
 - Both trap switches, and what traps do.
 - The box at every spot.
 - The teddy odds and the box moving.
+- Last stand: going down, revives (with and without Quick Revive), bleeding out, respawning, game
+  over, and solo Quick Revive's three uses.
 
 Development views use `?preview=<view>&map=asylum`. The views are `american`, `hallway`,
 `balcony`, `upstairs`, `power`, `kitchen`, `rightBalcony`, `courtyard`, `barrier`, `upperEntry` and `juggernog`. Add `&power=on` to start with the power on,
-or `&traps=on` to also set both traps running.
+or `&traps=on` to also set both traps running. `&down=on` starts in last stand, with Quick Revive.

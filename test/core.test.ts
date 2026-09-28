@@ -47,7 +47,7 @@ describe('world state', () => {
     const world = createWorld(99);
     const id = allocateEntityId(world);
     addEntity(world, {
-      id, kind: 'player', alive: true, position: origin(), velocity: origin(), perks: [],
+      id, kind: 'player', alive: true, position: origin(), velocity: origin(), perks: [], downed: null, selfRevives: 0,
       godMode: false, noclip: false, noclipAnchor: null, sprinting: false, sprintTicks: 240, sprintRechargeDelayTicks: 0, aiming: false, spreadBloom: 0,
       recoveryDelayTicks: 0, meleeCooldownTicks: 0, grenadeCharges: 2,
       repairRewardRound: 0, repairPointsEarned: 0,

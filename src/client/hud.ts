@@ -3,6 +3,7 @@ import type { EntityId } from '../core/types.ts';
 import type { GameSimulation } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import { maxPlayerHealth } from '../core/health.ts';
+import { reviveProgress } from '../core/downs.ts';
 import type { PerkId } from '../core/perks.ts';
 
 /** WaW's perk colours: Jugger-Nog red, Double Tap amber, Speed Cola green, Quick Revive blue. */
@@ -38,6 +39,10 @@ export interface HudSnapshot {
   grenadeCharges: number;
   roundPhase: string;
   interactionPrompt: string | null;
+  /** In last stand: "BLEEDING OUT 24" or "GETTING BACK UP". */
+  lastStand: string | null;
+  /** A revive under way, by or on this player: 0 to 1 in twentieths (so the canvas repaints rarely). */
+  reviveProgress: number;
   nearbyPowerup: string | null;
   bonusStatus: string | null;
   instaKillStatus: string | null;
@@ -57,6 +62,10 @@ export function buildHudSnapshot(
 ): HudSnapshot | null {
   const player = simulation.getPlayer(playerId);
   if (!player) return null;
+  // The revive this player is receiving, or giving to the teammate they are holding use beside.
+  const patient = player.downed ? player : simulation.players().find(other => other.downed?.reviverId === player.id);
+  const revive = patient?.downed && (patient.downed.reviveTicks > 0)
+    ? reviveProgress(patient.downed, patient.downed.selfRevive ? undefined : simulation.getPlayer(patient.downed.reviverId!) ?? undefined) : 0;
   const nearbyDrop = simulation.state.powerups.drops.find(drop => Math.hypot(
     drop.position.x - player.position.x, drop.position.z - player.position.z) < 4
     && Math.abs(drop.position.y - player.position.y) < 2);
@@ -76,6 +85,9 @@ export function buildHudSnapshot(
     grenadeCharges: player.grenadeCharges,
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
+    lastStand: player.downed ? player.downed.selfRevive ? 'GETTING BACK UP'
+      : `BLEEDING OUT  ${Math.ceil(player.downed.bleedoutTicks / 60)}` : null,
+    reviveProgress: Math.round(revive * 20) / 20,
     nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO'
       : nearbyDrop.kind === 'doublePoints' ? 'DOUBLE POINTS'
         : nearbyDrop.kind === 'instaKill' ? 'INSTA-KILL' : 'NUKE' : null,
@@ -357,6 +369,15 @@ export class CanvasHud {
     }
     if (snapshot.nearbyPowerup && !snapshot.gameOver) {
       this.text(snapshot.nearbyPowerup, centre, height * 0.655, { size: 28, color: GOLD, align: 'center', spacing: 3 });
+    }
+    if (snapshot.lastStand && !snapshot.gameOver) {
+      this.text(snapshot.lastStand, centre, height * 0.3, { size: 34, color: BLOOD, align: 'center', spacing: 4 });
+    }
+    if (snapshot.reviveProgress > 0 && !snapshot.gameOver) {
+      const barWidth = 320, y = height * 0.66;
+      this.text(snapshot.lastStand ? 'BEING REVIVED' : 'REVIVING', centre, y - 20, { size: 18, color: INK, align: 'center', spacing: 3 });
+      this.panel(centre - barWidth / 2, y, barWidth, 12, 6, 'rgba(0,0,0,0.6)', EDGE);
+      this.panel(centre - barWidth / 2, y, barWidth * snapshot.reviveProgress, 12, 6, INK, null);
     }
     if (snapshot.interactionPrompt) {
       // "E  Buy this" prompts lead with the key; show it as a keycap.

@@ -75,7 +75,7 @@ function distanceSquared(a: Vec3, b: Vec3): number {
 }
 
 export function chooseZombieTarget(zombie: ZombieState, players: readonly PlayerState[]): PlayerState | null {
-  const candidates = players.filter((player) => player.alive);
+  const candidates = players.filter((player) => player.alive && !player.downed);
   candidates.sort((a, b) => {
     const distanceDelta = distanceSquared(zombie.position, a.position) - distanceSquared(zombie.position, b.position);
     return distanceDelta !== 0 ? distanceDelta : a.id.localeCompare(b.id);
@@ -142,7 +142,7 @@ export function tickZombieMelee(
 ): Array<ZombieAttackEvent | DamageEvent> {
   if (!zombie.alive || zombie.entry) return [];
   if (zombie.attackCooldownTicks > 0) zombie.attackCooldownTicks -= 1;
-  const target = players.find((player) => player.id === zombie.targetId && player.alive)
+  const target = players.find((player) => player.id === zombie.targetId && player.alive && !player.downed)
     ?? chooseZombieTarget(zombie, players);
   if (!target || zombie.attackCooldownTicks > 0) return [];
   const dx = target.position.x - zombie.position.x;
@@ -178,7 +178,7 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
     return { engaged: false, events: [] };
   }
   const inReach = players.filter(player => {
-    if (!player.alive || Math.abs(player.position.y - barrier.position.y) > WINDOW_ATTACK.maxHeightDelta) return false;
+    if (!player.alive || player.downed || Math.abs(player.position.y - barrier.position.y) > WINDOW_ATTACK.maxHeightDelta) return false;
     const dx = player.position.x - barrier.position.x, dz = player.position.z - barrier.position.z;
     return dx * barrier.outward.x + dz * barrier.outward.z < 0 && Math.hypot(dx, dz) <= WINDOW_ATTACK.reach;
   }).sort((a, b) => distanceSquared(zombie.position, a.position) - distanceSquared(zombie.position, b.position)

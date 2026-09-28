@@ -45,7 +45,7 @@ describe('window attacks', () => {
       expect(tickWindowAttack(zombie, barrier, [player])).toEqual({ engaged: true, events: [] });
     }
     expect(tickWindowAttack(zombie, barrier, [player]).events.map(event => event.type))
-      .toEqual(['zombieAttacked', 'playerDamaged', 'playerDied']);
+      .toEqual(['zombieAttacked', 'playerDamaged', 'playerDowned']);
   });
 
   it('leaves players out of reach, outside, or on another floor alone', () => {

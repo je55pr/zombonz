@@ -30,7 +30,8 @@ export class HudFeedback {
     };
     for (const event of events) {
       if ('playerId' in event && event.playerId !== playerId
-        && event.type !== 'zombieAttacked' && event.type !== 'powerupCollected' && event.type !== 'powerActivated') continue;
+        && event.type !== 'zombieAttacked' && event.type !== 'powerupCollected' && event.type !== 'powerActivated'
+        && !(event.type === 'playerRevived' && event.reviverId === playerId)) continue;
       switch (event.type) {
         case 'weaponHit': this.marker = event.hitZone === 'head' ? 'head' : 'body'; this.markerUntil = tick + 12; break;
         case 'meleeHit': this.marker = 'body'; this.markerUntil = tick + 12; break;
@@ -52,8 +53,10 @@ export class HudFeedback {
         case 'pointsSpendRejected': say('NOT ENOUGH POINTS', 4); break;
         case 'doorOpened': say('PATH OPENED', 3); break;
         case 'powerActivated': say('THE POWER IS ON', 9); break;
+        case 'playerDowned': say('YOU ARE DOWN', 10); break;
+        case 'playerRevived': say(event.reviverId === playerId && event.playerId !== playerId ? 'TEAMMATE REVIVED' : 'REVIVED', 9); break;
+        case 'playerRespawned': say('BACK IN THE FIGHT', 9); break;
         case 'perkBought': say(PERKS[event.perk].name.toUpperCase(), 5); break;
-        case 'playerRevived': say('QUICK REVIVE SPENT', 9); break;
         case 'trapActivated': say('ELECTRIC TRAP ACTIVE', 4); break;
         case 'mysteryBoxTeddy': say('BYE BYE — THE BOX IS MOVING', 6); break;
         case 'powerupCollected': say(event.kind === 'maxAmmo' ? 'MAX AMMO'

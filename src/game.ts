@@ -23,7 +23,7 @@ import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
   createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity, currentSpread,
-  type EntityId, type ZombieState, type Vec3,
+  type EntityId, type ZombieState, type Vec3, DOWN_RULES, damagePlayer,
 } from './core/index.ts';
 import { MAPS, isMapId, type MapId } from './maps/index.ts';
 
@@ -194,6 +194,12 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     if (previewParams.get('traps') === 'on') for (const trap of simulation.state.traps) {
       trap.activeTicks = 2147483647; trap.ownerId = playerId;
     }
+    // `&down=on` shows last stand: with Quick Revive, so solo play gets back up rather than ending.
+    if (previewParams.get('down') === 'on') {
+      const player = simulation.getPlayer(playerId)!;
+      player.perks = ['quick-revive']; player.health = 1;
+      damagePlayer(player, 50);
+    }
     // `&round=N` starts the wave at round N (after the usual intermission) to inspect later-round gaits.
     const previewRound = Number(new URLSearchParams(location.search).get('round'));
     if (Number.isInteger(previewRound) && previewRound > 1) {
@@ -325,11 +331,12 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const player = simulation.getPlayer(playerId);
     if (!player) return;
     const position = interpolatePosition(previousPositions.get(playerId), player.position, alpha);
-    camera.position.set(position.x, position.y + PLAYER_MOVEMENT.eyeHeight, position.z);
+    // In last stand the view drops to the floor and lists to one side.
+    camera.position.set(position.x, position.y + (player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight), position.z);
     const look = input.pendingLook();
     camera.rotation.x = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(PLAYER_MOVEMENT.maxPitch, player.pitch + look.pitch));
     camera.rotation.y = player.yaw + look.yaw;
-    camera.rotation.z = 0;
+    camera.rotation.z = player.downed ? 0.22 : 0;
   }
 
   function resize(): void {

@@ -1,4 +1,5 @@
 import type { DoorDefinition, PowerSwitchDefinition } from '../core/door.ts';
+import type { BarrierDefinition } from '../core/barrier.ts';
 import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
 import { mysteryBoxBlocker, type MysteryBoxDefinition, type MysteryBoxLocation } from '../core/mysteryBox.ts';
 import type { PerkId, PerkMachineDefinition } from '../core/perks.ts';
@@ -265,7 +266,18 @@ for (const w of b.windows.filter(w => ASYLUM_UPPER_ENTRIES.includes(w.id))) {
   const cx = w.x + w.outward.x * (depth / 2 + 0.12), cz = w.z + w.outward.z * (depth / 2 + 0.12);
   b.box(cx, UP - 0.15, cz, w.axis === 'x' ? along : depth, 0.3, w.axis === 'x' ? depth : along, 'upperFloor', false);
 }
-const barriers = barriersFromWindows(b.windows, 6, ASYLUM_UPPER_ENTRIES);
+// The German balcony's other entry: zombies climb the courtyard wall and over the railing.
+const RAILING = { x: YARD.minX, z: -16 };
+export const ASYLUM_RAILING_ENTRY: BarrierDefinition = {
+  id: 'german-balcony-railing', position: { x: RAILING.x, y: UP, z: RAILING.z }, outward: { x: 1, y: 0, z: 0 },
+  width: 1.4, maxBoards: 0, vaultTicks: 150,
+  approachPath: [{ x: RAILING.x + 5, y: 0, z: RAILING.z + 0.6 }, { x: RAILING.x + 2.4, y: 0, z: RAILING.z + 0.6 },
+    { x: RAILING.x + 0.6, y: 0, z: RAILING.z }],
+  insidePoint: { x: RAILING.x - 0.95, y: UP, z: RAILING.z },
+};
+// A drainpipe up the wall marks the climb.
+b.box(RAILING.x + 0.28, UP / 2 + 0.5, RAILING.z - 0.75, 0.12, UP + 1, 0.12, 'metal', false);
+const barriers = [...barriersFromWindows(b.windows, 6, ASYLUM_UPPER_ENTRIES), ASYLUM_RAILING_ENTRY];
 const collision = collisionBoxesFor(b.shell, ASYLUM_PROPS);
 /** Both sides of every boarded door, for navigation through narrow doorways. */
 const doorSides = ASYLUM_DOORS.filter(d => d.id !== 'german-stairs' && d.id !== 'american-stairs').flatMap(d => {

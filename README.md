@@ -70,6 +70,9 @@ prototype tuning, not a frame-exact recreation.
 Reload early with R (or automatically when the magazine empties), knife with V,
 throw a grenade with T or middle mouse, switch weapons
 with Q, interact with E, and restart after game over with Enter.
+A killing blow puts you into last stand with a pistol: a teammate can revive you by holding E beside
+you, you bleed out after 30 seconds, and solo play ends there unless you drank Quick Revive
+(see [Asylum](docs/asylum-map.md#last-stand)).
 M mutes game audio. Escape releases the mouse and opens the pause menu, with Resume,
 Restart, Settings and Quit to Main Menu. Losing focus or hiding the tab also pauses the game,
 so zombies do not advance while you are away. Input releases when focus is lost.
@@ -177,6 +180,7 @@ open inspection views with waves disabled, routes open and 10000 test points.
 These overrides are development-only; the normal URL starts the standard survival game.
 Add `&map=asylum` to any preview URL to open Asylum instead of Bunker (see [Asylum](docs/asylum-map.md)).
 On Asylum, `&power=on` starts with the power on, and `&traps=on` also sets both electric traps running.
+`&down=on` starts in last stand, with Quick Revive so the solo player gets back up.
 `/?preview=wallBuys` and `/?preview=helpWalls` face the start-room and HELP-room chalk wall buys.
 `/?preview=barrier` runs a live wave at the first window for entry-animation checks.
 `/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and

@@ -1,9 +1,10 @@
-import { hasPerk, playerMaxHealth } from './perks.ts';
+import { goDown } from './downs.ts';
+import { playerMaxHealth } from './perks.ts';
 import type { EntityState, PlayerState, WorldState } from './types.ts';
 
 export interface DamageEvent {
-  /** `playerRevived`: Quick Revive spent itself, and every perk, to cancel a killing blow. */
-  type: 'playerDamaged' | 'playerDied' | 'playerHealed' | 'playerRevived';
+  /** `playerDowned`: a killing blow put the player into last stand (see downs.ts). */
+  type: 'playerDamaged' | 'playerDied' | 'playerHealed' | 'playerDowned';
   playerId: PlayerState['id'];
   amount: number;
   health: number;
@@ -16,7 +17,7 @@ export function maxPlayerHealth(player: PlayerState): number {
 }
 
 export function tickPlayerRecovery(player: PlayerState): DamageEvent[] {
-  if (!player.alive) return [];
+  if (!player.alive || player.downed) return [];
   if (player.recoveryDelayTicks > 0) { player.recoveryDelayTicks -= 1; return []; }
   const maximum = maxPlayerHealth(player);
   if (player.health >= maximum) return [];
@@ -26,7 +27,7 @@ export function tickPlayerRecovery(player: PlayerState): DamageEvent[] {
 }
 
 export function damagePlayer(player: PlayerState, amount: number): DamageEvent[] {
-  if (!player.alive || player.godMode || amount <= 0) return [];
+  if (!player.alive || player.downed || player.godMode || amount <= 0) return [];
   const nextHealth = Math.max(0, player.health - amount);
   const applied = player.health - nextHealth;
   player.health = nextHealth;
@@ -34,16 +35,7 @@ export function damagePlayer(player: PlayerState, amount: number): DamageEvent[]
   const events: DamageEvent[] = [{
     type: 'playerDamaged', playerId: player.id, amount: applied, health: player.health,
   }];
-  if (player.health === 0 && hasPerk(player, 'quick-revive')) {
-    // There is no downed state, so this is Black Ops' solo Quick Revive: straight back up, perks gone.
-    player.perks = [];
-    player.health = PLAYER_HEALTH.maximum;
-    events.push({ type: 'playerRevived', playerId: player.id, amount: 0, health: player.health });
-  } else if (player.health === 0) {
-    player.alive = false;
-    player.velocity = { x: 0, y: 0, z: 0 };
-    events.push({ type: 'playerDied', playerId: player.id, amount: 0, health: 0 });
-  }
+  if (player.health === 0) events.push(...goDown(player));
   return events;
 }
 

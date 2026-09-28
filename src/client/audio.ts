@@ -257,7 +257,9 @@ export class GameAudio {
             world.entities[event.zombieId]?.position, player); break;
         case 'powerActivated': this.playClip('electric-boom', MIX.explosion * 0.8); this.playClip('electric-powerup', MIX.electric); break;
         case 'perkBought': this.playClip('pickup', MIX.pickup); this.playClip('electric-powerup', MIX.electric * 0.4); break;
-        case 'playerRevived': this.playClip('electric-powerup', MIX.electric); break;
+        case 'playerRevived': this.playClip('pickup', MIX.pickup); break;
+        case 'playerDowned': this.playClip('ambience-sting-2', MIX.sting * 3); this.playClip('flesh-hit', MIX.hurt); break;
+        case 'playerRespawned': this.playClip('mechanical-click', MIX.reloadDone); break;
         case 'trapActivated': this.playClip('electric-powerup', MIX.electric); this.playClip('electric-hit', MIX.electric * 0.7); break;
         case 'mysteryBoxTeddy': this.playClip('ambience-sting-1', MIX.sting * 3); break;
         case 'meleeSwung': this.playClip('knife', MIX.knife); break;
