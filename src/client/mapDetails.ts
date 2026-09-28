@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
-import { environmentMaterial, projectWorldUvs } from './environmentMaterials.ts';
+import { environmentMaterial, lookScale, projectWorldUvs } from './environmentMaterials.ts';
 import type { GameMap } from '../maps/gameMap.ts';
 import type { SimulationState } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
@@ -9,8 +9,8 @@ import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './wea
 import { BOX_RULES } from '../core/mysteryBox.ts';
 import { PERKS, type PerkId } from '../core/perks.ts';
 
-// Six planks fill the frame between the sill and the lintel, nailed at uneven angles.
-const PLANK_TILT = [0.07, -0.16, 0.12, -0.08, 0.17, -0.05] as const;
+// Six planks fill the frame between the sill and the lintel, nailed at slightly uneven angles.
+const PLANK_TILT = [0.05, -0.09, 0.07, -0.04, 0.1, -0.03] as const;
 function plankHeight(index: number): number { return 1.02 + index * 0.27; }
 
 // Wall guns are shown life-size; viewmodels are modelled at roughly 0.86x.
@@ -42,6 +42,23 @@ function mountWallGun(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Ma
   place(outline, new THREE.Vector3(0.002, (size.y * WALL_GUN_SCALE + 0.05) / size.y, rim), 0.004);
 }
 
+/** The box's beam: brightest low down and in the middle, fading overhead and to both sides. */
+function beamFade(): THREE.Texture {
+  const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 256;
+  const context = canvas.getContext('2d')!;
+  const along = context.createLinearGradient(0, 256, 0, 0);
+  along.addColorStop(0, 'rgba(255,255,255,0)'); along.addColorStop(0.03, 'rgba(255,255,255,0.9)');
+  along.addColorStop(0.3, 'rgba(255,255,255,0.35)'); along.addColorStop(1, 'rgba(255,255,255,0)');
+  context.fillStyle = along; context.fillRect(0, 0, 64, 256);
+  // Keep only a soft core across the width.
+  context.globalCompositeOperation = 'destination-in';
+  const across = context.createLinearGradient(0, 0, 64, 0);
+  across.addColorStop(0, 'rgba(0,0,0,0)'); across.addColorStop(0.5, 'rgba(0,0,0,1)'); across.addColorStop(1, 'rgba(0,0,0,0)');
+  context.fillStyle = across; context.fillRect(0, 0, 64, 256);
+  const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 /**
  * Everything drawn on top of a map's greybox from its definition: window boards and frames, stair
  * rails, purchasable doors and debris, painted labels, chalk wall guns, the mystery box, practical
@@ -52,6 +69,8 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
   group.name = `${map.id}-details`;
   scene.add(group);
   const wood = bunkerMaterial('barrier');
+  const boards = environmentMaterial('old-planks');
+  const nailGeometry = new THREE.CylinderGeometry(0.011, 0.011, 0.012, 6);
   const concrete = bunkerMaterial('wall');
   const iron = bunkerMaterial('metal');
   const upholstery = environmentMaterial('sofa-upholstery');
@@ -91,8 +110,13 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     const planks: THREE.Mesh[] = [];
     barrierViews.set(opening.id, planks);
     for (let i = 0; i < map.windowBoards; i++) {
-      const plank = box(frame, wood, 0, plankHeight(i), 0.03, opening.width + 0.1, 0.16, 0.09);
+      // A plank is 2.5 cm thick with a nail head at each end, into the frame.
+      const plank = box(frame, boards, 0, plankHeight(i), 0.03, opening.width + 0.14, 0.17, 0.025);
       plank.rotation.z = PLANK_TILT[i % PLANK_TILT.length];
+      for (const end of [-1, 1]) {
+        const nail = new THREE.Mesh(nailGeometry, iron);
+        nail.position.set(end * (opening.width / 2 + 0.01), 0, 0.015); nail.rotation.x = Math.PI / 2; plank.add(nail);
+      }
       plank.userData.dynamic = true;
       planks.push(plank);
     }
@@ -164,9 +188,10 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
   // A fixed box's body is part of the greybox; one that moves carries its own.
   if (moves) { chest.userData.dynamic = true; box(chest, wood, 0, 0.52, 0, 0.95, 1.04, 2.35); }
   // A box that moves marks where it is with WaW's pale beam of light.
-  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.8, 30, 12, 1, true), new THREE.MeshBasicMaterial({
-    color: 0xcfe0ff, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-  beam.position.set(0, 15.5, 0); beam.visible = moves; chest.add(beam);
+  // A soft glow that always faces the viewer, so it never shows the edges of a solid.
+  const beam = new THREE.Sprite(new THREE.SpriteMaterial({ map: beamFade(), color: 0xcfe0ff, transparent: true, opacity: 0.5,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+  beam.center.set(0.5, 0); beam.scale.set(1.8, 24, 1); beam.position.set(0, 0.6, 0); beam.visible = moves; chest.add(beam);
   // The teddy bear that comes up instead of a gun, before the box leaves.
   const fur = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 });
   const teddy = new THREE.Group(); teddy.visible = false; chest.add(teddy);
@@ -215,7 +240,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
   const powerLamp = new THREE.MeshBasicMaterial({ color: 0xc02010 });
   if (map.powerSwitch) {
     const { x, y, z } = map.powerSwitch.position;
-    lever.position.set(x + 0.18, y, z); group.add(lever);
+    lever.position.set(x + 0.18, y, z - 0.02); group.add(lever);
     box(lever, iron, 0, 0.18, 0, 0.07, 0.36, 0.07);
     box(lever, wood, 0, 0.38, 0, 0.1, 0.1, 0.1);
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), powerLamp);
@@ -256,7 +281,6 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
     const arcs = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xbfe4ff }));
     arcs.visible = false; arcs.userData.dynamic = true; group.add(arcs);
     const light = new THREE.PointLight(0x8fc8ff, 0, 9, 2); light.position.set(mid.x, floor + 1.4, mid.z); group.add(light);
-    box(group, iron, trap.switchPosition.x, trap.switchPosition.y, trap.switchPosition.z, 0.24, 0.4, 0.24);
     const lamp = new THREE.MeshBasicMaterial({ color: 0x401010 });
     const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), lamp);
     bulb.position.set(trap.switchPosition.x, trap.switchPosition.y + 0.28, trap.switchPosition.z); group.add(bulb);
@@ -271,29 +295,53 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap): { update(stat
   // Low rubble stays below the collision step height and out of navigation lanes.
   let seed = 753;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  const lumps = Array.from({ length: 6 }, () => {
+    // A few broken-chunk shapes: a squashed, dented polyhedron each.
+    const geometry = new THREE.DodecahedronGeometry(0.5, 0);
+    const position = geometry.attributes.position;
+    for (let i = 0; i < position.count; i++) {
+      const scale = 0.7 + random() * 0.6;
+      position.setXYZ(i, position.getX(i) * scale, position.getY(i) * scale * 0.55, position.getZ(i) * scale);
+    }
+    geometry.computeVertexNormals();
+    return geometry;
+  });
   for (const area of map.rubble) for (let i = 0; i < area.count; i++) {
     const x = area.minX + random() * (area.maxX - area.minX), z = area.minZ + random() * (area.maxZ - area.minZ);
-    const rubble = box(group, i % 3 ? debris : wood, x, area.y + 0.045, z, 0.12 + random() * 0.3, 0.09, 0.1 + random() * 0.25);
-    rubble.rotation.y = random() * Math.PI;
-  }
-  // A foggy treeline is visible through every opening, with no external assets.
-  box(group, environmentMaterial('dirt'), map.focus.x, -0.25, map.focus.z, 180, 0.1, 180);
-  const bark = new THREE.MeshStandardMaterial({ color: 0x1d2422, roughness: 1 });
-  for (let i = 0; i < 55; i++) {
-    const angle = random() * Math.PI * 2, radius = map.focus.radius * 1.62 + random() * 25;
-    const tree = new THREE.Group();
-    tree.position.set(map.focus.x + Math.cos(angle) * radius, 0, map.focus.z + Math.sin(angle) * radius);
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.27, 7 + random() * 6, 5), bark);
-    trunk.position.y = 4; tree.add(trunk);
-    for (let j = 0; j < 3; j++) {
-      const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.11, 2.7, 4), bark);
-      branch.position.set(j % 2 ? 0.8 : -0.8, 3 + j * 1.5, 0);
-      branch.rotation.z = j % 2 ? -0.7 : 0.7; tree.add(branch);
+    if (i % 4 === 0) {
+      const splinter = box(group, boards, x, area.y + 0.012, z, 0.35 + random() * 0.5, 0.025, 0.07 + random() * 0.06);
+      splinter.rotation.y = random() * Math.PI;
+      continue;
     }
-    tree.rotation.y = angle; group.add(tree);
+    const size = 0.08 + random() * 0.2;
+    const lump = new THREE.Mesh(lumps[i % lumps.length], i % 3 ? debris : concrete);
+    lump.position.set(x, area.y + size * 0.2, z); lump.scale.setScalar(size);
+    lump.rotation.set(random() * 0.4, random() * Math.PI * 2, random() * 0.4);
+    lump.castShadow = true; lump.receiveShadow = true; group.add(lump);
   }
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(1.4, 20, 12), new THREE.MeshBasicMaterial({ color: 0xc9dad5, fog: false }));
-  moon.position.set(-22, 30, -42); group.add(moon);
+  // Leaf litter all around; the treeline (src/client/treeline.ts) and night sky (sky.ts) stand beyond it.
+  const ground = new THREE.PlaneGeometry(180, 180);
+  ground.rotateX(-Math.PI / 2);
+  projectWorldUvs(ground, new THREE.Vector3(map.focus.x, -0.2, map.focus.z), lookScale('forest-floor'));
+  const outside = new THREE.Mesh(ground, environmentMaterial('forest-floor'));
+  outside.position.set(map.focus.x, -0.2, map.focus.z); outside.receiveShadow = true; group.add(outside);
+  // A round stone fountain: a basin with a lip, still dark water, and a pillar with a bowl.
+  if (map.fountain) {
+    const stone = environmentMaterial('weathered-concrete-a');
+    const fountain = new THREE.Group(); fountain.position.set(map.fountain.x, 0, map.fountain.z); group.add(fountain);
+    const lathe = (points: Array<[number, number]>) => {
+      const geometry = new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), 32);
+      const uv = geometry.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 6, uv.getY(i));
+      const mesh = new THREE.Mesh(geometry, stone); mesh.castShadow = true; mesh.receiveShadow = true;
+      fountain.add(mesh); return mesh;
+    };
+    lathe([[2.2, 0], [2.65, 0.02], [2.7, 0.5], [2.62, 0.62], [2.35, 0.62], [2.3, 0.3], [0, 0.3]]);
+    const water = new THREE.Mesh(new THREE.CircleGeometry(2.3, 32),
+      new THREE.MeshStandardMaterial({ color: 0x10181a, roughness: 0.08, metalness: 0.2 }));
+    water.rotation.x = -Math.PI / 2; water.position.y = 0.42; fountain.add(water);
+    lathe([[0.3, 0.3], [0.24, 0.6], [0.2, 1.3], [0.28, 1.4], [0.75, 1.45], [0.8, 1.6], [0.7, 1.62], [0.25, 1.55], [0.18, 1.9], [0.1, 2.1], [0, 2.12]]);
+  }
   return { ready: Promise.allSettled(wallGuns), update(state) {
     // On a map with a switch, the lamps burn low until the power comes on.
     const lampLevel = map.powerSwitch && !state.power.on ? 0.4 : 1;

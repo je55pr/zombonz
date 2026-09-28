@@ -31,6 +31,8 @@ import type { NetHost } from './net/host.ts';
 import type { NetClient, StartInfo } from './net/client.ts';
 import type { LobbyPlayer } from './net/protocol.ts';
 import { PlayerView } from './client/playerView.ts';
+import { applySky } from './client/sky.ts';
+import { TREELINE_ASSETS, buildTreeline } from './client/treeline.ts';
 
 import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
 // Re-exported so the start screen can preload through the same chunk it will run.
@@ -67,7 +69,8 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
   const tasks: Array<() => Promise<unknown> | null> = [
     ...(manifest ? [() => loadEnvironmentMaterials(manifest),
       ...[...new Set(allMaps.flatMap(map => map.decals.map(decal => decal.asset)))].map(id => () => loadDecalTextures(manifest, id))] : []),
-    ...[...new Set(allMaps.flatMap(map => map.props.map(prop => prop.asset)))].map(asset => () => loadModel(`props/${asset}/model.glb`)),
+    ...[...new Set([...allMaps.flatMap(map => map.props.map(prop => prop.asset)), ...TREELINE_ASSETS])]
+      .map(asset => () => loadModel(`props/${asset}/model.glb`)),
     () => loadZombieAsset(zombie),
     () => prepareWeaponModel('starter-pistol'),
     // The chalk wall buys hang the real guns.
@@ -132,7 +135,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     // Prop proxies/collision must stay visible even when the texture manifest fails.
     const props = buildEnvironmentProps(scene, map.props);
     const surfaces = readEnvironmentManifest().then(manifest =>
-      Promise.all([loadEnvironmentMaterials(manifest), buildEnvironmentDecals(scene, manifest, map.decals)]))
+      Promise.all([loadEnvironmentMaterials(manifest), buildEnvironmentDecals(scene, manifest, map.decals),
+        applySky(scene, manifest, keyLight).then(() => 0, error => { console.warn('Night sky unavailable', error); return 1; }),
+        buildTreeline(scene, map.focus).then(() => 0)]))
       .catch(error => { console.warn('Environment manifest unavailable', error); return [1]; });
     const [propFailures, surfaceFailures] = await Promise.all([props, surfaces]);
     environmentNotice = propFailures > 0 || surfaceFailures.some(n => n > 0) ? 'Some environment assets failed to load; check console' : null;

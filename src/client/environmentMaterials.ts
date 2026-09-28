@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { getAsset } from './assetStore.ts';
-import { SURFACE_LOOKS, type GreyboxBox, type GreyboxMaterial } from '../maps/gameMap.ts';
+import { LOOK_SCALE, SURFACE_LOOKS, type GreyboxBox, type GreyboxMaterial } from '../maps/gameMap.ts';
 
 export const MATERIAL_IDS = SURFACE_LOOKS;
 export type EnvironmentMaterialId = typeof MATERIAL_IDS[number];
 export interface EnvironmentManifest {
   materials: Record<EnvironmentMaterialId, { basecolor: string; normal: string; arm: string }>;
   decals: Record<string, { maps: { basecolor: string; opacity: string } }>;
+  /** A night-sky panorama and where its moon is (u across, v down, 0 to 1). */
+  sky?: { image: string; moon: { u: number; v: number } };
 }
 export const ENVIRONMENT_TEXTURE_SIZE = 1024;
 const materials = new Map<EnvironmentMaterialId, THREE.MeshStandardMaterial>();
@@ -33,7 +35,9 @@ export function materialForBox(entry: GreyboxBox): EnvironmentMaterialId {
   if (entry.material === 'floor' && entry.center.x < -8) return 'dirt';
   if (entry.material !== 'wall') return roles[entry.material];
   if (entry.size.y > 2 && Math.max(entry.size.x, entry.size.z) > 2.4) return 'broken-plaster-brick';
-  return entry.size.y < 0.5 ? 'weathered-concrete-b' : 'weathered-concrete-a';
+  // Thin pieces are either slabs (roofs, ledges: poured concrete) or beams (timber).
+  if (entry.size.y < 0.5) return Math.min(entry.size.x, entry.size.z) > 1.5 ? 'weathered-concrete-a' : 'old-planks';
+  return 'weathered-concrete-a';
 }
 
 export function assetUrl(path: string): string { return `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`; }
@@ -87,12 +91,16 @@ export async function loadEnvironmentMaterials(manifest: EnvironmentManifest): P
   return failures;
 }
 
-// Metre-based projection shared by architecture and procedural detail meshes.
-export function projectWorldUvs(geometry: THREE.BufferGeometry, offset = new THREE.Vector3()): void {
+/** Metres per repeat for a look's texture. */
+export function lookScale(id: EnvironmentMaterialId): number { return LOOK_SCALE[id] ?? 2; }
+
+// Metre-based projection shared by architecture and procedural detail meshes: one texture repeat
+// every `scale` metres, 2 by default.
+export function projectWorldUvs(geometry: THREE.BufferGeometry, offset = new THREE.Vector3(), scale = 2): void {
   const positions = geometry.attributes.position, normals = geometry.attributes.normal, uv = geometry.attributes.uv;
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i) + offset.x, y = positions.getY(i) + offset.y, z = positions.getZ(i) + offset.z;
-    uv.setXY(i, (Math.abs(normals.getX(i)) > 0.5 ? z : x) / 2,
-      (Math.abs(normals.getY(i)) > 0.5 ? z : y) / 2);
+    uv.setXY(i, (Math.abs(normals.getX(i)) > 0.5 ? z : x) / scale,
+      (Math.abs(normals.getY(i)) > 0.5 ? z : y) / scale);
   }
 }

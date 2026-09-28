@@ -53,9 +53,8 @@ export const BUNKER_PROPS: readonly PropPlacement[] = onPlan([
   prop('lamp-spawn', 'wall-lamp', 0.35, 2.1, 3.7, 0.273, 0.43, 0.14, Math.PI / 2, false),
   prop('lamp-help', 'wall-lamp', -0.35, 2.1, -2, 0.273, 0.43, 0.14, -Math.PI / 2, false),
   prop('lamp-upper', 'wall-lamp', -0.35, 5.5, 2.5, 0.273, 0.43, 0.14, -Math.PI / 2, false),
-  prop('hanging-light', 'caged-ceiling-light', 5, 2.45, 2, 0.8, 0.52, 0.22, 0, false),
-  prop('yard-jeep', 'vehicles/gaz-67', 5, 0, 17, 1.8, 1.65, 3.6, 0.4, false, true),
-  prop('yard-tank', 'vehicles/t-12', 27, 0, 5, 2.7, 2.8, 6.3, Math.PI / 2, false, true),
+  // A real hanging lamp, in its own proportions (the caged light was squeezed into a flat bar).
+  prop('hanging-light', 'hanging-lamp', 5, 2.24, 2, 0.4, 0.76, 0.4, 0, false),
   prop('yard-barrel-a', 'explosive-barrel', 15, 0, -8, 0.58, 0.9, 0.58, 0, false, true),
   prop('yard-barrel-b', 'explosive-barrel', 15.7, 0, -8.25, 0.58, 0.9, 0.58, 0, false, true),
 ]);
