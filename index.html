@@ -29,6 +29,37 @@
     .pause-setting input { grid-column: 1 / -1; width: 100%; accent-color: #bf382b; }
     .pause-setting output { color: #dbb75d; }
     .pause-panel p { margin: 25px 0 0; color: #aaa391; font: 14px 'Oswald', sans-serif; letter-spacing: 2px; }
+    .pause-panel .pause-note { margin: -12px 0 18px; letter-spacing: 1px; }
+    .lobby { position: fixed; inset: 0; z-index: 3; display: grid; place-items: center; overflow-y: auto;
+      background: rgba(3, 4, 4, .82); color: #e5ddc8; font-family: 'Oswald', sans-serif; }
+    .lobby-panel { width: min(560px, calc(100vw - 32px)); margin: 16px 0; padding: 30px 34px 22px; box-sizing: border-box;
+      background: linear-gradient(150deg, #22211e, #111312); border: 1px solid #6a433b;
+      box-shadow: 0 24px 80px #000c, inset 0 1px #ffffff1c; text-align: center; }
+    .lobby-panel h1 { margin: 0; font: 54px 'Special Elite', Georgia, serif; letter-spacing: 2px; }
+    .lobby-panel h2 { margin: 18px 0 6px; font: 500 18px 'Oswald', sans-serif; letter-spacing: 3px; text-transform: uppercase;
+      color: #c9c1aa; }
+    .lobby-map { margin: -14px 0 16px; font-size: 22px; letter-spacing: 3px; text-transform: uppercase; color: #dbb75d; }
+    .lobby-name { display: grid; gap: 6px; text-align: left; font-size: 16px; letter-spacing: 1px; }
+    .lobby input, .lobby textarea { box-sizing: border-box; width: 100%; padding: 9px 10px; border: 1px solid #5b5b50;
+      background: #0c0d0c; color: #eee6cf; font: 15px ui-monospace, Consolas, monospace; resize: none; }
+    .lobby input { font: 18px 'Oswald', sans-serif; }
+    .lobby input:focus, .lobby textarea:focus { outline: none; border-color: #c64130; }
+    .lobby-players { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 19px; }
+    .lobby-players span { color: #dbb75d; font-size: 14px; letter-spacing: 2px; text-transform: uppercase; }
+    .lobby-step { display: grid; gap: 8px; margin-top: 16px; text-align: left; }
+    .lobby-step p { margin: 6px 0 0; font-size: 16px; letter-spacing: .5px; }
+    .lobby-code { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .lobby button { padding: 10px 16px; border: 1px solid #5b5b50; background: #242723; color: #e5ddc8;
+      font: 18px 'Oswald', sans-serif; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; }
+    .lobby button:hover:not(:disabled), .lobby button:focus-visible { border-color: #c64130; background: #44302b; outline: none; }
+    .lobby button:disabled { opacity: .45; cursor: default; }
+    .lobby-status { min-height: 1.4em; margin: 14px 0 0; color: #dbb75d; font-size: 16px; }
+    .lobby-status.lobby-error { color: #e0604f; }
+    .lobby-actions { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+    .lobby-hint { margin: 16px 0 0; color: #8f897a; font-size: 13px; letter-spacing: .5px; }
+    .notice { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); z-index: 4; max-width: calc(100vw - 32px);
+      padding: 12px 20px; background: #2a1714; border: 1px solid #a2382b; color: #f0e6cf;
+      font: 18px 'Oswald', sans-serif; letter-spacing: 1px; box-shadow: 0 10px 40px #000a; }
   </style>
 </head>
 <body>

@@ -16,6 +16,12 @@ export class HudFeedback {
   private marker: FeedbackSnapshot['hitMarker'] = null;
   private markerUntil = 0;
   private hurtUntil = 0;
+  private names = new Map<EntityId, string>();
+
+  /** Teammates' names, for messages about them in a co-op game. */
+  setNames(names: ReadonlyMap<EntityId, string>): void { this.names = new Map(names); }
+  /** A message from outside the match (a player joining or leaving), shown like any other. */
+  notice(message: string, tick: number): void { this.message = message; this.messageUntil = tick + 180; }
 
   consume(events: readonly SimulationEvent[], playerId: EntityId, tick: number): void {
     if (events.some(event => event.type === 'matchRestarted')) {
@@ -29,6 +35,13 @@ export class HudFeedback {
       if (rank > priority) { message = value; priority = rank; }
     };
     for (const event of events) {
+      // Word of a teammate going down, getting up or bleeding out.
+      const teammate = 'playerId' in event && event.playerId !== playerId ? this.names.get(event.playerId) : undefined;
+      if (teammate) {
+        if (event.type === 'playerDowned') say(`${teammate.toUpperCase()} IS DOWN`, 8);
+        else if (event.type === 'playerBledOut') say(`${teammate.toUpperCase()} BLED OUT`, 8);
+        else if (event.type === 'playerRespawned') say(`${teammate.toUpperCase()} IS BACK`, 6);
+      }
       if ('playerId' in event && event.playerId !== playerId
         && event.type !== 'zombieAttacked' && event.type !== 'powerupCollected' && event.type !== 'powerActivated'
         && !(event.type === 'playerRevived' && event.reviverId === playerId)) continue;

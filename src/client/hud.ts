@@ -47,6 +47,12 @@ export interface HudSnapshot {
   bonusStatus: string | null;
   instaKillStatus: string | null;
   gameOver: boolean;
+  /** Teammates in a co-op game, one per line: name, points, and whether they are down or out. */
+  team: string;
+  /** Round-trip time to the host, for a client in a co-op game. */
+  pingMs: number | null;
+  /** False for a co-op client: only the host restarts. */
+  canRestart: boolean;
   paused: boolean;
   godMode: boolean;
   noclip: boolean;
@@ -59,6 +65,7 @@ export interface HudSnapshot {
 export function buildHudSnapshot(
   simulation: GameSimulation,
   playerId: EntityId,
+  names?: ReadonlyMap<EntityId, string>,
 ): HudSnapshot | null {
   const player = simulation.getPlayer(playerId);
   if (!player) return null;
@@ -96,6 +103,11 @@ export function buildHudSnapshot(
     instaKillStatus: simulation.state.powerups.instaKillTicksRemaining > 0
       ? `INSTA-KILL  ${Math.ceil(simulation.state.powerups.instaKillTicksRemaining / 60)}s` : null,
     gameOver: simulation.state.round.phase === 'gameOver',
+    team: names ? simulation.players().filter(other => other.id !== playerId && !simulation.state.leftPlayers.includes(other.id))
+      .map(other => [names.get(other.id) ?? 'Player', other.points, !other.alive ? 'OUT' : other.downed ? 'DOWN' : ''].join('\t'))
+      .join('\n') : '',
+    pingMs: null,
+    canRestart: true,
     paused: false,
     godMode: player.godMode,
     noclip: player.noclip,
@@ -344,6 +356,15 @@ export class CanvasHud {
 
     // Bottom right: points in gold over the weapon, its ammunition and the holstered gun.
     const pointsWidth = this.text(String(snapshot.points), right, height - 178, { size: 46, color: GOLD, align: 'right' });
+    // Teammates' points stack above this player's, as in World at War.
+    snapshot.team.split('\n').filter(Boolean).forEach((row, index) => {
+      const [name, points, status] = row.split('\t');
+      const y = height - 232 - index * 30;
+      this.text(`${name}  ${points}`, right, y, { size: 20, weight: 500, color: status ? DIM : INK, align: 'right', spacing: 1 });
+      if (status) this.text(status, right - this.measure(`${name}  ${points}`, { size: 20, weight: 500, spacing: 1 }) - 12, y,
+        { size: 16, color: BLOOD, align: 'right', spacing: 2 });
+    });
+    if (snapshot.pingMs !== null) this.text(`PING ${Math.round(snapshot.pingMs)} MS`, right, 22, { size: 13, color: DIM, align: 'right', spacing: 2 });
     this.pointsEdge = { x: right - pointsWidth - 10, y: height - 178 };
     if (snapshot.reloading) this.text('RELOADING', right, height - 138, { size: 16, color: DIM, align: 'right', spacing: 3 });
     else if (snapshot.magazineAmmo === 0) {
@@ -399,7 +420,8 @@ export class CanvasHud {
       this.text(`ROUND ${snapshot.round}   ·   ${snapshot.kills} KILLS   ·   ${snapshot.headshots} HEADSHOTS`,
         centre, height * 0.52, { size: 24, weight: 500, align: 'center', spacing: 3 });
       this.text(`${snapshot.points} POINTS`, centre, height * 0.58, { size: 30, color: GOLD, align: 'center', spacing: 2 });
-      this.text('PRESS ENTER TO RESTART', centre, height * 0.68, { size: 22, color: DIM, align: 'center', spacing: 5 });
+      this.text(snapshot.canRestart ? 'PRESS ENTER TO RESTART' : 'WAITING FOR THE HOST TO RESTART', centre, height * 0.68,
+        { size: 22, color: DIM, align: 'center', spacing: 5 });
     }
     if (this.credits) {
       const panelWidth = Math.min(1240, width - 80), left = centre - panelWidth / 2;

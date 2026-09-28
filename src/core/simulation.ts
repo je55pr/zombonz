@@ -81,6 +81,8 @@ export interface SimulationState {
   power: { on: boolean };
   perkMachines: PerkMachineState[];
   traps: TrapState[];
+  /** Players who left a co-op match: out for good, even across restarts. */
+  leftPlayers: EntityId[];
 }
 export interface ZombieSpawnedEvent {
   type: 'zombieSpawned';
@@ -192,13 +194,42 @@ export class GameSimulation {
     syncTrapInteractables(traps, interactables, power.on);
     return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
       powerups: createPowerupState(this.playerIds.length * this.economyConfig.startingPoints, this.powerupConfig),
-      grenades: createGrenadePool(), power, perkMachines, traps };
+      grenades: createGrenadePool(), power, perkMachines, traps, leftPlayers: [] };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
     const previousSeed = this.state.world.seed;
+    const left = this.state.leftPlayers;
     this.state = this.createMatchState(seed);
+    for (const id of left) this.removePlayer(id);
     return { type: 'matchRestarted', previousSeed, seed: this.state.world.seed };
+  }
+
+  /** Takes a player who left (a disconnected co-op peer) out of the match for good. */
+  removePlayer(id: EntityId): void {
+    if (!this.state.leftPlayers.includes(id)) this.state.leftPlayers.push(id);
+    const player = this.getPlayer(id);
+    if (player) { player.alive = false; player.downed = null; player.velocity = { x: 0, y: 0, z: 0 }; }
+  }
+
+  /**
+   * Re-derives every interactable's prompt, availability and position from the rest of the state.
+   * A networked client applies the host's state without the interactables, then calls this.
+   */
+  refreshInteractables(): void {
+    const items = this.interactables();
+    const byId = new Map(items.map(item => [item.id, item]));
+    for (const door of this.state.doors) { const item = byId.get(door.interactableId); if (item) item.enabled = !door.open; }
+    for (const box of this.state.mysteryBoxes) {
+      const item = byId.get(box.interactableId);
+      if (!item) continue;
+      item.enabled = true; item.prompt = mysteryBoxPrompt(box);
+      if (box.locations.length) item.position = { ...box.locations[box.locationIndex].position };
+    }
+    for (const item of items) if (item.interactionType === 'powerSwitch') item.enabled = !this.state.power.on;
+    syncBarrierInteractables(this.state.barriers, items);
+    syncPerkInteractables(this.state.perkMachines, items, this.state.power.on);
+    syncTrapInteractables(this.state.traps, items, this.state.power.on);
   }
 
   getPlayer(id: EntityId): PlayerState | null {
@@ -490,7 +521,7 @@ export class GameSimulation {
         // Players who bled out come back at the start of the next round, as in World at War co-op.
         this.playerIds.forEach((id, index) => {
           const player = this.getPlayer(id);
-          if (!player || player.alive) return;
+          if (!player || player.alive || this.state.leftPlayers.includes(id)) return;
           const fresh = createPlayerState(id, this.playerSpawns[index] ?? this.playerSpawns[0], player.points);
           Object.assign(player, { ...fresh, pointsEarned: player.pointsEarned, kills: player.kills, headshots: player.headshots,
             selfRevives: player.selfRevives, godMode: player.godMode });

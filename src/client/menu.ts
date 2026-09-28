@@ -3,8 +3,8 @@ import {
 } from './settings.ts';
 import { MAP_CATALOG, type MapId } from '../maps/catalog.ts';
 
-/** Solo opens 'maps', where choosing a map starts the game. */
-export type MenuScreen = 'main' | 'maps' | 'multiplayer' | 'settings' | 'loading';
+/** Solo opens 'maps', where choosing a map starts the game; hosting a co-op game picks its map on 'hostMaps'. */
+export type MenuScreen = 'main' | 'maps' | 'multiplayer' | 'hostMaps' | 'settings' | 'loading';
 
 export interface MenuItem {
   id: string;
@@ -47,7 +47,7 @@ export type MenuAction =
 
 /** What the host should do after an action: start the solo game, persist settings or retry the download. */
 export type MenuEffect = { type: 'startSolo'; map: MapId } | { type: 'saveSettings'; settings: GameSettings }
-  | { type: 'retryDownload' } | null;
+  | { type: 'retryDownload' } | { type: 'hostGame'; map: MapId } | { type: 'joinGame' } | null;
 
 const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
   sensitivity: 'Mouse sensitivity', fov: 'Field of view', volume: 'Volume',
@@ -67,7 +67,9 @@ export function menuItems(state: MenuState): MenuItem[] {
     case 'maps':
       return [...MAP_CATALOG.map(map => ({ id: `map:${map.id}`, label: map.name })), { id: 'back', label: 'Back' }];
     case 'multiplayer':
-      return [{ id: 'back', label: 'Back' }];
+      return [{ id: 'host', label: 'Host Game' }, { id: 'join', label: 'Join Game' }, { id: 'back', label: 'Back' }];
+    case 'hostMaps':
+      return [...MAP_CATALOG.map(map => ({ id: `host:${map.id}`, label: map.name })), { id: 'back', label: 'Back' }];
     case 'settings':
       return [
         ...(Object.keys(SETTING_LIMITS) as SettingKey[]).map(key => ({
@@ -122,7 +124,7 @@ export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
     case 'hover':
       if (action.index >= 0 && action.index < items.length && !items[action.index].disabled) state.selected = action.index;
       return null;
-    case 'back': if (state.screen !== 'main') open(state, 'main'); return null;
+    case 'back': if (state.screen !== 'main') open(state, state.screen === 'hostMaps' ? 'multiplayer' : 'main'); return null;
     case 'left': case 'right': {
       const setting = items[state.selected]?.setting;
       if (!setting) return null;
@@ -145,8 +147,12 @@ export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
       const chosen = MAP_CATALOG.find(map => `map:${map.id}` === item.id);
       if (chosen) { state.map = chosen.id; open(state, 'loading'); return { type: 'startSolo', map: chosen.id }; }
       if (item.id === 'multiplayer') { open(state, 'multiplayer'); return null; }
+      if (item.id === 'host') { open(state, 'hostMaps'); return null; }
+      if (item.id === 'join') return { type: 'joinGame' };
+      const hosted = MAP_CATALOG.find(map => `host:${map.id}` === item.id);
+      if (hosted) return { type: 'hostGame', map: hosted.id };
       if (item.id === 'settings') { open(state, 'settings'); return null; }
-      if (item.id === 'back') { open(state, 'main'); return null; }
+      if (item.id === 'back') { open(state, state.screen === 'hostMaps' ? 'multiplayer' : 'main'); return null; }
       if (item.id === 'retry') { setDownload(state, { ...INITIAL_DOWNLOAD }); return { type: 'retryDownload' }; }
       return null;
     }

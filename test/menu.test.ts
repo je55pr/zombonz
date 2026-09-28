@@ -41,6 +41,13 @@ describe('start menu', () => {
     expect(menuItems(state).map(item => item.label)).toEqual(['Solo', 'Multiplayer', 'Settings']);
     expect(reduceMenu(state, { type: 'activate', index: 1 })).toBeNull();
     expect(state.screen).toBe('multiplayer');
+    expect(menuItems(state).map(item => item.label)).toEqual(['Host Game', 'Join Game', 'Back']);
+    expect(reduceMenu(state, { type: 'activate', index: 1 })).toEqual({ type: 'joinGame' });
+    expect(reduceMenu(state, { type: 'activate', index: 0 })).toBeNull();
+    expect(state.screen).toBe('hostMaps');
+    expect(reduceMenu(state, { type: 'activate', index: 1 })).toEqual({ type: 'hostGame', map: 'asylum' });
+    reduceMenu(state, { type: 'back' });
+    expect(state.screen).toBe('multiplayer');
     reduceMenu(state, { type: 'back' });
     expect(state.screen).toBe('main');
     expect(reduceMenu(state, { type: 'activate', index: 0 })).toBeNull();

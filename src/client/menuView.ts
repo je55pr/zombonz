@@ -164,11 +164,11 @@ export class MenuView {
     this.rows = [];
     const screen = this.state.screen;
     let y = height * (screen === 'main' ? 0.52 : 0.47);
-    if (screen === 'multiplayer') {
+    if (screen === 'multiplayer' || screen === 'hostMaps') {
       c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(30 * scale)}px ${UI_FONT}`;
-      c.fillText('Multiplayer is on the way', centre, y);
+      c.fillText(screen === 'hostMaps' ? 'Choose a map to host' : 'Online co-op, up to four players', centre, y);
       c.fillStyle = '#a19b88'; c.font = `400 ${Math.round(19 * scale)}px ${UI_FONT}`;
-      c.fillText('Player-hosted online co-op is the next milestone. Play Solo for now.', centre, y + 42 * scale);
+      c.fillText('Players connect directly by swapping short codes, over chat or text.', centre, y + 42 * scale);
       y += 110 * scale;
     }
     if (screen === 'loading') {
