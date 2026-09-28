@@ -6,10 +6,35 @@ import { createZombieView } from '../src/client/zombieView.ts';
 import { interpolatePosition } from '../src/client/interpolation.ts';
 import { CanvasHud, type HudSnapshot } from '../src/client/hud.ts';
 import { FixedStepClock } from '../src/core/clock.ts';
+import { FrameProfiler, type FrameProfile } from '../src/client/performance.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('render performance contracts', () => {
+  it('summarizes stage costs and separates shadow-update frames', () => {
+    const profiler = new FrameProfiler();
+    const frame: FrameProfile = {
+      intervalMs: 100, cpuMs: 8, simulationMs: 1, networkMs: 0.5,
+      actorsMs: 1.5, detailsMs: 0.5, sceneMs: 2, weaponMs: 0.5,
+      hudMs: 1, overlayMs: 0.5, shadowFrame: false,
+      ticks: 6, calls: 90, triangles: 120_000, rigs: 24, scale: 1,
+    };
+    expect(profiler.add({ ...frame, intervalMs: 0 })).toBeNull();
+    expect(profiler.add({ ...frame, intervalMs: 6000 })).toBeNull();
+    for (let i = 0; i < 9; i++) expect(profiler.add({ ...frame, shadowFrame: i === 0,
+      sceneMs: i === 0 ? 4 : 2, cpuMs: i === 0 ? 10 : 8 })).toBeNull();
+    const report = profiler.add(frame)!;
+    expect(report.fps).toBe(10);
+    expect(report.frameP95Ms).toBe(100);
+    expect(report.cpuP95Ms).toBe(10);
+    expect(report.stages.scene).toBeCloseTo(2.2);
+    expect(report.stages.other).toBeCloseTo(0.5);
+    expect(report.shadowSceneMs).toBe(4);
+    expect(report.regularSceneMs).toBe(2);
+    expect(report.rigs).toBe(24);
+    expect(profiler.add(frame)).toBeNull();
+  });
+
   it('batches static geometry without changing world bounds or animated objects', () => {
     const scene = new THREE.Scene(), group = new THREE.Group(); scene.add(group);
     group.position.set(1, 2, 3); group.rotation.y = 0.2;

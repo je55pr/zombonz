@@ -349,7 +349,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
         net.client.closed.add(reason => hooks.onDisconnected?.(reason))];
     netCleanup.push(...stops);
   }
-  const performanceOverlay = new PerformanceOverlay();
+  const performanceOverlay = new PerformanceOverlay(renderer);
   renderer.info.autoReset = false;
   let previousSeconds: number | undefined;
   let lastShadowTick = -Infinity;
@@ -434,18 +434,22 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   function frame(): void {
     if (disposed) return;
     const started = performance.now();
+    const profiling = performanceOverlay.enabled;
     if (++lastWarmFrame % 20 === 0) warmUpcomingWeapons();
     // One time base for animation frames and the background timer, so neither can step the clock back.
     const nowSeconds = started / 1000;
     const interval = lastFrameSeconds === undefined ? 0 : (nowSeconds - lastFrameSeconds) * 1000;
     lastFrameSeconds = nowSeconds;
+    const tickBefore = simulation.state.world.tick;
+    const simulationStarted = profiling ? performance.now() : 0;
     advance(nowSeconds);
-    const simulationMs = performance.now() - started;
+    const simulationEnded = profiling ? performance.now() : 0;
     const alpha = clock.interpolationAlpha();
     // A client draws everything but itself from the host's snapshots, slightly in the past.
     const netFrame = net?.role === 'client' ? net.client.frame(interval / 1000) : null;
     if (netFrame?.restarted) { resetMatchViews(); for (const view of playerViews.values()) view.root.visible = false; }
     if (netFrame) present(netFrame.events);
+    const networkEnded = profiling ? performance.now() : 0;
     const remote = netFrame ?? { alpha, tick: simulation.state.world.tick - 1 + alpha, previous: previousPositions };
     syncCamera(alpha);
     const playerForCamera = simulation.getPlayer(playerId);
@@ -458,18 +462,23 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     syncPlayerViews(remote.alpha, remote.tick, remote.previous);
     powerupView.update(simulation.state.powerups.drops, remote.tick);
     grenadeView.update(simulation.state.grenades.active, remote.tick);
+    const actorsEnded = profiling ? performance.now() : 0;
     details.update(simulation.state);
+    const detailsEnded = profiling ? performance.now() : 0;
+    performanceOverlay.beginGpu();
     renderer.clear();
     renderer.info.reset();
     // The moon/camera are independent: expensive skinned shadow passes only need
     // 15 Hz updates. Models and camera still render at the display's full rate.
-    if (simulation.state.world.tick - lastShadowTick >= 4 || simulation.state.world.tick < lastShadowTick) {
+    const shadowFrame = simulation.state.world.tick - lastShadowTick >= 4 || simulation.state.world.tick < lastShadowTick;
+    if (shadowFrame) {
       renderer.shadowMap.needsUpdate = true; lastShadowTick = simulation.state.world.tick;
     }
     renderer.render(scene, camera);
+    const sceneEnded = profiling ? performance.now() : 0;
     const player = simulation.getPlayer(playerId);
     if (player) { weaponView.update(player, simulation.state.world.tick - 1 + alpha, interval / 1000); weaponView.render(renderer, camera.aspect); }
-    const hudStarted = performance.now();
+    const weaponEnded = profiling ? performance.now() : 0;
     const hudSnapshot = buildHudSnapshot(simulation, playerId, net ? names : undefined);
     const waiting = !hostRunning ? 'Waiting for everyone to load…' : null;
     if (hudSnapshot) hud.render({ ...hudSnapshot, paused: pause.paused && !net,
@@ -478,9 +487,25 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       feedback: feedback.snapshot(simulation.state.world.tick),
       assetNotice: waiting ?? zombieAssetNotice ?? weaponView.notice ?? environmentNotice }, performance.now(),
       player ? { spread: currentSpread(player), verticalFov: camera.fov } : undefined);
-    performanceOverlay.sample(interval, performance.now() - started, simulationMs, performance.now() - hudStarted,
-      renderer.info.render.calls, renderer.info.render.triangles, renderer.getPixelRatio());
+    performanceOverlay.endGpu();
+    const hudEnded = profiling ? performance.now() : 0;
+    const calls = profiling ? renderer.info.render.calls : 0;
+    const triangles = profiling ? renderer.info.render.triangles : 0;
     performanceOverlay.render(renderer);
+    if (profiling) performanceOverlay.sample({
+      intervalMs: interval, cpuMs: performance.now() - started,
+      simulationMs: simulationEnded - simulationStarted,
+      networkMs: networkEnded - simulationEnded,
+      actorsMs: actorsEnded - networkEnded,
+      detailsMs: detailsEnded - actorsEnded,
+      sceneMs: sceneEnded - detailsEnded,
+      weaponMs: weaponEnded - sceneEnded,
+      hudMs: hudEnded - weaponEnded,
+      overlayMs: performance.now() - hudEnded,
+      shadowFrame, ticks: simulation.state.world.tick - tickBefore,
+      calls, triangles, rigs: skinnedViews.size + playerViews.size,
+      scale: renderer.getPixelRatio(),
+    });
     frameId = requestAnimationFrame(frame);
   }
 

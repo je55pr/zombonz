@@ -83,7 +83,11 @@ WASD flies in the direction you look, Space rises and C descends. Active modes a
 on the HUD. Turning noclip off lands you on a valid surface; if you are inside a wall
 or outside the map, it returns you to where you enabled noclip. Both modes reset on restart.
 
-F3 toggles the performance panel (FPS, frame time, CPU time and draw calls).
+F3 toggles the frame profiler (`?perf` opens it automatically). It shows average and
+95th-percentile frame/CPU time, a 144 Hz budget bar for each CPU stage, shadow-update
+versus regular scene cost, draw calls, triangles, and active rigs. GPU draw time appears
+when the browser supports asynchronous timer queries; it excludes browser presentation,
+so CPU and GPU times should not be added together. The panel stays dormant while hidden.
 Rendering follows the display refresh rate, with interpolated movement and immediate
 mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
 1x pixel density, no MSAA, and 1024px shadows refreshed at 15 Hz. Static scenery and fallback zombie body parts
