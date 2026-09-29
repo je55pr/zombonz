@@ -247,8 +247,8 @@ god mode for repeatable performance checks. Add `&round=N` to any preview URL to
 round N, for example `/?preview=start&round=9` to face a round of sprinters. `npm run benchmark` measures a headless
 24-zombie stair-routing scenario (mean/p95 tick time); it does not measure GPU time or FPS.
 `/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
-That preview guarantees a Max Ammo drop when the target dies; add
-`&powerup=doublePoints`, `&powerup=instaKill` or `&powerup=nuke` to inspect the alternate pickups.
+That preview places a Max Ammo pickup in front of the player and guarantees another when the target dies. Add
+`&powerup=doublePoints`, `&powerup=instaKill`, `&powerup=nuke` or `&powerup=carpenter` to inspect the other pickup models.
 Use `weapon=` with any gun id (for example `thompson`, `stg44`, `ak74u`, `spas12`, `rpg7`,
 `irrlicht` or `molniya`; the full list is `WEAPON_DEFINITIONS` in `src/core/weapon.ts`) on any preview URL
 to inspect that viewmodel; add `&aim=1` to hold it aimed down the sights (development only). P fires in development previews only (useful in browsers
