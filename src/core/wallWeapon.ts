@@ -20,6 +20,7 @@ export interface WallWeaponState {
   weaponId: string;
   weaponCost: number;
   ammoCost: number;
+  purchased: boolean;
 }
 export type WallWeaponEvent =
   | { type: 'wallWeaponPurchased'; playerId: EntityId; wallWeaponId: string; weaponId: string }
@@ -52,6 +53,7 @@ export function createWallWeaponState(
     weaponId: definition.weaponId,
     weaponCost: definition.weaponCost,
     ammoCost: definition.ammoCost,
+    purchased: false,
   };
 }
 
@@ -76,7 +78,7 @@ export function handleWallWeaponInteraction(
 
   // Reserve refill preserves the magazine, reload progress and fire cadence.
   if (owned) owned.reserveAmmo = definition.startingReserveAmmo;
-  else equipWeapon(player, wall.weaponId);
+  else { equipWeapon(player, wall.weaponId); wall.purchased = true; }
   const event: WallWeaponEvent = ownsWeapon
     ? { type: 'wallWeaponAmmoPurchased', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId }
     : { type: 'wallWeaponPurchased', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId };
