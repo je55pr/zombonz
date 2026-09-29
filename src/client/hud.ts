@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { EntityId } from '../core/types.ts';
 import type { GameSimulation } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
+import { packedGlowCss } from './packedMaterial.ts';
 import { maxPlayerHealth } from '../core/health.ts';
 import { reviveProgress } from '../core/downs.ts';
 import type { PerkId } from '../core/perks.ts';
@@ -397,7 +398,8 @@ export class CanvasHud {
       this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', right, height - 145,
         { size: 20, color: snapshot.reserveAmmo > 0 ? GOLD : BLOOD, align: 'right', spacing: 2 });
     }
-    this.text(weaponLabel(snapshot.weapon), right, height - 112, { size: 24, weight: 500, color: DIM, align: 'right', spacing: 2 });
+    this.text(weaponLabel(snapshot.weapon), right, height - 112, { size: 24, weight: 500,
+      color: packedGlowCss(snapshot.weapon) ?? DIM, align: 'right', spacing: 2 });
     const reserveWidth = this.text(` / ${snapshot.reserveAmmo}`, right, height - 56,
       { size: 31, weight: 500, color: DIM, align: 'right' });
     this.text(String(snapshot.magazineAmmo), right - reserveWidth, height - 60,
@@ -405,7 +407,8 @@ export class CanvasHud {
     if (snapshot.holsteredWeapon) {
       const name = weaponLabel(snapshot.holsteredWeapon);
       const nameWidth = this.measure(name, { size: 18, weight: 500, spacing: 2 });
-      this.text(name, right, height - 22, { size: 18, weight: 500, color: FAINT, align: 'right', spacing: 2 });
+      this.text(name, right, height - 22, { size: 18, weight: 500, color: packedGlowCss(snapshot.holsteredWeapon) ?? FAINT,
+        align: 'right', spacing: 2 });
       this.keycap('Q', right - nameWidth - 39, height - 22, 14);
     }
 

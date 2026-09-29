@@ -3,6 +3,7 @@ import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { deinterleaveGeometry, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { takeAssetAsync } from './assetStore.ts';
+import { UPGRADED_SUFFIX, UPGRADE_SPECS } from '../core/upgrades.ts';
 
 export type ZombieAssetId = 'peter_d' | 'pxltiger';
 /** The model each zombie look is drawn with: index = `ZombieState.variant` (see core/zombieBody.ts, whose rigs these are). */
@@ -11,11 +12,16 @@ export const zombieAssetFor = (variant: number): ZombieAssetId => ZOMBIE_ASSET_I
 export type ZombieAnimation = 'idle' | 'walk' | 'run' | 'attack' | 'death';
 export interface ZombieAsset { id?: ZombieAssetId; model: THREE.Group; clips: Partial<Record<ZombieAnimation, THREE.AnimationClip>> }
 // Every gun's GLB lives in public/assets/weapons/<id>/, except the starter pistol's M1911 folder.
-export const WEAPON_ASSETS: Readonly<Record<string, string>> = {
+const BASE_WEAPON_ASSETS: Readonly<Record<string, string>> = {
   'starter-pistol': 'm1911',
   ...Object.fromEntries(['kar98k', 'springfield', 'mosin', 'm1-garand', 'm1-carbine', 'm14', 'fal', 'stg44', 'fg42',
     'thompson', 'mp40', 'ppsh41', 'commando', 'ak74u', 'mp5k', 'skorpion', 'bar', 'mg42', 'rpk', 'double-barrel',
     'trench-gun', 'spas12', 'ithaca37', 'magnum-357', 'python', 'rpg7', 'irrlicht', 'molniya'].map(id => [id, id])),
+};
+/** The guns, then each Pack-a-Punched gun (which is drawn with its base gun's model, tinted: see weaponView.ts). */
+export const WEAPON_ASSETS: Readonly<Record<string, string>> = {
+  ...BASE_WEAPON_ASSETS,
+  ...Object.fromEntries(Object.keys(UPGRADE_SPECS).map(base => [`${base}${UPGRADED_SUFFIX}`, BASE_WEAPON_ASSETS[base]])),
 };
 
 const loader = new GLTFLoader();

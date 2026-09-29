@@ -1,7 +1,7 @@
 import { spendPoints, type EconomyEvent } from './economy.ts';
 import { createInteractableState, type InteractionEvent } from './interaction.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3 } from './types.ts';
-import { equipWeapon, ownedWeapon, WEAPON_DEFINITIONS } from './weapon.ts';
+import { equipWeapon, ownedWeaponOrUpgrade, weaponDefinition, WEAPON_DEFINITIONS } from './weapon.ts';
 
 export interface WallWeaponDefinition {
   id: string;
@@ -65,9 +65,10 @@ export function handleWallWeaponInteraction(
   if (interaction.interactionType !== 'wallWeapon') return [];
   const wall = wallWeapons.find((candidate) => candidate.interactableId === interaction.interactableId);
   if (!wall || !player.alive) return [];
-  const owned = ownedWeapon(player, wall.weaponId);
+  // A player holding the gun's Pack-a-Punched version is sold its ammo, and not the gun again.
+  const owned = ownedWeaponOrUpgrade(player, wall.weaponId);
   const ownsWeapon = !!owned;
-  const definition = WEAPON_DEFINITIONS[wall.weaponId];
+  const definition = weaponDefinition(owned?.weaponId ?? wall.weaponId)!;
   if (owned && owned.reserveAmmo >= definition.startingReserveAmmo) {
     return [{ type: 'wallWeaponAmmoFull', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId }];
   }

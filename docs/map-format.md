@@ -20,7 +20,7 @@ The example omits required arrays. Use either committed document as a complete r
 | Section | Fields | Used by |
 | --- | --- | --- |
 | `metadata` | `id`, `name`, `upperHeight` | Registry and map selection |
-| `gameplay` | Collision and shot blockers, walk surfaces, navigation, player and zombie spawns, how likely each zombie look is (`zombieLooks`, a weight per model), barriers, doors, purchases, power, traps, hazards, equipment | Deterministic simulation |
+| `gameplay` | Collision and shot blockers, walk surfaces, navigation, player and zombie spawns, how likely each zombie look is (`zombieLooks`, a weight per model), barriers, doors, purchases, power, traps, hazards, equipment, Pack-a-Punch machines (`packAPunch`: position, a quarter-turn `yaw`; the machine's solid body is added by the simulation) | Deterministic simulation |
 | `presentation` | Greybox and scenery meshes, prop placements, windows, labels, lighting, decals, preview views, other visual anchors | Three.js renderer |
 
 The simulation receives only the gameplay subset through `simulationMap`. IDs on barriers, doors, purchases, and navigation nodes must be unique within their arrays. Navigation neighbor IDs and zombie spawn barrier IDs must exist. A collision box may have a zero width on one axis for a blocker plane, but `min` must never exceed `max`. Costs must be nonnegative. Format versions other than 1 are rejected so changes can be migrated deliberately.

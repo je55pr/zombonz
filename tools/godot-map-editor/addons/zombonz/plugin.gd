@@ -86,6 +86,7 @@ func _import_map() -> void:
 	_add_array(root, gameplay, "gameplay", "traps", "switchPosition", "Trap", Color.YELLOW)
 	_add_array(root, gameplay, "gameplay", "hazards", "position", "Hazard", Color.RED)
 	_add_array(root, gameplay, "gameplay", "equipment", "position", "Equipment", Color.CYAN)
+	_add_array(root, gameplay, "gameplay", "packAPunch", "position", "Pack-a-Punch", Color.MEDIUM_PURPLE)
 	if gameplay.has("powerSwitch"):
 		_add_marker(root, "gameplay/powerSwitch/position", gameplay["powerSwitch"]["position"], "Power switch", Color.YELLOW, gameplay["powerSwitch"])
 	for i in range(gameplay["barriers"].size()):

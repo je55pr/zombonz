@@ -1,6 +1,7 @@
 import type { EntityId, PlayerState, Vec3, WorldState, ZombieState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
-import { WEAPON_DEFINITIONS } from '../core/weapon.ts';
+import { weaponDefinition } from '../core/weapon.ts';
+import { baseWeaponId, isUpgradedWeapon } from '../core/upgrades.ts';
 import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip, type AudioClip } from './audioClips.ts';
 
 type Clip = AudioClip;
@@ -17,9 +18,11 @@ const GUN_CLIPS: Readonly<Record<string, Clip>> = {
   'magnum-357': 'gun-revolver', python: 'gun-revolver', irrlicht: 'irrlicht-fire', molniya: 'molniya-fire',
 };
 export function gunClip(weaponId: string): { clip: Clip; rate: number } {
+  const gun = baseWeaponId(weaponId);
   // The launcher's thump is the double-barrel's report pitched well down.
-  if (weaponId === 'rpg7') return { clip: 'gun-double', rate: 0.62 };
-  return { clip: GUN_CLIPS[weaponId] ?? 'gun-pistol', rate: 1 };
+  if (gun === 'rpg7') return { clip: 'gun-double', rate: isUpgradedWeapon(weaponId) ? 0.58 : 0.62 };
+  // A Pack-a-Punched gun sounds like its base gun, a little heavier.
+  return { clip: GUN_CLIPS[gun] ?? 'gun-pistol', rate: isUpgradedWeapon(weaponId) ? 0.94 : 1 };
 }
 /** One of a numbered set of variations, so repeated sounds don't machine-gun the same take. */
 function variant(prefix: string, count: number, seed: number): Clip {
@@ -290,10 +293,10 @@ export class GameAudio {
         case 'zombieSwung': this.playAt(variant('zombie-attack', 3, world.tick + Number(event.zombieId.slice(2))), MIX.zombieAttack,
           world.entities[event.zombieId]?.position, player); break;
         case 'playerDamaged': this.playClip('flesh-hit', MIX.hurt); break;
-        case 'weaponReloadStarted': this.playClip(WEAPON_DEFINITIONS[event.weaponId]?.pellets ? 'shotgun-shell'
-          : ['kar98k', 'springfield', 'mosin'].includes(event.weaponId) ? 'reload-round' : 'reload-mag', MIX.reload); break;
+        case 'weaponReloadStarted': this.playClip(weaponDefinition(event.weaponId)?.pellets ? 'shotgun-shell'
+          : ['kar98k', 'springfield', 'mosin'].includes(baseWeaponId(event.weaponId)) ? 'reload-round' : 'reload-mag', MIX.reload); break;
         case 'weaponReloadCompleted':
-          if (WEAPON_DEFINITIONS[event.weaponId]?.pellets) this.playClip('shotgun-rack', MIX.reloadDone);
+          if (weaponDefinition(event.weaponId)?.pellets) this.playClip('shotgun-rack', MIX.reloadDone);
           break;
         case 'pointsSpendRejected': this.playClip('buy-denied', MIX.reject); break;
         case 'mysteryBoxUsed': this.playClip('mechanical-button', MIX.box); break;
@@ -332,6 +335,14 @@ export class GameAudio {
           break;
         case 'equipmentPurchased': this.playClip('pickup', MIX.pickup); this.playClip('mechanical-click', MIX.reloadDone, 0, 0.8); break;
         case 'equipmentFull': this.playClip('buy-denied', MIX.reject); break;
+        // Stand-ins from the recorded clips until the ones in docs/audio-wanted.md exist: a clank and a hum as the gun goes in,
+        // the electric surge when it is ready, and the pickup when it is taken.
+        case 'packAPunchStarted':
+          this.playClip('door-metal', MIX.reload * 0.7, 0, 0.5); this.playClip('mechanical-button', MIX.box, 0, 0.7);
+          this.playClip('electric-powerup', MIX.electric * 0.8, 0, 0.8); break;
+        case 'packAPunchReady': this.playClip('electric-powerup', MIX.electric); this.playClip('pickup', MIX.pickup * 0.8, 0, 1.2); break;
+        case 'packAPunchCollected': this.playClip('pickup', MIX.pickup); this.playClip('mechanical-click', MIX.reloadDone, 0, 0.8); break;
+        case 'packAPunchRefused': this.playClip('buy-denied', MIX.reject); break;
         // Boards break where the zombie tearing them stands, so a far window is faint and panned.
         case 'barrierBoardRemoved': this.playAt(event.boards === 0 ? variant('wood-impact', 2, world.tick) : variant('wood-crack', 4, world.tick + event.boards),
           MIX.boardBreak, world.entities[event.zombieId]?.position, player); break;

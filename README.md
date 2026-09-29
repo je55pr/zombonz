@@ -187,6 +187,17 @@ who is not down. It only drops once five barriers have lost every board (or all 
 map with fewer), so a kind that cannot drop yet is passed over in the deck. The wonder weapons
 are as likely as any other gun in the box for now, and each solo game starts from a fresh random
 seed, so the box and drops differ between games (dev builds can pin one with `?seed=<n>`).
+### Pack-a-Punch
+
+A Pack-a-Punch machine turns the gun in your hand into a stronger one with a name of its own: 5000 points, five seconds
+to upgrade, then twelve to take it before it is lost. It needs the power on where a map has a switch, and another gun to
+hold meanwhile (with one gun it says so and takes nothing). The upgraded gun has about twice the damage, bigger magazine
+and reserve, a faster reload, and its base gun's sights and sound, but a dark space-age finish with glowing circuit lines
+(and a muzzle flash) in a bright colour of its own: a magenta MP5K, an ice-blue Kar98k, a red Thompson. Every gun has one, and a
+Molniya's lightning reaches eight zombies where it reached five. Bunker's machine is upstairs where the Nacht der Untoten
+floor plan has its sniper cabinet, and Asylum's is in the BAR back room. Wall ammo refills an upgraded gun and the box never
+offers you the gun you have upgraded. See [docs/pack-a-punch.md](docs/pack-a-punch.md).
+
 ### Explosives
 
 Everything that goes bang shares one set of blast rules (`src/core/blast.ts`): full damage at the

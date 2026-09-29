@@ -8,6 +8,7 @@ import type { PerkMachineDefinition } from '../core/perks.ts';
 import type { TrapDefinition } from '../core/traps.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { EquipmentBuyDefinition } from '../core/equipment.ts';
+import type { PackAPunchDefinition } from '../core/packAPunch.ts';
 import type { HazardDefinition } from '../core/hazard.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
 import type { Vec3 } from '../core/types.ts';
@@ -110,6 +111,11 @@ export interface GameMap {
   hazards?: readonly HazardDefinition[];
   /** Equipment (Bouncing Betties) sold from the wall, and the yaw each chalk outline faces, away from its wall. */
   equipment?: readonly EquipmentBuyDefinition[];
+  /**
+   * Pack-a-Punch machines (see core/packAPunch.ts): where each stands and which way it faces. The simulation
+   * makes its body solid, so a map leaves that space clear of its own collision.
+   */
+  packAPunch?: readonly PackAPunchDefinition[];
   equipmentFacing?: Readonly<Record<string, number>>;
   /** How likely each zombie look is on this map (index = `ZombieState.variant`); see zombieBody.ts for the looks. */
   zombieLooks?: readonly number[];
