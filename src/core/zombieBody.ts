@@ -12,6 +12,12 @@ import { RIG_DATA, RIG_POINT_KEYS } from './zombieRigData.ts';
 export const ZOMBIE_RIG_IDS = ['soldier', 'walker'] as const;
 export type ZombieRigId = typeof ZOMBIE_RIG_IDS[number];
 
+/** A joint of a pose, by name: the order of every pose's numbers (see RIG_POINT_KEYS). */
+export function poseJoint(points: readonly number[], key: typeof RIG_POINT_KEYS[number]): [number, number, number] {
+  const i = RIG_POINT_KEYS.indexOf(key) * 3;
+  return [points[i], points[i + 1], points[i + 2]];
+}
+
 /** The rig a zombie's `variant` (its look, chosen when it spawned) is drawn with. */
 export const rigOf = (zombie: Pick<ZombieState, 'variant'>): ZombieRigId => ZOMBIE_RIG_IDS[zombie.variant % ZOMBIE_RIG_IDS.length];
 
@@ -54,7 +60,7 @@ export const BODY_RADII = { head: 0.12, torso: 0.18, upperArm: 0.075, foreArm: 0
  * A crawler drags itself along on its arms and elbows, torso low and head up: authored, since neither model has a crawl
  * clip. The client bends the skeleton to match (see skinnedZombieView.ts). x, y, z for each of RIG_POINT_KEYS.
  */
-const CRAWL_POINTS: readonly number[] = [
+export const CRAWL_POINTS: readonly number[] = [
   0, 0.56, 0.62, // head (skull centre)
   0, 0.46, 0.42, // neck
   0, 0.4, 0.2, // chest

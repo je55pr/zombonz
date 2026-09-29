@@ -457,6 +457,8 @@ export const ASYLUM_MAP: GameMap = {
     : { kind: 'planks' as const, yaw: d.blocker.max.x - d.blocker.min.x < 1 ? 0 : Math.PI / 2, width: DOOR_WIDTH }])),
   wallWeapons: ASYLUM_WALL_WEAPONS, wallWeaponFacing: ASYLUM_WALL_WEAPON_FACING,
   hazards: ASYLUM_HAZARDS, equipment: ASYLUM_EQUIPMENT, equipmentFacing: ASYLUM_EQUIPMENT_FACING,
+  // Its patients (the bare-chested walker) far outnumber the soldiers who came to close it.
+  zombieLooks: [1, 3],
   mysteryBoxes: ASYLUM_MYSTERY_BOXES, boxCenter: ASYLUM_BOX_CENTER, boxYaw: -Math.PI / 2,
   fountain: FOUNTAIN,
   powerSwitch: ASYLUM_POWER_SWITCH, perkMachines: ASYLUM_PERK_MACHINES, perkMachineFacing: ASYLUM_PERK_FACING, traps: ASYLUM_TRAPS,

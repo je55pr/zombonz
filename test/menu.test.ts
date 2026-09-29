@@ -214,7 +214,8 @@ describe('start-screen asset list', () => {
       for (const prop of BUNKER_PROPS) expect(urls).toContain(`/assets/props/${prop.asset}/model.glb`);
       for (const clip of ['model', 'idle', 'walk', 'run', 'attack', 'death']) expect(urls).toContain(`/assets/zombies/peter_d/${clip}.glb`);
       for (const clip of AUDIO_CLIPS) expect(urls).toContain(`/assets/audio/${clip}.mp3`);
-      expect(urls.some(url => url.includes('pxltiger'))).toBe(false);
+      // Every look's model, since a match draws zombies of each.
+      for (const clip of ['model', 'idle', 'walk', 'run', 'attack']) expect(urls).toContain(`/assets/zombies/pxltiger/${clip}.glb`);
       expect(urls.filter(url => /\.(webp|jpg|png)$/.test(url)).length).toBeGreaterThanOrEqual(9 + 2);
       for (const url of urls) expect(assetExists(`public${url}`), url).toBe(true);
     } finally {

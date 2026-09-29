@@ -5,8 +5,11 @@ import { deinterleaveGeometry, mergeVertices } from 'three/addons/utils/BufferGe
 import { takeAsset } from './assetStore.ts';
 
 export type ZombieAssetId = 'peter_d' | 'pxltiger';
+/** The model each zombie look is drawn with: index = `ZombieState.variant` (see core/zombieBody.ts, whose rigs these are). */
+export const ZOMBIE_ASSET_IDS: readonly ZombieAssetId[] = ['peter_d', 'pxltiger'];
+export const zombieAssetFor = (variant: number): ZombieAssetId => ZOMBIE_ASSET_IDS[variant % ZOMBIE_ASSET_IDS.length];
 export type ZombieAnimation = 'idle' | 'walk' | 'run' | 'attack' | 'death';
-export interface ZombieAsset { model: THREE.Group; clips: Partial<Record<ZombieAnimation, THREE.AnimationClip>> }
+export interface ZombieAsset { id?: ZombieAssetId; model: THREE.Group; clips: Partial<Record<ZombieAnimation, THREE.AnimationClip>> }
 // Every gun's GLB lives in public/assets/weapons/<id>/, except the starter pistol's M1911 folder.
 export const WEAPON_ASSETS: Readonly<Record<string, string>> = {
   'starter-pistol': 'm1911',
@@ -112,7 +115,7 @@ async function buildZombieAsset(id: ZombieAssetId): Promise<ZombieAsset> {
     if (animations[index].animations[0]) clips[name] = inPlaceClip(animations[index].animations[0], model.scene);
   });
   prepareZombieModel(model.scene);
-  return { model: model.scene, clips };
+  return { id, model: model.scene, clips };
 }
 
 function prepareZombieModel(model: THREE.Object3D): { scale: number; offset: THREE.Vector3 } {

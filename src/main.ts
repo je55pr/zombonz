@@ -12,7 +12,6 @@ type NetPlay = import('./game.ts').NetPlay;
 const gameCanvas = document.querySelector<HTMLCanvasElement>('#game');
 if (!gameCanvas) throw new Error('Missing #game canvas.');
 const buildId = (import.meta.env.VITE_BUILD_ID as string | undefined)?.slice(0, 7) ?? 'local';
-const zombieVariant = new URLSearchParams(location.search).get('zombie') === 'pxltiger' ? 'pxltiger' : 'peter_d';
 
 let game: GameModule | undefined;
 let menu: MenuView | undefined;
@@ -130,7 +129,7 @@ async function downloadGame(view: MenuView): Promise<void> {
   }
   let urls: string[] = [];
   try {
-    urls = await game.gameAssetUrls(zombieVariant);
+    urls = await game.gameAssetUrls();
   } catch (error) {
     // Without the environment manifest the list is incomplete; the game still loads what it can.
     console.warn('Unable to list game assets', error);
@@ -143,7 +142,7 @@ async function downloadGame(view: MenuView): Promise<void> {
   // Unpack everything the opening moments need, so Bunker appears fully textured with the real pistol.
   await game.prepareGameAssets((preparedSteps, totalSteps) => view.setDownload({
     phase: 'preparing', ...downloaded, preparedSteps, totalSteps,
-  }), zombieVariant);
+  }));
   readyDownload = { phase: 'ready', ...downloaded };
   view.setDownload(readyDownload);
 }

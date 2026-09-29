@@ -398,6 +398,8 @@ export const BUNKER_MAP: GameMap = {
   },
   wallWeapons: BUNKER_WALL_WEAPONS, wallWeaponFacing: BUNKER_WALL_WEAPON_FACING,
   hazards: BUNKER_HAZARDS, equipment: BUNKER_EQUIPMENT, equipmentFacing: BUNKER_EQUIPMENT_FACING,
+  // Soldiers who have lain in the dark, and some of the other dead (see MAP_ZOMBIE_LOOKS for how they are coloured).
+  zombieLooks: [3, 1],
   mysteryBoxes: BUNKER_MYSTERY_BOXES, boxCenter: BUNKER_BOX_CENTER, boxYaw: Math.PI / 2,
   rails: BUNKER_RAILS, props: [...BUNKER_PROPS, ...BUNKER_OUTSIDE_PROPS], decals: BUNKER_DECALS,
   labels: [
