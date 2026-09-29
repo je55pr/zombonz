@@ -63,7 +63,7 @@ export const WEAPON_SIGHTS: Readonly<Record<string, WeaponSightsMm>> = {
   mp40: { rear: [4.1, -10.0, -370], front: [4.1, -8.9, -695], size: { at: 'front', width: 17.7 } },
   ppsh41: { rear: [0.0, -12.8, -345], front: [0.0, -9.0, -655], size: { at: 'front', width: 19 } },
   commando: { rear: [-0.8, -4.9, -255], front: [-0.7, -4.0, -555], size: { at: 'front', width: 12.1 } },
-  ak74u: { rear: [-19.0, -7.0, -335], front: [-20.6, -5.6, -548], size: { at: 'front', width: 15 } },
+  ak74u: { rear: [-11.3, -6.6, -335], front: [-10.7, -5.0, -548], size: { at: 'front', width: 15 } },
   bar: { rear: [12.5, -7.0, -280], front: [12.8, -6.3, -960], size: { at: 'rear', width: 8.9 } },
   mg42: { rear: [38.6, 0.5, -525], front: [38.6, 0.0, -905], size: { at: 'rear', width: 12.5 } },
   rpk: { rear: [-4.2, -0.7, -400], front: [-4.2, -6.8, -880], size: { at: 'front', width: 12.5 } },

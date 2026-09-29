@@ -87,7 +87,10 @@ Where the model does not give a real sight picture the choice is deliberate:
 - **Shotguns** (`double-barrel`, `trench-gun`, `ithaca37`) have no rear sight. The line starts a few millimetres above
   the end of the receiver, so it clears the receiver and runs along the barrel to the muzzle, and the barrel shows below
   it.
-- **`ak74u`**: the model's rear sight is folded down, about 14 mm below its front post, which would tilt the aimed gun
+- **`ak74u`** (issue #188): the source model poses the gun rolled 9.4 degrees about its bore and yawed 1.25, which
+  showed as the aimed gun leaning to one side, its magazine hanging 25 mm off the sights. The converter now turns it
+  upright (`turn` in `scripts/weapon-convert/weapons.mjs`) and its two points were moved with it. Its rear sight is
+  folded down, about 14 mm below its front post, which would tilt the aimed gun
   by almost 4 degrees. The rear point is placed nearly level with the post instead, and the folded leaf shows below.
 - **`mg42`**: the rear sight is a solid ridge with no notch, so the rear point sits just above its top.
 - **`fal`**: the model's rear aperture is 3 mm left of its front post, so the aimed gun is turned very slightly to
@@ -111,3 +114,13 @@ Where the model does not give a real sight picture the choice is deliberate:
 To look at one gun aimed: `npm run dev`, then open `/?preview=start&weapon=<id>&aim=1`. After changing a model, its
 length in `VIEWMODEL_LENGTHS` or the parts hidden in `HIDDEN_PARTS` (`src/client/weaponView.ts`), the numbers move and
 the tests will very likely fail; re-measure the points as described above.
+
+## A gun that is rolled in its source
+
+Aiming turns the gun about the vertical and its side-to-side axis only, so a model that is rolled about its bore stays
+rolled, aimed and at the hip. The tell is a magazine that does not hang under the sights: `test/weapon-sights.test.ts`
+requires that of every gun with a central magazine (the AK-74u, BAR, MP40, STG-44, M14, FAL and RPK), within 3 mm, about a
+degree of roll. To straighten a gun, find its mirror plane (reflect the model's vertices in a candidate plane, and search
+roll, yaw and offset for the plane that maps the gun onto itself best), then give the converter that roll and yaw as
+`turn: { roll, yaw }` (degrees, about the muzzle direction and about up) and rebuild. The model's coordinates change, so
+re-measure the sight points; where the rotation is the only change they can be carried across by applying it to them.

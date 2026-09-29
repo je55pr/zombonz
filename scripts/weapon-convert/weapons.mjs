@@ -75,11 +75,15 @@ export const WEAPONS = {
   },
   ak74u: {
     source: 'animated-aks-74u/source/fp_hands_aks74u.fbx', length: 0.73, flipForward: true,
-    // The source rigs the gun into first-person arms; keep only the gun's materials.
+    // The source rigs the gun into first-person arms, posed rolled 9.4 degrees about the bore and yawed 1.25 (found
+    // by fitting the gun's mirror plane: the top and bottom of the gun then sit on one vertical line along its
+    // whole length); turn it upright.
+    turn: { roll: 9.4, yaw: -1.25 },
+    // Keep only the gun's materials.
     dropMaterials: /^(arms|bullet|__DEFAULT)$/,
     // Its reload rig parks a spare magazine behind the grip; the fitted one becomes the reload part.
-    islandRules: [{ min: [0.03, -1, -0.37], max: [0.07, 1, -0.25], action: 'drop' },
-      { min: [-0.05, 0.02, 0.08], max: [-0.02, 0.06, 0.12], action: 'magazine' }],
+    islandRules: [{ min: [0.05, -1, -0.37], max: [0.09, 1, -0.25], action: 'drop' },
+      { min: [-0.07, 0.02, 0.08], max: [-0.03, 0.06, 0.12], action: 'magazine' }],
     materials: {
       aks74u: { color: [0.11, 0.11, 0.12, 1], metal: 0.8, rough: 0.5,
         normal: 'animated-aks-74u/textures/AKS74U_Normal.png', ao: 'animated-aks-74u/textures/AKS74U_AO.png' },
