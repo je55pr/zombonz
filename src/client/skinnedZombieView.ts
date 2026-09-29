@@ -128,9 +128,11 @@ export class SkinnedZombieView {
     this.mixer.update(dt);
     for (const [bone, quaternion] of this.animated) quaternion.copy(bone.quaternion);
 
-    if (zombie.alive) {
+    // Only a body that is bent needs its bones' matrices brought up to date here (the renderer does it for the rest).
+    const crawling = (zombie.limbs & LEGS_MASK) !== 0;
+    if (zombie.alive && (crawling || this.look.posture !== 'straight')) {
       this.root.updateMatrixWorld(true);
-      if (zombie.limbs & LEGS_MASK) this.poseCrawl(tick); else this.posture(tick);
+      if (crawling) this.poseCrawl(tick); else this.posture(tick);
     }
     this.syncLimbs(zombie.limbs);
     if (this.flashLeft > 0) {
