@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { addEntity, createInputFrame, createZombieState, GameSimulation } from '../src/core/index.ts';
+import { addEntity, createZombieState, GameSimulation, zombieChest, zombieHeadCentre } from '../src/core/index.ts';
+import { aimedFire } from './aim.ts';
 
 describe('solo run statistics', () => {
   it('credits the killing player once, distinguishes headshots, and resets on restart', () => {
@@ -9,19 +10,15 @@ describe('solo run statistics', () => {
       roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 },
     });
     const id = sim.playerIds[0], player = sim.getPlayer(id)!;
-    const fire = createInputFrame(0);
-    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
-
     const head = createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1);
     head.health = 1; addEntity(sim.state.world, head);
-    sim.tick({ [id]: fire });
+    sim.tick({ [id]: aimedFire(player, zombieHeadCentre(head)) });
     expect(player).toMatchObject({ kills: 1, headshots: 1 });
 
     player.weapon.cooldownTicks = 0;
-    player.pitch = -0.1;
     const body = createZombieState('e:100', { x: 0, y: 0, z: -3 }, 1);
     body.health = 1; addEntity(sim.state.world, body);
-    sim.tick({ [id]: fire });
+    sim.tick({ [id]: aimedFire(player, zombieChest(body)) });
     expect(player).toMatchObject({ kills: 2, headshots: 1 });
     sim.tick();
     expect(player.kills).toBe(2);

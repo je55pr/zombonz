@@ -25,6 +25,7 @@ export class SkinnedZombieView {
   private current?: THREE.AnimationAction;
   private lastTick?: number;
   private deathTick?: number;
+  private yaw?: number;
   constructor(asset: ZombieAsset, private readonly phaseOffset: number) {
     const { body, model } = cloneZombieModel(asset);
     this.body = body; this.root.add(body); this.mixer = new THREE.AnimationMixer(model);
@@ -39,11 +40,12 @@ export class SkinnedZombieView {
     const position = interpolatePosition(previous, zombie.position, alpha);
     this.root.position.set(position.x, position.y, position.z);
     const phase = zombie.entry?.phase;
-    if (barrier && (phase === 'breaking' || phase === 'vaulting')) {
-      this.root.rotation.y = Math.atan2(-barrier.outward.x, -barrier.outward.z);
-    } else if (Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0.05) {
-      this.root.rotation.y = Math.atan2(zombie.velocity.x, zombie.velocity.z);
-    }
+    // Which way it faces is the simulation's (its hit volumes turn with it); chase that so snapshots that arrive
+    // a few ticks apart still turn the model smoothly.
+    const elapsed = this.lastTick === undefined ? 0 : Math.max(0, Math.min(0.1, (tick - this.lastTick) / 60));
+    this.yaw = this.yaw === undefined ? zombie.yaw
+      : this.yaw + Math.atan2(Math.sin(zombie.yaw - this.yaw), Math.cos(zombie.yaw - this.yaw)) * (1 - Math.exp(-elapsed * 24));
+    this.root.rotation.y = this.yaw;
     const name = zombieAnimation(zombie);
     const action = this.actions.get(name) ?? this.actions.get('idle');
     if (action && action !== this.current) {

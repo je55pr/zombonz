@@ -34,3 +34,53 @@ Shots to kill, by round (body / head), for representative guns:
 | .357 Magnum (240) | 1 / 1 | 2 / 1 | 2 / 1 | 3 / 2 |
 
 `test/damage-balance.test.ts` pins these, so a later change to a gun or a multiplier has to change the table on purpose.
+
+## Where a zombie can be hit (issue #160)
+
+The old hit test was one box, 0.64 m wide and 1.72 m tall, with the top 0.3 m of it counted as the head: a zombie that
+stoops (both models do; their heads sit at 1.4 to 1.6 m, not 1.72) had a "head" zone that was mostly air above and beside
+its skull, and a shot that grazed its shoulder counted as a headshot.
+
+A zombie is now ten capsules (`src/core/zombieBody.ts`): a head, a torso, and an upper and lower part for each arm and
+leg. Where they are comes from what the zombie is doing:
+
+- **Stand, walk, run**: the mean position of each joint over that animation's cycle, and for the head how far it bobs, so
+  its capsule is stretched by that much. The head is the centre of the skull's vertices carried by the head bone, not
+  the bone.
+- **Swing**: the attack clip sampled at the moment the swing has reached (the client plays the clip from the same tick
+  count), so a raised arm or a head thrown back is where it is drawn.
+- **Tear** (pulling at boards), **vault**: the attack pose, and the walk pose squashed to 0.85 as it is drawn.
+- **Crawl**: an authored low pose (neither model has a crawl clip); the client bends the skeleton to match.
+
+Every pose is turned to the zombie's facing (`ZombieState.yaw`, which the simulation turns at up to 9 rad/s; the client
+draws exactly that) and belongs to its look (`ZombieState.variant`): the soldier stoops and hangs its arms, the walker
+stands upright with its arms out in front. The numbers come from `scripts/measure-zombie-rig.ts`, which loads the models
+and clips the way the game does and writes `src/core/zombieRigData.ts`; run it again after changing a rig.
+
+A shot hits the nearest capsule it meets, so a head in front of a chest is hit first, a raised arm can shield a head,
+and there is no way to score a headshot through the torso. Head hits are headshots; everything else is a body shot, and the
+part struck (`torso`, `armL`, `armR`, `legL`, `legR`) rides on the hit event for the client's blood and, later, for
+dismemberment. Blasts, knives and chain lightning aim at the middle of the chest wherever that is (a crawler's is low).
+
+`?hitboxes=1` draws the capsules over every zombie (red head, yellow torso, blue arms, green legs) so they can be checked
+against the model by eye.
+
+## Hip-fire and aiming (issue #160)
+
+Shots land evenly over a disc whose half-angle is the gun's spread, the circle the crosshair draws. Hip spread was under
+half a degree for a pistol, so a distant head was as easy to hit as a near one; it is now 2.6 degrees for the M1911 (0.9 m
+either side at 20 m), 3 to 4 for sub-machine guns and 2.3 to 3 for rifles, 4 to 5 for machine guns, and it doubles while
+walking and triples while sprinting on top of the bloom from each shot (never wider than 11 degrees). Aiming down the sights
+leaves 12% of it (5% for the scoped bolt-action rifles); shotguns keep their pellet cone.
+
+Measured with the starting pistol at a standing zombie, 4000 seeded shots aimed at the middle of the head:
+
+| Range | Hip: headshot | Hip: any hit on the body | Aimed: headshot | Aimed: any hit |
+| --- | --- | --- | --- | --- |
+| 5 m | 32% | 62% | 100% | 100% |
+| 10 m | 8% | 39% | 100% | 100% |
+| 20 m | 1.8% | 21% | 100% | 100% |
+| 30 m | 0.9% | 12.5% | 58% | 83% |
+| 50 m | 0.3% | 4.5% | 21% | 54% |
+
+`test/hip-fire.test.ts` and `test/hit-volumes.test.ts` pin these.

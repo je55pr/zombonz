@@ -41,9 +41,9 @@ import {
 import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
 import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
-import { SeededRng } from './rng.ts';
+import { SeededRng, mix32 } from './rng.ts';
 import {
-  createZombieState, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound,
+  createZombieState, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
   type ZombieAttackEvent,
 } from './zombie.ts';
 import {
@@ -73,6 +73,8 @@ export interface SimulationMap {
   hazards?: readonly HazardDefinition[];
   /** Equipment (Bouncing Betties) sold from the wall. */
   equipment?: readonly EquipmentBuyDefinition[];
+  /** How likely each look (see `ZombieState.variant`) is for a new zombie; a map with none has only the first. */
+  zombieLooks?: readonly number[];
 }
 
 export interface SimulationState {
@@ -505,8 +507,18 @@ export class GameSimulation {
         const source = availableSpawns[request.spawnIndex];
         const round = this.state.round.round;
         const gait = zombieGaitForRound(round, new SeededRng(world.seed ^ Math.imul(Number(id.slice(2)), 0x85ebca6b)));
-        const zombie = createZombieState(id, request.position, round, gait);
-        if (source.spawn.barrierId) zombie.entry = createZombieEntry(source.spawn.barrierId, this.state.spawnDirector.spawned - 1);
+        const variant = zombieLookFor(this.map.zombieLooks, new SeededRng(mix32(world.seed ^ Math.imul(Number(id.slice(2)), 0x9e3779b1))));
+        const zombie = createZombieState(id, request.position, round, gait, variant);
+        if (source.spawn.barrierId) {
+          const barrier = this.state.barriers.find(barrier => barrier.id === source.spawn.barrierId)!;
+          zombie.entry = createZombieEntry(barrier.id, this.state.spawnDirector.spawned - 1);
+          // It comes out of the dark already looking at its window.
+          const next = barrier.approachPath[1] ?? barrier.position;
+          zombie.yaw = Math.atan2(next.x - request.position.x, next.z - request.position.z);
+        } else {
+          const nearest = livingPlayers(world)[0];
+          if (nearest) zombie.yaw = Math.atan2(nearest.position.x - request.position.x, nearest.position.z - request.position.z);
+        }
         addEntity(world, zombie);
         events.push({
           type: 'zombieSpawned', zombieId: id, round: this.state.round.round,

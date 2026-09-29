@@ -16,8 +16,9 @@ import {
   wantsToFire,
 } from '../src/core/index.ts';
 
+// Level with a standing zombie's skull (about 1.49 m up), straight down -z at zombies placed on the z axis.
 const ray = {
-  origin: { x: 0, y: 1.62, z: 0 },
+  origin: { x: 0, y: 1.45, z: 0 },
   direction: { x: 0, y: 0, z: -1 },
 };
 
@@ -40,7 +41,7 @@ describe('hitscan weapons', () => {
   });
 
   it('makes ADS ten times steadier than hip-fire with repeatable shot spread', () => {
-    const target = zombie('e:2', -50);
+    const target = zombie('e:2', -15);
     const hip = Array.from({ length: 20 }, (_, seed) =>
       resolveHitscan(spreadHitscanRay(ray, WEAPON_DEFINITIONS.bar.hipSpreadRadians, seed + 1),
         [target], [], 80).kind === 'zombie');
@@ -116,7 +117,7 @@ describe('hitscan weapons', () => {
   it('applies damage exactly once and enforces fire cadence', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     const target = zombie('e:2', -5);
-    player.pitch = -0.1; // Body shot: eye-level shots now correctly hit the head.
+    player.pitch = -0.1; player.aiming = true; // Body shot: an eye-level shot at this range goes over the shoulder into the head.
     const first = firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
     expect(target.health).toBe(100);
     expect(first.filter((event) => event.type === 'weaponHit')).toHaveLength(1);

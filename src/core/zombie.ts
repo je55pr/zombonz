@@ -4,6 +4,7 @@ import { moveWithCollision, sampleWalkHeight } from './collision.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
 import { hasClearNavigationLine, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { SeededRng } from './rng.ts';
+import { faceToward } from './zombieBody.ts';
 import type { EntityId, PlayerState, Vec3, ZombieGait, ZombieState } from './types.ts';
 
 export const ZOMBIE_MOVEMENT = {
@@ -44,7 +45,19 @@ export function zombieGaitForRound(round: number, rng: SeededRng): ZombieGait {
   return roll <= ZOMBIE_GAIT_RULES.walkMax ? 'walk' : roll <= ZOMBIE_GAIT_RULES.runMax ? 'run' : 'sprint';
 }
 
-export function createZombieState(id: EntityId, position: Vec3, round: number, gait: ZombieGait = 'walk'): ZombieState {
+/** The look (model) of a new zombie, chosen by weight from a map's `zombieLooks`; the first look if it names none. */
+export function zombieLookFor(weights: readonly number[] | undefined, rng: SeededRng): number {
+  const total = (weights ?? []).reduce((sum, weight) => sum + Math.max(0, weight), 0);
+  if (!weights || total <= 0) return 0;
+  let roll = rng.next() * total;
+  for (let look = 0; look < weights.length; look++) {
+    roll -= Math.max(0, weights[look]);
+    if (roll < 0) return look;
+  }
+  return 0;
+}
+
+export function createZombieState(id: EntityId, position: Vec3, round: number, gait: ZombieGait = 'walk', variant = 0): ZombieState {
   return {
     id,
     kind: 'zombie',
@@ -57,6 +70,11 @@ export function createZombieState(id: EntityId, position: Vec3, round: number, g
     targetId: null,
     entry: null,
     deadTicks: 0,
+    yaw: 0,
+    variant,
+    limbs: 0,
+    attackTicks: 0,
+    attackStyle: 0,
     alive: true,
   };
 }
@@ -115,6 +133,7 @@ export function updateZombiePursuit(
     && hasClearNavigationLine(zombie.position, target.position, collisionBoxes)) {
     zombie.velocity.x = 0;
     zombie.velocity.z = 0;
+    faceToward(zombie, Math.atan2(targetDx, targetDz), deltaSeconds);
     return;
   }
   const waypoint = navigationQuery ? navigationQuery(zombie.position, target.position) : navigationWaypoint(
@@ -132,6 +151,7 @@ export function updateZombiePursuit(
   const velocityZ = planarDistance > 0 ? (dz / planarDistance) * zombie.moveSpeed : 0;
   zombie.velocity.x = velocityX;
   zombie.velocity.z = velocityZ;
+  if (planarDistance > 0) faceToward(zombie, Math.atan2(dx, dz), deltaSeconds);
   const requested = { x: velocityX * deltaSeconds, y: 0, z: velocityZ * deltaSeconds };
   const next = moveWithCollision(
     zombie.position,

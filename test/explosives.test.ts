@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GameSimulation, HAZARD_KINDS, MINE_RULES, addEntity, blastScale, createInputFrame, createWeaponState, createZombieState,
-  detonate, damagePlayer, hazardBox, hazardCentre, hazardSolids, hazardTargets, createHazard, damageHazard, tickHazards,
+  detonate, damagePlayer, hazardBox, hazardCentre, hazardSolids, hazardTargets, createHazard, damageHazard, tickHazards, zombieChest,
   type EntityId, type HazardDefinition, type PlayerState, type SimulationEvent, type Vec3,
 } from '../src/core/index.ts';
 import { captureSnapshot, applySnapshot } from '../src/net/snapshot.ts';
@@ -25,9 +25,10 @@ function world(options: { hazards?: HazardDefinition[]; walls?: Array<{ min: { x
   const [player] = sim.players();
   return { sim, player };
 }
-/** One tick, with the player pressing these actions (all of them held as well). */
+/** One tick, with the player pressing these actions (all of them held as well) and looking down the sights. */
 function step(sim: GameSimulation, actions: Array<'fire' | 'throwGrenade' | 'placeMine' | 'interact'> = [], id?: EntityId): SimulationEvent[] {
   const frame = createInputFrame(sim.state.world.tick);
+  frame.actions.aim = { pressed: false, held: true, released: false, value: 1 };
   for (const action of actions) frame.actions[action] = { pressed: true, held: true, released: false, value: 1 };
   return sim.tick({ [id ?? sim.playerIds[0]]: frame });
 }
@@ -55,7 +56,9 @@ describe('the shared blast rules', () => {
     const wall = { min: { x: 0.8, y: 0, z: -1 }, max: { x: 1.2, y: 2, z: 1 } };
     const events = detonate({ x: 0, y: 0.9, z: 0 }, rules, owner.id, 'owner',
       { zombies: [near, sheltered, far], players: [owner], boxes: [wall], instaKill: false });
-    expect(near.health).toBe(150 - Math.round(200 * 0.5));
+    // A blast is measured to the chest, wherever this zombie carries it.
+    const chest = zombieChest(near);
+    expect(near.health).toBe(150 - Math.round(200 * blastScale(Math.hypot(chest.x, chest.y - 0.9, chest.z), 4)));
     expect(sheltered.health).toBe(150);
     expect(far.health).toBe(150);
     expect(events).toContainEqual(expect.objectContaining({ type: 'zombieDamaged', zombieId: near.id, playerId: owner.id }));

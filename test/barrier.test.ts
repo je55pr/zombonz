@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BARRIER_RULES, GameSimulation, createInputFrame, createNavigationQuery, createZombieState,
   createZombieEntry, createBarrier, prepareBarriers, updateZombieEntry, syncBarrierInteractables,
-  tickZombieMelee, firePlayerWeapon, type SimulationEvent } from '../src/core/index.ts';
+  tickZombieMelee, firePlayerWeapon, zombieHeadCentre, type SimulationEvent } from '../src/core/index.ts';
+import { rayThrough } from './aim.ts';
 import { BUNKER_BARRIERS, BUNKER_DOORS, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN, BUNKER_WINDOW_BOARDS,
   BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
 
@@ -102,14 +103,12 @@ describe('exterior entry routes', () => {
     for (let tick = 0; tick < 2400 && sim.state.barriers[0].vaultingZombieId === null; tick++) sim.tick();
     const victim = sim.zombies().find(zombie => zombie.id === sim.state.barriers[0].vaultingZombieId)!;
     expect(victim).toBeDefined();
-    const target = { x: victim.position.x, y: victim.position.y + 1.25, z: victim.position.z };
+    // Level with the zombie's head as it comes over the sill, from just inside the window.
     const eye = { x: victim.position.x, y: 1.62, z: BUNKER_BARRIERS[0].position.z + 1.5 };
-    const direction = { x: target.x - eye.x, y: target.y - eye.y, z: target.z - eye.z };
-    const length = Math.hypot(direction.x, direction.y, direction.z);
-    direction.x /= length; direction.y /= length; direction.z /= length;
+    player.aiming = true;
     for (let i = 0; i < 3; i++) {
       player.weapon.cooldownTicks = 0;
-      firePlayerWeapon(player, { origin: eye, direction }, [victim], sim.collisionBoxes());
+      firePlayerWeapon(player, rayThrough(eye, zombieHeadCentre(victim)), [victim], sim.collisionBoxes());
     }
     expect(victim.alive).toBe(false);
     let entered = false;

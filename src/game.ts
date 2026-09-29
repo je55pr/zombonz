@@ -24,6 +24,7 @@ import { PowerupView } from './client/powerupView.ts';
 import { GrenadeView } from './client/grenadeView.ts';
 import { BlastEffects, groundFromSurfaces } from './client/blastEffects.ts';
 import { HazardView } from './client/hazardView.ts';
+import { HitboxView } from './client/hitboxView.ts';
 import { MineView } from './client/mineView.ts';
 import { createGrenadeModel, createMineModel } from './client/explosiveModels.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
@@ -204,7 +205,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const lobbyPlayers = net ? net.role === 'host' ? net.players : net.start.players : [];
   const simulation = net ? createMatch(map, lobbyPlayers.length, net.role === 'host' ? net.seed : net.start.seed) : new GameSimulation({
     seed: soloSeed(preview !== null),
-    map: { ...simulationMap(map), zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns },
+    map: { ...simulationMap(map), zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns,
+      // The rig every zombie is drawn with (and so where its body is); `?zombie=pxltiger` swaps the default one.
+      zombieLooks: new URLSearchParams(location.search).get('zombie') === 'pxltiger' ? [0, 1] : [1, 0] },
     // `&teammate=idle|run|down` adds a teammate three metres ahead, to inspect their figure.
     playerSpawns: [preview?.position ?? map.playerSpawn, ...(previewTeammate && preview ? [{
       x: preview.position.x - Math.sin(preview.yaw) * 3, y: preview.position.y, z: preview.position.z - Math.cos(preview.yaw) * 3 }] : [])],
@@ -284,6 +287,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
 
   const zombieViews = new Map<EntityId, ZombieView>();
   const zombieBatch = new ActorBatch(scene);
+  // `?hitboxes=1` draws the capsules shots are tested against over every zombie.
+  const hitboxView = new URLSearchParams(location.search).get('hitboxes') === '1' ? new HitboxView(scene) : null;
   const previousPositions = new Map<EntityId, Vec3>();
   const skinnedViews = new Map<EntityId, SkinnedZombieView>();
   let zombieAsset: ZombieAsset | undefined;
@@ -506,6 +511,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
     if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
     syncZombieViews(remote.alpha, remote.tick, remote.previous);
+    hitboxView?.update(simulation.zombies());
     syncPlayerViews(remote.alpha, remote.tick, remote.previous);
     powerupView.update(simulation.state.powerups.drops, remote.tick);
     grenadeView.update(simulation.state.grenades.active, remote.tick, interval / 1000);

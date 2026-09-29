@@ -3,6 +3,7 @@ import { damagePlayer, type DamageEvent } from './health.ts';
 import { clearLine } from './ray.ts';
 import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import type { WeaponEvent } from './weapon.ts';
+import { zombieChest } from './zombieBody.ts';
 
 /**
  * How an explosion hurts, whatever set it off (a grenade, a rocket, a Bouncing Betty, a barrel or a
@@ -50,7 +51,7 @@ export function blastReach<T>(centre: Vec3, radius: number, things: readonly T[]
 }
 
 export const blastZombies = (centre: Vec3, radius: number, zombies: readonly ZombieState[], boxes: readonly CollisionBox[]) =>
-  blastReach(centre, radius, zombies.filter(zombie => zombie.alive), zombie => chestOf(zombie.position), boxes);
+  blastReach(centre, radius, zombies.filter(zombie => zombie.alive), zombieChest, boxes);
 
 export const blastPlayers = (centre: Vec3, radius: number, players: readonly PlayerState[], boxes: readonly CollisionBox[]) =>
   blastReach(centre, radius, players.filter(player => player.alive), player => chestOf(player.position), boxes);

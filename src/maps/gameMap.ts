@@ -111,6 +111,8 @@ export interface GameMap {
   /** Equipment (Bouncing Betties) sold from the wall, and the yaw each chalk outline faces, away from its wall. */
   equipment?: readonly EquipmentBuyDefinition[];
   equipmentFacing?: Readonly<Record<string, number>>;
+  /** How likely each zombie look is on this map (index = `ZombieState.variant`); see zombieBody.ts for the looks. */
+  zombieLooks?: readonly number[];
   /** Where the box starts. A box with `locations` moves between them; the renderer follows its state. */
   boxCenter: Vec3;
   /** The box's front (where buyers stand) faces (cos yaw, -sin yaw) in x/z. */
