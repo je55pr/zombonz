@@ -108,7 +108,8 @@ round with 24 zombies encodes to under 16 KB.
 `src/net/client.ts` and `src/net/prediction.ts` handle the client side.
 
 - **Own player:** each client tick samples input, sends it, and at once runs this player's part of a
-  simulation tick locally: movement, view, sprint, gun timing and ammo, switch, reload and melee.
+  simulation tick locally: movement, view, sprint, gun timing and ammo, switch, reload and the timing of a knife
+  swing (`meleeStrikeTicks` counts down as on the host; only the host knows what the blow hits).
   Nothing gets hit, bought or opened locally. The client's own shots, reloads, switches and swings
   play straight away, and the host's copies of those events for this player are dropped.
 - **Reconciliation:** when a newer snapshot arrives, the predicted player is reset to the host's

@@ -157,4 +157,10 @@ export const WEAPONS = {
     materials: { 'M1903 A3': pbr('m1903-a3-springfield/textures', 'M1903_A3_',
       { base: 'Base_color.png', normal: 'Normal_OpenGL.png', metallic: 'Metallic.png', roughness: 'Roughness.png', ao: 'Mixed_AO.png' }) },
   },
+  // Melee viewmodel (issue #178): the gamekorp Ka-Bar, CC0. Its FBX is version 6.1, read by fbx6.mjs; make-knife-maps.mjs
+  // writes the metallic and roughness maps its single baked skin lacks. Real overall length 30 cm.
+  knife: {
+    source: 'kabar-knife/knife_mesh.FBX', length: 0.3, flipForward: true,
+    materials: { knife: { base: 'kabar-knife/skin.jpg', metallic: 'kabar-knife/metallic.png', roughness: 'kabar-knife/roughness.png' } },
+  },
 };

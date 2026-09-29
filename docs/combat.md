@@ -187,3 +187,35 @@ Still wanted, and the reason #134 stays open: more models (other outfits, a nurs
 burnt and bloated ones), and more clips: a real crawl, several walks, runs, idles, hit reactions, deaths (from front, back,
 blasts) and window and climbing animations. [zombie-art-wanted.md](zombie-art-wanted.md) lists them; the systems above take
 another model or clip as data (a `RigSpec` in `zombieRig.ts`, a rig in the measure script, and a weight in a map).
+
+## The player's knife (issue #178)
+
+Pressing melee used to play a sound and hit the nearest zombie on that same tick, with nothing to see. Now a swing has a
+shape in the core and a picture on screen, and the two are tied together (`MELEE_RULES` in `src/core/weapon.ts`, the
+picture in `knifeSwing` in `src/client/weaponView.ts`).
+
+- **Timing.** A swing lasts 48 ticks (0.8 s: nothing else can be done meanwhile, as before) and its blow lands 9 ticks
+  (0.15 s) after the button: `beginMelee` announces the swing with `meleeSwung` at once, and `tickMelee` lands the blow on
+  the tick a per-player counter (`meleeStrikeTicks`) reaches zero. Reach (1.6 m), facing and line of sight are read then,
+  not when the button went down, so a zombie that steps out is missed and one that steps in is hit. If the player is
+  downed or dead by then, or the zombie is, nothing lands. Damage, range, cooldown and points are unchanged (150 damage,
+  130 points for a kill).
+- **Picture.** The knife's swing is a wind-up (it rises from the lower right and is cocked beside the head), the strike,
+  a follow-through across the view to the lower left and a return, while the gun drops out of the way and comes back.
+  The strike is the pose at full stretch, furthest in front of the player, and it is at the same 0.15 s as the blow (a
+  test finds the furthest point of the animation and requires it to be within a tick of `strikeTicks`).
+- **Aiming.** A swing cancels aiming (as it already did), and the view comes out of it fast (a time constant of 25 ms
+  rather than 77 ms) so the knife is not drawn through a narrow aimed lens.
+- **Other actions.** Firing, reloading and switching are already blocked for the swing. A grenade or a Bouncing Betty can
+  no longer be thrown or set during one either (they would have drawn over the knife); starting a swing still cancels a
+  grenade wind-up and a reload. A toss animation in progress is dropped when a swing begins.
+- **Rapid presses.** The core allows one swing at a time, so a knife is drawn once; the view holds one knife object,
+  hidden between swings, and a test presses melee every seven ticks for five seconds and checks there is still exactly
+  one and that it ends hidden.
+- **Sound.** The swish plays with `meleeSwung`, at the start; a thud plays with `meleeHit`, at the strike.
+- **Network.** `meleeStrikeTicks` is part of the player in snapshots (protocol 7). A client runs the swing's timing for
+  itself (no hits: only the host knows what the blow reaches), so its knife and gun move at once.
+
+The model is the gamekorp Ka-Bar, CC0 (see [assets/THIRD_PARTY_ASSETS.md](assets/THIRD_PARTY_ASSETS.md)).
+Not built: the first-person hands and arms (there is no hand system yet), a separate lunge and stab, or a Bowie knife
+(issue #150).

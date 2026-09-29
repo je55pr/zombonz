@@ -71,7 +71,8 @@ your eye are one line through the middle of the screen, which is also the line t
 ([how the sights were measured](docs/weapon-sights.md)). ADS also reduces weapon-specific hip-fire spread by 90%; shot
 variation is seeded in the game core for repeatable results. The handling is
 prototype tuning, not a frame-exact recreation.
-Reload early with R (or automatically when the magazine empties), knife with V,
+Reload early with R (or automatically when the magazine empties), knife with V (the gun drops away, the knife
+swings across the view and its blow lands at the strike, 0.15 s in, whatever is then in reach; see [combat notes](docs/combat.md)),
 throw a grenade with T or middle mouse, set a Bouncing Betty with G, switch weapons
 with Q or the mouse wheel, interact with E, and restart after game over with Enter.
 A killing blow puts you into last stand with a pistol: a teammate can revive you by holding E beside

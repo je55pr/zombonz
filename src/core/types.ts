@@ -43,6 +43,8 @@ export interface PlayerState extends EntityBase {
   health: number;
   recoveryDelayTicks: number;
   meleeCooldownTicks: number;
+  /** Ticks until a knife swing already begun lands its blow, or 0 when none is pending (see MELEE_RULES). */
+  meleeStrikeTicks: number;
   /** After a zombie's blow lands, ticks during which no other zombie's can (see ZOMBIE_MELEE.hurtGraceTicks). */
   hurtGraceTicks: number;
   grenadeCharges: number;
