@@ -66,7 +66,9 @@ hold the right mouse button to aim down sights, and fire with the left mouse but
 Sprint lasts about four seconds, then recharges after a short pause; once exhausted you
 need a second of stamina back before sprinting again. Sprinting also stops when firing, aiming, reloading or changing weapons; aiming slows movement
 and zooms the view in (1.55x for a pistol, 1.8x for anything else, from whatever field of view is set;
-the zooms are tuned by eye, not taken from a game's data). ADS also reduces weapon-specific hip-fire spread by 90%; shot
+the zooms are tuned by eye, not taken from a game's data). Aimed, each gun turns so its own rear sight, front sight and
+your eye are one line through the middle of the screen, which is also the line the shot leaves along
+([how the sights were measured](docs/weapon-sights.md)). ADS also reduces weapon-specific hip-fire spread by 90%; shot
 variation is seeded in the game core for repeatable results. The handling is
 prototype tuning, not a frame-exact recreation.
 Reload early with R (or automatically when the magazine empties), knife with V,

@@ -23,11 +23,10 @@ describe('runtime GLB integration', () => {
     // One draw per source material; only one viewmodel renders at a time (the Thompson has 12).
     expect(meshes).toBeLessThanOrEqual(12);
     expect(new THREE.Box3().setFromObject(asset.scene).equals(before)).toBe(true);
-    // Aiming puts the sight line on the camera axis: it must lie on the gun, with the rear sight behind the muzzle.
-    expect(Math.abs(weapon.sight.height)).toBeLessThan(id === 'rpg7' ? 0.06 : 0.04);
-    expect(Math.abs(weapon.sight.x)).toBeLessThan(id === 'rpg7' ? 0.09 : 0.04);
-    expect(weapon.sight.rearZ).toBeLessThanOrEqual(0);
-    expect(weapon.sight.rearZ).toBeGreaterThan(-VIEWMODEL_LENGTHS[id] * 0.8);
+    // Aiming lines the eye up with both sights (test/weapon-sights.test.ts): the rear sight must sit behind the front one, on the gun.
+    expect(weapon.sights.rear.z).toBeGreaterThan(weapon.sights.front.z);
+    expect(weapon.sights.front.z).toBeGreaterThan(-VIEWMODEL_LENGTHS[id] - 0.001);
+    expect(weapon.sights.rear.z).toBeLessThanOrEqual(0);
   });
 
   it.each(['peter_d', 'pxltiger'])('binds %s animations, clones independent skeletons and pins root motion', async id => {
