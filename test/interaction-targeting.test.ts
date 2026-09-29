@@ -95,7 +95,7 @@ describe('perk machines, up close', () => {
     frame.actions.interact = { pressed: true, held: true, released: false, value: 1 };
     return sim.tick({ [sim.playerIds[0]]: frame });
   }
-  /** The machine's body centre: its buy point is a metre in front of it (see asylum.ts). */
+  /** The machine's body centre: its buy point is a metre in front of it. */
   const bodyCentre = (position: { x: number; z: number }, facing: number) =>
     ({ x: position.x - Math.sin(facing), z: position.z - Math.cos(facing) });
 

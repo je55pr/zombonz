@@ -124,7 +124,10 @@ export function validateMapDocument(value: unknown): string[] {
     if (gameplay[field] === undefined && !['doors', 'wallWeapons', 'mysteryBoxes'].includes(field)) continue;
     array(gameplay[field], `gameplay.${field}`).forEach((item, i) => {
       if (!record(item)) return;
-      vec(item.position, `gameplay.${field}[${i}].position`);
+      if (field === 'traps') {
+        vec(item.switchPosition, `gameplay.traps[${i}].switchPosition`);
+        box(item.zone, `gameplay.traps[${i}].zone`);
+      } else vec(item.position, `gameplay.${field}[${i}].position`);
       if (field === 'doors') box(item.blocker, `gameplay.${field}[${i}].blocker`);
       for (const cost of ['cost', 'weaponCost', 'ammoCost'] as const)
         if (item[cost] !== undefined && (!finite(item[cost]) || item[cost] < 0))

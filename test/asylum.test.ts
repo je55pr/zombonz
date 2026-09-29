@@ -4,11 +4,17 @@ import {
   closedDoorBlockers, createDoorState, createNavigationQuery, hasWalkableConnection, navigationWaypoint, resolveHitscan,
   sampleWalkHeight,
 } from '../src/core/index.ts';
-import { ASYLUM_MAP, ASYLUM_STAIR_ROUTES, ASYLUM_UPPER_ENTRIES } from '../src/maps/asylum.ts';
+import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { MAPS, MAP_CATALOG } from '../src/maps/index.ts';
 
 const map = ASYLUM_MAP;
 const UP = map.upperHeight;
+const ASYLUM_UPPER_ENTRIES = ['german-balcony-west', 'left-upstairs-west', 'left-upstairs-north', 'power-north',
+  'kitchen-north', 'speed-cola-east', 'right-balcony-east', 'right-balcony-south'];
+const ASYLUM_STAIR_ROUTES = {
+  german: map.navigation.nodes.filter(node => node.id.startsWith('german-stair-')),
+  american: map.navigation.nodes.filter(node => node.id.startsWith('american-stair-')),
+};
 const simMap = { collisionBoxes: [...map.collisionBoxes], walkSurfaces: map.walkSurfaces, zombieSpawns: map.zombieSpawns,
   navigationGraph: map.navigation, doors: map.doors, mysteryBoxes: map.mysteryBoxes, shotBlockers: map.shotBlockers,
   barriers: map.barriers, wallWeapons: map.wallWeapons };

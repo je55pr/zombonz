@@ -83,7 +83,7 @@ func _import_map() -> void:
 	_add_array(root, gameplay, "gameplay", "wallWeapons", "position", "Wall weapon", Color.CYAN)
 	_add_array(root, gameplay, "gameplay", "mysteryBoxes", "position", "Mystery box", Color.PURPLE)
 	_add_array(root, gameplay, "gameplay", "perkMachines", "position", "Perk", Color.PINK)
-	_add_array(root, gameplay, "gameplay", "traps", "position", "Trap", Color.YELLOW)
+	_add_array(root, gameplay, "gameplay", "traps", "switchPosition", "Trap", Color.YELLOW)
 	_add_array(root, gameplay, "gameplay", "hazards", "position", "Hazard", Color.RED)
 	_add_array(root, gameplay, "gameplay", "equipment", "position", "Equipment", Color.CYAN)
 	if gameplay.has("powerSwitch"):
@@ -506,7 +506,7 @@ func _export_and_play() -> void:
 		message.text = "Could not start Vite. Run npm run dev in the repository, then open the preview URL."
 		return
 	await get_tree().create_timer(2.0).timeout
-	OS.shell_open("http://127.0.0.1:5173/?preview=help&map=" + str(_open_document()["metadata"]["id"]))
+	OS.shell_open("http://127.0.0.1:5173/?preview=start&map=" + str(_open_document()["metadata"]["id"]))
 
 func _validate(document: Dictionary) -> Array[String]:
 	var errors: Array[String] = []
