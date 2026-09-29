@@ -25,6 +25,7 @@ export interface WorldSnapshot {
   round: RoundState;
   director: SpawnDirectorState | null;
   doors: boolean[];
+  wallWeapons: boolean[];
   /** Boards, last torn tick, vaulting zombie, repairer, tear ticks, repair ticks, board slots, last torn slot. */
   barriers: Array<[number, number, EntityId | null, EntityId | null, number, number, number, number]>;
   boxes: BoxMotion[];
@@ -51,6 +52,7 @@ export function captureSnapshot(simulation: GameSimulation): WorldSnapshot {
     round: state.round,
     director: state.spawnDirector,
     doors: state.doors.map(door => door.open),
+    wallWeapons: state.wallWeapons.map(wall => wall.purchased),
     barriers: state.barriers.map(barrier => [barrier.boards, barrier.lastTornTick, barrier.vaultingZombieId,
       barrier.repairerId, barrier.tearTicks, barrier.repairTicks, boardMask(barrier), barrier.lastTornSlot]),
     boxes: state.mysteryBoxes.map(box => ({ phase: box.phase, cooldownTicks: box.cooldownTicks, lastWeapon: box.lastWeapon,
@@ -81,6 +83,7 @@ export function applySnapshot(simulation: GameSimulation, snapshot: WorldSnapsho
   state.round = snapshot.round;
   state.spawnDirector = snapshot.director;
   snapshot.doors.forEach((open, index) => { if (state.doors[index]) state.doors[index].open = open; });
+  snapshot.wallWeapons.forEach((purchased, index) => { if (state.wallWeapons[index]) state.wallWeapons[index].purchased = purchased; });
   snapshot.barriers.forEach(([boards, lastTornTick, vaultingZombieId, repairerId, tearTicks, repairTicks, mask, lastTornSlot], index) => {
     const barrier = state.barriers[index];
     if (barrier) Object.assign(barrier, { boards, lastTornTick, vaultingZombieId, repairerId, tearTicks, repairTicks, mask, lastTornSlot });

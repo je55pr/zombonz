@@ -125,7 +125,7 @@ original map: a Kar98k (200) and M1A1 Carbine (600) in the starting room, a Thom
 double-barreled shotgun (1200 each) in the Help room, and a Trench Gun (1500) and BAR (1800)
 upstairs. BO1-style chalk adds an M14 (500) in the starting room, an MP5K (1000) in the Help room
 and an AK-74u (1200) upstairs. Wall ammo costs half the gun. Wall buys show a chalk
-contour before and after purchase; the actual gun only appears in the player's hands.
+contour at first, then the gun model appears over the contour after its first purchase.
 Shotguns fire eight pellets per shell, deadly up close and weak at range. Buying wall
 ammo refills an owned gun's reserves without replacing its loaded magazine; full
 reserves cannot be purchased again. Bullet penetration varies by weapon: a pistol can

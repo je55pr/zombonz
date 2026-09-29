@@ -5,6 +5,7 @@ import {
   createInputFrame,
   type WallWeaponDefinition,
 } from '../src/core/index.ts';
+import { applySnapshot, captureSnapshot } from '../src/net/snapshot.ts';
 
 const wall: WallWeaponDefinition = {
   id: 'test-kar98k',
@@ -47,6 +48,7 @@ describe('wall weapon purchases', () => {
     expect(events.some((event) => event.type === 'pointsSpendRejected')).toBe(true);
     expect(sim.getPlayer(playerId)?.weapon.weaponId).toBe('starter-pistol');
     expect(sim.getPlayer(playerId)?.points).toBe(100);
+    expect(sim.state.wallWeapons[0].purchased).toBe(false);
   });
   it('purchases and equips the wall weapon with full starting ammo', () => {
     const sim = simulation(500);
@@ -60,6 +62,7 @@ describe('wall weapon purchases', () => {
       weaponId: 'kar98k', magazineAmmo: 5, reserveAmmo: 50,
       reloadTicksRemaining: 0,
     });
+    expect(sim.state.wallWeapons[0].purchased).toBe(true);
   });
 
   it('defines repeat purchase as an ammo refill at the lower ammo price', () => {
@@ -74,5 +77,19 @@ describe('wall weapon purchases', () => {
     expect(events.some((event) => event.type === 'wallWeaponAmmoPurchased')).toBe(true);
     expect(player.points).toBe(200);
     expect(player.weapon).toMatchObject({ weaponId: 'kar98k', magazineAmmo: 1, reserveAmmo: 50 });
+    expect(sim.state.wallWeapons[0].purchased).toBe(true);
+  });
+
+  it('synchronizes the display state and clears it for a new match', () => {
+    const host = simulation();
+    const client = simulation();
+    host.tick({ [host.playerIds[0]]: interactFrame() });
+    expect(client.state.wallWeapons[0].purchased).toBe(false);
+    applySnapshot(client, structuredClone(captureSnapshot(host)));
+    expect(client.state.wallWeapons[0].purchased).toBe(true);
+    host.restart();
+    expect(host.state.wallWeapons[0].purchased).toBe(false);
+    applySnapshot(client, structuredClone(captureSnapshot(host)));
+    expect(client.state.wallWeapons[0].purchased).toBe(false);
   });
 });

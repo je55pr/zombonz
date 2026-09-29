@@ -5,6 +5,7 @@ import { getAsset } from './assetStore.ts';
 import { loadModel } from './runtimeAssets.ts';
 import type { GameMap } from '../maps/gameMap.ts';
 import type { SimulationState } from '../core/simulation.ts';
+import type { WallWeaponState } from '../core/wallWeapon.ts';
 import { weaponName } from '../core/weapon.ts';
 import { lampFlicker } from './atmosphere.ts';
 import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
@@ -21,10 +22,10 @@ const WALL_GUN_SCALE = 1.15;
 const CHALK = 0xc9c7a7;
 
 /**
- * Keeps a chalk purchase outline behind a physical copy of the gun. The prepared viewmodel stays
- * independent, so buying the gun can equip it without removing this wall display.
+ * Keeps a chalk purchase outline behind a physical copy of the gun. The physical copy starts hidden
+ * and is revealed after purchase; the equipped viewmodel remains independent.
  */
-export function mountWallWeapon(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Material, inset: THREE.Material): void {
+export function mountWallWeapon(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Material, inset: THREE.Material): THREE.Group {
   const model = weapon.root.clone(true);
   model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.set(1, 1, 1);
   model.updateMatrixWorld(true);
@@ -51,12 +52,35 @@ export function mountWallWeapon(sign: THREE.Group, weapon: PreparedWeapon, chalk
   silhouette(chalk, size.y * WALL_GUN_SCALE + 0.08, size.z * WALL_GUN_SCALE + 0.08, 0.004);
   silhouette(inset, size.y * WALL_GUN_SCALE - 0.015, size.z * WALL_GUN_SCALE - 0.015, 0.009);
   model.name = 'wall-weapon-model';
+  model.visible = false;
   model.traverse(object => {
     if (object instanceof THREE.Mesh) { object.castShadow = true; object.receiveShadow = false; }
   });
   // Its nearest surface stays in front of the outline, including wide drums and side magazines.
   place(model, new THREE.Vector3(WALL_GUN_SCALE, WALL_GUN_SCALE, WALL_GUN_SCALE),
     0.04 + size.x * WALL_GUN_SCALE / 2);
+  return model;
+}
+
+/** Keeps loaded wall models in sync even when an asset finishes loading after the purchase. */
+export class WallWeaponDisplays {
+  private readonly views = new Map<string, THREE.Object3D>();
+  private purchased = new Set<string>();
+
+  add(id: string, model: THREE.Object3D): void {
+    model.visible = this.purchased.has(id);
+    this.views.set(id, model);
+  }
+
+  update(walls: readonly WallWeaponState[]): boolean {
+    this.purchased = new Set(walls.filter(wall => wall.purchased).map(wall => wall.id));
+    let changed = false;
+    for (const [id, model] of this.views) {
+      const visible = this.purchased.has(id);
+      if (model.visible !== visible) { model.visible = visible; changed = true; }
+    }
+    return changed;
+  }
 }
 
 /** The perk machine model, and each perk's paint for it (see scripts/weapon-convert/import-vending.mjs). */
@@ -195,19 +219,23 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
   const chalk = new THREE.MeshBasicMaterial({ color: CHALK, side: THREE.DoubleSide });
   const chalkInset = new THREE.MeshBasicMaterial({ color: 0x24231e, side: THREE.DoubleSide });
   const wallGuns: Promise<unknown>[] = [];
+  const wallGunViews = new WallWeaponDisplays();
   for (const weapon of map.wallWeapons) {
     const sign = new THREE.Group();
     sign.position.set(weapon.position.x, weapon.position.y + 0.4, weapon.position.z);
     sign.rotation.y = map.wallWeaponFacing[weapon.id] ?? 0;
     group.add(sign);
-    // The mounted gun and outline remain after purchase, since this spot also sells replacement ammo.
+    // Chalk is always visible; the physical gun appears here only after its first purchase.
     const pending = prepareWeaponModel(weapon.weaponId);
     const fallback = () => {
       box(sign, chalk, 0, 0, 0, 1.75, 0.17, 0.015);
       box(sign, chalk, -0.5, -0.015, 0.025, 0.55, 0.18, 0.015);
       box(sign, chalk, 0.25, 0.025, 0.025, 1.15, 0.065, 0.015);
     };
-    if (pending) wallGuns.push(pending.then(model => mountWallWeapon(sign, model, chalk, chalkInset), error => {
+    if (pending) wallGuns.push(pending.then(model => {
+      const mounted = mountWallWeapon(sign, model, chalk, chalkInset);
+      wallGunViews.add(weapon.id, mounted);
+    }, error => {
       console.warn(`Unable to load the ${weapon.weaponId} wall gun`, error); fallback();
     }));
     else fallback();
@@ -412,6 +440,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
   let shadowPose = '';
   return { ready: Promise.allSettled([...wallGuns, vending]), update(state) {
     let moved = false;
+    if (wallGunViews.update(state.wallWeapons)) moved = true;
     // On a map with a switch, the lamps burn low until the power comes on.
     const lampLevel = map.powerSwitch && !state.power.on ? 0.4 : 1;
     for (let i = 0; i < practicalLights.length; i++) {
