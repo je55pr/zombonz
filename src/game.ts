@@ -16,7 +16,7 @@ import { interpolatePosition } from './client/interpolation.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import { HudFeedback } from './client/feedback.ts';
 import { GameAudio } from './client/audio.ts';
-import { decodeAudioClips } from './client/audioClips.ts';
+import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip } from './client/audioClips.ts';
 import { ZOMBIE_ASSET_IDS, loadModel, loadZombieAsset, zombieAssetFor, type ZombieAsset } from './client/runtimeAssets.ts';
 import { zombieLook } from './client/zombieLooks.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
@@ -48,7 +48,8 @@ import { TREELINE_ASSETS, buildTreeline } from './client/treeline.ts';
 
 import { DEFAULT_SETTINGS, type GameSettings } from './client/settings.ts';
 // Re-exported so the start screen can preload through the same chunk it will run.
-export { downloadAssets, gameAssetUrls, type DownloadProgress } from './client/preload.ts';
+export { downloadAssets, gameAssetUrls, loadBootstrapManifest, markPrepared, openAssetCache, wasPrepared,
+  type DownloadProgress, type BootstrapManifest } from './client/preload.ts';
 
 export interface GameSession {
   ready: Promise<void>;
@@ -72,15 +73,15 @@ export type NetPlay =
 /**
  * Start-screen warm-up after the download: decode every environment texture and parse the props, the
  * zombie rig and the starting pistol into the loaders' page-wide caches, so startGame finds them ready.
- * Failures are left for the game to report; it already falls back to placeholders.
+ * Bootstrap stops if required preparation fails, so menus never advertise an incomplete installation.
  */
 export async function prepareGameAssets(onProgress: (done: number, total: number) => void): Promise<void> {
   // Warm every map's assets: the map is chosen after this, on the Solo screen.
   const allMaps = Object.values(MAPS);
-  const manifest = await readEnvironmentManifest().catch(() => null);
+  const manifest = await readEnvironmentManifest();
   const tasks: Array<() => Promise<unknown> | null> = [
-    ...(manifest ? [() => loadEnvironmentMaterials(manifest),
-      ...[...new Set(allMaps.flatMap(map => map.decals.map(decal => decal.asset)))].map(id => () => loadDecalTextures(manifest, id))] : []),
+    async () => { if (await loadEnvironmentMaterials(manifest)) throw new Error('Environment textures failed to decode.'); },
+    ...[...new Set(allMaps.flatMap(map => map.decals.map(decal => decal.asset)))].map(id => () => loadDecalTextures(manifest, id)),
     ...[...new Set([...allMaps.flatMap(map => map.props.map(prop => prop.asset)), ...TREELINE_ASSETS])]
       .map(asset => () => loadModel(`props/${asset}/model.glb`)),
     () => loadModel(VENDING_MODEL),
@@ -90,14 +91,23 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
     // Model-derived chalk outlines need the weapon assets ready before the map appears.
     ...[...new Set(allMaps.flatMap(map => map.wallWeapons.map(wall => wall.weaponId)))].map(id => () => prepareWeaponModel(id)),
     // Every sound, so the first shot and the first moan play on the first frame of the map.
-    () => decodeAudioClips(),
+    async () => {
+      await decodeAudioClips();
+      if (AUDIO_CLIPS.some(clip => !decodedAudioClip(clip))) throw new Error('Audio clips failed to decode.');
+    },
   ];
   let done = 0;
+  const failures: unknown[] = [];
   onProgress(done, tasks.length);
-  for (const task of tasks) {
-    try { await task(); } catch { /* reported in game */ }
-    onProgress(++done, tasks.length);
-  }
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(4, tasks.length) }, async () => {
+    while (next < tasks.length) {
+      const task = tasks[next++];
+      try { await task(); } catch (error) { failures.push(error); }
+      onProgress(++done, tasks.length);
+    }
+  }));
+  if (failures.length) throw new AggregateError(failures, `${failures.length} asset preparation tasks failed.`);
 }
 
 /** Dev previews keep one seed so a given view always looks the same. */

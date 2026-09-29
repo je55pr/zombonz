@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getAsset } from './assetStore.ts';
+import { getAssetAsync } from './assetStore.ts';
 import { assetUrl, type EnvironmentManifest } from './environmentMaterials.ts';
 
 /** How bright the night sky is drawn against the scene. */
@@ -13,7 +13,7 @@ export async function applySky(scene: THREE.Scene, manifest: EnvironmentManifest
   const sky = manifest.sky;
   if (!sky) return;
   const options: ImageBitmapOptions = { imageOrientation: 'flipY', premultiplyAlpha: 'none', colorSpaceConversion: 'none' };
-  const downloaded = getAsset(assetUrl(sky.image));
+  const downloaded = await getAssetAsync(assetUrl(sky.image));
   const bitmap = downloaded ? await createImageBitmap(downloaded, options)
     : await new THREE.ImageBitmapLoader().setOptions(options).loadAsync(assetUrl(sky.image));
   const texture = new THREE.Texture(bitmap);
