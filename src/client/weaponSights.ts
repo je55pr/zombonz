@@ -26,14 +26,14 @@ export interface WeaponSightsMm {
 }
 
 export const WEAPON_SIGHTS: Readonly<Record<string, WeaponSightsMm>> = {
-  // Handguns and machine pistols are held out at arm's length, so their rear sights sit further from the eye.
-  m1911: { rear: [0.0, -0.6, -70], front: [0.0, -2.8, -347], relief: 280 },
-  'magnum-357': { rear: [0.1, -8.0, -155], front: [0.1, 0.0, -410], relief: 280 },
-  python: { rear: [0.0, -1.5, -135], front: [0.0, -0.6, -390], relief: 280 },
-  irrlicht: { rear: [0.0, -1.1, -120], front: [0.0, -0.5, -415], relief: 280 },
-  molniya: { rear: [9.5, -2.3, -37], front: [9.5, 0.0, -393], relief: 280 },
-  mp5k: { rear: [3.4, -11.4, -65], front: [3.5, -15.6, -435], relief: 240 },
-  skorpion: { rear: [0.0, -4.5, -115], front: [0.0, -3.8, -385], relief: 240 },
+  // Handguns are held out at arm's length, and Black Ops does not zoom the view or the gun when they are aimed.
+  m1911: { rear: [0.0, -0.6, -70], front: [0.0, -2.8, -347], relief: 670 },
+  'magnum-357': { rear: [0.1, -8.0, -155], front: [0.1, 0.0, -410], relief: 670 },
+  python: { rear: [0.0, -1.5, -135], front: [0.0, -0.6, -390], relief: 670 },
+  irrlicht: { rear: [0.0, -1.1, -120], front: [0.0, -0.5, -415], relief: 670 },
+  molniya: { rear: [9.5, -2.3, -37], front: [9.5, 0.0, -393], relief: 670 },
+  mp5k: { rear: [3.4, -11.4, -65], front: [3.5, -15.6, -435] },
+  skorpion: { rear: [0.0, -4.5, -115], front: [0.0, -3.8, -385], relief: 300 },
   // Shotguns have no rear sight: the eye looks along the receiver and barrel to the muzzle.
   'double-barrel': { rear: [0.0, 5.0, -440], front: [0.0, -5.9, -975] },
   'trench-gun': { rear: [-0.7, 0.2, -320], front: [-0.7, -1.4, -830] },
@@ -61,13 +61,16 @@ export const WEAPON_SIGHTS: Readonly<Record<string, WeaponSightsMm>> = {
 };
 
 /**
- * A shouldered gun puts the eye about this far in front of the butt, which fixes how far it is from the rear sight:
- * a rear sight far up the barrel (Kar98k, MG42) is looked at from much further away than a peep sight on the
- * receiver. Within limits, so a sight right at the butt is not on the eye and a launcher's is still readable.
+ * How large a gun's sights look when aimed comes from two things, tuned against Black Ops screenshots (the Kar98k's front
+ * sight ring is about 3.1% of the window's width and its rear sight about 8%; the pistol's rear sight about 2.4%):
+ * - the gun is drawn with the same magnification as the world, as Black Ops does (`viewmodelFov` in aim.ts);
+ * - `relief`, how far the rear sight sits in front of the eye, is a set multiple of the distance between the two
+ *   sights unless the gun lists its own, which keeps the rear sight a fixed proportion of the front one.
  */
-const EYE_IN_FRONT_OF_BUTT = 0.12;
+const RELIEF_PER_SIGHT_RADIUS = 0.7;
+/** The eye relief the hip poses in weaponView.ts were tuned against, and the least a gun is given. */
 export const MIN_EYE_RELIEF = 0.13;
-const MAX_EYE_RELIEF = 0.42;
+const MAX_EYE_RELIEF = 0.9;
 
 export interface SightPoints { rear: THREE.Vector3; front: THREE.Vector3; relief: number }
 /** How to hold a gun to aim it: see `adsPose`. */
@@ -76,15 +79,15 @@ export interface AimPose { position: THREE.Vector3; quaternion: THREE.Quaternion
 const toMetres = ([x, y, z]: SightPointMm) => new THREE.Vector3(x / 1000, y / 1000, z / 1000);
 
 /** How far in front of the eye the rear sight sits when a gun is aimed, in metres. */
-export function eyeRelief(rear: THREE.Vector3): number {
-  return Math.min(MAX_EYE_RELIEF, Math.max(MIN_EYE_RELIEF, -rear.z - EYE_IN_FRONT_OF_BUTT));
+export function eyeRelief(rear: THREE.Vector3, front: THREE.Vector3): number {
+  return Math.min(MAX_EYE_RELIEF, Math.max(MIN_EYE_RELIEF, RELIEF_PER_SIGHT_RADIUS * (rear.z - front.z)));
 }
 
 export function sightPoints(id: string): SightPoints | null {
   const sights = WEAPON_SIGHTS[id];
   if (!sights) return null;
-  const rear = toMetres(sights.rear);
-  return { rear, front: toMetres(sights.front), relief: sights.relief !== undefined ? sights.relief / 1000 : eyeRelief(rear) };
+  const rear = toMetres(sights.rear), front = toMetres(sights.front);
+  return { rear, front, relief: sights.relief !== undefined ? sights.relief / 1000 : eyeRelief(rear, front) };
 }
 
 /**
