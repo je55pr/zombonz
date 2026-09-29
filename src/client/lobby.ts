@@ -38,6 +38,9 @@ export class LobbyView {
   private join: PendingJoin | null = null;
   private peers = 0;
   private done = false;
+  private ticker: ReturnType<typeof setInterval> | null = null;
+  /** The connection log of the latest invite or reply, for the Copy log button. */
+  private logSource: (() => string) | null = null;
 
   constructor(private readonly mode: { kind: 'host'; map: MapId } | { kind: 'join' }, private readonly callbacks: LobbyCallbacks,
     parent: HTMLElement = document.body) {
@@ -58,8 +61,8 @@ export class LobbyView {
             <p>1. Send this invite code to your friend:</p>
             <div class="lobby-code"><textarea data-invite-code readonly rows="3"></textarea>
               <button type="button" data-action="copy-invite">Copy</button></div>
-            <p>2. Paste the reply code they send back:</p>
-            <textarea data-reply rows="3" placeholder="ZBR1-…" spellcheck="false"></textarea>
+            <p>2. Paste the reply code they send back, and press Connect before the countdown on their screen ends:</p>
+            <textarea data-reply rows="3" placeholder="ZBR2-…" spellcheck="false"></textarea>
             <button type="button" data-action="connect">Connect</button>
           </div>
         </section>` : `
@@ -68,7 +71,7 @@ export class LobbyView {
           <textarea data-invite-in rows="3" placeholder="ZBI1-…" spellcheck="false"></textarea>
           <button type="button" data-action="answer">Make my reply code</button>
           <div data-reply-steps hidden>
-            <p>2. Send this reply code back to the host:</p>
+            <p>2. Send this reply code back to the host. You both start connecting when the countdown ends:</p>
             <div class="lobby-code"><textarea data-reply-code readonly rows="3"></textarea>
               <button type="button" data-action="copy-reply">Copy</button></div>
           </div>
@@ -78,8 +81,10 @@ export class LobbyView {
       <div class="lobby-actions">
         ${hosting ? '<button type="button" data-action="start" disabled>Start game</button>' : ''}
         <button type="button" data-action="test">Test connection</button>
+        <button type="button" data-action="log" hidden>Copy log</button>
         <button type="button" data-action="back">Back</button>
       </div>
+      <textarea data-log-box class="lobby-log" readonly rows="7" spellcheck="false" aria-label="Connection log" hidden></textarea>
       <p class="lobby-hint">Everyone needs this same version of the game. Connections go straight between players' browsers.</p>
     </div>`;
     parent.append(this.element);
@@ -112,6 +117,22 @@ export class LobbyView {
     const status = this.find<HTMLElement>('[data-status]');
     status.textContent = text; status.classList.toggle('lobby-error', error);
   }
+  /** Counts down to `at` in the status line, then shows `after`. */
+  private countdown(at: number, text: (seconds: number) => string, after: string): void {
+    this.stopCountdown();
+    const show = () => {
+      const left = Math.ceil((at - Date.now()) / 1000);
+      if (left <= 0) { this.stopCountdown(); this.status(after); } else this.status(text(left));
+    };
+    show();
+    this.ticker = setInterval(show, 250);
+  }
+  private stopCountdown(): void { if (this.ticker) clearInterval(this.ticker); this.ticker = null; }
+  private offerLog(source: () => string): void {
+    this.logSource = source;
+    this.find<HTMLButtonElement>('[data-action="log"]').hidden = false;
+  }
+
   private busy<T>(button: string, work: () => Promise<T>): Promise<T | undefined> {
     const element = this.find<HTMLButtonElement>(`[data-action="${button}"]`);
     element.disabled = true;
@@ -138,6 +159,7 @@ export class LobbyView {
         const invite = await this.busy('invite', () => createInvite());
         if (!invite || this.done) { invite?.cancel(); return; }
         this.invite = invite;
+        this.offerLog(() => invite.log());
         this.find<HTMLElement>('[data-invite-steps]').hidden = false;
         this.find<HTMLTextAreaElement>('[data-invite-code]').value = invite.code;
         this.find<HTMLTextAreaElement>('[data-reply]').value = '';
@@ -156,7 +178,10 @@ export class LobbyView {
         const invite = this.invite;
         if (!invite || !this.transport) return;
         this.status('Connecting…');
-        const link = await this.busy('connect', () => invite.accept(this.find<HTMLTextAreaElement>('[data-reply]').value));
+        const link = await this.busy('connect', () => invite.accept(this.find<HTMLTextAreaElement>('[data-reply]').value, {
+          scheduled: at => this.countdown(at, seconds => `Connecting in ${seconds} s. Keep this window open.`, 'Connecting…'),
+        }));
+        this.stopCountdown();
         if (!link || this.done) { link?.close(); return; }
         this.invite = null;
         this.transport.addPeer(`peer-${++this.peers}`, link);
@@ -171,10 +196,12 @@ export class LobbyView {
         const join = await this.busy('answer', () => answerInvite(this.find<HTMLTextAreaElement>('[data-invite-in]').value));
         if (!join || this.done) { join?.cancel(); return; }
         this.join = join;
+        this.offerLog(() => join.log());
         this.find<HTMLElement>('[data-reply-steps]').hidden = false;
         this.find<HTMLTextAreaElement>('[data-reply-code]').value = join.reply;
-        this.status('Send the reply code to the host, then wait for them to paste it.');
+        this.countdown(join.startsAt, seconds => `Send the reply code to the host now. You both start connecting in ${seconds} s: they have to paste it and press Connect before then.`, 'Connecting…');
         join.connected.then(link => {
+          this.stopCountdown();
           if (this.done || this.join !== join) { link.close(); return; }
           const name = cleanName(this.find<HTMLInputElement>('[data-name]').value, 'Player');
           const client = new NetClient(linkClientTransport(link), name);
@@ -190,7 +217,7 @@ export class LobbyView {
           client.closed.add(reason => { if (!this.done) this.status(reason, true); });
           client.started.add(start => { this.finish(); this.callbacks.clientStarted(client, start); });
           this.status('Connected. Joining…');
-        }, error => { if (!this.done && this.join === join) this.status(message(error), true); });
+        }, error => { this.stopCountdown(); if (!this.done && this.join === join) this.status(message(error), true); });
         break;
       }
       case 'start': {
@@ -203,6 +230,19 @@ export class LobbyView {
         break;
       }
       case 'test': this.callbacks.testConnection(); break;
+      case 'log': {
+        const build = (import.meta.env.VITE_BUILD_ID as string | undefined)?.slice(0, 7) ?? 'local';
+        const text = `ZOMBONZ CONNECTION LOG
+Build ${build} - ${this.mode.kind === 'host' ? 'hosting' : 'joining'} - ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC
+${this.logSource?.() ?? ''}`;
+        try { await navigator.clipboard.writeText(text); this.status('Log copied. Paste it into a message.'); } catch {
+          // The browser would not copy for us: show the log, selected, to copy by hand.
+          const box = this.find<HTMLTextAreaElement>('[data-log-box]');
+          box.value = text; box.hidden = false; box.select();
+          this.status('Press Ctrl+C to copy the selected log, and paste it into a message.');
+        }
+        break;
+      }
       case 'back': this.back(); break;
     }
   }
@@ -210,6 +250,7 @@ export class LobbyView {
   /** Hands the session on to the game, keeping its connections open. */
   private finish(): void {
     this.done = true;
+    this.stopCountdown();
     this.invite?.cancel(); this.invite = null;
     this.element.remove();
   }

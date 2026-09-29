@@ -45,7 +45,7 @@ describe('copy-paste codes', () => {
   });
 
   it('explain codes pasted in the wrong box, cut short or changed', () => {
-    const code = encodeSession('reply', { ...parseSdp(CHROME_OFFER), setup: 'active' });
+    const code = encodeSession('reply', { ...parseSdp(CHROME_OFFER), setup: 'active', start: 1_790_000_000_000 });
     expect(() => decodeSession('invite', code)).toThrow(/reply code/);
     expect(() => decodeSession('reply', code.slice(0, -6))).toThrow(CodeError);
     const changed = code.slice(0, 20) + (code[20] === 'A' ? 'B' : 'A') + code.slice(21);
