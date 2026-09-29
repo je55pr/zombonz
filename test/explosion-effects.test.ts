@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { HAZARD_KINDS, createHazard, type HazardDefinition } from '../src/core/index.ts';
-import { SYNTH_CLIPS, SYNTH_RATE, synthesizeClip, type SynthClip } from '../src/client/explosionSynth.ts';
 import { BlastEffects, groundFromSurfaces, type BlastKind } from '../src/client/blastEffects.ts';
 import { GrenadeView } from '../src/client/grenadeView.ts';
 import { HazardView } from '../src/client/hazardView.ts';
@@ -15,71 +14,6 @@ vi.mock('../src/client/runtimeAssets.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../src/client/runtimeAssets.ts')>(),
   loadModel: () => Promise.reject(new Error('no models in tests')),
 }));
-
-const rms = (samples: Float32Array, from: number, to: number) => {
-  let sum = 0;
-  for (let i = from; i < to; i++) sum += samples[i] * samples[i];
-  return Math.sqrt(sum / Math.max(1, to - from));
-};
-/** The share of a window's energy below `cutoff` Hz (one-pole low-pass). */
-function lowShare(samples: Float32Array, from: number, to: number, cutoff: number): number {
-  const k = 1 - Math.exp(-2 * Math.PI * cutoff / SYNTH_RATE);
-  let y = 0, low = 0, all = 0;
-  for (let i = from; i < to; i++) { y += k * (samples[i] - y); low += y * y; all += samples[i] * samples[i]; }
-  return low / Math.max(all, 1e-12);
-}
-
-describe('the synthesized sounds', () => {
-  const clips = new Map<SynthClip, Float32Array>(SYNTH_CLIPS.map(name => [name, synthesizeClip(name)]));
-
-  it('are finite, loud enough to hear, never past full scale, and end in silence', () => {
-    for (const [name, samples] of clips) {
-      let peak = 0, bad = 0;
-      for (const value of samples) { if (!Number.isFinite(value)) bad++; peak = Math.max(peak, Math.abs(value)); }
-      expect(bad, name).toBe(0);
-      expect(peak, name).toBeLessThanOrEqual(1);
-      expect(peak, name).toBeGreaterThan(0.5);
-      expect(Math.abs(samples[samples.length - 1]), name).toBeLessThan(0.02);
-    }
-  });
-
-  it('come out the same every time', () => {
-    for (const name of ['blast-frag', 'mine-pop', 'grenade-bounce'] as const) expect(synthesizeClip(name)).toEqual(clips.get(name));
-  });
-
-  it('start with a bang and die away: the first tenth of a second is far louder than the last half', () => {
-    for (const name of ['blast-frag', 'blast-barrel', 'blast-vehicle', 'blast-mine'] as const) {
-      const samples = clips.get(name)!, tenth = SYNTH_RATE / 10;
-      expect(rms(samples, 0, tenth), name).toBeGreaterThan(rms(samples, Math.floor(samples.length / 2), samples.length) * 6);
-    }
-  });
-
-  it('get bigger with what blew up: a car lasts longer and rumbles lower than a grenade', () => {
-    const frag = clips.get('blast-frag')!, barrel = clips.get('blast-barrel')!, vehicle = clips.get('blast-vehicle')!;
-    expect(barrel.length).toBeGreaterThan(frag.length);
-    expect(vehicle.length).toBeGreaterThan(barrel.length);
-    // Under 120 Hz is where the weight of it is.
-    const window = Math.floor(SYNTH_RATE * 0.4);
-    expect(lowShare(vehicle, 0, window, 120)).toBeGreaterThan(lowShare(clips.get('blast-mine')!, 0, window, 120));
-    expect(lowShare(barrel, 0, window, 120)).toBeGreaterThan(0.3);
-  });
-
-  it('keep small sounds small, and metal bright', () => {
-    for (const name of ['grenade-ping', 'grenade-bounce', 'barrel-ping', 'metal-clang', 'mine-pop'] as const) {
-      expect(clips.get(name)!.length / SYNTH_RATE, name).toBeLessThan(0.8);
-    }
-    // A grenade's ping is almost all treble; a blast is mostly not.
-    const ping = clips.get('grenade-ping')!, blast = clips.get('blast-frag')!;
-    expect(lowShare(ping, 0, Math.floor(SYNTH_RATE * 0.15), 500)).toBeLessThan(0.05);
-    expect(lowShare(blast, 0, Math.floor(SYNTH_RATE * 0.15), 500)).toBeGreaterThan(0.4);
-  });
-
-  it('take well under a second to make, all told, so they can be built at the start screen', () => {
-    const started = performance.now();
-    for (const name of SYNTH_CLIPS) synthesizeClip(name);
-    expect(performance.now() - started).toBeLessThan(1500);
-  });
-});
 
 describe('the grenade and mine models', () => {
   it('build a grenade with a fuse, and a pinned one with its lever and ring as well', () => {

@@ -264,7 +264,8 @@ export class GameSimulation {
 
   /** Everything solid to walk into: the walls, and every hazard that has not vanished. */
   collisionBoxes(): CollisionBox[] {
-    return [...this.wallBoxes(), ...hazardSolids(this.map.hazards ?? [], this.state.hazards)];
+    const walls = this.wallBoxes(), solids = hazardSolids(this.map.hazards ?? [], this.state.hazards);
+    return solids.length ? walls.concat(solids) : walls;
   }
 
   /**
@@ -272,7 +273,7 @@ export class GameSimulation {
    * are not among them (a shot hits one and a blast reaches it; see hazardTargets).
    */
   private shotBlockers(): CollisionBox[] {
-    return [...this.wallBoxes(), ...hazardWrecks(this.map.hazards ?? [], this.state.hazards), ...(this.map.shotBlockers ?? [])];
+    return this.wallBoxes().concat(hazardWrecks(this.map.hazards ?? [], this.state.hazards), this.map.shotBlockers ?? []);
   }
 
   /** The hazards that can be shot or hurt right now. */

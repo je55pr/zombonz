@@ -26,7 +26,6 @@ import { BlastEffects, groundFromSurfaces } from './client/blastEffects.ts';
 import { HazardView } from './client/hazardView.ts';
 import { MineView } from './client/mineView.ts';
 import { createGrenadeModel, createMineModel } from './client/explosiveModels.ts';
-import { hazardCentre } from './core/hazard.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from './client/environmentProps.ts';
 import {
@@ -513,10 +512,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     // A blast near enough shakes the view, dying away over a second or so.
     const shake = blastEffects.shake();
     camera.rotation.x += shake.x; camera.rotation.y += shake.y; camera.rotation.z += shake.z;
-    if (simulation.state.hazards.some(hazard => hazard.phase === 'burning')) {
-      audio.burning((map.hazards ?? []).flatMap((definition, index) => simulation.state.hazards[index]?.phase === 'burning'
-        ? [{ id: definition.id, position: hazardCentre(definition) }] : []), playerId, simulation.state.world);
-    }
+
     const actorsEnded = profiling ? performance.now() : 0;
     if (details.update(simulation.state)) shadowsDirty = true;
     lightPool.update(camera, interval / 1000);

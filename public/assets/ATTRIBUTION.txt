@@ -249,10 +249,7 @@ Compressed, edited MP3 derivatives in /assets/audio. The original downloads rema
 - Locks, metal, pickups, knife and hit foley: 80 CC0 RPG SFX: https://opengameart.org/content/80-cc0-rpg-sfx
 - Door opening: Door Open, Door Close Set by qubodup: https://lpc.opengameart.org/content/door-open-door-close-set
 - Explosions: 25 CC0 bang / firework SFX by rubberduck, recorded fireworks: https://opengameart.org/node/92774
-  (laid under the synthesized blasts described below)
-- Synthesized in code, from noise and sine sweeps, with no third-party source: the grenade, mine, barrel and vehicle
-  blasts, the grenade's ping and bounce, the Betty's launch, a barrel's ring, a car's clang and the crackle of fire
-  (src/client/explosionSynth.ts)
+  (for now every explosion, of every kind; better recordings are listed in docs/audio-wanted.md)
 - Electric effects: Electricity Game Sound Pack: https://opengameart.org/content/electricity-game-sound-pack
 - Ventilation: Airvent Loop: https://opengameart.org/content/airvent-loop
 - Wind: wind1: https://opengameart.org/content/wind1

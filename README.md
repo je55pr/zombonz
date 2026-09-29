@@ -206,11 +206,10 @@ whoever set it off. Insta-Kill and Double Points apply to every kind.
   a column of flame for fuel, smoke that cools from warm to black, sparks, debris that lands on the
   floor, a shockwave ring, a scorch mark that fades over a minute, a burst of light from the shared
   light pool and a shake of the camera that grows with how near the blast is. Barrels and cars smoke
-  as they are shot up and burn before they go. The grenade and the Betty are built in code, so are
-  their sounds: `src/client/explosionSynth.ts` renders the explosions (a sub-bass thump, the crack of the
-  blast front, a roaring body, a low tail and falling debris, through a small reverb), the grenade's
-  ping and bounce, the Betty's launch, a barrel's ring and a car's clang, and the crackle of a fire. The
-  recorded bangs are laid under them. Nothing here needs downloaded assets or a licence.
+  as they are shot up and burn before they go. The grenade and the Betty are built in code. Their sounds
+  are the recorded clips the game already had (two bangs, some metal and mechanical sounds), pitched to
+  suit, until the recordings listed in [docs/audio-wanted.md](docs/audio-wanted.md) are found. Teammates'
+  explosions are heard where they happen.
 
 The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
 attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a

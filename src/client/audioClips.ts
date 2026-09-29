@@ -1,5 +1,4 @@
 import { takeAsset } from './assetStore.ts';
-import { SYNTH_CLIPS, synthesizeClip, type SynthClip } from './explosionSynth.ts';
 
 /** Every recorded clip the game plays (built by scripts/prepare_audio.py into public/assets/audio). */
 export const AUDIO_CLIPS = [
@@ -24,22 +23,6 @@ export function audioClipUrl(clip: AudioClip): string {
 const decoded = new Map<AudioClip, AudioBuffer>();
 let decoding: Promise<void> | null = null;
 
-/** The synthesized clips (explosions, pings, fire), rendered once per page; see explosionSynth.ts. */
-const rendered = new Map<SynthClip, Float32Array>();
-
-/** Renders them one at a time, giving the page a moment between each so start-up never stalls on all of them. */
-async function renderSynthClips(): Promise<void> {
-  for (const clip of SYNTH_CLIPS) {
-    try { rendered.set(clip, synthesizeClip(clip)); } catch { /* A clip that fails to render stays silent. */ }
-    await new Promise<void>(resolve => setTimeout(resolve, 0));
-  }
-}
-
-/** A synthesized clip's samples, once rendered. */
-export function renderedSynthClip(clip: SynthClip): Float32Array | undefined {
-  return rendered.get(clip);
-}
-
 /**
  * Decodes every clip once per page, from the start-screen download (or the network for dev previews,
  * which skip the menu). Decoding needs no user gesture, only playback does, so the start screen does
@@ -49,7 +32,7 @@ export function renderedSynthClip(clip: SynthClip): Float32Array | undefined {
 export function decodeAudioClips(context?: BaseAudioContext): Promise<void> {
   const decoder = context ?? (typeof OfflineAudioContext === 'undefined' ? null : new OfflineAudioContext(1, 1, 48000));
   if (!decoder) return Promise.resolve();
-  decoding ??= Promise.all([renderSynthClips(), ...AUDIO_CLIPS.map(async clip => {
+  decoding ??= Promise.all(AUDIO_CLIPS.map(async clip => {
     try {
       const url = audioClipUrl(clip);
       const downloaded = takeAsset(url);
@@ -62,7 +45,7 @@ export function decodeAudioClips(context?: BaseAudioContext): Promise<void> {
       }
       decoded.set(clip, await decoder.decodeAudioData(data));
     } catch { /* Missing samples stay silent; audio must never affect gameplay. */ }
-  })]).then(() => {});
+  })).then(() => {});
   return decoding;
 }
 
