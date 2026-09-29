@@ -131,11 +131,11 @@ describe('render performance contracts', () => {
     hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair' });
     expect(context.clearRect).toHaveBeenCalledTimes(5);
     hud.render({ ...state, godMode: true, interactionPrompt: 'Hold E to repair',
-      feedback: { message: 'HEADSHOT', hitMarker: 'kill', damageVignette: false } });
+      feedback: { message: 'MAX AMMO', hitMarker: 'kill', damageVignette: false } });
     expect(context.clearRect).toHaveBeenCalledTimes(6);
     // Score popups and a round change animate on their own quads without repainting the HUD canvas.
     const frame = { ...state, godMode: true, interactionPrompt: 'Hold E to repair',
-      feedback: { message: 'HEADSHOT', hitMarker: 'kill', damageVignette: false } } as HudSnapshot;
+      feedback: { message: 'MAX AMMO', hitMarker: 'kill', damageVignette: false } } as HudSnapshot;
     hud.events([{ type: 'pointsAwarded', playerId: 'e:1', amount: 50, reason: 'kill', balance: 550 },
       { type: 'pointsSpent', playerId: 'e:1', amount: 950, reason: 'box', balance: 0 },
       { type: 'pointsAwarded', playerId: 'e:2', amount: 10, reason: 'hit', balance: 10 }], 'e:1', 0);

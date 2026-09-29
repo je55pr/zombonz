@@ -42,10 +42,12 @@ upstairs at the north end, and each side reaches it by its own route:
 | Kitchen from the Speed Cola room | 1000 |
 | Power room from the kitchen | 750 |
 
-The fourteen wall buys follow the original's rooms: Kar98k and Gewehr 43 in the German start,
+The fourteen wall buys follow the original's rooms: Kar98k and M1 Garand in the German start,
 M1 Garand and Springfield in the American start, Thompson and double-barrel in the hallway, BAR
 in the back room, MP40 and double-barrel on the German balcony, STG-44 and Trench Gun in Left
-Upstairs, Trench Gun and BAR on the right balcony, and the sawed-off in the Speed Cola room.
+Upstairs, Trench Gun and BAR on the right balcony, and a double-barrel in the Speed Cola room.
+The original Verrückt used a Gewehr 43 and a sawed-off in those two spots; this game uses the
+available M1 Garand and full-length double-barrel models, so the labels match what players receive.
 There are seventeen zombie windows and one open climb, as in the original's room guides:
 
 - **German balcony railing:** zombies also climb the courtyard wall by a drainpipe and over the

@@ -3,7 +3,7 @@ import { HudFeedback } from '../src/client/feedback.ts';
 import type { SimulationEvent } from '../src/core/simulation.ts';
 
 describe('local combat feedback', () => {
-  it('shows the local hit and kill once, then expires', () => {
+  it('shows hit and kill markers without combat text', () => {
     const feedback = new HudFeedback();
     const events: SimulationEvent[] = [
       { type: 'weaponHit', playerId: 'e:1', zombieId: 'e:9', weaponId: 'bar', damage: 150, distance: 4, hitZone: 'head' },
@@ -11,9 +11,11 @@ describe('local combat feedback', () => {
       { type: 'pointsAwarded', playerId: 'e:1', amount: 90, reason: 'headshot', balance: 600 },
     ];
     feedback.consume(events, 'e:1', 10);
-    expect(feedback.snapshot(10)).toMatchObject({ message: 'HEADSHOT', hitMarker: 'kill' });
+    expect(feedback.snapshot(10)).toMatchObject({ message: null, hitMarker: 'kill' });
     expect(feedback.snapshot(30).hitMarker).toBeNull();
     expect(feedback.snapshot(116).message).toBeNull();
+    feedback.consume([{ type: 'zombieDied', playerId: 'e:1', zombieId: 'e:10', method: 'melee' }], 'e:1', 117);
+    expect(feedback.snapshot(117)).toMatchObject({ message: null, hitMarker: 'kill' });
   });
 
   it('ignores other players and clears indicators on restart', () => {
@@ -21,9 +23,17 @@ describe('local combat feedback', () => {
     feedback.consume([{ type: 'playerDamaged', playerId: 'e:2', amount: 50, health: 50 }], 'e:1', 2);
     expect(feedback.snapshot(2).damageVignette).toBe(false);
     feedback.consume([{ type: 'playerDamaged', playerId: 'e:1', amount: 50, health: 50 }], 'e:1', 3);
-    expect(feedback.snapshot(3)).toMatchObject({ message: 'TAKE COVER', damageVignette: true });
+    expect(feedback.snapshot(3)).toMatchObject({ message: null, damageVignette: true });
     feedback.consume([{ type: 'matchRestarted', previousSeed: 1, seed: 2 }], 'e:1', 4);
     expect(feedback.snapshot(4)).toEqual({ message: null, hitMarker: null, damageVignette: false });
+  });
+
+  it('keeps important failures while routine purchases stay off centre screen', () => {
+    const feedback = new HudFeedback();
+    feedback.consume([{ type: 'wallWeaponPurchased', playerId: 'e:1', wallWeaponId: 'wall', weaponId: 'kar98k' }], 'e:1', 10);
+    expect(feedback.snapshot(10).message).toBeNull();
+    feedback.consume([{ type: 'wallWeaponAmmoFull', playerId: 'e:1', wallWeaponId: 'wall', weaponId: 'kar98k' }], 'e:1', 11);
+    expect(feedback.snapshot(11).message).toBe('AMMO ALREADY FULL');
   });
 
   it('announces a team-wide Max Ammo pickup to every player', () => {

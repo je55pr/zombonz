@@ -1,8 +1,5 @@
 import type { EntityId } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
-import { weaponName } from '../core/weapon.ts';
-import { PERKS } from '../core/perks.ts';
-import { equipmentName } from '../core/equipment.ts';
 
 export interface FeedbackSnapshot {
   message: string | null;
@@ -52,26 +49,16 @@ export class HudFeedback {
         case 'grenadeHit': this.marker = 'body'; this.markerUntil = tick + 12; break;
         case 'zombieDied':
           this.marker = 'kill'; this.markerUntil = tick + 16;
-          if (event.method === 'head') say('HEADSHOT', 5);
-          else if (event.method === 'melee') say('KNIFE KILL', 5);
           break;
-        case 'playerDamaged': this.hurtUntil = tick + 32; say('TAKE COVER', 6); break;
-        case 'wallWeaponPurchased': say(`${weaponName(event.weaponId).toUpperCase()} ACQUIRED`, 3); break;
-        case 'wallWeaponAmmoPurchased': say('AMMO REFILLED', 3); break;
+        case 'playerDamaged': this.hurtUntil = tick + 32; break;
         case 'wallWeaponAmmoFull': say('AMMO ALREADY FULL', 3); break;
-        case 'equipmentPurchased': say(`${equipmentName(event.item).toUpperCase()}S ACQUIRED`, 3); break;
-        case 'equipmentFull': say(`ALREADY CARRYING THE MOST ${equipmentName(event.item).toUpperCase()}S`, 3); break;
-        case 'mysteryBoxUsed': say('THE BOX IS ROLLING', 3); break;
-        case 'mysteryBoxClaimed': say(`${weaponName(event.weaponId).toUpperCase()} CLAIMED`, 4); break;
+        case 'equipmentFull': say('EQUIPMENT FULL', 3); break;
         case 'mysteryBoxUnavailable': say('NO NEW WEAPONS IN BOX', 3); break;
         case 'pointsSpendRejected': say('NOT ENOUGH POINTS', 4); break;
-        case 'doorOpened': say('PATH OPENED', 3); break;
         case 'powerActivated': say('THE POWER IS ON', 9); break;
         case 'playerDowned': say('YOU ARE DOWN', 10); break;
         case 'playerRevived': say(event.reviverId === playerId && event.playerId !== playerId ? 'TEAMMATE REVIVED' : 'REVIVED', 9); break;
         case 'playerRespawned': say('BACK IN THE FIGHT', 9); break;
-        case 'perkBought': say(PERKS[event.perk].name.toUpperCase(), 5); break;
-        case 'trapActivated': say('ELECTRIC TRAP ACTIVE', 4); break;
         case 'mysteryBoxTeddy': say('BYE BYE — THE BOX IS MOVING', 6); break;
         case 'powerupCollected': say(event.kind === 'maxAmmo' ? 'MAX AMMO'
           : event.kind === 'doublePoints' ? 'DOUBLE POINTS'
