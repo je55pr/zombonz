@@ -204,8 +204,6 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
       console.warn(`Unable to load the ${weapon.weaponId} wall gun`, error); fallback();
     }));
     else fallback();
-    const name = writing(weaponName(weapon.weaponId).toUpperCase(), 1.65, 0.24);
-    name.position.set(0, -0.38, 0.03); sign.add(name);
   }
   // Equipment for sale: a shelf on the wall with a pair of Bouncing Betties standing on it, under their name.
   for (const buy of map.equipment ?? []) {

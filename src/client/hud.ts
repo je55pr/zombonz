@@ -307,23 +307,23 @@ export class CanvasHud {
     }
 
     // Top: the map, the credits key and the controls, kept quiet.
-    this.text(this.mapName.toUpperCase(), 40, 40, { size: 22, font: 'title', color: DIM });
-    this.text('F2  CREDITS', 42, 66, { size: 13, weight: 500, color: FAINT, spacing: 2 });
+    this.text(this.mapName.toUpperCase(), 40, 40, { size: 27, font: 'title', color: DIM });
+    this.text('F2  CREDITS', 42, 72, { size: 17, weight: 500, color: FAINT, spacing: 2 });
     // The controls line only fits clear of the map name on wider screens.
-    const controls: TextStyle = { size: 13, weight: 500, color: FAINT, align: 'center', spacing: 1.5 };
-    if (!snapshot.paused && centre - this.measure(CONTROLS, controls) / 2 > 280) this.text(CONTROLS, centre, 26, controls);
+    const controls: TextStyle = { size: 16, weight: 500, color: FAINT, align: 'center', spacing: 1 };
+    if (!snapshot.paused && centre - this.measure(CONTROLS, controls) / 2 > 320) this.text(CONTROLS, centre, 26, controls);
     const key = (action: GameAction) => actionKeyLabel(this.bindings, action);
     const modes = [snapshot.godMode ? `GOD MODE [${key('toggleGodMode')}]` : '', snapshot.noclip ? `NOCLIP [${key('toggleNoclip')}]` : ''].filter(Boolean);
-    if (modes.length) this.text(modes.join('   /   '), 42, 98, { size: 18, color: GOLD, spacing: 1 });
-    if (snapshot.noclip) this.text(`WASD fly · ${key('flyUp')} up · ${key('flyDown')} down`, 42, 124, { size: 16, weight: 500, color: DIM });
+    if (modes.length) this.text(modes.join('   /   '), 42, 105, { size: 21, color: GOLD, spacing: 1 });
+    if (snapshot.noclip) this.text(`WASD fly · ${key('flyUp')} up · ${key('flyDown')} down`, 42, 133, { size: 18, weight: 500, color: DIM });
     // Top right: active power-ups as badges.
     let badgeY = 46;
     for (const status of [snapshot.bonusStatus, snapshot.instaKillStatus]) {
       if (!status) continue;
-      const badgeWidth = this.measure(status, { size: 19, spacing: 2 }) + 32;
-      this.panel(right - badgeWidth, badgeY - 19, badgeWidth, 38, 19, 'rgba(60,44,10,0.7)', 'rgba(242,197,92,0.6)');
-      this.text(status, right - badgeWidth / 2, badgeY + 1, { size: 19, color: GOLD, align: 'center', spacing: 2 });
-      badgeY += 48;
+      const badgeWidth = this.measure(status, { size: 22, spacing: 2 }) + 38;
+      this.panel(right - badgeWidth, badgeY - 23, badgeWidth, 46, 23, 'rgba(60,44,10,0.7)', 'rgba(242,197,92,0.6)');
+      this.text(status, right - badgeWidth / 2, badgeY + 1, { size: 22, color: GOLD, align: 'center', spacing: 2 });
+      badgeY += 56;
     }
 
     if (!snapshot.gameOver) {
@@ -344,84 +344,85 @@ export class CanvasHud {
     }
 
     // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health and grenades.
-    if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 184, { size: 16, color: GOLD, spacing: 4 });
-    this.text('ROUND', 44, height - 158, { size: 16, weight: 500, color: DIM, spacing: 5 });
+    if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 340, { size: 23, color: GOLD, spacing: 3 });
+    this.text('ROUND', 44, height - 280, { size: 34, weight: 500, color: INK, spacing: 4 });
     const low = snapshot.health <= 50;
-    this.text('HP', 44, height - 36, { size: 15, weight: 500, color: DIM, spacing: 2 });
-    this.panel(74, height - 41, 180, 10, 5, 'rgba(0,0,0,0.55)', EDGE);
-    const healthWidth = 180 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
+    this.text('HP', 44, height - 48, { size: 29, weight: 500, color: INK, spacing: 2 });
+    this.panel(98, height - 60, 238, 24, 8, 'rgba(0,0,0,0.65)', EDGE);
+    const healthWidth = 238 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
     // Perk icons sit in a row above the round counter, in the order they were drunk.
     (snapshot.perks ? snapshot.perks.split(',') as PerkId[] : []).forEach((perk, index) => {
-      const style = PERK_ICONS[perk], x = 44 + index * 46, y = height - 250;
-      this.panel(x, y, 38, 38, 8, style.fill, 'rgba(255,255,255,0.35)');
-      this.text(style.mark, x + 19, y + 20, { size: 17, color: '#fff7e6', align: 'center' });
+      const style = PERK_ICONS[perk], x = 44 + index * 60, y = height - 435;
+      this.panel(x, y, 52, 52, 9, style.fill, 'rgba(255,255,255,0.35)');
+      this.text(style.mark, x + 26, y + 27, { size: 23, color: '#fff7e6', align: 'center' });
     });
-    if (healthWidth > 0) this.panel(74, height - 41, healthWidth, 10, 5, low ? BLOOD : INK, null);
-    this.text(String(snapshot.health), 266, height - 36, { size: 17, color: low ? BLOOD : INK });
-    let grenadeX = 318 + this.keycap(actionKeyLabel(this.bindings, 'throwGrenade'), 318, height - 36, 13) + 12;
-    for (let slot = 0; slot < GRENADE_SLOTS; slot++, grenadeX += 20) {
-      c.beginPath(); c.arc(grenadeX + 6, height - 36, 6, 0, Math.PI * 2);
+    if (healthWidth > 0) this.panel(98, height - 60, healthWidth, 24, 8, low ? BLOOD : INK, null);
+    this.text(String(snapshot.health), 352, height - 48, { size: 29, color: low ? BLOOD : INK });
+    let grenadeX = 420 + this.keycap(actionKeyLabel(this.bindings, 'throwGrenade'), 420, height - 48, 24) + 16;
+    for (let slot = 0; slot < GRENADE_SLOTS; slot++, grenadeX += 30) {
+      c.beginPath(); c.arc(grenadeX + 9, height - 48, 9, 0, Math.PI * 2);
       if (slot < snapshot.grenadeCharges) { c.fillStyle = GOLD; c.fill(); }
-      else { c.strokeStyle = FAINT; c.lineWidth = 1.5; c.stroke(); }
+      else { c.strokeStyle = FAINT; c.lineWidth = 2; c.stroke(); }
     }
     // Bouncing Betties, while any are carried: their key, then a little mine (a canister with three prongs) for each.
     if (snapshot.mineCharges > 0) {
-      grenadeX += 10;
-      grenadeX += this.keycap(actionKeyLabel(this.bindings, 'placeMine'), grenadeX, height - 36, 13) + 12;
-      for (let slot = 0; slot < MINE_SLOTS; slot++, grenadeX += 22) {
+      grenadeX += 12;
+      grenadeX += this.keycap(actionKeyLabel(this.bindings, 'placeMine'), grenadeX, height - 48, 24) + 16;
+      for (let slot = 0; slot < MINE_SLOTS; slot++, grenadeX += 30) {
         const held = slot < snapshot.mineCharges;
-        c.save(); c.translate(grenadeX + 7, height - 36);
-        c.fillStyle = GOLD; c.strokeStyle = held ? GOLD : FAINT; c.lineWidth = 1.5;
-        c.beginPath(); c.rect(-6, -1, 12, 8);
+        c.save(); c.translate(grenadeX + 9, height - 48);
+        c.fillStyle = GOLD; c.strokeStyle = held ? GOLD : FAINT; c.lineWidth = 2;
+        c.beginPath(); c.rect(-8, -1, 16, 11);
         if (held) c.fill(); else c.stroke();
-        for (const dx of [-3.5, 0, 3.5]) { c.beginPath(); c.moveTo(dx, -1); c.lineTo(dx * 1.4, -7); c.stroke(); }
+        for (const dx of [-5, 0, 5]) { c.beginPath(); c.moveTo(dx, -1); c.lineTo(dx * 1.4, -10); c.stroke(); }
         c.restore();
       }
     }
 
     // Bottom right: points in gold over the weapon, its ammunition and the holstered gun.
-    const pointsWidth = this.text(String(snapshot.points), right, height - 178, { size: 46, color: GOLD, align: 'right' });
+    const pointsWidth = this.text(String(snapshot.points), right, height - 190, { size: 52, color: GOLD, align: 'right' });
     // Teammates' points stack above this player's, as in World at War.
     snapshot.team.split('\n').filter(Boolean).forEach((row, index) => {
       const [name, points, status] = row.split('\t');
-      const y = height - 232 - index * 30;
-      this.text(`${name}  ${points}`, right, y, { size: 20, weight: 500, color: status ? DIM : INK, align: 'right', spacing: 1 });
-      if (status) this.text(status, right - this.measure(`${name}  ${points}`, { size: 20, weight: 500, spacing: 1 }) - 12, y,
-        { size: 16, color: BLOOD, align: 'right', spacing: 2 });
+      const y = height - 252 - index * 36;
+      this.text(`${name}  ${points}`, right, y, { size: 23, weight: 500, color: status ? DIM : INK, align: 'right', spacing: 1 });
+      if (status) this.text(status, right - this.measure(`${name}  ${points}`, { size: 23, weight: 500, spacing: 1 }) - 12, y,
+        { size: 19, color: BLOOD, align: 'right', spacing: 2 });
     });
-    if (snapshot.pingMs !== null) this.text(`PING ${Math.round(snapshot.pingMs)} MS`, right, 22, { size: 13, color: DIM, align: 'right', spacing: 2 });
-    this.pointsEdge = { x: right - pointsWidth - 10, y: height - 178 };
+    if (snapshot.pingMs !== null) this.text(`PING ${Math.round(snapshot.pingMs)} MS`, right, 24, { size: 17, color: DIM, align: 'right', spacing: 2 });
+    this.pointsEdge = { x: right - pointsWidth - 10, y: height - 190 };
     // A reload shows in the gun's animation and sound, not in words; an empty magazine still gets its prompt.
     if (!snapshot.reloading && snapshot.magazineAmmo === 0) {
-      this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', right, height - 138,
-        { size: 16, color: snapshot.reserveAmmo > 0 ? GOLD : BLOOD, align: 'right', spacing: 3 });
+      this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', right, height - 145,
+        { size: 20, color: snapshot.reserveAmmo > 0 ? GOLD : BLOOD, align: 'right', spacing: 2 });
     }
-    this.text(weaponLabel(snapshot.weapon), right, height - 108, { size: 20, weight: 500, color: DIM, align: 'right', spacing: 3 });
+    this.text(weaponLabel(snapshot.weapon), right, height - 112, { size: 24, weight: 500, color: DIM, align: 'right', spacing: 2 });
     const reserveWidth = this.text(` / ${snapshot.reserveAmmo}`, right, height - 56,
-      { size: 26, weight: 500, color: DIM, align: 'right' });
+      { size: 31, weight: 500, color: DIM, align: 'right' });
     this.text(String(snapshot.magazineAmmo), right - reserveWidth, height - 60,
-      { size: 56, color: snapshot.magazineAmmo === 0 ? BLOOD : INK, align: 'right' });
+      { size: 62, color: snapshot.magazineAmmo === 0 ? BLOOD : INK, align: 'right' });
     if (snapshot.holsteredWeapon) {
       const name = weaponLabel(snapshot.holsteredWeapon);
-      const nameWidth = this.measure(name, { size: 14, weight: 500, spacing: 2 });
-      this.text(name, right, height - 20, { size: 14, weight: 500, color: FAINT, align: 'right', spacing: 2 });
-      this.keycap('Q', right - nameWidth - 34, height - 20, 11);
+      const nameWidth = this.measure(name, { size: 18, weight: 500, spacing: 2 });
+      this.text(name, right, height - 22, { size: 18, weight: 500, color: FAINT, align: 'right', spacing: 2 });
+      this.keycap('Q', right - nameWidth - 39, height - 22, 14);
     }
 
     // Centre: notices, pickups and the interaction prompt.
-    if (snapshot.assetNotice) this.text(snapshot.assetNotice, centre, height - 110, { size: 17, weight: 500, color: DIM, align: 'center' });
+    if (snapshot.assetNotice) this.text(snapshot.assetNotice, centre, height - 112, { size: 20, weight: 500, color: DIM, align: 'center' });
     if (snapshot.feedback?.message && !snapshot.gameOver) {
-      this.text(snapshot.feedback.message, centre, height * 0.6, { size: 30, align: 'center', spacing: 3 });
+      this.text(snapshot.feedback.message, centre, height * 0.6, { size: 34, align: 'center', spacing: 2 });
     }
     if (snapshot.nearbyPowerup && !snapshot.gameOver) {
-      this.text(snapshot.nearbyPowerup, centre, height * 0.655, { size: 28, color: GOLD, align: 'center', spacing: 3 });
+      this.text(snapshot.nearbyPowerup, centre, height * (snapshot.reviveProgress > 0 ? 0.52 : 0.655),
+        { size: 32, color: GOLD, align: 'center', spacing: 2 });
     }
     if (snapshot.lastStand && !snapshot.gameOver) {
-      this.text(snapshot.lastStand, centre, height * 0.3, { size: 34, color: BLOOD, align: 'center', spacing: 4 });
+      this.text(snapshot.lastStand, centre, height * 0.3, { size: 40, color: BLOOD, align: 'center', spacing: 3 });
     }
     if (snapshot.reviveProgress > 0 && !snapshot.gameOver) {
       const barWidth = 320, y = height * 0.66;
-      this.text(snapshot.lastStand ? 'BEING REVIVED' : 'REVIVING', centre, y - 20, { size: 18, color: INK, align: 'center', spacing: 3 });
+      this.text(snapshot.lastStand ? 'BEING REVIVED' : 'REVIVING', centre, y - 24, { size: 23, color: INK, align: 'center', spacing: 2 });
       this.panel(centre - barWidth / 2, y, barWidth, 12, 6, 'rgba(0,0,0,0.6)', EDGE);
       this.panel(centre - barWidth / 2, y, barWidth * snapshot.reviveProgress, 12, 6, INK, null);
     }
@@ -429,13 +430,16 @@ export class CanvasHud {
       // "E  Buy this" prompts lead with the key; show it as a keycap.
       const keyed = /^E\s{2}(.*)$/.exec(snapshot.interactionPrompt);
       const label = keyed ? keyed[1] : snapshot.interactionPrompt;
-      const style: TextStyle = { size: 24, weight: 500, spacing: 0.5 };
-      const keyWidth = keyed ? 16 * 1.5 + 14 : 0;
-      const promptWidth = this.measure(label, style) + keyWidth + 48, y = height * 0.74;
+      const style: TextStyle = { size: 28, weight: 500, spacing: 0.5 };
+      const keyWidth = keyed ? 18 * 1.5 + 16 : 0;
+      style.size *= Math.min(1, (width - 64 - keyWidth - 56) / Math.max(1, this.measure(label, style)));
+      // On narrow windows a wide prompt would cover the left-hand round display.
+      const promptWidth = this.measure(label, style) + keyWidth + 56;
+      const y = height * (width < 1300 ? 0.5 : 0.74);
       const left = centre - promptWidth / 2;
-      this.panel(left, y - 27, promptWidth, 54, 10);
-      if (keyed) this.keycap('E', left + 24, y, 16);
-      this.text(label, left + 24 + keyWidth, y + 1, style);
+      this.panel(left, y - 33, promptWidth, 66, 10);
+      if (keyed) this.keycap('E', left + 28, y, 18);
+      this.text(label, left + 28 + keyWidth, y + 1, style);
     }
 
     if (snapshot.gameOver) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GameSimulation,
   createInputFrame,
+  doorPrompt,
   type DoorDefinition,
 } from '../src/core/index.ts';
 
@@ -9,7 +10,6 @@ const testDoor: DoorDefinition = {
   id: 'test-door',
   position: { x: 0, y: 0, z: -1 },
   cost: 1000,
-  prompt: 'Press E to open [1000]',
   blocker: {
     min: { x: -0.5, y: 0, z: -1.1 },
     max: { x: 0.5, y: 2.5, z: -0.9 },
@@ -38,10 +38,14 @@ function forwardFrame(sequence = 0) {
 }
 
 describe('purchasable doors', () => {
+  it('uses obstacle type and cost for door and debris prompts', () => {
+    expect(doorPrompt(testDoor)).toBe('E  Open Door [Cost: 1000]');
+    expect(doorPrompt({ ...testDoor, kind: 'debris', cost: 750 })).toBe('E  Clear Debris [Cost: 750]');
+  });
   it('exposes cost prompt and closed collision before purchase', () => {
     const sim = simulation(500);
     const playerId = sim.playerIds[0];
-    expect(sim.interactionCandidate(playerId)?.prompt).toBe('Press E to open [1000]');
+    expect(sim.interactionCandidate(playerId)?.prompt).toBe('E  Open Door [Cost: 1000]');
     expect(sim.state.doors[0]).toMatchObject({ id: 'test-door', cost: 1000, open: false });
     expect(sim.collisionBoxes()).toHaveLength(1);
   });

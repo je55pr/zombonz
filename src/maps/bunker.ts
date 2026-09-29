@@ -1,6 +1,6 @@
 import { walkSurfaceHeight, sampleWalkHeight, type CollisionBox, type WalkSurface } from '../core/collision.ts';
 import { hasClearNavigationLine, hasWalkableConnection, type NavigationGraph, type NavigationNode } from '../core/navigation.ts';
-import type { DoorDefinition } from '../core/door.ts';
+import { doorPrompt, type DoorDefinition } from '../core/door.ts';
 import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
 import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
 import type { Vec3 } from '../core/types.ts';
@@ -206,13 +206,13 @@ export const BUNKER_PRISMS: readonly GreyboxPrism[] = prisms;
 export const BUNKER_WALK_SURFACES: readonly WalkSurface[] = surfaces;
 export const BUNKER_DOORS: readonly DoorDefinition[] = [
   { id: 'help-room', position: { x: 0, y: 0, z: 0 }, cost: 1000,
-    prompt: 'E  Open HELP room  [1000]', interactionRange: 2.6, minFacingDot: 0.3,
+    interactionRange: 2.6, minFacingDot: 0.3,
     blocker: { min: { x: -0.2, y: 0, z: -1.2 }, max: { x: 0.2, y: 2.85, z: 1.2 } } },
   { id: 'start-stairs', position: { x: ps(6), y: 2.8, z: FLIGHT_Z }, cost: 1000,
-    prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
+    kind: 'debris', interactionRange: 2.8, minFacingDot: 0.2,
     blocker: { min: { x: ps(6) - 0.4, y: 2.2, z: FLIGHT.minZ - 0.1 }, max: { x: ps(6) + 0.4, y: 5.7, z: FLIGHT.maxZ + 0.15 } } },
   { id: 'help-stairs', position: { x: HELP_STAIR_X, y: 1.7, z: HELP_STAIR_Z }, cost: 1000,
-    prompt: 'E  Clear stair debris  [1000]', interactionRange: 2.8, minFacingDot: 0.2,
+    kind: 'debris', interactionRange: 2.8, minFacingDot: 0.2,
     blocker: { min: { x: HELP_STAIR.minX - 0.05, y: 0, z: HELP_STAIR_Z - 0.375 },
       max: { x: HELP_STAIR.maxX + 0.05, y: 4.5, z: HELP_STAIR_Z + 0.375 } } },
 ];
@@ -321,7 +321,7 @@ for (const [z, length, height] of [[-22.5, 3, 2.2], [-19, 3.5, 1.3], [-15.6, 2.6
 }
 export const BUNKER_MARKERS: readonly MapMarker[] = [
   ...BUNKER_BARRIERS.map(b => ({ id: b.id, type: 'zombieSpawn' as const, position: b.approachPath[0], label: 'Barricaded entry' })),
-  ...BUNKER_DOORS.map(d => ({ id: d.id, type: 'door' as const, position: d.position, label: d.prompt! })),
+  ...BUNKER_DOORS.map(d => ({ id: d.id, type: 'door' as const, position: d.position, label: doorPrompt(d) })),
   ...BUNKER_WALL_WEAPONS.map(w => ({ id: w.id, type: 'wallBuy' as const, position: w.position, label: w.prompt! })),
   { id: 'box-help', type: 'mysteryBox', position: BUNKER_MYSTERY_BOXES[0].position, label: 'Mystery Box [950]' },
 ];

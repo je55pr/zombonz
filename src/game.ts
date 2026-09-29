@@ -31,7 +31,7 @@ import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
   createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity, currentSpread,
-  type EntityId, type ZombieState, type Vec3, DOWN_RULES, damagePlayer, createInputFrame, type SimulationEvent,
+  type EntityId, type ZombieState, type Vec3, type PowerupKind, DOWN_RULES, damagePlayer, createInputFrame, type SimulationEvent,
 } from './core/index.ts';
 import { MAPS, isMapId, type MapId } from './maps/index.ts';
 import { createMatch, simulationMap } from './maps/match.ts';
@@ -193,7 +193,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   };
 
   const previewName = new URLSearchParams(location.search).get('preview');
-  const previewPowerup = new URLSearchParams(location.search).get('powerup');
+  const previewPowerup = (DEFAULT_POWERUP_CONFIG.kinds as readonly PowerupKind[])
+    .find(kind => kind === new URLSearchParams(location.search).get('powerup')) ?? 'maxAmmo';
   const forceAim = import.meta.env.DEV && new URLSearchParams(location.search).get('aim') === '1';
   const previewTeammate = import.meta.env.DEV ? new URLSearchParams(location.search).get('teammate') : null;
   const preview = import.meta.env.DEV && !net && previewName && Object.hasOwn(previewViews, previewName)
@@ -212,9 +213,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     } } : {}),
     ...(previewName === 'assets' && preview ? { powerupConfig: {
       ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 100, maxDropsPerRound: 1_000_000,
-      kinds: [previewPowerup === 'doublePoints' ? 'doublePoints'
-        : previewPowerup === 'instaKill' ? 'instaKill'
-          : previewPowerup === 'nuke' ? 'nuke' : 'maxAmmo'] as const,
+      kinds: [previewPowerup],
     } } : {}),
     ...(preview ? { roundConfig: { initialWaitTicks: previewName === 'barrier' || previewName === 'stress' ? 120 : 2147483647, intermissionTicks: 180 },
       economyConfig: { startingPoints: 10000, hitReward: 10, killBonus: 50 } }
@@ -273,6 +272,10 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       simulation.getPlayer(playerId)!.weapon = createWeaponState(testWeapon);
     }
     if (previewName === 'assets') {
+      // Keep a sample pickup in view for inspecting every kind, including Carpenter before barriers break.
+      simulation.state.powerups.drops.push({ id: 'preview:powerup', kind: previewPowerup,
+        position: { x: map.playerSpawn.x, y: map.playerSpawn.y, z: map.playerSpawn.z - 2.7 },
+        ticksRemaining: 2147483647 });
       const target = createZombieState(allocateEntityId(simulation.state.world),
         { x: map.playerSpawn.x, y: 0, z: map.playerSpawn.z - 5 }, 1);
       target.moveSpeed = 0; addEntity(simulation.state.world, target);

@@ -137,29 +137,29 @@ export const ASYLUM_UPPER_HEIGHT = UP;
 export const ASYLUM_BOX_CENTER: Vec3 = { x: -12, y: UP + 0.52, z: NORTH + 0.2 + 0.525 };
 
 /** A boarded door in a wall along z (at x) or along x (at z). */
-const plankDoor = (id: string, x: number, y: number, z: number, along: 'x' | 'z', cost: number, name: string): DoorDefinition => ({
-  id, position: { x, y, z }, cost, prompt: `E  Open ${name}  [${cost}]`, interactionRange: 2.6, minFacingDot: 0.2,
+const plankDoor = (id: string, x: number, y: number, z: number, along: 'x' | 'z', cost: number): DoorDefinition => ({
+  id, position: { x, y, z }, cost, interactionRange: 2.6, minFacingDot: 0.2,
   blocker: along === 'z'
     ? { min: { x: x - 0.2, y, z: z - DOOR_WIDTH / 2 }, max: { x: x + 0.2, y: y + 2.85, z: z + DOOR_WIDTH / 2 } }
     : { min: { x: x - DOOR_WIDTH / 2, y, z: z - 0.2 }, max: { x: x + DOOR_WIDTH / 2, y: y + 2.85, z: z + 0.2 } },
 });
 const stairDebris = (id: string, minX: number, maxX: number, z: number, height: number): DoorDefinition => ({
-  id, position: { x: (minX + maxX) / 2, y: height, z }, cost: 1000, prompt: 'E  Clear stair debris  [1000]',
+  id, position: { x: (minX + maxX) / 2, y: height, z }, cost: 1000, kind: 'debris',
   interactionRange: 2.8, minFacingDot: 0.2,
   blocker: { min: { x: minX, y: 0, z: z - 0.4 }, max: { x: maxX, y: UP + 1, z: z + 0.4 } },
 });
 export const ASYLUM_DOORS: readonly DoorDefinition[] = [
   // Verrückt's electric door between the starts opens only with the power switch.
-  { ...plankDoor('start-gate', 3, 0, 6, 'z', 0, 'power door'), requiresPower: true },
+  { ...plankDoor('start-gate', 3, 0, 6, 'z', 0), requiresPower: true },
   stairDebris('german-stairs', -29.8, -25.8, 10.8, 0.6),
-  plankDoor('left-upstairs', -24, UP, YARD.minZ, 'x', 750, 'Left Upstairs'),
-  plankDoor('power-west', -18, UP, -26, 'z', 1000, 'power room'),
-  plankDoor('american-hallway', 16, 0, 6, 'z', 750, 'hallway'),
-  plankDoor('bar-room', 16, 0, 11.5, 'z', 750, 'back room'),
+  plankDoor('left-upstairs', -24, UP, YARD.minZ, 'x', 750),
+  plankDoor('power-west', -18, UP, -26, 'z', 1000),
+  plankDoor('american-hallway', 16, 0, 6, 'z', 750),
+  plankDoor('bar-room', 16, 0, 11.5, 'z', 750),
   stairDebris('american-stairs', 21, 26, -9, 0.5),
-  plankDoor('right-upstairs', 18.5, UP, YARD.minZ, 'x', 750, 'Right Upstairs'),
-  plankDoor('kitchen', 16, UP, -26, 'z', 1000, 'kitchen'),
-  plankDoor('power-east', 0, UP, -26, 'z', 750, 'power room'),
+  plankDoor('right-upstairs', 18.5, UP, YARD.minZ, 'x', 750),
+  plankDoor('kitchen', 16, UP, -26, 'z', 1000),
+  plankDoor('power-east', 0, UP, -26, 'z', 750),
 ];
 
 const wallBuy = (id: string, weaponId: string, name: string, cost: number, position: Vec3): WallWeaponDefinition => ({

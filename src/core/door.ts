@@ -9,11 +9,18 @@ export interface DoorDefinition {
   position: Vec3;
   cost: number;
   blocker: CollisionBox;
+  /** Purchase wording follows the obstacle rather than the room behind it. */
+  kind?: 'door' | 'debris';
   prompt?: string;
   interactionRange?: number;
   minFacingDot?: number;
   /** An electric door: it cannot be bought, and opens by itself when the power comes on. */
   requiresPower?: boolean;
+}
+
+export function doorPrompt(definition: DoorDefinition): string {
+  if (definition.requiresPower) return POWER_REQUIRED_PROMPT;
+  return definition.prompt ?? `E  ${definition.kind === 'debris' ? 'Clear Debris' : 'Open Door'} [Cost: ${definition.cost}]`;
 }
 
 export interface DoorState {
@@ -37,7 +44,7 @@ export function createDoorInteractable(
   return createInteractableState(id, definition.position, {
     interactionType: 'door',
     actionId: `door:${definition.id}`,
-    prompt: definition.requiresPower ? POWER_REQUIRED_PROMPT : definition.prompt ?? `Press E to open [${definition.cost}]`,
+    prompt: doorPrompt(definition),
     interactionRange: definition.interactionRange,
     minFacingDot: definition.minFacingDot,
   });
