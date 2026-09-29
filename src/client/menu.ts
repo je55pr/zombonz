@@ -47,7 +47,8 @@ export type MenuAction =
 
 /** What the host should do after an action: start the solo game, persist settings or retry the download. */
 export type MenuEffect = { type: 'startSolo'; map: MapId } | { type: 'saveSettings'; settings: GameSettings }
-  | { type: 'retryDownload' } | { type: 'hostGame'; map: MapId } | { type: 'joinGame' } | null;
+  | { type: 'retryDownload' } | { type: 'hostGame'; map: MapId } | { type: 'joinGame' }
+  | { type: 'openBindings' } | null;
 
 const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
   sensitivity: 'Mouse sensitivity', fov: 'Field of view', volume: 'Volume',
@@ -75,6 +76,7 @@ export function menuItems(state: MenuState): MenuItem[] {
         ...(Object.keys(SETTING_LIMITS) as SettingKey[]).map(key => ({
           id: key, label: SETTING_LABELS[key], setting: key, value: formatSetting(key, state.settings[key]),
         })),
+        { id: 'bindings', label: 'Controls' },
         { id: 'back', label: 'Back' },
       ];
     case 'loading':
@@ -152,6 +154,7 @@ export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
       const hosted = MAP_CATALOG.find(map => `host:${map.id}` === item.id);
       if (hosted) return { type: 'hostGame', map: hosted.id };
       if (item.id === 'settings') { open(state, 'settings'); return null; }
+      if (item.id === 'bindings') return { type: 'openBindings' };
       if (item.id === 'back') { open(state, state.screen === 'hostMaps' ? 'multiplayer' : 'main'); return null; }
       if (item.id === 'retry') { setDownload(state, { ...INITIAL_DOWNLOAD }); return { type: 'retryDownload' }; }
       return null;

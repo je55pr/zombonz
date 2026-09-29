@@ -5,7 +5,7 @@ import type { MapId } from '../maps/catalog.ts';
 import type { WorldSnapshot } from './snapshot.ts';
 
 /** Bumped whenever messages or snapshots change shape; mismatched builds refuse to connect. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 export const MAX_PLAYERS = 4;
 /** The host sends a snapshot every third tick: 20 a second. */
 export const SNAPSHOT_INTERVAL_TICKS = 3;
@@ -41,6 +41,7 @@ export const NET_ACTIONS: readonly GameAction[] = [
   'moveForward', 'moveBackward', 'moveLeft', 'moveRight', 'sprint', 'aim', 'fire', 'reload', 'melee',
   'throwGrenade', 'switchWeapon', 'interact', 'toggleGodMode', 'toggleNoclip', 'flyUp', 'flyDown', 'restart',
   'placeMine',
+  'jump', 'crouch', 'prone', 'cancelGrenade',
 ];
 /** Actions only the host's own keyboard may use in a shared game: cheats, and restarting the match. */
 export const HOST_ONLY_ACTIONS: ReadonlySet<GameAction> = new Set(['toggleGodMode', 'toggleNoclip', 'flyUp', 'flyDown', 'restart']);

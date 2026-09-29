@@ -59,6 +59,7 @@ export function goDown(player: PlayerState): DamageEvent[] {
   player.health = 0;
   player.velocity = { x: 0, y: 0, z: 0 };
   player.sprinting = false; player.aiming = false;
+  player.grenadeWindupTicks = 0;
   return [{ type: 'playerDowned', playerId: player.id, amount: 0, health: 0 }];
 }
 

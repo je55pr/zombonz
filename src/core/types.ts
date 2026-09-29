@@ -30,6 +30,10 @@ export interface PlayerState extends EntityBase {
   yaw: number;
   pitch: number;
   sprinting: boolean;
+  stance: 'stand' | 'crouch' | 'prone';
+  grounded: boolean;
+  /** Remaining wind-up before the held grenade leaves the hand. */
+  grenadeWindupTicks: number;
   /** Remaining sprint stamina, in ticks. */
   sprintTicks: number;
   sprintRechargeDelayTicks: number;

@@ -37,6 +37,8 @@ export class PlayerView {
   private readonly fallback = new THREE.Group();
   private readonly revive: THREE.Sprite;
   private readonly gunMount = new THREE.Group();
+  private readonly nameTag: THREE.Sprite;
+  private model: THREE.Object3D | null = null;
   private gunId: string | null = null;
   private mixer: THREE.AnimationMixer | null = null;
   private readonly actions = new Map<Clip, THREE.AnimationAction>();
@@ -51,7 +53,7 @@ export class PlayerView {
     body.position.y = 0.85; this.fallback.add(body);
     this.root.add(this.fallback);
     this.root.add(this.gunMount);
-    const nameTag = label(name, '#e5ddc8', 0.22, true); nameTag.position.y = 2.05; this.root.add(nameTag);
+    this.nameTag = label(name, '#e5ddc8', 0.22, true); this.nameTag.position.y = 2.05; this.root.add(this.nameTag);
     this.revive = label('REVIVE', '#e0402f', 0.3, false); this.revive.position.y = 1.1; this.revive.visible = false;
     this.root.add(this.revive);
     void loadModel(TEAMMATE_MODEL).then(gltf => this.attach(gltf.scene, gltf.animations),
@@ -60,6 +62,7 @@ export class PlayerView {
 
   private attach(source: THREE.Object3D, clips: THREE.AnimationClip[]): void {
     const model = clone(source);
+    this.model = model;
     // The model faces +z; a player looks toward -z at yaw 0.
     model.rotation.y = Math.PI;
     model.traverse(object => {
@@ -96,9 +99,21 @@ export class PlayerView {
     this.root.position.set(position.x, position.y, position.z);
     this.root.rotation.y = player.yaw;
     const downed = player.downed !== null;
+    const prone = !downed && player.stance === 'prone';
+    const crouched = !downed && player.stance === 'crouch';
+    this.nameTag.position.y = prone ? 0.88 : crouched ? 1.48 : 2.05;
+    this.fallback.scale.y = crouched ? 0.72 : 1;
+    this.fallback.rotation.x = prone ? -1.12 : 0;
+    this.fallback.position.y = prone ? 0.28 : 0;
+    if (this.model) {
+      this.model.scale.y = crouched ? 0.72 : 1;
+      this.model.rotation.x = prone ? -1.12 : 0;
+      this.model.position.y = prone ? 0.28 : 0;
+    }
     this.revive.visible = downed;
     const speed = Math.hypot(player.velocity.x, player.velocity.z);
     if (downed) this.play('death', 1);
+    else if (prone) this.play('idle', 1);
     else if (speed > 1.6) this.play('run', Math.max(0.7, Math.min(2, speed / RUN_PACE)));
     else if (speed > 0.2) this.play('walk', Math.max(0.6, Math.min(1.4, speed / WALK_PACE)));
     else this.play('idle', 1);

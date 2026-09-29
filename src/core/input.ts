@@ -4,6 +4,11 @@ export type GameAction =
   | 'moveLeft'
   | 'moveRight'
   | 'sprint'
+  | 'jump'
+  | 'crouch'
+  | 'prone'
+  /** Internal control sent while an online player has the pause menu open. */
+  | 'cancelGrenade'
   | 'aim'
   | 'fire'
   | 'reload'

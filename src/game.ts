@@ -7,7 +7,7 @@ import { fitShadowCamera, placeMoon } from './client/shadowFit.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { ADS_LOOK_SCALE, aimedFov } from './client/aim.ts';
-import { DEFAULT_KEY_BINDINGS } from './client/bindings.ts';
+import { loadBindings, type KeyBindings } from './client/bindings.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
@@ -33,7 +33,7 @@ import { createGrenadeModel, createMineModel } from './client/explosiveModels.ts
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from './client/environmentProps.ts';
 import {
-  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, DEFAULT_POWERUP_CONFIG,
+  FixedStepClock, GameSimulation, PLAYER_MOVEMENT, playerEyeHeight, DEFAULT_POWERUP_CONFIG,
   createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity, currentSpread,
   type EntityId, type ZombieState, type Vec3, type PowerupKind, DOWN_RULES, damagePlayer, createInputFrame, type SimulationEvent,
 } from './core/index.ts';
@@ -56,6 +56,7 @@ export interface GameSession {
   resume(): void;
   restart(): void;
   updateSettings(settings: GameSettings): void;
+  updateBindings(bindings: KeyBindings): void;
   dispose(): void;
 }
 export interface GameHooks {
@@ -375,20 +376,25 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   }
 
   const clock = new FixedStepClock({ tickRate: 60 });
+  const bindings = loadBindings();
   const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022 * settings.sensitivity, previewFireKey: !!preview,
     // Looking around is slower while aiming, for a steadier, more accurate feel than hip fire.
     lookScale: () => simulation.getPlayer(playerId)?.aiming ? ADS_LOOK_SCALE : 1,
-    bindings: DEFAULT_KEY_BINDINGS });
+    bindings });
   const audio = new GameAudio(canvas);
   audio.setPaused(!preview);
   if (!preview) audio.startFromGesture();
   audio.setVolume(settings.volume);
   const pause = new SoloPauseController(canvas, window, document, paused => {
-    if (paused) input.clear();
+    if (paused) {
+      input.clear();
+      const player = simulation.getPlayer(playerId);
+      if (player) player.grenadeWindupTicks = 0;
+    }
     if (!net) { clock.reset(); previousPositions.clear(); audio.setPaused(paused); }
     hooks.onPauseChange?.(paused);
   }, !preview, () => !preview, !preview);
-  const hud = new CanvasHud(renderer, map.name, DEFAULT_KEY_BINDINGS);
+  const hud = new CanvasHud(renderer, map.name, bindings);
   const feedback = new HudFeedback();
   const netCleanup: Array<() => void> = [];
   if (net?.role === 'host') net.host.attach(simulation);
@@ -425,6 +431,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     }
     // With the menu open in a shared game, the player just stands still.
     const inputFrame = pause.paused && net ? createInputFrame(0) : input.consume();
+    if (pause.paused && net) inputFrame.actions.cancelGrenade = { held: false, pressed: true, released: false, value: 0 };
     if (forceAim) inputFrame.actions.aim = { held: true, pressed: false, released: false, value: 1 };
     let events: SimulationEvent[];
     if (net?.role === 'client') events = net.client.step(inputFrame);
@@ -464,7 +471,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     // A client's view eases out of any correction from the host rather than jumping.
     const correction = net?.role === 'client' ? net.client.correction : { x: 0, y: 0, z: 0 };
     camera.position.set(position.x + correction.x,
-      position.y + correction.y + (player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight), position.z + correction.z);
+      position.y + correction.y + (player.downed ? DOWN_RULES.eyeHeight : playerEyeHeight(player)), position.z + correction.z);
     const look = input.pendingLook();
     camera.rotation.x = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(PLAYER_MOVEMENT.maxPitch, player.pitch + look.pitch));
     camera.rotation.y = player.yaw + look.yaw;
@@ -661,6 +668,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       input.setSensitivity(0.0022 * settings.sensitivity);
       audio.setVolume(settings.volume);
     },
+    updateBindings: next => { input.setBindings(next); hud.setBindings(next); },
     dispose: () => {
       if (disposed) return;
       disposed = true;

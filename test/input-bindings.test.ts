@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BrowserInput } from '../src/client/input.ts';
-import { DEFAULT_KEY_BINDINGS, actionKeyLabel, actionsByKey, keyLabel } from '../src/client/bindings.ts';
+import { DEFAULT_KEY_BINDINGS, actionKeyLabel, actionsByKey, keyLabel, loadBindings, rebindKey, saveBindings } from '../src/client/bindings.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -21,6 +21,17 @@ function setup(options: { locked?: boolean; bindings?: Parameters<typeof actions
 }
 
 describe('key bindings', () => {
+  it('saves rebound controls and transfers a key away from its previous action', () => {
+    const data = new Map<string, string>();
+    const storage = { getItem: (key: string) => data.get(key) ?? null,
+      setItem: (key: string, value: string) => { data.set(key, value); } };
+    const rebound = rebindKey(DEFAULT_KEY_BINDINGS, 'reload', 'KeyG');
+    expect(rebound.placeMine).toEqual([]);
+    saveBindings(rebound, storage);
+    expect(loadBindings(storage).reload).toEqual(['KeyG']);
+    expect(loadBindings(storage).placeMine).toEqual([]);
+  });
+
   it('binds fly to K and god mode to L, with Space and C to move while flying', () => {
     expect(DEFAULT_KEY_BINDINGS.toggleNoclip).toEqual(['KeyK']);
     expect(DEFAULT_KEY_BINDINGS.toggleGodMode).toEqual(['KeyL']);
@@ -29,7 +40,7 @@ describe('key bindings', () => {
     key('KeyF'); key('KeyJ');
     expect(input.consume().actions).toEqual({});
     key('KeyK'); key('KeyL'); key('Space'); key('KeyC');
-    expect(Object.keys(input.consume().actions).sort()).toEqual(['flyDown', 'flyUp', 'toggleGodMode', 'toggleNoclip']);
+    expect(Object.keys(input.consume().actions).sort()).toEqual(['crouch', 'flyDown', 'flyUp', 'jump', 'toggleGodMode', 'toggleNoclip']);
     key('KeyG');
     expect(input.consume().actions.placeMine?.pressed).toBe(true);
     input.dispose();

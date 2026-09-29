@@ -6,6 +6,7 @@ import { MIN_EYE_RELIEF, adsPose, eyeRelief, sightPoints, type AimPose, type Sig
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
 import { createGrenadeModel, createMineModel } from './explosiveModels.ts';
 import { WEAPON_DEFINITIONS, reloadTicksFor, weaponName } from '../core/weapon.ts';
+import { GRENADE_RULES } from '../core/grenade.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
@@ -264,7 +265,13 @@ export class WeaponView {
     const hip = HIP_OFFSET_OVERRIDES[this.id] ?? (HANDGUNS.has(this.id) ? HIP_OFFSET_HANDGUN : HIP_OFFSET_LONG_GUN);
     const away = 1 - this.aimBlend;
     // Throwing a grenade or setting a mine: the gun dips out of the way while the thing is in the hand.
-    const toss = handToss(this.tossKind, Math.max(0, (tick - this.tossTick) / 60));
+    const winding = player.alive && !player.downed && player.grenadeWindupTicks > 0;
+    const tossKind = winding ? 'grenade' : this.tossKind;
+    const toss = !player.alive || player.downed ? { dip: 0, item: null }
+      : winding ? handToss('grenade', Math.min(0.299,
+        (GRENADE_RULES.windupTicks - player.grenadeWindupTicks) / GRENADE_RULES.windupTicks * 0.29))
+        : handToss(tossKind, this.tossKind === 'grenade' ? 0.3 + Math.max(0, (tick - this.tossTick) / 60)
+          : Math.max(0, (tick - this.tossTick) / 60));
     this.pose.position.set(ads.position.x + hip.x * away + bob + toss.dip * 0.08,
       ads.position.y + hip.y * away - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob) - toss.dip * 0.32,
       // A longer eye relief moves the aimed gun forward; the hip pose stays where it was.
@@ -274,7 +281,7 @@ export class WeaponView {
       0.12 * away, -reload * 0.45 + this.sprintBlend * 0.12 - toss.dip * 0.2))
       .multiply(this.aimTurn.identity().slerp(ads.quaternion, this.aimBlend));
     for (const kind of ['grenade', 'mine'] as const) {
-      const shown = kind === this.tossKind && toss.item !== null;
+      const shown = kind === tossKind && toss.item !== null;
       if (!shown && !this.held[kind]) continue;
       const item = this.heldItem(kind);
       item.visible = shown;

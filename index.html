@@ -13,7 +13,8 @@
     [hidden] { display: none !important; }
     .pause-menu { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center;
       background: rgba(3, 4, 4, .79); color: #e5ddc8; font-family: 'Oswald', sans-serif; }
-    .pause-panel { width: min(440px, calc(100vw - 36px)); padding: 38px 40px 26px;
+    .pause-panel { width: min(440px, calc(100vw - 36px)); max-height: calc(100vh - 24px); overflow-y: auto;
+      box-sizing: border-box; padding: 38px 40px 26px;
       background: linear-gradient(150deg, #22211e, #111312); border: 1px solid #6a433b;
       box-shadow: 0 24px 80px #000c, inset 0 1px #ffffff1c; text-align: center; }
     .pause-panel h1 { margin: 0; font: 68px 'Special Elite', Georgia, serif; letter-spacing: 2px; }
@@ -30,6 +31,21 @@
     .pause-setting output { color: #dbb75d; }
     .pause-panel p { margin: 25px 0 0; color: #aaa391; font: 14px 'Oswald', sans-serif; letter-spacing: 2px; }
     .pause-panel .pause-note { margin: -12px 0 18px; letter-spacing: 1px; }
+    .binding-editor { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center;
+      background: rgba(3, 4, 4, .88); color: #e5ddc8; font-family: 'Oswald', sans-serif; }
+    .binding-panel { box-sizing: border-box; width: min(560px, calc(100vw - 24px)); max-height: min(760px, calc(100vh - 24px));
+      display: flex; flex-direction: column; padding: 24px; background: linear-gradient(150deg, #22211e, #111312);
+      border: 1px solid #6a433b; box-shadow: 0 24px 80px #000c; }
+    .binding-panel h1 { margin: 0; text-align: center; font: 48px 'Special Elite', Georgia, serif; }
+    .binding-panel p { margin: 8px 0 16px; color: #aaa391; text-align: center; font-size: 15px; }
+    .binding-rows { overflow-y: auto; min-height: 0; }
+    .binding-row { display: grid; grid-template-columns: 1fr 156px; gap: 12px; align-items: center;
+      padding: 5px 2px; border-bottom: 1px solid #ffffff1a; font-size: 18px; }
+    .binding-editor button { padding: 7px 10px; border: 1px solid #5b5b50; background: #242723;
+      color: #e5ddc8; font: 17px 'Oswald', sans-serif; cursor: pointer; }
+    .binding-editor button:hover, .binding-editor button:focus-visible { border-color: #c64130; background: #44302b; outline: none; }
+    .binding-footer { display: flex; gap: 10px; margin-top: 18px; }
+    .binding-footer button { flex: 1; }
     .lobby { position: fixed; inset: 0; z-index: 3; display: grid; place-items: center; overflow-y: auto;
       background: rgba(3, 4, 4, .82); color: #e5ddc8; font-family: 'Oswald', sans-serif; }
     .lobby-panel { width: min(560px, calc(100vw - 32px)); margin: 16px 0; padding: 30px 34px 22px; box-sizing: border-box;
