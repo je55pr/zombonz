@@ -1,5 +1,6 @@
 import { moveWithCollision, type CollisionBox } from './collision.ts';
-import { createInteractableState } from './interaction.ts';
+import { ANY_FACING, createInteractableState } from './interaction.ts';
+import { SeededRng } from './rng.ts';
 import type { EntityId, InteractableState, Vec3, ZombieState } from './types.ts';
 
 /** `climbSpeed` (m/s) is how fast a zombie climbs a wall on its way in, such as onto a roof below an upstairs window. */
@@ -24,12 +25,64 @@ export interface BarrierDefinition {
 export interface BarrierState extends BarrierDefinition {
   interactableId: EntityId;
   boards: number;
+  /**
+   * Which of the `maxBoards` slots still hold a board: bit 0 is the lowest. Zombies tear, and players
+   * rebuild, a random slot rather than working top to bottom, so this is what the window looks like.
+   * Always has `boards` bits set (see `boardMask`).
+   */
+  mask: number;
+  /** The slot the last torn board came from, for its falling animation; -1 before any. */
+  lastTornSlot: number;
   tearTicks: number;
   repairTicks: number;
   repairerId: EntityId | null;
   vaultingZombieId: EntityId | null;
   lastTornTick: number;
 }
+/** Slots are the bits of a 32-bit mask, of which one is spare. */
+export const MAX_BOARD_SLOTS = 30;
+export const fullBoardMask = (slots: number): number => slots >= 31 ? 0x7fffffff : (1 << slots) - 1;
+const bitCount = (mask: number): number => { let n = 0; for (let m = mask >>> 0; m; m &= m - 1) n++; return n; };
+
+/**
+ * The barrier's board slots, always consistent with its `boards` count. The two only drift apart if
+ * something sets `boards` directly, in which case the lowest slots are taken as the ones that remain.
+ */
+export function boardMask(barrier: Pick<BarrierState, 'boards' | 'mask' | 'maxBoards'>): number {
+  return bitCount(barrier.mask) === barrier.boards ? barrier.mask : fullBoardMask(barrier.boards);
+}
+
+/** Puts every board back, as the Carpenter does. */
+export function restoreBarrier(barrier: BarrierState): void {
+  barrier.boards = barrier.maxBoards; barrier.mask = fullBoardMask(barrier.maxBoards);
+  barrier.repairTicks = 0; barrier.repairerId = null;
+}
+
+/** Scrambles every bit, so seeds that differ only slightly still pick differently. */
+function mix32(value: number): number {
+  let h = value >>> 0;
+  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
+  return h >>> 0;
+}
+
+function idHash(id: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) hash = Math.imul(hash ^ id.charCodeAt(i), 0x01000193);
+  return hash >>> 0;
+}
+
+/**
+ * A random slot that holds a board (`present`) or is empty, from the match seed and this barrier's own
+ * state, so every peer picks the same one. Call only when there is such a slot.
+ */
+function pickBoardSlot(barrier: BarrierState, present: boolean, seed: number, tick: number): number {
+  barrier.mask = boardMask(barrier);
+  const slots: number[] = [];
+  for (let slot = 0; slot < barrier.maxBoards; slot++) if (((barrier.mask >>> slot) & 1) === (present ? 1 : 0)) slots.push(slot);
+  const rng = new SeededRng(mix32(seed ^ idHash(barrier.id) ^ Math.imul(tick + 1, 0x9e3779b9) ^ Math.imul(barrier.mask + 1, 0x85ebca6b)));
+  return slots[rng.int(0, slots.length)];
+}
+
 export interface ZombieEntryState {
   barrierId: string;
   phase: 'approach' | 'breaking' | 'vaulting';
@@ -46,19 +99,21 @@ export type BarrierEvent =
 export function createBarrier(definition: BarrierDefinition, id: EntityId): {
   state: BarrierState; interactable: InteractableState;
 } {
-  if (!Number.isInteger(definition.maxBoards) || definition.maxBoards < 0 || definition.approachPath.length < 2) {
+  if (!Number.isInteger(definition.maxBoards) || definition.maxBoards < 0 || definition.maxBoards > MAX_BOARD_SLOTS
+    || definition.approachPath.length < 2) {
     throw new Error('A barrier needs a board count and an exterior approach path.');
   }
   return {
     state: { ...definition, position: { ...definition.position }, outward: { ...definition.outward },
       insidePoint: { ...definition.insidePoint }, approachPath: definition.approachPath.map(point => ({ ...point })),
-      interactableId: id, boards: definition.maxBoards, tearTicks: 0, repairTicks: 0,
+      interactableId: id, boards: definition.maxBoards, mask: fullBoardMask(definition.maxBoards), lastTornSlot: -1,
+      tearTicks: 0, repairTicks: 0,
       repairerId: null, vaultingZombieId: null, lastTornTick: -1 },
     interactable: createInteractableState(id,
       { x: definition.position.x - definition.outward.x * 0.25,
         y: definition.position.y + 1.2, z: definition.position.z - definition.outward.z * 0.25 }, {
         interactionType: 'barrier', actionId: `repair:${definition.id}`,
-        prompt: 'Hold E to rebuild barrier', interactionRange: 2.25, minFacingDot: 0.1,
+        prompt: 'Hold E to rebuild barrier', interactionRange: 2.25, minFacingDot: ANY_FACING,
       }),
   };
 }
@@ -103,7 +158,7 @@ export function prepareBarriers(barriers: BarrierState[], zombies: readonly Zomb
 
 /** Only this short, explicit window traversal may cross the solid sill. */
 export function updateZombieEntry(zombie: ZombieState, barrier: BarrierState,
-  zombies: readonly ZombieState[], dt: number, boxes: readonly CollisionBox[], tick: number): BarrierEvent[] {
+  zombies: readonly ZombieState[], dt: number, boxes: readonly CollisionBox[], tick: number, seed = 0): BarrierEvent[] {
   const entry = zombie.entry;
   if (!zombie.alive || !entry) return [];
   zombie.targetId = null;
@@ -130,6 +185,9 @@ export function updateZombieEntry(zombie: ZombieState, barrier: BarrierState,
     if (barrier.boards > 0) {
       if (leader?.id !== zombie.id || ++barrier.tearTicks < BARRIER_RULES.tearTicks) return [];
       barrier.tearTicks = 0;
+      // Any board still up may be the one that goes, not just the top one.
+      const slot = pickBoardSlot(barrier, true, seed, tick);
+      barrier.mask &= ~(1 << slot); barrier.lastTornSlot = slot;
       barrier.boards -= 1;
       barrier.lastTornTick = tick;
       return [{ type: 'barrierBoardRemoved', barrierId: barrier.id, zombieId: zombie.id, boards: barrier.boards }];
@@ -159,7 +217,8 @@ export function updateZombieEntry(zombie: ZombieState, barrier: BarrierState,
   return [{ type: 'zombieEntered', barrierId: barrier.id, zombieId: zombie.id }];
 }
 
-export function repairBarriers(barriers: BarrierState[], repairers: ReadonlyMap<string, EntityId>): BarrierEvent[] {
+export function repairBarriers(barriers: BarrierState[], repairers: ReadonlyMap<string, EntityId>,
+  seed = 0, tick = 0): BarrierEvent[] {
   const events: BarrierEvent[] = [];
   for (const barrier of barriers) {
     const playerId = repairers.get(barrier.id);
@@ -169,7 +228,8 @@ export function repairBarriers(barriers: BarrierState[], repairers: ReadonlyMap<
     if (barrier.repairerId !== playerId) barrier.repairTicks = 0;
     barrier.repairerId = playerId;
     if (++barrier.repairTicks < BARRIER_RULES.repairTicks) continue;
-    barrier.repairTicks = 0; barrier.boards += 1;
+    barrier.repairTicks = 0;
+    barrier.mask |= 1 << pickBoardSlot(barrier, false, seed, tick); barrier.boards += 1;
     events.push({ type: 'barrierBoardRepaired', barrierId: barrier.id, playerId, boards: barrier.boards });
   }
   return events;

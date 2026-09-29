@@ -5,7 +5,7 @@ import type { MapId } from '../maps/catalog.ts';
 import type { WorldSnapshot } from './snapshot.ts';
 
 /** Bumped whenever messages or snapshots change shape; mismatched builds refuse to connect. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 export const MAX_PLAYERS = 4;
 /** The host sends a snapshot every third tick: 20 a second. */
 export const SNAPSHOT_INTERVAL_TICKS = 3;

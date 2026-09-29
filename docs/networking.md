@@ -94,7 +94,7 @@ A snapshot (`src/net/snapshot.ts`) carries only what changes during play:
 - every player and zombie
 - the round and the spawn director
 - each door's `open` flag
-- barriers' boards and timers
+- barriers' boards (which slots are up, and which one last fell) and timers
 - the box's motion
 - traps' timers
 - power, power-ups, grenades and departed players

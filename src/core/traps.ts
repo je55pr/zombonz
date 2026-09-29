@@ -40,7 +40,7 @@ export function createTrap(definition: TrapDefinition, id: EntityId): { state: T
     activeTicks: 0, cooldownTicks: 0, ownerId: null };
   return { state, interactable: createInteractableState(id, definition.switchPosition, {
     interactionType: 'trap', actionId: `trap:${definition.id}`, prompt: trapPrompt(state, false),
-    interactionRange: 2, minFacingDot: 0.4,
+    interactionRange: 2, minFacingDot: 0.25,
   }) };
 }
 

@@ -479,7 +479,7 @@ export class GameSimulation {
         const swipe = tickWindowAttack(zombie, barrier, players);
         events.push(...swipe.events);
         if (!swipe.engaged) {
-          events.push(...updateZombieEntry(zombie, barrier, zombies, deltaSeconds, this.collisionBoxes(), world.tick));
+          events.push(...updateZombieEntry(zombie, barrier, zombies, deltaSeconds, this.collisionBoxes(), world.tick, world.seed));
         }
         continue;
       }
@@ -496,7 +496,7 @@ export class GameSimulation {
     }
     if (this.state.perkMachines.length) syncPerkInteractables(this.state.perkMachines, this.interactables(), this.state.power.on);
     // Repair resolves after entry decisions, so rebuilding cannot trap an active vault.
-    const repairEvents = repairBarriers(this.state.barriers, repairers);
+    const repairEvents = repairBarriers(this.state.barriers, repairers, world.seed, world.tick);
     events.push(...repairEvents);
     for (const event of repairEvents) if (event.type === 'barrierBoardRepaired') {
       const player = this.getPlayer(event.playerId);

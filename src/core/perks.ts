@@ -35,7 +35,8 @@ export function createPerkMachine(definition: PerkMachineDefinition, id: EntityI
     state: { id: definition.id, perk: definition.perk, interactableId: id },
     interactable: createInteractableState(id, definition.position, {
       interactionType: 'perk', actionId: `perk:${definition.id}`, prompt: perkPrompt(definition.perk, false),
-      interactionRange: 2.2, minFacingDot: 0.3,
+      // Facing roughly toward the machine is enough, and standing right against it always is.
+      interactionRange: 2.2, minFacingDot: 0,
     }),
   };
 }

@@ -1,3 +1,4 @@
+import { boardMask } from '../core/barrier.ts';
 import type { GrenadePool } from '../core/grenade.ts';
 import type { MysteryBoxState } from '../core/mysteryBox.ts';
 import type { PowerupState } from '../core/powerups.ts';
@@ -23,8 +24,8 @@ export interface WorldSnapshot {
   round: RoundState;
   director: SpawnDirectorState | null;
   doors: boolean[];
-  /** Boards, last torn tick, vaulting zombie, repairer, tear ticks, repair ticks. */
-  barriers: Array<[number, number, EntityId | null, EntityId | null, number, number]>;
+  /** Boards, last torn tick, vaulting zombie, repairer, tear ticks, repair ticks, board slots, last torn slot. */
+  barriers: Array<[number, number, EntityId | null, EntityId | null, number, number, number, number]>;
   boxes: BoxMotion[];
   /** Active ticks, cooldown ticks, owner. */
   traps: Array<[number, number, EntityId | null]>;
@@ -48,7 +49,7 @@ export function captureSnapshot(simulation: GameSimulation): WorldSnapshot {
     director: state.spawnDirector,
     doors: state.doors.map(door => door.open),
     barriers: state.barriers.map(barrier => [barrier.boards, barrier.lastTornTick, barrier.vaultingZombieId,
-      barrier.repairerId, barrier.tearTicks, barrier.repairTicks]),
+      barrier.repairerId, barrier.tearTicks, barrier.repairTicks, boardMask(barrier), barrier.lastTornSlot]),
     boxes: state.mysteryBoxes.map(box => ({ phase: box.phase, cooldownTicks: box.cooldownTicks, lastWeapon: box.lastWeapon,
       ownerId: box.ownerId, rolls: box.rolls, locationIndex: box.locationIndex, usesHere: box.usesHere, moves: box.moves,
       teddy: box.teddy })),
@@ -76,9 +77,9 @@ export function applySnapshot(simulation: GameSimulation, snapshot: WorldSnapsho
   state.round = snapshot.round;
   state.spawnDirector = snapshot.director;
   snapshot.doors.forEach((open, index) => { if (state.doors[index]) state.doors[index].open = open; });
-  snapshot.barriers.forEach(([boards, lastTornTick, vaultingZombieId, repairerId, tearTicks, repairTicks], index) => {
+  snapshot.barriers.forEach(([boards, lastTornTick, vaultingZombieId, repairerId, tearTicks, repairTicks, mask, lastTornSlot], index) => {
     const barrier = state.barriers[index];
-    if (barrier) Object.assign(barrier, { boards, lastTornTick, vaultingZombieId, repairerId, tearTicks, repairTicks });
+    if (barrier) Object.assign(barrier, { boards, lastTornTick, vaultingZombieId, repairerId, tearTicks, repairTicks, mask, lastTornSlot });
   });
   snapshot.boxes.forEach((motion, index) => { if (state.mysteryBoxes[index]) Object.assign(state.mysteryBoxes[index], motion); });
   snapshot.traps.forEach(([activeTicks, cooldownTicks, ownerId], index) => {

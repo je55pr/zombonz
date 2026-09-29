@@ -17,18 +17,18 @@ describe('window and treeline batching', () => {
     expect(view.planks.castShadow).toBe(true);
 
     // setState reports when a board moves, so the moon's shadow map is redrawn only then.
-    expect(view.setState(3, null)).toBe(true);
-    expect(view.setState(3, null)).toBe(false);
+    expect(view.setState(0b000111, -1, null)).toBe(true);
+    expect(view.setState(0b000111, -1, null)).toBe(false);
     expect(view.planks.count).toBe(3);
     expect(view.nails.count).toBe(6);
-    expect(view.setState(2, 0.4)).toBe(true);
-    expect(view.setState(2, 0.4)).toBe(false);
+    expect(view.setState(0b000011, 2, 0.4)).toBe(true);
+    expect(view.setState(0b000011, 2, 0.4)).toBe(false);
     expect(view.planks.count).toBe(3); // one torn board remains visible while it falls
     expect(view.nails.count).toBe(6);
     const falling = new THREE.Matrix4(), intact = new THREE.Matrix4();
     view.planks.getMatrixAt(2, falling); view.planks.getMatrixAt(1, intact);
     expect(falling.elements[13]).toBeLessThan(intact.elements[13]);
-    view.setState(map.windowBoards, null);
+    view.setState((1 << map.windowBoards) - 1, -1, null);
     expect(view.planks.count).toBe(map.windowBoards);
     expect(view.nails.count).toBe(map.windowBoards * 2);
   });

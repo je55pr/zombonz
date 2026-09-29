@@ -10,7 +10,8 @@ import { lampFlicker } from './atmosphere.ts';
 import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
 import { BOX_RULES } from '../core/mysteryBox.ts';
 import { PERKS, type PerkId } from '../core/perks.ts';
-import { WindowBoards } from './windowBoards.ts';
+import { WindowBoards, windowSeed } from './windowBoards.ts';
+import { boardMask } from '../core/barrier.ts';
 import { LightSource, type LightPool } from './lightPool.ts';
 
 // Wall guns are shown life-size; viewmodels are modelled at roughly 0.86x.
@@ -134,7 +135,8 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
     box(frame, concrete, 0, 0.83, 0, opening.width + 0.25, 0.15, 0.65);
     box(frame, iron, -opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
     box(frame, iron, opening.width / 2, 1.75, 0, 0.09, 1.8, 0.25);
-    barrierViews.set(opening.id, new WindowBoards(frame, opening.width, map.windowBoards, boards, iron, nailGeometry));
+    barrierViews.set(opening.id, new WindowBoards(frame, opening.width, map.windowBoards, boards, iron, nailGeometry,
+      windowSeed(opening.id)));
   }
   // Architecture lives in shared map data, so the visuals and collision agree.
   for (const rail of map.rails) {
@@ -422,7 +424,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
       const planks = barrierViews.get(barrier.id);
       if (!planks) continue;
       const elapsed = barrier.lastTornTick >= 0 ? (state.world.tick - barrier.lastTornTick) / 60 : null;
-      if (planks.setState(barrier.boards, elapsed)) moved = true;
+      if (planks.setState(boardMask(barrier), barrier.lastTornSlot, elapsed)) moved = true;
     }
     for (const door of state.doors) {
       const view = doorViews.get(door.id);
