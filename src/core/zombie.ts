@@ -61,11 +61,20 @@ export function createZombieState(id: EntityId, position: Vec3, round: number, g
   };
 }
 
+const HEALTH_CAP = 1_000_000_000;
+const healthByRound: number[] = [0, 150];
+/**
+ * Health of a zombie spawned in `round`, step for step as WaW's ai_calculate_health does it: 150 at the start,
+ * 100 more each round up to round 9, and from round 10 a tenth more than the round before, truncated each round
+ * (so round 11 is 1149, not the 1150 a single rounding would give). Capped so a long match cannot overflow.
+ */
 export function zombieHealthForRound(round: number): number {
-  const level = Math.max(1, Math.floor(round));
-  // Classic early-round ramp, then exponential scaling; bounded for long test runs.
-  return Math.min(1_000_000_000, Math.round((150 + 100 * Math.min(8, level - 1))
-    * 1.1 ** Math.min(200, Math.max(0, level - 9))));
+  const level = Math.min(400, Math.max(1, Math.floor(round)));
+  while (healthByRound.length <= level) {
+    const next = healthByRound.length, previous = healthByRound[next - 1];
+    healthByRound.push(Math.min(HEALTH_CAP, next >= 10 ? previous + Math.floor(previous * 0.1) : previous + 100));
+  }
+  return healthByRound[level];
 }
 function distanceSquared(a: Vec3, b: Vec3): number {
   const dx = a.x - b.x;

@@ -68,7 +68,7 @@ describe('hitscan weapons', () => {
     targets.forEach(target => { target.health = 500; });
     const events = firePlayerWeapon(player, ray, targets, []);
     expect(events.filter(event => event.type === 'weaponHit').map(event => event.zombieId)).toEqual(['e:2', 'e:3']);
-    expect(targets.map(target => target.health)).toEqual([500, 395, 350]);
+    expect(targets.map(target => target.health)).toEqual([500, 430, 400]);
   });
 
   it('gives a high-penetration rifle deeper ordered hits, stopped by a wall', () => {
@@ -81,8 +81,8 @@ describe('hitscan weapons', () => {
       const hits = firePlayerWeapon(player, ray, targets, wall).filter(event => event.type === 'weaponHit');
       return hits.map(hit => [hit.zombieId, hit.damage]);
     };
-    expect(makeShot(false)).toEqual([['e:2', 315], ['e:3', 268], ['e:4', 228], ['e:5', 193]]);
-    expect(makeShot(true)).toEqual([['e:2', 315], ['e:3', 268]]);
+    expect(makeShot(false)).toEqual([['e:2', 210], ['e:3', 179], ['e:4', 152], ['e:5', 129]]);
+    expect(makeShot(true)).toEqual([['e:2', 210], ['e:3', 179]]);
   });
 
   it('stops a penetrating round at a barrel after damaging the zombie ahead of it', () => {

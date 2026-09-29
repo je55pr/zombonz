@@ -142,7 +142,7 @@ describe('timed power-ups', () => {
     addEntity(sim.state.world, second);
     sim.tick({ [player.id]: fire });
     expect(second.alive).toBe(true);
-    expect(second.health).toBe(secondHealth - 150);
+    expect(second.health).toBe(secondHealth - 100);
   });
 
   it('detonates a Nuke before zombie attacks and awards a flat team bonus', () => {

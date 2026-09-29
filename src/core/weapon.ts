@@ -46,7 +46,13 @@ export interface HitZone {
 /** Checked top-down; an impact below every zone falls back to FALLBACK_HIT_ZONE. */
 export const ZOMBIE_HIT_ZONES: readonly HitZone[] = [{ id: 'head', minHeightFraction: 1.42 / 1.72 }];
 export const FALLBACK_HIT_ZONE: HitZoneId = 'body';
-export const DEFAULT_HIT_ZONE_MULTIPLIERS: Readonly<Record<HitZoneId, number>> = { head: 3, body: 1 };
+/**
+ * A headshot is worth twice a body shot unless the gun says otherwise. The pistol's 50 damage kills a round-1
+ * zombie (150 health) in three body shots, as in the Nazi Zombies wiki, and so in two headshots rather than one;
+ * bolt-action rifles and shotguns override this below. Zombie mode's own multipliers are not in the scripts we can
+ * read (multiplayer's is 1.4 for pistols, SMGs and rifles), so this is a balance choice: see docs/combat.md.
+ */
+export const DEFAULT_HIT_ZONE_MULTIPLIERS: Readonly<Record<HitZoneId, number>> = { head: 2, body: 1 };
 
 export function hitZoneMultiplier(definition: WeaponDefinition, zone: HitZoneId): number {
   return definition.hitZoneMultipliers?.[zone] ?? DEFAULT_HIT_ZONE_MULTIPLIERS[zone];

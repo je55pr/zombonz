@@ -28,7 +28,7 @@ describe('classic survival health', () => {
     expect(player.health).toBe(0); expect(player.downed).not.toBeNull();
   });
   it('ramps zombie health through round nine then scales exponentially', () => {
-    expect([1, 2, 3, 9, 10, 11].map(zombieHealthForRound)).toEqual([150, 250, 350, 950, 1045, 1150]);
+    expect([1, 2, 3, 9, 10, 11].map(zombieHealthForRound)).toEqual([150, 250, 350, 950, 1045, 1149]);
     expect(createZombieState('e:2', origin, 10).health).toBe(1045);
     expect(zombieHealthForRound(10000)).toBe(1_000_000_000);
   });
@@ -38,10 +38,15 @@ describe('headshots and knife', () => {
   it('classifies body and head impacts and rewards headshot kills once', () => {
     const player = createPlayerState('e:1', origin);
     const target = createZombieState('e:2', { x: 0, y: 0, z: -4 }, 1);
+    // One pistol headshot (twice the body damage) leaves a round-1 zombie standing; the second kills it.
+    const first = firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
+    expect(first).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'head', damage: 100 }));
+    expect(target.alive).toBe(true);
+    player.weapon.cooldownTicks = 0;
     const events = firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'head', damage: 150 }));
-    awardCombatPoints(player, events);
-    expect(player.points).toBe(600);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'head', damage: 50 }));
+    awardCombatPoints(player, [...first, ...events]);
+    expect(player.points).toBe(610);
     expect(target.alive).toBe(false);
     expect(firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], [])).toEqual([]);
     const body = createZombieState('e:3', { x: 0, y: 0, z: -4 }, 1);
@@ -59,7 +64,7 @@ describe('headshots and knife', () => {
     expect(at(0.3)).toMatchObject({ kind: 'zombie', hitZone: 'body' });
   });
   it('uses per-weapon headshot multipliers: the Kar98k one-shots through round 3 only', () => {
-    expect(hitZoneMultiplier(WEAPON_DEFINITIONS['starter-pistol'], 'head')).toBe(3);
+    expect(hitZoneMultiplier(WEAPON_DEFINITIONS['starter-pistol'], 'head')).toBe(2);
     expect(hitZoneMultiplier(WEAPON_DEFINITIONS.kar98k, 'head')).toBe(4);
     expect(hitZoneMultiplier(WEAPON_DEFINITIONS.kar98k, 'body')).toBe(1);
     for (const [round, dies] of [[3, true], [4, false]] as const) {
