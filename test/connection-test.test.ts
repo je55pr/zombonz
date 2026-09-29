@@ -178,9 +178,9 @@ function fakeBrowser(gather: (urls: string[]) => Gathered, options: { invite?: '
     createConnection: configuration => new FakeConnection(configuration) as unknown as RTCPeerConnection,
     createInvite: async () => {
       if (options.invite === 'fail') throw new Error('This browser has no WebRTC.');
-      return { code: encodeSession('invite', session), cancel: () => {}, accept: async () => hostLink };
+      return { code: encodeSession('invite', session), cancel: () => {}, log: () => '', accept: async () => hostLink };
     },
-    answerInvite: async () => ({ reply: 'ZBR1-x', cancel: () => {}, connected: Promise.resolve(joinLink) }),
+    answerInvite: async () => ({ reply: 'ZBR2-x', startsAt: Date.now(), cancel: () => {}, log: () => '', connected: Promise.resolve(joinLink) }),
     now: () => performance.now(), userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/141.0.0.0 Safari/537.36',
     online: true, build: 'abc1234', protocol: 8,
   };

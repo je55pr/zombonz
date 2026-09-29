@@ -259,9 +259,9 @@ async function selfTest(env: TestEnvironment): Promise<SelfTest> {
         host: kinds.filter(c => c.type === 'host').length, relay: kinds.filter(c => c.type === 'relay').length,
         public: kinds.filter(c => c.type === 'srflx' || c.type === 'prflx').length,
       };
-      const join = await env.answerInvite(invite.code, SELF_TEST_LIMIT_MS);
+      const join = await env.answerInvite(invite.code, { timeoutMs: SELF_TEST_LIMIT_MS, startDelayMs: 0 });
       pending.push(join);
-      const [hostLink, joinLink] = await Promise.all([invite.accept(join.reply, SELF_TEST_LIMIT_MS), join.connected]);
+      const [hostLink, joinLink] = await Promise.all([invite.accept(join.reply, { timeoutMs: SELF_TEST_LIMIT_MS }), join.connected]);
       links.push(hostLink, joinLink);
       result.connectMs = Math.round(env.now() - start) - result.inviteMs;
       const received = { reliable: false, fast: false };

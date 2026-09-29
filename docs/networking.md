@@ -9,9 +9,14 @@ copy-paste codes. There is no game server.
 1. The host chooses **Multiplayer → Host Game** and a map, then **Invite a player**. This makes an
    invite code (`ZBI1-…`, about 180 characters) to send to one friend over chat or text.
 2. The friend chooses **Multiplayer → Join Game**, pastes the invite, and gets a reply code
-   (`ZBR1-…`) to send back.
-3. The host pastes the reply and presses **Connect**. The friend appears in both lobbies.
+   (`ZBR2-…`) to send back. A 45-second countdown starts on their screen.
+3. The host pastes the reply and presses **Connect**, before that countdown ends. The host's screen counts down to the
+   same moment; when both reach zero the two browsers connect, and the friend appears in both lobbies.
 4. Repeat with a new invite for each player (up to four in all), then the host presses **Start game**.
+
+If the host is too slow the reply has expired and the host is told to ask for a new one; the friend just presses
+**Make my reply code** again. **Copy log**, which appears once an invite or reply has been made, copies a short timeline of
+the connection (no addresses) to send along if a connection still fails.
 
 Every player needs the same version of the game. A different version is refused with a message.
 Each invite works once. Codes carry a checksum, so a code that was cut short or pasted into the
@@ -59,6 +64,23 @@ The first line of the text is the result: `GOOD`, `MAYBE` (only IPv6 was found, 
 ports could not be compared) or `PROBLEM` (offline, WebRTC blocked, no public address found, or a symmetric NAT with no IPv6),
 with a sentence on why. Both players' networks matter: a good result on one side and a problem on the other still fails, so
 ask both to run it.
+
+## Why both sides start together
+
+A browser starts sending connection probes the moment it has both halves of the exchange, and gives up after about ten
+seconds. A home router drops what arrives from an address it has not sent anything to. In the old flow the friend's browser
+had both halves as soon as it made the reply code, so it probed for the whole time it took the reply to reach the host through
+a chat (a minute, say), sent everything into the host's router, and had given up by the time the host pressed **Connect**.
+Two browsers on one computer hid this, because the host's own machine answered the early probes. It was reproduced by putting an
+unreachable address in the invite, standing in for a router that drops them: a host that pasted within 10 seconds connected,
+and one that took 15 seconds or more never did.
+
+So the joiner names a start time in its reply code (45 seconds ahead, in the game server's clock: each side finds its offset
+from the `Date` header of the page's own server, good to about a second). The joiner gives its browser the host's invite
+without any addresses, so it has nothing to try, and nothing to give up on, and adds the addresses at the start time.
+The host reads the start time from the reply and waits for it before giving its browser the reply. Both start within about
+a second of each other. A reply read up to four seconds after its start time still starts at once; later than that it has
+expired. Code: `src/network/webrtc.ts` (`START_DELAY_MS`, `timeUntilStart`, `clockOffset`) and `src/network/codes.ts`.
 
 ## Transport
 
@@ -174,7 +196,7 @@ Development builds expose `window.zombonz` (`{ simulation, playerId, net }`) for
 
 ## Not yet
 
-- A room-code server, so codes can be short (#39, #40).
+- A room-code server, so codes can be short and nobody has to paste anything or watch a countdown (#39, #40).
 - A TURN relay for networks that block direct connections (#46).
 - Reconnecting after a drop.
 - An automated two-browser test (#44).
