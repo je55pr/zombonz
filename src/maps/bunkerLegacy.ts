@@ -130,7 +130,6 @@ for (const z of [-7.4, -3.8, -0.2, 3.4]) {
 shell.push(planBox(3.3, 3.01, 2.6, 0.65, 0.3, 10.4, 'wall'));
 shell.push(planBox(7, 3.01, 4.5, 0.65, 0.3, 6.6, 'wall'));
 shell.push(planBox(-1.65, 5.1, -7.5, 0.45, 3.4, 4, 'wall'), planBox(-5.2, 5.1, -9.3, 2, 3.4, 0.28, 'wall'));
-shell.push(planBox(-3.4, 4.35, -4.5, 1.2, 1.9, 0.55, 'barrier'));
 shell.push(planBox(2.7, 4.9, -2.2, 0.7, 3, 0.9, 'wall'), planBox(3.3, 4.95, 3.4, 0.65, 3.1, 0.65, 'wall'));
 
 // Quarter-turn fan stair, followed by a short westbound straight flight (all scaled as one shape).

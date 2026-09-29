@@ -24,6 +24,8 @@ export * from './blast.ts';
 export * from './hazard.ts';
 export * from './equipment.ts';
 export * from './perks.ts';
+export * from './upgrades.ts';
+export * from './packAPunch.ts';
 export * from './traps.ts';
 export * from './downs.ts';
 export * from './zombieBody.ts';

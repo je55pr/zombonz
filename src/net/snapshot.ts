@@ -1,5 +1,6 @@
 import { boardMask } from '../core/barrier.ts';
 import { HAZARD_PHASES } from '../core/hazard.ts';
+import { PACK_A_PUNCH_PHASES } from '../core/packAPunch.ts';
 import type { GrenadePool } from '../core/grenade.ts';
 import type { MysteryBoxState } from '../core/mysteryBox.ts';
 import type { PowerupState } from '../core/powerups.ts';
@@ -33,6 +34,8 @@ export interface WorldSnapshot {
   traps: Array<[number, number, EntityId | null]>;
   /** Health, phase (an index into HAZARD_PHASES), burn ticks, last attacker. */
   hazards: Array<[number, number, number, EntityId | null]>;
+  /** Phase (an index into PACK_A_PUNCH_PHASES), owner, the upgraded gun in it, ticks left. */
+  pap: Array<[number, EntityId | null, string | null, number]>;
   power: boolean;
   powerups: PowerupState;
   grenades: GrenadePool;
@@ -60,6 +63,8 @@ export function captureSnapshot(simulation: GameSimulation): WorldSnapshot {
       teddy: box.teddy })),
     traps: state.traps.map(trap => [trap.activeTicks, trap.cooldownTicks, trap.ownerId]),
     hazards: state.hazards.map(hazard => [hazard.health, HAZARD_PHASES.indexOf(hazard.phase), hazard.burnTicks, hazard.attackerId]),
+    pap: state.packAPunch.map(machine => [PACK_A_PUNCH_PHASES.indexOf(machine.phase), machine.ownerId, machine.weaponId,
+      machine.cooldownTicks]),
     power: state.power.on,
     powerups: state.powerups,
     grenades: state.grenades,
@@ -95,6 +100,10 @@ export function applySnapshot(simulation: GameSimulation, snapshot: WorldSnapsho
   snapshot.hazards.forEach(([health, phase, burnTicks, attackerId], index) => {
     const hazard = state.hazards[index];
     if (hazard) Object.assign(hazard, { health, phase: HAZARD_PHASES[phase] ?? 'intact', burnTicks, attackerId });
+  });
+  snapshot.pap.forEach(([phase, ownerId, weaponId, cooldownTicks], index) => {
+    const machine = state.packAPunch[index];
+    if (machine) Object.assign(machine, { phase: PACK_A_PUNCH_PHASES[phase] ?? 'idle', ownerId, weaponId, cooldownTicks });
   });
   state.power.on = snapshot.power;
   state.powerups = snapshot.powerups;

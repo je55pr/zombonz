@@ -24,6 +24,8 @@ import { createHazard, hazardSolids, hazardTargets, hazardWrecks, tickHazards,
   type HazardDefinition, type HazardEvent, type HazardState } from './hazard.ts';
 import { createEquipmentInteractable, createEquipmentState, handleEquipmentInteraction,
   type EquipmentBuyDefinition, type EquipmentBuyState, type EquipmentEvent } from './equipment.ts';
+import { createPackAPunch, handlePackAPunchInteraction, packAPunchBlocker, packAPunchPrompt, syncPackAPunchInteractables,
+  tickPackAPunch, type PackAPunchDefinition, type PackAPunchEvent, type PackAPunchState } from './packAPunch.ts';
 import { collectPowerups, createPowerupState, startPowerupRound, tickPowerupLifetime, tryDropPowerup, updatePowerupThreshold,
   DEFAULT_POWERUP_CONFIG, type PowerupConfig, type PowerupEvent, type PowerupState } from './powerups.ts';
 import {
@@ -73,6 +75,8 @@ export interface SimulationMap {
   hazards?: readonly HazardDefinition[];
   /** Equipment (Bouncing Betties) sold from the wall. */
   equipment?: readonly EquipmentBuyDefinition[];
+  /** Pack-a-Punch machines; their bodies are solid, and they need the power on. */
+  packAPunch?: readonly PackAPunchDefinition[];
   /** How likely each look (see `ZombieState.variant`) is for a new zombie; a map with none has only the first. */
   zombieLooks?: readonly number[];
 }
@@ -94,6 +98,7 @@ export interface SimulationState {
   /** One per map hazard, in the map's order. */
   hazards: HazardState[];
   equipment: EquipmentBuyState[];
+  packAPunch: PackAPunchState[];
   /** Players who left a co-op match: out for good, even across restarts. */
   leftPlayers: EntityId[];
 }
@@ -116,7 +121,7 @@ export function nextMatchSeed(seed: number): number {
 }
 
 export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieMeleeEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
-  | PowerEvent | PerkEvent | TrapEvent | DownEvent | HazardEvent | EquipmentEvent;
+  | PowerEvent | PerkEvent | TrapEvent | DownEvent | HazardEvent | EquipmentEvent | PackAPunchEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -139,6 +144,8 @@ export class GameSimulation {
   private readonly powerupConfig: PowerupConfig;
   private readonly playerSpawns: readonly Vec3[];
   private navigationCache?: { doors: string; query: NavigationQuery };
+  /** The solid bodies of this match's Pack-a-Punch machines. */
+  private packBlockers: CollisionBox[] = [];
 
   constructor(options: GameSimulationOptions) {
     this.map = options.map;
@@ -206,15 +213,22 @@ export class GameSimulation {
       addEntity(world, createEquipmentInteractable(interactableId, definition));
       equipment.push(createEquipmentState(definition, interactableId));
     }
+    const packAPunch: PackAPunchState[] = [];
+    for (const definition of this.map.packAPunch ?? []) {
+      const machine = createPackAPunch(definition, allocateEntityId(world));
+      packAPunch.push(machine.state); addEntity(world, machine.interactable);
+    }
+    this.packBlockers = packAPunch.map(packAPunchBlocker);
     const power = { on: !this.map.powerSwitch };
     const interactables = Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable');
     syncPerkInteractables(perkMachines, interactables, power.on, this.playerIds.length);
+    syncPackAPunchInteractables(packAPunch, interactables, power.on);
     syncTrapInteractables(traps, interactables, power.on);
     return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
       powerups: createPowerupState(this.playerIds.length * this.economyConfig.startingPoints, this.powerupConfig),
       grenades: createGrenadePool(), power, perkMachines, traps, hazards: (this.map.hazards ?? []).map(createHazard),
-      equipment, leftPlayers: [] };
+      equipment, packAPunch, leftPlayers: [] };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -251,6 +265,7 @@ export class GameSimulation {
     syncPerkInteractables(this.state.perkMachines, items, this.state.power.on, this.playerIds.length,
       this.players()[0]?.selfRevives ?? 0);
     syncTrapInteractables(this.state.traps, items, this.state.power.on);
+    syncPackAPunchInteractables(this.state.packAPunch, items, this.state.power.on);
   }
 
   getPlayer(id: EntityId): PlayerState | null {
@@ -262,7 +277,7 @@ export class GameSimulation {
   private wallBoxes(): CollisionBox[] {
     const boxes = this.state.mysteryBoxes.filter(box => box.locations.length && box.phase !== 'away')
       .map(box => mysteryBoxBlocker(box.locations[box.locationIndex]));
-    return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors), ...boxes];
+    return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors), ...boxes, ...this.packBlockers];
   }
 
   /** Everything solid to walk into: the walls, and every hazard that has not vanished. */
@@ -328,7 +343,9 @@ export class GameSimulation {
       facingDot: 1 };
     const candidate = player ? findInteractionCandidate(player, this.reachableInteractables(player)) : null;
     const box = this.state.mysteryBoxes.find(box => box.interactableId === candidate?.interactableId);
-    return candidate && box ? { ...candidate, prompt: mysteryBoxPrompt(box, playerId) } : candidate;
+    if (candidate && box) return { ...candidate, prompt: mysteryBoxPrompt(box, playerId) };
+    const machine = this.state.packAPunch.find(machine => machine.interactableId === candidate?.interactableId);
+    return candidate && machine ? { ...candidate, prompt: packAPunchPrompt(machine, player ?? undefined, this.state.power.on) } : candidate;
   }
 
   private navigationQuery(): NavigationQuery {
@@ -349,7 +366,7 @@ export class GameSimulation {
       if (!item.enabled || Math.hypot(item.position.x - player.position.x,
         item.position.y - player.position.y, item.position.z - player.position.z) > item.interactionRange) return false;
       const blockers = [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors
-        .filter(door => door.interactableId !== item.id)), ...(this.map.shotBlockers ?? [])];
+        .filter(door => door.interactableId !== item.id)), ...(this.map.shotBlockers ?? []), ...this.packBlockers];
       return hasClearNavigationLine(eye, item.position, blockers, 0, 0);
     });
   }
@@ -390,6 +407,7 @@ export class GameSimulation {
     const world = this.state.world;
     events.push(...tickPowerupLifetime(this.state.powerups));
     events.push(...tickMysteryBoxes(this.state.mysteryBoxes, this.interactables(), livingPlayers(world), world.seed ^ world.tick));
+    if (this.state.packAPunch.length) events.push(...tickPackAPunch(this.state.packAPunch, livingPlayers(world)));
     const repairers = new Map<string, EntityId>();
 
     const playerFrames = new Map<EntityId, InputFrame>();
@@ -445,6 +463,7 @@ export class GameSimulation {
           events.push(...buyPerk(player, interaction, this.state.perkMachines, this.state.power.on, this.playerIds.length));
           events.push(...activateTrap(player, interaction, this.state.traps, this.state.power.on));
           events.push(...handleEquipmentInteraction(player, interaction, this.state.equipment));
+          events.push(...handlePackAPunchInteraction(player, interaction, this.state.packAPunch, this.state.power.on));
         }
       }
     }
@@ -584,6 +603,7 @@ export class GameSimulation {
     }
     if (this.state.perkMachines.length) syncPerkInteractables(this.state.perkMachines, this.interactables(),
       this.state.power.on, this.playerIds.length, this.players()[0]?.selfRevives ?? 0);
+    if (this.state.packAPunch.length) syncPackAPunchInteractables(this.state.packAPunch, this.interactables(), this.state.power.on);
     // Repair resolves after entry decisions, so rebuilding cannot trap an active vault.
     const repairEvents = repairBarriers(this.state.barriers, repairers, world.seed, world.tick);
     events.push(...repairEvents);

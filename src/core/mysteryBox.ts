@@ -1,7 +1,7 @@
 import { spendPoints, type EconomyEvent } from './economy.ts';
 import { createInteractableState, type InteractionEvent } from './interaction.ts';
 import { SeededRng } from './rng.ts';
-import { equipWeapon, ownedWeapon, weaponName, WEAPON_DEFINITIONS } from './weapon.ts';
+import { equipWeapon, ownedWeaponOrUpgrade, weaponName, WEAPON_DEFINITIONS } from './weapon.ts';
 import type { CollisionBox } from './collision.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3 } from './types.ts';
 
@@ -145,7 +145,7 @@ export function useMysteryBox(player: PlayerState, interaction: InteractionEvent
     return [{ type: 'mysteryBoxClaimed', playerId: player.id, boxId: box.id, weaponId: box.lastWeapon }];
   }
   if (box.phase !== 'idle') return [];
-  const pool = box.weapons.filter(id => !ownedWeapon(player, id));
+  const pool = box.weapons.filter(id => !ownedWeaponOrUpgrade(player, id));
   if (!pool.length) return [{ type: 'mysteryBoxUnavailable', playerId: player.id, boxId: box.id }];
   const spend = spendPoints(player, box.cost, `box:${box.id}`);
   if (spend.type === 'pointsSpendRejected') return [spend];

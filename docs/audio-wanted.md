@@ -75,3 +75,18 @@ Each one is: drop the file in beside the other sources, add a row to `CLIPS` in 
 runtime name, maximum seconds), run it, add the name to `AUDIO_CLIPS` in `src/client/audioClips.ts`, and swap the
 stand-in in `src/client/audio.ts` for the new name (with a variant chosen per event where there are several files).
 The mix level for each kind is in `MIX` there.
+
+## Pack-a-Punch
+
+The machine (see [pack-a-punch.md](pack-a-punch.md)) plays the game's existing clips as stand-ins. The recordings that would
+suit it: a heavy metal clunk with a rising electrical hum for the gun going in; a machine working, looped, a few seconds of
+pistons and a low resonant whine; a bright chime with a hiss of steam for the gun being ready; and a solid clack of the tray
+for taking it. Same requirements as above.
+
+| Event | Stand-in (existing clip, pitch) |
+| --- | --- |
+| The gun goes in | `door-metal` pitched down, `mechanical-button` pitched down and `electric-powerup` |
+| Working | nothing |
+| The gun is ready | `electric-powerup` and `pickup` pitched up |
+| The gun is taken | `pickup` and `mechanical-click` |
+| Refused (power, second gun, unsupported) | `buy-denied` |

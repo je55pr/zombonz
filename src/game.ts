@@ -34,7 +34,7 @@ import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/envi
 import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from './client/environmentProps.ts';
 import {
   FixedStepClock, GameSimulation, PLAYER_MOVEMENT, playerEyeHeight, DEFAULT_POWERUP_CONFIG,
-  createWeaponState, createZombieState, WEAPON_DEFINITIONS, allocateEntityId, addEntity, currentSpread,
+  createWeaponState, createZombieState, weaponDefinition, allocateEntityId, addEntity, currentSpread,
   type EntityId, type ZombieState, type Vec3, type PowerupKind, DOWN_RULES, damagePlayer, createInputFrame, type SimulationEvent,
 } from './core/index.ts';
 import { MAPS, isMapId, type MapId } from './maps/index.ts';
@@ -285,7 +285,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     for (const door of simulation.state.doors) door.open = true;
     for (const item of simulation.interactables()) if (item.interactionType === 'door') item.enabled = false;
     const testWeapon = new URLSearchParams(location.search).get('weapon');
-    if (testWeapon && Object.hasOwn(WEAPON_DEFINITIONS, testWeapon)) {
+    if (testWeapon && weaponDefinition(testWeapon)) {
       simulation.getPlayer(playerId)!.weapon = createWeaponState(testWeapon);
     }
     if (previewName === 'assets') {
@@ -505,6 +505,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     if (wall) prepareWeaponModel(wall.weaponId);
     const holstered = simulation.getPlayer(playerId)?.holsteredWeapon;
     if (holstered) prepareWeaponModel(holstered.weaponId);
+    // The upgraded gun is drawn while it is made, and held the moment it is taken.
+    for (const machine of simulation.state.packAPunch) if (machine.weaponId) prepareWeaponModel(machine.weaponId);
     // Teammates carry real guns too.
     for (const id of names.keys()) { const weapon = simulation.getPlayer(id)?.weapon.weaponId; if (weapon) prepareWeaponModel(weapon); }
   }

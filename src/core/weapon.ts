@@ -9,6 +9,7 @@ import { blastHazards, damageHazard, type HazardEvent, type HazardTarget } from 
 import { clearLine, rayAabbDistance } from './ray.ts';
 import { rayZombieBody, zombieChest, type BodyPart } from './zombieBody.ts';
 import { dismember, type GoreEvent } from './gore.ts';
+import { UPGRADED_SUFFIX, UPGRADE_SPECS, upgradedDefinition } from './upgrades.ts';
 export { rayAabbDistance } from './ray.ts';
 
 export interface WeaponDefinition {
@@ -212,12 +213,27 @@ export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   },
 };
 
+/**
+ * Every Pack-a-Punched gun, by its own id (`<base>-pap`; see upgrades.ts). They are not in WEAPON_DEFINITIONS, which
+ * is the guns that can be found and bought; a player only ever holds one after the machine.
+ */
+export const UPGRADED_WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = Object.fromEntries(
+  Object.entries(UPGRADE_SPECS).map(([base, spec]) => {
+    const upgraded = upgradedDefinition(WEAPON_DEFINITIONS[base], spec);
+    return [upgraded.id, upgraded];
+  }));
+
+/** A gun's definition by its id, upgraded guns included. */
+export function weaponDefinition(id: string): WeaponDefinition | undefined {
+  return WEAPON_DEFINITIONS[id] ?? UPGRADED_WEAPON_DEFINITIONS[id];
+}
+
 export function weaponName(id: string): string {
-  return WEAPON_DEFINITIONS[id]?.name ?? id.toUpperCase();
+  return weaponDefinition(id)?.name ?? id.toUpperCase();
 }
 
 export function createWeaponState(weaponId: string): WeaponState {
-  const definition = WEAPON_DEFINITIONS[weaponId];
+  const definition = weaponDefinition(weaponId);
   if (!definition) throw new Error(`Unknown weapon: ${weaponId}`);
   return {
     weaponId: definition.id, cooldownTicks: 0,
@@ -234,6 +250,11 @@ export const WEAPON_SWITCH_TICKS = 24;
 
 export function ownedWeapon(player: PlayerState, id: string): WeaponState | undefined {
   return [player.weapon, player.holsteredWeapon].find(weapon => weapon?.weaponId === id) ?? undefined;
+}
+
+/** The player's copy of a gun, or of its Pack-a-Punched version. */
+export function ownedWeaponOrUpgrade(player: PlayerState, id: string): WeaponState | undefined {
+  return ownedWeapon(player, id) ?? ownedWeapon(player, `${id}${UPGRADED_SUFFIX}`);
 }
 
 /** Fill the second slot first; only a third distinct gun replaces the held weapon. */
@@ -389,7 +410,7 @@ export function reloadTicksFor(player: PlayerState, definition: WeaponDefinition
 }
 
 export function beginReload(player: PlayerState): WeaponEvent[] {
-  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  const definition = weaponDefinition(player.weapon.weaponId);
   if (!definition || !player.alive || player.meleeCooldownTicks > 0 || player.switchTicksRemaining > 0) return [];
   if (player.weapon.reloadTicksRemaining > 0) return [];
   if (player.weapon.magazineAmmo >= definition.magazineSize || player.weapon.reserveAmmo <= 0) return [];
@@ -399,7 +420,7 @@ export function beginReload(player: PlayerState): WeaponEvent[] {
 }
 
 function completeReload(player: PlayerState): WeaponEvent[] {
-  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  const definition = weaponDefinition(player.weapon.weaponId);
   if (!definition) return [];
   const missing = Math.max(0, definition.magazineSize - player.weapon.magazineAmmo);
   const loaded = Math.min(missing, player.weapon.reserveAmmo);
@@ -423,7 +444,7 @@ export const DEFAULT_AIM_SPREAD = 0.12;
 
 /** The spread cone (radians) the player's next shot will use; the HUD crosshair draws the same value. */
 export function currentSpread(player: PlayerState): number {
-  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  const definition = weaponDefinition(player.weapon.weaponId);
   if (!definition) return 0;
   const pace = Math.min(1, Math.hypot(player.velocity.x, player.velocity.z) / PLAYER_MOVEMENT.maxSpeed);
   const movement = player.sprinting ? SPREAD_RULES.sprintExtra : SPREAD_RULES.movingExtra * pace;
@@ -448,7 +469,7 @@ export function tickWeaponCooldown(state: WeaponState): void {
 }
 
 export function wantsToFire(player: PlayerState, pressed: boolean, held: boolean): boolean {
-  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  const definition = weaponDefinition(player.weapon.weaponId);
   if (!definition) return false;
   // A click shorter than one fixed tick still fires once on an automatic gun.
   return definition.trigger === 'semi' ? pressed : held || pressed;
@@ -521,7 +542,7 @@ export function firePlayerWeapon(
   spreadSeed = 0,
   hazards: readonly HazardTarget[] = [],
 ): Array<WeaponEvent | DamageEvent> {
-  const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
+  const definition = weaponDefinition(player.weapon.weaponId);
   if (!definition || player.weapon.cooldownTicks > 0 || !player.alive) return [];
   if (player.switchTicksRemaining > 0 || player.meleeCooldownTicks > 0 || player.weapon.reloadTicksRemaining > 0 || player.weapon.magazineAmmo <= 0) return [];
   player.weapon.magazineAmmo -= 1;

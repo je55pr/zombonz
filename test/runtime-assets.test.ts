@@ -5,7 +5,7 @@ import { cloneZombieModel, inPlaceClip, WEAPON_ASSETS, type ZombieAsset } from '
 import { prepareWeapon, VIEWMODEL_LENGTHS, WeaponView } from '../src/client/weaponView.ts';
 import { SkinnedZombieView, zombieAnimation } from '../src/client/skinnedZombieView.ts';
 import { zombieLook } from '../src/client/zombieLooks.ts';
-import { createPlayerState, createZombieState, createWeaponState, WEAPON_DEFINITIONS } from '../src/core/index.ts';
+import { createPlayerState, createZombieState, createWeaponState, weaponDefinition, WEAPON_DEFINITIONS } from '../src/core/index.ts';
 import { BrowserInput } from '../src/client/input.ts';
 
 describe('runtime GLB integration', () => {
@@ -106,7 +106,7 @@ describe('runtime GLB integration', () => {
     // Every gun now has a licensed model; none falls back to the placeholder.
     expect(Object.keys(WEAPON_DEFINITIONS).filter(id => !WEAPON_ASSETS[id])).toEqual([]);
     for (const [id, asset] of Object.entries(WEAPON_ASSETS)) {
-      expect(WEAPON_DEFINITIONS[id], id).toBeDefined();
+      expect(weaponDefinition(id), id).toBeDefined();
       expect(assetExists(`public/assets/weapons/${asset}/model.glb`), asset).toBe(true);
     }
   });

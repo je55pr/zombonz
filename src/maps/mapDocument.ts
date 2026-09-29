@@ -6,7 +6,7 @@ export const MAP_FORMAT_VERSION = 1;
 export const GAMEPLAY_FIELDS = [
   'collisionBoxes', 'shotBlockers', 'walkSurfaces', 'navigation', 'playerSpawn',
   'windowBoards', 'barriers', 'zombieSpawns', 'doors', 'wallWeapons',
-  'mysteryBoxes', 'powerSwitch', 'perkMachines', 'traps', 'hazards', 'equipment', 'zombieLooks',
+  'mysteryBoxes', 'powerSwitch', 'perkMachines', 'traps', 'hazards', 'equipment', 'packAPunch', 'zombieLooks',
 ] as const satisfies readonly (keyof GameMap)[];
 export const PRESENTATION_FIELDS = [
   'greybox', 'scenery', 'prisms', 'windows', 'doorStyles', 'wallWeaponFacing',
@@ -120,7 +120,7 @@ export function validateMapDocument(value: unknown): string[] {
     if (record(spawn) && spawn.barrierId !== undefined && !barrierIds.has(String(spawn.barrierId)))
       error(`gameplay.zombieSpawns[${i}].barrierId`, `unknown barrier "${String(spawn.barrierId)}"`);
   });
-  for (const field of ['doors', 'wallWeapons', 'mysteryBoxes', 'perkMachines', 'traps', 'hazards', 'equipment'] as const) {
+  for (const field of ['doors', 'wallWeapons', 'mysteryBoxes', 'perkMachines', 'traps', 'hazards', 'equipment', 'packAPunch'] as const) {
     if (gameplay[field] === undefined && !['doors', 'wallWeapons', 'mysteryBoxes'].includes(field)) continue;
     array(gameplay[field], `gameplay.${field}`).forEach((item, i) => {
       if (!record(item)) return;
@@ -129,6 +129,9 @@ export function validateMapDocument(value: unknown): string[] {
         box(item.zone, `gameplay.traps[${i}].zone`);
       } else vec(item.position, `gameplay.${field}[${i}].position`);
       if (field === 'doors') box(item.blocker, `gameplay.${field}[${i}].blocker`);
+      // The machine's body is an axis-aligned box, so it can only face along an axis.
+      if (field === 'packAPunch' && (!finite(item.yaw) || Math.abs(Math.sin(2 * item.yaw)) > 1e-6))
+        error(`gameplay.packAPunch[${i}].yaw`, 'expected a multiple of a quarter turn (0, pi/2, pi, ...)');
       for (const cost of ['cost', 'weaponCost', 'ammoCost'] as const)
         if (item[cost] !== undefined && (!finite(item[cost]) || item[cost] < 0))
           error(`gameplay.${field}[${i}].${cost}`, 'expected a nonnegative finite cost');

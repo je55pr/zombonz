@@ -97,6 +97,7 @@ A snapshot (`src/net/snapshot.ts`) carries only what changes during play:
 - barriers' boards (which slots are up, and which one last fell) and timers
 - the box's motion
 - traps' timers
+- each Pack-a-Punch machine's phase, owner, the upgraded gun in it and its clock
 - power, power-ups, grenades, Bouncing Betties and departed players
 - each barrel's and vehicle's health and burn state (health, phase, burn ticks, who last hurt it)
 

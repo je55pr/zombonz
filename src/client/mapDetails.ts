@@ -16,6 +16,7 @@ import { boardMask } from '../core/barrier.ts';
 import { LightSource, type LightPool } from './lightPool.ts';
 import { createMineModel } from './explosiveModels.ts';
 import { equipmentName } from '../core/equipment.ts';
+import { buildPackAPunchMachines } from './packAPunchView.ts';
 
 // Wall mounts are life-size; viewmodels are modelled at roughly 0.86x.
 const WALL_GUN_SCALE = 1.15;
@@ -358,6 +359,8 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
       view.add(model);
     }
   }).catch(error => console.warn('Perk machine model unavailable', error)) : Promise.resolve();
+  // Pack-a-Punch machines, glowing once the power is on.
+  const packAPunch = buildPackAPunchMachines(group, map, lightPool);
   // Electric traps: iron pylons at either end of the live strip, a grate between, and a switch box.
   const trapViews = new Map<string, { arcs: THREE.LineSegments; light: LightSource; lamp: THREE.MeshBasicMaterial;
     from: THREE.Vector3; to: THREE.Vector3 }>();
@@ -441,6 +444,7 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
   return { ready: Promise.allSettled([...wallGuns, vending]), update(state) {
     let moved = false;
     if (wallGunViews.update(state.wallWeapons)) moved = true;
+    if (packAPunch.update(state)) moved = true;
     // On a map with a switch, the lamps burn low until the power comes on.
     const lampLevel = map.powerSwitch && !state.power.on ? 0.4 : 1;
     for (let i = 0; i < practicalLights.length; i++) {

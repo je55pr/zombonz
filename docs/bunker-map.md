@@ -44,7 +44,8 @@ Only the plan grows:
 - Upper level at y 3.4: a long HELP wing and smaller eastern room, connected by an
   open passage. It does not duplicate the full downstairs footprint. The main
   stairwell has a bevelled floor cutout and low perimeter wall.
-- Surviving roof slabs, large sky openings, wall returns and a cabinet silhouette.
+- Surviving roof slabs, large sky openings and wall returns. Upstairs on the wing's centre line, where the floor plan's sniper
+  cabinet stands (and where the blockout had a wooden cabinet), is a Pack-a-Punch machine ([pack-a-punch.md](pack-a-punch.md)).
 - Mystery box near the south-east corner of HELP, beside the stair end of the room.
 - Five spawn-room window entries; two HELP windows plus a recessed cave breach.
 - Four upper windows with exterior climb routes and repairable barriers. Their spawn
@@ -88,7 +89,7 @@ door purchases, closed routes, zombie pursuit via both stairs with HELP shut,
 every entry through to pursuit, graph clearance/support, floor shot occlusion,
 box placement/purchase/cooldown and deterministic state.
 
-Development inspection URLs: `?preview=start`, `doorway`, `props`, `help`, `upstairs`, `overview`,
+Development inspection URLs: `?preview=start`, `doorway`, `props`, `help`, `upstairs`, `packAPunch`, `overview`,
 `barrier`, `stress`, `assets`. Preview modes open the routes and are development-only.
 The normal URL starts with closed routes and the normal economy. F3 displays timings.
 

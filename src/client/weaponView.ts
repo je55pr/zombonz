@@ -5,7 +5,8 @@ import { HANDGUNS, VIEWMODEL_HIP_FOV, adsZoom, viewmodelFov } from './aim.ts';
 import { MIN_EYE_RELIEF, adsPose, eyeRelief, sightPoints, type AimPose, type SightPoints } from './weaponSights.ts';
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
 import { createGrenadeModel, createMineModel } from './explosiveModels.ts';
-import { MELEE_RULES, WEAPON_DEFINITIONS, reloadTicksFor, weaponName } from '../core/weapon.ts';
+import { MELEE_RULES, reloadTicksFor, weaponDefinition, weaponName } from '../core/weapon.ts';
+import { baseWeaponId, isUpgradedWeapon } from '../core/upgrades.ts';
 import { GRENADE_RULES } from '../core/grenade.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
@@ -185,21 +186,49 @@ const readyWeapons = new Map<string, PreparedWeapon>();
  * time (starting pistol, box rolls, nearby wall buys) so equipping never shows the placeholder block.
  */
 export function prepareWeaponModel(id: string): Promise<PreparedWeapon> | null {
-  const asset = WEAPON_ASSETS[id];
-  if (!asset) return null;
-  let pending = preparedWeapons.get(asset);
+  const asset = WEAPON_ASSETS[id], key = modelKey(id);
+  if (!asset || !key) return null;
+  let pending = preparedWeapons.get(key);
   if (!pending) {
-    pending = loadModel(`weapons/${asset}/model.glb`).then(gltf => prepareWeapon(gltf.scene, asset));
-    pending.then(weapon => readyWeapons.set(asset, weapon), () => {});
-    preparedWeapons.set(asset, pending);
+    pending = loadModel(`weapons/${asset}/model.glb`).then(gltf => {
+      const weapon = prepareWeapon(gltf.scene, asset);
+      return isUpgradedWeapon(id) ? applyPackedLook(weapon) : weapon;
+    });
+    pending.then(weapon => readyWeapons.set(key, weapon), () => {});
+    preparedWeapons.set(key, pending);
   }
   return pending;
 }
 
 /** The prepared model if it has already finished loading, without starting or waiting for a load. */
 export function readyWeaponModel(id: string): PreparedWeapon | null {
+  const key = modelKey(id);
+  return key ? readyWeapons.get(key) ?? null : null;
+}
+
+/** Where a gun's prepared model is kept: by its folder, and apart from the base gun's when it is Pack-a-Punched. */
+function modelKey(id: string): string | null {
   const asset = WEAPON_ASSETS[id];
-  return asset ? readyWeapons.get(asset) ?? null : null;
+  return asset ? isUpgradedWeapon(id) ? `${asset}+pap` : asset : null;
+}
+
+/** What Pack-a-Punch does to a gun's look: a cool cast and a faint violet glow, over its own textures (any stronger and they are lost). */
+const PACKED_TINT = new THREE.Color(0xdde2ff);
+const PACKED_GLOW = new THREE.Color(0x5a48d0);
+export function applyPackedLook(weapon: PreparedWeapon): PreparedWeapon {
+  weapon.root.traverse(object => {
+    if (!(object instanceof THREE.Mesh)) return;
+    // Copies: the base gun's own materials are shared with its model and must never be written to.
+    const packed = (Array.isArray(object.material) ? object.material : [object.material]).map(material => {
+      if (!(material instanceof THREE.MeshStandardMaterial)) return material;
+      const copy = material.clone();
+      copy.color.multiply(PACKED_TINT);
+      copy.emissive.copy(PACKED_GLOW); copy.emissiveIntensity = copy.emissiveMap ? 0.2 : 0.015;
+      return copy;
+    });
+    object.material = Array.isArray(object.material) ? packed : packed[0];
+  });
+  return weapon;
 }
 
 let knifeModel: Promise<PreparedWeapon> | null = null;
@@ -243,6 +272,8 @@ export class WeaponView {
   private readonly fallbacks = new Map<string, PreparedWeapon>();
   private current?: PreparedWeapon;
   private id = '';
+  /** The gun this one is drawn as (its base gun, for a Pack-a-Punched one): its flash, hip pose and zoom are the base gun's. */
+  private get gun(): string { return baseWeaponId(this.id); }
   private firedTick = -100;
   private active = true;
   private aimBlend = 0;
@@ -276,15 +307,15 @@ export class WeaponView {
   }
   private equip(id: string): void {
     this.id = id; this.firedTick = -100;
-    (this.flash.material as THREE.MeshBasicMaterial).color.setHex(FLASH_COLOURS[id] ?? 0xffd57a);
+    (this.flash.material as THREE.MeshBasicMaterial).color.setHex(FLASH_COLOURS[this.gun] ?? 0xffd57a);
     const generation = ++this.generation;
     this.current?.root.removeFromParent();
     let fallback = this.fallbacks.get(id);
-    if (!fallback) { fallback = placeholderWeapon(id); this.fallbacks.set(id, fallback); }
+    if (!fallback) { fallback = placeholderWeapon(this.gun); this.fallbacks.set(id, fallback); }
     this.current = fallback; this.pose.add(fallback.root);
     const asset = WEAPON_ASSETS[id];
     if (!asset) { this.notice = `${weaponName(id).toUpperCase()}: placeholder model`; return; }
-    const ready = readyWeapons.get(asset);
+    const ready = readyWeapons.get(modelKey(id)!);
     if (ready) {
       this.current.root.removeFromParent(); this.current = ready; this.pose.add(ready.root); this.notice = null;
       return;
@@ -325,8 +356,8 @@ export class WeaponView {
     if (!this.current) return;
     const sinceShot = Math.max(0, (tick - this.firedTick) / 60);
     const kick = Math.exp(-sinceShot * 24);
-    const definition = WEAPON_DEFINITIONS[this.id];
-    const progress = player.weapon.reloadTicksRemaining > 0 ? 1 - player.weapon.reloadTicksRemaining / reloadTicksFor(player, definition) : 0;
+    const definition = weaponDefinition(this.id);
+    const progress = definition && player.weapon.reloadTicksRemaining > 0 ? 1 - player.weapon.reloadTicksRemaining / reloadTicksFor(player, definition) : 0;
     const reload = Math.sin(progress * Math.PI);
     // A knife swing in progress (a downed or dead player's is over): the gun dips away and the knife is drawn.
     const stabbing = player.alive && !player.downed ? knifeSwing((tick - this.meleeTick) / 60) : { dip: 0, knife: null };
@@ -340,7 +371,7 @@ export class WeaponView {
     // Aimed: rear sight, front sight and eye on one line down the middle of the screen (see `adsPose`).
     const { ads } = this.current;
     // Hip: the same gun held lower-right and a little further out, turned slightly inwards.
-    const hip = HIP_OFFSET_OVERRIDES[this.id] ?? (HANDGUNS.has(this.id) ? HIP_OFFSET_HANDGUN : HIP_OFFSET_LONG_GUN);
+    const hip = HIP_OFFSET_OVERRIDES[this.gun] ?? (HANDGUNS.has(this.gun) ? HIP_OFFSET_HANDGUN : HIP_OFFSET_LONG_GUN);
     const away = 1 - this.aimBlend;
     // Throwing a grenade or setting a mine: the gun dips out of the way while the thing is in the hand.
     const winding = player.alive && !player.downed && player.grenadeWindupTicks > 0;
@@ -400,7 +431,7 @@ export class WeaponView {
   render(renderer: THREE.WebGLRenderer, aspect: number): void {
     if (!this.active) return;
     // The gun's own lens narrows as it is raised (see `viewmodelFov`), which is what makes its sights large when aimed.
-    const fov = viewmodelFov(this.aimBlend, adsZoom(this.id), aspect);
+    const fov = viewmodelFov(this.aimBlend, adsZoom(this.gun), aspect);
     if (this.camera.aspect !== aspect || this.camera.fov !== fov) { this.camera.aspect = aspect; this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     renderer.clearDepth(); renderer.render(this.scene, this.camera);
   }

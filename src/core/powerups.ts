@@ -3,7 +3,7 @@ import type { CollisionBox } from './collision.ts';
 import { GRENADE_RULES } from './grenade.ts';
 import { SeededRng } from './rng.ts';
 import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
-import { WEAPON_DEFINITIONS } from './weapon.ts';
+import { weaponDefinition } from './weapon.ts';
 import { rayAabbDistance } from './weapon.ts';
 
 export type PowerupKind = 'maxAmmo' | 'doublePoints' | 'instaKill' | 'nuke' | 'carpenter';
@@ -181,7 +181,7 @@ function refillAmmo(player: PlayerState): void {
   player.grenadeCharges = GRENADE_RULES.maximum;
   for (const weapon of [player.weapon, player.holsteredWeapon]) {
     if (!weapon) continue;
-    const definition = WEAPON_DEFINITIONS[weapon.weaponId];
+    const definition = weaponDefinition(weapon.weaponId);
     if (definition) weapon.reserveAmmo = Math.max(weapon.reserveAmmo, definition.startingReserveAmmo);
   }
 }

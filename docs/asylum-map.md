@@ -115,6 +115,8 @@ Bouncing Betties for 1000 points.
   seconds and loses the perk. It can be bought and used three times; after the third self-revive the
   machine is depleted and can no longer be interacted with. In co-op it costs 1500, requires power,
   and only speeds up teammate revives; it never self-revives a player.
+- **Pack-a-Punch:** one machine against the BAR back room's north wall, facing the door: 5000 points, and it needs the
+  power on like the perks. See [pack-a-punch.md](pack-a-punch.md); `?preview=packAPunch&map=asylum&power=on` looks at it.
 - **Electric traps:** one across each balcony, 1000 points once the power is on. A trap runs for
   25 seconds and then recharges for 25. It kills zombies that walk into it, for no points, and
   hurts players standing in it.
