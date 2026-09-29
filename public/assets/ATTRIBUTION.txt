@@ -225,6 +225,10 @@ Asylum's explosive truck, and the T-12 is a burnt-out wreck outside Bunker's wir
 - Soviet military off-road vehicle: https://opengameart.org/content/soviet-military-off-road-vehicle
 - T-12 Soviet light tank: https://opengameart.org/content/t-12-soviet-light-tank-lowpoly
 
+The combat knife (the first-person melee model) is CC0: "Kabar Combat knife" by gamekorp,
+https://opengameart.org/content/kabar-combat-knife. Changes: its FBX (version 6.1) was converted to glTF, its baked greyscale
+skin re-encoded as WebP, and metallic and roughness maps written from the skin's layout.
+
 The frag grenade (a Mk 2 pineapple) and the Bouncing Betty (an S-mine) are built in code from primitive geometry
 and canvas-painted textures, with no third-party source; so are the explosion sprites and scorch marks.
 

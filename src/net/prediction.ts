@@ -7,7 +7,7 @@ import { GRENADE_RULES } from '../core/grenade.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 import type { PlayerState } from '../core/types.ts';
 import {
-  beginReload, firePlayerWeapon, meleeAttack, rayFromPlayer, switchWeapon, tickWeaponState, wantsToFire,
+  beginMelee, beginReload, firePlayerWeapon, rayFromPlayer, switchWeapon, tickMelee, tickWeaponState, wantsToFire,
 } from '../core/weapon.ts';
 
 export interface PredictionWorld {
@@ -47,11 +47,13 @@ export function predictPlayerTick(player: PlayerState, frame: InputFrame, world:
     events.push(...tickWeaponState(player));
     if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
     if (frame.actions.reload?.pressed) events.push(...beginReload(player));
-    if (frame.actions.melee?.pressed) events.push(...meleeAttack(player, [], blockers, false));
+    // The swing's timing runs here as on the host; only the host knows what the blow hits.
+    tickMelee(player, [], blockers, false);
+    if (frame.actions.melee?.pressed) events.push(...beginMelee(player));
     if (frame.actions.switchWeapon?.pressed || frame.actions.melee?.pressed || frame.actions.reload?.pressed
       || frame.actions.cancelGrenade?.pressed || player.noclip) player.grenadeWindupTicks = 0;
     else if (frame.actions.throwGrenade?.pressed && player.grenadeWindupTicks === 0
-      && player.grenadeCharges > 0 && player.switchTicksRemaining === 0) player.grenadeWindupTicks = GRENADE_RULES.windupTicks;
+      && player.grenadeCharges > 0 && player.switchTicksRemaining === 0 && player.meleeCooldownTicks === 0) player.grenadeWindupTicks = GRENADE_RULES.windupTicks;
     if (player.grenadeWindupTicks > 0) player.grenadeWindupTicks -= 1;
   }
   const fire = frame.actions.fire;

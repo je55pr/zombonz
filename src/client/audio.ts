@@ -284,6 +284,8 @@ export class GameAudio {
         case 'trapActivated': this.playClip('electric-powerup', MIX.electric); this.playClip('electric-hit', MIX.electric * 0.7); break;
         case 'mysteryBoxTeddy': this.playClip('ambience-sting-1', MIX.sting * 3); break;
         case 'meleeSwung': this.playClip('knife', MIX.knife); break;
+        // The blow lands a moment after the swish, so it gets its own thud.
+        case 'meleeHit': this.playAt('flesh-hit', MIX.hurt, world.entities[event.zombieId]?.position, player); break;
         // A zombie grunts as it winds up, from where it stands: the warning that a blow is coming; the hit itself is a thud.
         case 'zombieSwung': this.playAt(variant('zombie-attack', 3, world.tick + Number(event.zombieId.slice(2))), MIX.zombieAttack,
           world.entities[event.zombieId]?.position, player); break;

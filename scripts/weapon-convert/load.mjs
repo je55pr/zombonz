@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { loadFbx6 } from './fbx6.mjs';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const fakeImage = () => ({ addEventListener() {}, removeEventListener() {}, set src(_) {}, style: {} });
@@ -31,7 +32,9 @@ export function loadSource(path) {
   if (lower.endsWith('.glb')) return loadGlb(path);
   if (lower.endsWith('.fbx')) {
     const bytes = readFileSync(path);
-    return new FBXLoader().parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), '');
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    // FBXLoader needs version 7000 or later; the gamekorp knife is 6.1.
+    return new DataView(buffer).getUint32(23, true) < 7000 ? loadFbx6(buffer) : new FBXLoader().parse(buffer, '');
   }
   if (lower.endsWith('.dae')) return new ColladaLoader().parse(readFileSync(path, 'utf8'), '').scene;
   if (lower.endsWith('.obj')) return new OBJLoader().parse(readFileSync(path, 'utf8'));

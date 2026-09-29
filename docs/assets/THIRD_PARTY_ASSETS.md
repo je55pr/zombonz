@@ -242,3 +242,27 @@ Found with Sketchfab's public search API (downloadable, CC BY or CC0, textured),
 | RPG-7 | RPG 7 ( Free Model ) | javadbayat | https://sketchfab.com/3d-models/rpg-7-free-model-99c0af8a1803490a86edc48cd3bfc700 |
 | Python | GameReady: Colt Python Revolver | HYQQM | https://sketchfab.com/3d-models/gameready-colt-python-revolver-3def6e3980e64dfa832f298004ce1b94 |
 | Skorpion | Vz.61 Skorpion | Maxim_Van_Daele | https://sketchfab.com/3d-models/vz61-skorpion-403a48e300b944bfbee04b1dda17ff62 |
+
+## Combat knife (2026-09-29, issue #178)
+
+The first-person melee viewmodel. Unlike the guns above it is a direct, login-free download.
+
+| In game | Model | Creator | Licence | Source |
+|---|---|---|---|---|
+| Knife swing (V) | Kabar Combat knife | gamekorp | CC0 | https://opengameart.org/content/kabar-combat-knife |
+
+- Downloaded from `https://opengameart.org/sites/default/files/knife%20gamekorp.zip` (864,776 bytes, SHA-256
+  `144d47912eb7e600a53ecf7dddc1a6760158df0b103bde08d027d3a8400d6bb5`), kept as `kabar-combat-knife.zip` with the other
+  originals in `C:\ChatGPT\Shared\Cache\ZombonzAssets\originals\weapons`.
+- The archive's licence file says free for commercial and non-commercial use in compiled works, no credit required (CC0),
+  and asks that the raw unmodified files not be sold. The game ships a converted, modified model.
+- The source is one mesh of 2,048 triangles (the author's screenshots say 1,092 polys, before quads split) with one baked
+  greyscale `skin.jpg` (lit and ambient-occluded, 1024 px) and no material maps.
+- Conversion: the FBX is version 6.1, which three.js's loader (7000 and up) and Blender 4.5 (7100 and up) both refuse, so
+  `scripts/weapon-convert/fbx6.mjs` reads it (vertices, polygons, normals, UVs, the local transform, with the winding
+  reversed for the negative scale it carries). `make-knife-maps.mjs` writes a metallic map (steel 0.59, the handle's
+  block 0.04) and a roughness map (0.37 and 0.84) from the skin's layout, because the viewmodel scene has lights but no
+  environment and a fully metallic blade would render black. `convert.mjs` then packs `knife/model.glb` (0.12 MB,
+  1024 px WebP, 30 cm long).
+- To rebuild: extract the archive to `<dir>/kabar-knife/`, run `node make-knife-maps.mjs <dir>/kabar-knife`, then
+  `WEAPONS=<dir> node run.mjs knife` from `scripts/weapon-convert`.

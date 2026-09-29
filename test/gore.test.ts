@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   CRAWLER, GORE_RULES, GameSimulation, LEGS_MASK, LIMB, ZOMBIE_MELEE, addEntity, awardCombatPoints, createPlayerState,
-  createWeaponState, createZombieEntry, createZombieState, detonate, dismember, firePlayerWeapon, inMeleeReach, meleeAttack,
+  createWeaponState, createZombieEntry, createZombieState, detonate, dismember, firePlayerWeapon, inMeleeReach,
   updateZombiePursuit, zombieBody, zombiePose, type BodyPart, type EntityId, type GoreEvent, type PlayerState, type Vec3, type ZombieState,
 } from '../src/core/index.ts';
 import { applySnapshot, captureSnapshot } from '../src/net/snapshot.ts';
 import { aimedFire, rayThrough } from './aim.ts';
+import { swing } from './melee.ts';
 
 /** A shooter at the origin with a gun, aiming down the sights, and a zombie of a round 4 m ahead. */
 function scene(weapon: string, round: number, id: EntityId = 'e:2') {
@@ -64,7 +65,7 @@ describe('what takes a limb off', () => {
   it('does not take limbs off with a knife, or off a gun that chains lightning', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     const close = createZombieState('e:2', { x: 0, y: 0, z: -1 }, 1);
-    expect(goreOf(meleeAttack(player, [close], []))).toEqual([]);
+    expect(goreOf(swing(player, [close]))).toEqual([]);
     expect(close.limbs).toBe(0);
     const zap = scene('molniya', 1);
     expect(goreOf(shoot(zap.player, zap.zombie, 'armL'))).toEqual([]);

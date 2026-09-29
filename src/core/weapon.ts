@@ -608,14 +608,39 @@ export function firePlayerWeapon(
   return events;
 }
 
-export const MELEE_RULES = { damage: 150, range: 1.6, cooldownTicks: 48, minFacingDot: 0.65 } as const;
+/**
+ * The knife. A swing takes `cooldownTicks` in all (nothing else can be done meanwhile) and its blow lands `strikeTicks`
+ * into it: the first-person animation (`knifeSwing` in weaponView.ts) reaches full extension at exactly that moment, so
+ * the hit is checked where the knife is drawn to hit. Reach and facing are read when the blow lands, not when the button
+ * went down.
+ */
+export const MELEE_RULES = { damage: 150, range: 1.6, cooldownTicks: 48, minFacingDot: 0.65, strikeTicks: 9 } as const;
 
-export function meleeAttack(player: PlayerState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[],
-  instaKill = false): WeaponEvent[] {
+/** Starts a knife swing if one can start: announces it and sets the blow to land `strikeTicks` later. */
+export function beginMelee(player: PlayerState): WeaponEvent[] {
   if (!player.alive || player.meleeCooldownTicks > 0) return [];
   player.meleeCooldownTicks = MELEE_RULES.cooldownTicks;
+  player.meleeStrikeTicks = MELEE_RULES.strikeTicks;
   player.weapon.reloadTicksRemaining = 0;
-  const events: WeaponEvent[] = [{ type: 'meleeSwung', playerId: player.id }];
+  return [{ type: 'meleeSwung', playerId: player.id }];
+}
+
+/**
+ * One tick of a swing in progress: counts down to the blow and lands it on the tick the count reaches zero. A player who
+ * is downed or dead by then does not land it.
+ */
+export function tickMelee(player: PlayerState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[],
+  instaKill = false): WeaponEvent[] {
+  if (player.meleeStrikeTicks <= 0) return [];
+  if (!player.alive || player.downed) { player.meleeStrikeTicks = 0; return []; }
+  player.meleeStrikeTicks -= 1;
+  return player.meleeStrikeTicks === 0 ? strikeMelee(player, zombies, boxes, instaKill) : [];
+}
+
+/** The blow itself: the nearest zombie in reach, in front and not behind a wall, takes it. */
+export function strikeMelee(player: PlayerState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[],
+  instaKill = false): WeaponEvent[] {
+  const events: WeaponEvent[] = [];
   const ray = rayFromPlayer(player, playerEyeHeight(player));
   const candidates = zombies.filter(zombie => zombie.alive).map(zombie => {
     const chest = zombieChest(zombie);

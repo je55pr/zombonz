@@ -464,7 +464,7 @@ export class CanvasHud {
         else lines.push(credit);
       }
       const footer = ['Characters / weapons: CC BY 4.0 · converted and adapted',
-        'Environment / props: Poly Haven, ambientCG, OpenGameArt · CC0',
+        'Environment / props / knife: Poly Haven, ambientCG, OpenGameArt · CC0',
         'Fonts: Oswald (SIL OFL 1.1) · Special Elite (Apache 2.0)',
         'Source links and licence: assets/ATTRIBUTION.txt', `F2 TO CLOSE  ·  BUILD ${BUILD_ID}`];
       const panelHeight = 140 + lines.length * 28 + footer.length * 30;
