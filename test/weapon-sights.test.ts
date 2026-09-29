@@ -124,6 +124,21 @@ describe('iron sight alignment', () => {
     }
   });
 
+  // Issue #188: the AK-74u's source poses the gun rolled about 9 degrees about its bore, so its magazine hung 25 mm to
+  // one side of its sights and the aimed gun looked twisted. A gun with a central magazine and sights on its middle line
+  // has the magazine under the sights; 3 mm at the distance between them is a degree of roll. (The FG42's magazine
+  // is on its side, the others have none, or a tube.)
+  it.each(['ak74u', 'bar', 'mp40', 'stg44', 'm14', 'fal', 'rpk'])('%s: the magazine hangs under the sights, so the gun is not rolled', async id => {
+    const weapon = await prepared(id);
+    const magazine = new THREE.Box3().setFromObject(weapon.magazine);
+    const aside = ((magazine.min.x + magazine.max.x) / 2 - (weapon.sights.rear.x + weapon.sights.front.x) / 2) * 1000;
+    expect(Math.abs(aside), `${id}'s magazine is ${aside.toFixed(1)} mm to the side of its sights`).toBeLessThan(3);
+    // And so it is once aimed: the magazine's middle is on the middle of the screen, at its own depth.
+    const { toView } = aimed(weapon);
+    const inView = toView(magazine.getCenter(new THREE.Vector3()));
+    expect(Math.abs(inView.x) * 1000, `${id} aimed`).toBeLessThan(3);
+  });
+
   it('the Kar98k is 3.1% and the starting pistol 2.8%, as asked', async () => {
     const kar = await prepared('kar98k'), pistol = await prepared('m1911');
     expect(percentOfWindow(kar, 'kar98k', kar.sights.front, 0.016, 16 / 9)).toBeCloseTo(3.1, 1);

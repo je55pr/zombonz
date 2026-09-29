@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "revision": "d2979aa2c12e917173f1674c21edb7432126120c83fdbf6992182bd24d76f8e8",
+  "revision": "c4f6abfc6f851cb8707893654a0df2a9061f1bcf65cede9dce884c4e5cd22687",
   "files": {
     "assets/audio/ambience-sting-1.mp3": {
       "size": 36951,
@@ -739,8 +739,8 @@
       "sha256": "ad71902009c29ad4ad6251ae945fe7f6c89598ccb9e5754d1335da7a31768cdd"
     },
     "assets/weapons/ak74u/model.glb": {
-      "size": 686624,
-      "sha256": "24be8d596be079b713b1e4189933ba97f8abc50604dd30c316ea2a575ee7cad0"
+      "size": 686628,
+      "sha256": "737b5fb4e8aa49fd0b66f5615b0faeb73ba94dca765e2e3cac37c982bdf61144"
     },
     "assets/weapons/bar/model.glb": {
       "size": 1527132,

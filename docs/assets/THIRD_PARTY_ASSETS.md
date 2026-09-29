@@ -266,3 +266,15 @@ The first-person melee viewmodel. Unlike the guns above it is a direct, login-fr
   1024 px WebP, 30 cm long).
 - To rebuild: extract the archive to `<dir>/kabar-knife/`, run `node make-knife-maps.mjs <dir>/kabar-knife`, then
   `WEAPONS=<dir> node run.mjs knife` from `scripts/weapon-convert`.
+
+## AK-74u orientation (2026-09-29, issue #188)
+
+The Animated AKs-74u's source rigs the gun into first-person arms and poses it rolled about 9.4 degrees about its bore and
+yawed 1.25, which the converter's axis choice (longest axis to Z, next to Y) cannot see; the aimed gun leaned to one side.
+The mirror plane of the whole gun was fitted (mean nearest-vertex distance of the reflected gun, searched over roll, yaw
+and offset; 0.0175 m unturned, 0.0019 m fitted) and `weapons.mjs` now gives the AK-74u `turn: { roll: 9.4, yaw: -1.25 }`, a
+new converter option applied after the axis choice. Afterwards the gun's top and bottom sit on one vertical line along
+its whole length. The island rules that find the fitted and the spare magazine were widened to follow the turn, and the
+converter now shares a texture between materials that name the same map (the model is 0.69 MB, as before, not 1.14).
+`weaponSights.ts` has the new points. To rebuild: extract the archive to `<dir>/animated-aks-74u/`, then
+`WEAPONS=<dir> node run.mjs ak74u` from `scripts/weapon-convert`.

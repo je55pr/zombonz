@@ -56,7 +56,11 @@ function bounds(parts) {
   return box;
 }
 
-/** World -> weapon space: longest axis becomes Z, next longest Y, with configured flips. */
+/**
+ * World -> weapon space: longest axis becomes Z, next longest Y, with configured flips.
+ * `turn: { roll, yaw }` (degrees, right-handed about +Z, the muzzle, and about +Y, up) then straightens a gun that its
+ * source poses slightly rolled or yawed, which the axis choice above cannot see.
+ */
 export function orientation(parts, config) {
   const size = bounds(parts).getSize(new THREE.Vector3()).toArray();
   const order = [0, 1, 2].sort((a, b) => size[a] - size[b]);
@@ -66,7 +70,11 @@ export function orientation(parts, config) {
   if (config.flipUp) yAxis.negate();
   if (config.flipForward) zAxis.negate();
   const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis);
-  return new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis).transpose();
+  const aligned = new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis).transpose();
+  if (!config.turn) return aligned;
+  const rad = degrees => (degrees ?? 0) * Math.PI / 180;
+  return new THREE.Matrix4().makeRotationY(rad(config.turn.yaw)).multiply(new THREE.Matrix4().makeRotationZ(rad(config.turn.roll)))
+    .multiply(aligned);
 }
 
 export function transformParts(parts, matrix, lengthMetres) {
@@ -194,6 +202,9 @@ export async function convert(id, config, outDir) {
   const materials = new Map();
   const maxTexture = config.maxTexture ?? 2048;
   const specs = { ...config.materials };
+  // Materials that name the same map share one texture (the AK-74u's two materials share their normal and ORM maps).
+  const shared = new Map();
+  const once = async (key, make) => { if (!shared.has(key)) shared.set(key, await make()); return shared.get(key); };
   // `autoMaterials: 'dir/'` maps every remaining material name to dir/<name>_* maps.
   if (config.autoMaterials) for (const part of parts) specs[part.material] ??= { auto: `${config.autoMaterials}${part.material}_` };
   for (const [name, rawSpec] of Object.entries(specs)) {
@@ -201,8 +212,8 @@ export async function convert(id, config, outDir) {
     const spec = resolveMaterialSpec(rawSpec);
     const material = doc.createMaterial(name).setMetallicFactor(spec.metal ?? 1).setRoughnessFactor(spec.rough ?? 1);
     if (spec.color) material.setBaseColorFactor(spec.color);
-    const texture = async (key, path, size, quality) => doc.createTexture(`${name}_${key}`)
-      .setImage(await encode(`${W}/${path}`, size, quality)).setMimeType('image/webp');
+    const texture = (key, path, size, quality) => once(`${path}|${size}|${quality}`, async () => doc.createTexture(`${name}_${key}`)
+      .setImage(await encode(`${W}/${path}`, size, quality)).setMimeType('image/webp'));
     if (spec.base) material.setBaseColorTexture(await texture('base', spec.base, maxTexture, 85));
     if (spec.normal) material.setNormalTexture(await texture('normal', spec.normal, maxTexture, 90));
     if (spec.emissive) {
@@ -210,9 +221,10 @@ export async function convert(id, config, outDir) {
         .setEmissiveFactor(spec.emissiveFactor ?? [1, 1, 1]);
     }
     if (spec.roughness || spec.metallic || spec.ao) {
-      const orm = doc.createTexture(`${name}_orm`).setMimeType('image/webp').setImage(await packOrm({
-        ao: spec.ao && `${W}/${spec.ao}`, roughness: spec.roughness && `${W}/${spec.roughness}`,
-        metallic: spec.metallic && `${W}/${spec.metallic}` }, Math.min(1024, maxTexture)));
+      const orm = await once(`orm|${spec.ao}|${spec.roughness}|${spec.metallic}`, async () => doc.createTexture(`${name}_orm`)
+        .setMimeType('image/webp').setImage(await packOrm({
+          ao: spec.ao && `${W}/${spec.ao}`, roughness: spec.roughness && `${W}/${spec.roughness}`,
+          metallic: spec.metallic && `${W}/${spec.metallic}` }, Math.min(1024, maxTexture))));
       material.setMetallicRoughnessTexture(orm);
       if (!spec.metallic) material.setMetallicFactor(spec.metal ?? 0);
       if (spec.ao) material.setOcclusionTexture(orm);
