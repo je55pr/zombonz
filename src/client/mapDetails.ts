@@ -16,15 +16,15 @@ import { LightSource, type LightPool } from './lightPool.ts';
 import { createMineModel } from './explosiveModels.ts';
 import { equipmentName } from '../core/equipment.ts';
 
-// Chalk signs are life-size; viewmodels are modelled at roughly 0.86x.
+// Wall mounts are life-size; viewmodels are modelled at roughly 0.86x.
 const WALL_GUN_SCALE = 1.15;
 const CHALK = 0xc9c7a7;
 
 /**
- * Projects the shared weapon model into a shallow two-layer silhouette. The inset dark shape leaves
- * only an irregular chalk contour; the physical model is never placed on the wall.
+ * Keeps a chalk purchase outline behind a physical copy of the gun. The prepared viewmodel stays
+ * independent, so buying the gun can equip it without removing this wall display.
  */
-function mountWallChalk(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Material, inset: THREE.Material): void {
+export function mountWallWeapon(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Material, inset: THREE.Material): void {
   const model = weapon.root.clone(true);
   model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.set(1, 1, 1);
   model.updateMatrixWorld(true);
@@ -50,6 +50,13 @@ function mountWallChalk(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.
   };
   silhouette(chalk, size.y * WALL_GUN_SCALE + 0.08, size.z * WALL_GUN_SCALE + 0.08, 0.004);
   silhouette(inset, size.y * WALL_GUN_SCALE - 0.015, size.z * WALL_GUN_SCALE - 0.015, 0.009);
+  model.name = 'wall-weapon-model';
+  model.traverse(object => {
+    if (object instanceof THREE.Mesh) { object.castShadow = true; object.receiveShadow = false; }
+  });
+  // Its nearest surface stays in front of the outline, including wide drums and side magazines.
+  place(model, new THREE.Vector3(WALL_GUN_SCALE, WALL_GUN_SCALE, WALL_GUN_SCALE),
+    0.04 + size.x * WALL_GUN_SCALE / 2);
 }
 
 /** The perk machine model, and each perk's paint for it (see scripts/weapon-convert/import-vending.mjs). */
@@ -95,7 +102,7 @@ function beamFade(): THREE.Texture {
 
 /**
  * Everything drawn on top of a map's greybox from its definition: window boards and frames, stair
- * rails, purchasable doors and debris, painted labels, chalk wall guns, the mystery box, practical
+ * rails, purchasable doors and debris, painted labels, wall guns, the mystery box, practical
  * lamps, rubble and the surrounding treeline. `update` follows the authoritative simulation state, and
  * says whether anything that casts a moon shadow moved (a door, a board, the box or the power lever).
  * The map's lights are sources for the shared light pool, which draws the nearest of them.
@@ -193,14 +200,14 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
     sign.position.set(weapon.position.x, weapon.position.y + 0.4, weapon.position.z);
     sign.rotation.y = map.wallWeaponFacing[weapon.id] ?? 0;
     group.add(sign);
-    // The sign remains chalk after purchase, since it also sells replacement ammo.
+    // The mounted gun and outline remain after purchase, since this spot also sells replacement ammo.
     const pending = prepareWeaponModel(weapon.weaponId);
     const fallback = () => {
       box(sign, chalk, 0, 0, 0, 1.75, 0.17, 0.015);
       box(sign, chalk, -0.5, -0.015, 0.025, 0.55, 0.18, 0.015);
       box(sign, chalk, 0.25, 0.025, 0.025, 1.15, 0.065, 0.015);
     };
-    if (pending) wallGuns.push(pending.then(model => mountWallChalk(sign, model, chalk, chalkInset), error => {
+    if (pending) wallGuns.push(pending.then(model => mountWallWeapon(sign, model, chalk, chalkInset), error => {
       console.warn(`Unable to load the ${weapon.weaponId} wall gun`, error); fallback();
     }));
     else fallback();
