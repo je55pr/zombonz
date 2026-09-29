@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
 import { VENDING_MODEL, buildMapDetails } from './client/mapDetails.ts';
 import { LightPool } from './client/lightPool.ts';
+import { fitShadowCamera, placeMoon } from './client/shadowFit.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { aimedFov } from './client/aim.ts';
@@ -135,18 +136,22 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   camera.rotation.order = 'YXZ';
   scene.add(new THREE.HemisphereLight(0xaabfc9, 0x373026, 1.4));
   const keyLight = new THREE.DirectionalLight(0xb4ced7, 2.4);
-  // Aimed at the middle of the building, with a shadow frustum that covers all of it.
+  // Aimed at the middle of the building; the shadow camera is fitted to its walls and roofs below.
   const { focus } = map;
-  keyLight.position.set(focus.x - 12, 22, focus.z - 16); keyLight.target.position.set(focus.x, 0, focus.z); scene.add(keyLight.target);
+  placeMoon(keyLight, focus); scene.add(keyLight.target);
   keyLight.castShadow = true;
   // A larger building spreads the same shadow map further, so give it more texels.
   const shadowSize = focus.radius > 24 ? 2048 : 1024;
   keyLight.shadow.mapSize.set(shadowSize, shadowSize);
-  Object.assign(keyLight.shadow.camera, { left: -focus.radius, right: focus.radius, top: focus.radius, bottom: -focus.radius,
-    far: 45 + focus.radius * 1.2 });
   keyLight.shadow.bias = -0.0006;
   scene.add(keyLight);
-  scene.add(buildGreybox(map.greybox, map.prisms));
+  const greybox = buildGreybox(map.greybox, map.prisms);
+  scene.add(greybox);
+  // Anything outside the shadow camera's box is lit, so it must reach every corner of every roof and wall.
+  if (!fitShadowCamera(keyLight, greybox)) {
+    Object.assign(keyLight.shadow.camera, { left: -focus.radius, right: focus.radius, top: focus.radius, bottom: -focus.radius,
+      far: 45 + focus.radius * 1.2 });
+  }
   // The map's lamps, perk machines, traps and box glow share a few real point lights.
   const lightPool = new LightPool(scene);
   const details = buildMapDetails(scene, map, lightPool);
