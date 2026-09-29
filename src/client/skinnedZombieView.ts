@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { BarrierState } from '../core/barrier.ts';
 import type { Vec3, ZombieState } from '../core/types.ts';
 import { ZOMBIE_GAIT_SPEEDS } from '../core/zombie.ts';
+import { swingSeconds } from '../core/zombieBody.ts';
 import { cloneZombieModel, type ZombieAnimation, type ZombieAsset } from './runtimeAssets.ts';
 import { interpolatePosition } from './interpolation.ts';
 
@@ -10,7 +11,8 @@ const RUN_CYCLE_PACE = 1.84;
 
 export function zombieAnimation(zombie: ZombieState): ZombieAnimation {
   if (!zombie.alive) return 'death';
-  if (zombie.entry?.phase === 'breaking' || (!zombie.entry && zombie.attackCooldownTicks > 25)) return 'attack';
+  // A swing (see ZOMBIE_MELEE) plays the attack clip; so does tearing at boards.
+  if (zombie.entry?.phase === 'breaking' || zombie.attackTicks > 0) return 'attack';
   // Climbing a wall on the way in: clawing upward reads better than walking on air.
   if (zombie.entry?.phase === 'approach' && Math.abs(zombie.velocity.y) > 0.05) return 'attack';
   const moving = Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0.05;
@@ -56,6 +58,13 @@ export class SkinnedZombieView {
     // The pack has no sprint clip: play the run cycle at the zombie's ground speed so feet stay planted,
     // capped so sprinters' legs don't blur (they slide a little at full speed).
     if (action && name === 'run') action.timeScale = Math.min(1.6, ZOMBIE_GAIT_SPEEDS[zombie.gait] / RUN_CYCLE_PACE);
+    // A swing is played from the simulation's own count of it, not from a clock of the view's: the arm comes down
+    // on the tick the blow lands, and the clip is where the hit volumes were measured.
+    if (action) {
+      const swinging = name === 'attack' && zombie.attackTicks > 0;
+      action.paused = swinging;
+      if (swinging) action.time = swingSeconds(zombie) % action.getClip().duration;
+    }
     const dt = this.lastTick === undefined ? 0 : Math.max(0, Math.min(0.1, (tick - this.lastTick) / 60));
     this.lastTick = tick; this.mixer.update(dt);
     this.body.scale.y = this.body.scale.x * (phase === 'vaulting' ? 0.85 : 1);

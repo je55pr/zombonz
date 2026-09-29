@@ -65,7 +65,7 @@ const MIX = {
 const BLAST_ROLLOFF = { grenade: 0.16, mine: 0.16, barrel: 0.1, vehicle: 0.07 } as const;
 /** Events with a place in the world: everyone hears them, whoever caused them, from where they happened. */
 const WORLD_EVENTS: ReadonlySet<string> = new Set(['grenadeThrown', 'grenadeBounced', 'grenadeExploded', 'weaponExploded',
-  'minePlaced', 'mineArmed', 'mineTriggered', 'mineExploded', 'hazardHit', 'hazardIgnited', 'hazardExploded']);
+  'minePlaced', 'mineArmed', 'mineTriggered', 'mineExploded', 'hazardHit', 'hazardIgnited', 'hazardExploded', 'zombieSwung']);
 /** Positional sounds fade with distance and are culled past this (the map is about 35 m across). */
 const HEARING_RANGE = 36;
 
@@ -284,8 +284,10 @@ export class GameAudio {
         case 'trapActivated': this.playClip('electric-powerup', MIX.electric); this.playClip('electric-hit', MIX.electric * 0.7); break;
         case 'mysteryBoxTeddy': this.playClip('ambience-sting-1', MIX.sting * 3); break;
         case 'meleeSwung': this.playClip('knife', MIX.knife); break;
-        // A zombie's swipe lands with a grunt as well as the hit.
-        case 'playerDamaged': this.playClip('flesh-hit', MIX.hurt); this.playClip(variant('zombie-attack', 3, world.tick), MIX.zombieAttack); break;
+        // A zombie grunts as it winds up, from where it stands: the warning that a blow is coming; the hit itself is a thud.
+        case 'zombieSwung': this.playAt(variant('zombie-attack', 3, world.tick + Number(event.zombieId.slice(2))), MIX.zombieAttack,
+          world.entities[event.zombieId]?.position, player); break;
+        case 'playerDamaged': this.playClip('flesh-hit', MIX.hurt); break;
         case 'weaponReloadStarted': this.playClip(WEAPON_DEFINITIONS[event.weaponId]?.pellets ? 'shotgun-shell'
           : ['kar98k', 'springfield', 'mosin'].includes(event.weaponId) ? 'reload-round' : 'reload-mag', MIX.reload); break;
         case 'weaponReloadCompleted': this.playClip(WEAPON_DEFINITIONS[event.weaponId]?.pellets ? 'shotgun-rack' : 'mechanical-click', MIX.reloadDone); break;

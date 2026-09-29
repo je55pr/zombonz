@@ -10,7 +10,7 @@ function zombieIn(pose: ZombiePose, variant = 0): ZombieState {
   const zombie = createZombieState('e:2', { x: 0, y: 0, z: -6 }, 1, pose === 'run' ? 'run' : 'walk', variant);
   switch (pose) {
     case 'walk': case 'run': zombie.velocity = { x: 0, y: 0, z: -1 }; break;
-    case 'swing': zombie.attackTicks = swingTiming(zombie.gait).windupTicks; break;
+    case 'swing': zombie.attackTicks = swingTiming(zombie).windupTicks; break;
     case 'crawl': zombie.limbs = LIMB.legL | LIMB.legR; break;
     case 'tear': case 'vault':
       zombie.entry = { barrierId: 'w', phase: pose === 'tear' ? 'breaking' : 'vaulting', waypointIndex: 1, phaseTicks: 0, lane: 0, vaultStart: null };
@@ -86,7 +86,7 @@ describe('a zombie’s body follows what it is doing', () => {
   });
 
   it('follows a swing: the head goes back in the wind-up and comes forward with the blow', () => {
-    const zombie = zombieIn('swing'), { windupTicks, totalTicks } = swingTiming(zombie.gait);
+    const zombie = zombieIn('swing'), { windupTicks, totalTicks } = swingTiming(zombie);
     const heads = [1, windupTicks * 0.5, windupTicks, totalTicks - 1].map(ticks => { zombie.attackTicks = ticks; return zombieHeadCentre(zombie); });
     const travel = Math.max(...heads.map(h => h.z)) - Math.min(...heads.map(h => h.z));
     expect(travel).toBeGreaterThan(0.15);

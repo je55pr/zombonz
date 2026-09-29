@@ -39,6 +39,8 @@ export interface PlayerState extends EntityBase {
   health: number;
   recoveryDelayTicks: number;
   meleeCooldownTicks: number;
+  /** After a zombie's blow lands, ticks during which no other zombie's can (see ZOMBIE_MELEE.hurtGraceTicks). */
+  hurtGraceTicks: number;
   grenadeCharges: number;
   /** Bouncing Betties carried (see MINE_RULES). */
   mineCharges: number;

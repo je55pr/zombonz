@@ -137,7 +137,7 @@ export interface BodyVolume {
 
 /** Where in its model's attack clip (seconds) the zombie's current swing has got to. */
 export function swingSeconds(zombie: ZombieState): number {
-  const { windupTicks, totalTicks } = swingTiming(zombie.gait);
+  const { windupTicks, totalTicks } = swingTiming(zombie);
   return attackClipTime(rigOf(zombie), zombie.attackStyle, zombie.attackTicks, windupTicks, totalTicks);
 }
 

@@ -93,7 +93,7 @@ describe('runtime GLB integration', () => {
     const zombie = createZombieState('e:2', { x: 1, y: 0, z: 1 }, 1);
     expect(zombieAnimation(zombie)).toBe('idle');
     zombie.velocity.x = 1; expect(zombieAnimation(zombie)).toBe('walk');
-    zombie.attackCooldownTicks = 60; expect(zombieAnimation(zombie)).toBe('attack');
+    zombie.attackTicks = 5; expect(zombieAnimation(zombie)).toBe('attack');
     zombie.alive = false; expect(zombieAnimation(zombie)).toBe('death');
     const model = new THREE.Group(); model.add(new THREE.Mesh(new THREE.BoxGeometry()));
     const view = new SkinnedZombieView({ model, clips: {} }, 0);

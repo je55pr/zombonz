@@ -84,3 +84,43 @@ Measured with the starting pistol at a standing zombie, 4000 seeded shots aimed 
 | 50 m | 0.3% | 4.5% | 21% | 54% |
 
 `test/hip-fire.test.ts` and `test/hit-volumes.test.ts` pin these.
+
+## Zombie melee (issue #131)
+
+A zombie used to hit the moment it was within a metre of a player (3D, so also through a floor's thickness), then every
+second: two arriving together landed together, and a window swipe reached 1.4 m from the window's centre, which is more
+than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, timings in `src/core/zombieMelee.ts`):
+
+- **A swing has a wind-up and a recovery.** It starts when a target is in reach and in front, the blow lands when the
+  wind-up ends, and the recovery follows, then a pause of up to 8 ticks. A walker winds up for 42 ticks (0.7 s) and takes 1.6 s
+  a swing; a runner 30 and 1.2 s; a sprinter 22 and 0.9 s (WaW gives its faster zombies faster attack animations). Each
+  zombie's own tempo adds up to 12 ticks to the wind-up and 10 to the recovery, fixed by its id, so a group never swings in step.
+- **The client plays the attack clip from the swing's tick count** (`attackClipTime`), so the arm comes down on the tick the
+  blow lands, and the head and arms the hit volumes use are where they are drawn. The zombie grunts as it starts.
+- **Reach is real.** A swing starts within 1.1 m across the floor (0.9 m for a crawler) and a blow still lands out to 1.3 m,
+  the lunge a player can step back out of; the target must be on the same floor (within 0.9 m) with nothing solid between
+  their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
+  zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). A zombie stands its ground to swing, so the blow
+  is aimed where the player was, and a player who steps back out of reach in the wind-up is missed.
+- **Windows.** A zombie tearing boards swipes once a board is gone, at a player inside within 1 m of the window plane and
+  no farther to the side than the opening plus 0.3 m: an arm's length through the gap, not the length of the room. It stops
+  tearing while it swings, a crawler cannot swipe at all, and a swing is dropped if the window is rebuilt first.
+- **Blows come one at a time.** A landed blow gives the player 30 ticks (0.5 s) of grace against every other zombie; a
+  blow that arrives in the grace waits, its arm out, until it has passed. So a crowd's blows are spaced, and someone hit
+  once can step away, shoot or knife before the second.
+- **Zombies do not stand inside each other or the player.** Each tick, pairs closer than their bodies (0.58 m) are pushed
+  apart (all of it for the one free to move, when the other is mid-swing or coming through a window), zombies that have
+  walked into a player are pushed back out, and the walls still hold. A crowd spreads round its target.
+
+The damage per blow is unchanged at 50, so two blows still down a 100-health player (250 with Juggernog takes five), as in
+WaW; only when they land has changed. Ticks (at 60 a second) from a zombie's first swing until the player goes down, with
+the player standing still and the zombies arriving together (`test/zombie-melee.test.ts` pins the ordering):
+
+| Zombies | Walker: first blow / down | Runner | Sprinter |
+| --- | --- | --- | --- |
+| 1 | 47 / 158 (2.6 s) | 35 / 122 (2.0 s) | 27 / 98 (1.6 s) |
+| 2 | 47 / 77 (1.3 s) | 35 / 65 (1.1 s) | 27 / 57 (0.9 s) |
+| 4 | 47 / 77 (1.3 s) | 35 / 65 (1.1 s) | 27 / 57 (0.9 s) |
+| 6 | 43 / 73 (1.2 s) | 31 / 61 (1.0 s) | 23 / 53 (0.9 s) |
+
+Before, two or more zombies in reach put a player down on the first tick they met.

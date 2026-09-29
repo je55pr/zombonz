@@ -43,8 +43,8 @@ import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, Zombie
 import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
 import { SeededRng, mix32 } from './rng.ts';
 import {
-  createZombieState, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
-  type ZombieAttackEvent,
+  createZombieState, separateZombies, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
+  type ZombieMeleeEvent,
 } from './zombie.ts';
 import {
   beginReload, createWeaponState, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon,
@@ -115,7 +115,7 @@ export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieMeleeEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
   | PowerEvent | PerkEvent | TrapEvent | DownEvent | HazardEvent | EquipmentEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
@@ -548,6 +548,7 @@ export class GameSimulation {
       );
       events.push(...tickZombieMelee(zombie, players, this.collisionBoxes()));
     }
+    separateZombies(zombies, players, this.collisionBoxes(), this.map.walkSurfaces);
     if (this.state.traps.length) {
       events.push(...tickTraps(this.state.traps, this.zombies(), livingPlayers(world), world.tick));
       syncTrapInteractables(this.state.traps, this.interactables(), this.state.power.on);

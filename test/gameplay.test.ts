@@ -89,9 +89,11 @@ describe('headless game simulation', () => {
 
   it('advances without a renderer and reaches solo game over', () => {
     const simulation = makeSimulation();
-    const state = runHeadlessTicks(simulation, 240);
+    // A lone walker walks up, winds up, and lands two blows a swing apart: about four seconds in all.
+    const state = runHeadlessTicks(simulation, 900);
     const player = simulation.getPlayer(simulation.playerIds[0]);
-    expect(state.world.tick).toBeLessThan(240); // Game over freezes gameplay until restart.
+    expect(state.world.tick).toBeLessThan(900); // Game over freezes gameplay until restart.
+    expect(state.world.tick).toBeGreaterThan(180);
     const endedAt = state.world.tick;
     simulation.tick();
     expect(state.world.tick).toBe(endedAt);

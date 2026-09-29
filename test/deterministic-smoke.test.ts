@@ -71,6 +71,6 @@ describe('deterministic smoke scenario', () => {
     });
     expect(state.round.phase).toBe('intermission');
     // Includes movement stance, sprint stamina, earned-points and power-up drop tracking, survival timers/reward tracking, zombie gait, walk speed, facing, look, lost limbs and swing, spread bloom, spawn cadence, an aimed body-shot kill, and (empty) power, perk, trap, hazard, mine, last-stand and departed-player state.
-    expect(fnv1a(JSON.stringify(state))).toBe('a5d42552');
+    expect(fnv1a(JSON.stringify(state))).toBe('6067a809');
   });
 });
