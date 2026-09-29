@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { collectPowerups, createBarrier, createPlayerState, createPowerupState, createWeaponState,
   createZombieState, tickPowerupLifetime, tryDropPowerup, GameSimulation, createInputFrame,
-  addEntity, DEFAULT_POWERUP_CONFIG, startPowerupRound, updatePowerupThreshold,
+  addEntity, damagePlayer, DEFAULT_POWERUP_CONFIG, startPowerupRound, updatePowerupThreshold,
   type PowerupConfig } from '../src/core/index.ts';
 
 const forced: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 100, kinds: ['maxAmmo'] };
@@ -236,5 +236,73 @@ describe('classic power-up drop rules', () => {
     player.grenadeCharges = 0;
     collectPowerups(state, [player], [], forced);
     expect(player.grenadeCharges).toBe(4);
+  });
+});
+
+describe('Carpenter', () => {
+  const window = (n: number) => createBarrier({ id: `w${n}`, position: { x: n * 3, y: 0, z: 0 },
+    outward: { x: 0, y: 0, z: -1 }, width: 2, maxBoards: 6,
+    approachPath: [{ x: n * 3, y: 0, z: -5 }, { x: n * 3, y: 0, z: -1 }],
+    insidePoint: { x: n * 3, y: 0, z: 1 } }, `e:${20 + n}`).state;
+  const windows = (count: number, broken: number) => {
+    const barriers = Array.from({ length: count }, (_, n) => window(n));
+    barriers.slice(0, broken).forEach(barrier => { barrier.boards = 0; });
+    return barriers;
+  };
+  const carpenterOnly: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 100, maxDropsPerRound: 99,
+    kinds: ['carpenter', 'maxAmmo'] };
+  const dealt = (barriers: ReturnType<typeof windows>, drops: number) => {
+    const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+    for (let i = 0; i < drops; i++) tryDropPowerup(state, zombie, barriers, 77, i, carpenterOnly);
+    return state.drops.map(drop => drop.kind);
+  };
+
+  it('never drops until five barriers have lost every board', () => {
+    expect(dealt(windows(8, 4), 12)).not.toContain('carpenter');
+    // Torn but not stripped bare does not count.
+    const torn = windows(8, 4); torn[5].boards = 1;
+    expect(dealt(torn, 12)).not.toContain('carpenter');
+    expect(dealt(windows(8, 5), 12)).toContain('carpenter');
+  });
+
+  it('asks for every barrier on a map with fewer than five, and does not spend a drop when it must pass', () => {
+    expect(dealt(windows(3, 2), 6)).toEqual(['maxAmmo', 'maxAmmo', 'maxAmmo', 'maxAmmo', 'maxAmmo', 'maxAmmo']);
+    expect(dealt(windows(3, 3), 6)).toContain('carpenter');
+    const onlyCarpenter: PowerupConfig = { ...carpenterOnly, kinds: ['carpenter'] };
+    const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+    expect(tryDropPowerup(state, zombie, windows(8, 1), 77, 1, onlyCarpenter)).toEqual([]);
+    expect(state.dropsThisRound).toBe(0);
+  });
+
+  it('rebuilds every damaged barrier to full when collected and reports how many', () => {
+    const barriers = windows(8, 5); barriers[6].boards = 2;
+    barriers[0].repairTicks = 30; barriers[0].repairerId = 'e:1';
+    const state = createPowerupState();
+    state.drops.push({ id: 'p:1', kind: 'carpenter', position: { x: 0, y: 0, z: 0 }, ticksRemaining: 900 });
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    const events = collectPowerups(state, [player], [], carpenterOnly, [], barriers);
+    expect(events).toEqual([{ type: 'carpenterRepaired', dropId: 'p:1', repaired: 6 },
+      { type: 'powerupCollected', dropId: 'p:1', kind: 'carpenter', playerId: 'e:1' }]);
+    expect(barriers.every(barrier => barrier.boards === barrier.maxBoards)).toBe(true);
+    expect(barriers[0]).toMatchObject({ repairTicks: 0, repairerId: null });
+  });
+
+  it('pays 200 to every player on their feet, through the simulation', () => {
+    const map = { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] };
+    const sim = new GameSimulation({ seed: 17, map,
+      playerSpawns: [{ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }],
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
+    const down = sim.getPlayer(sim.playerIds[2])!;
+    damagePlayer(down, 500);
+    expect(down.downed).not.toBeNull();
+    sim.state.powerups.drops.push({ id: 'p:1', kind: 'carpenter', position: { x: 0, y: 0, z: 0 }, ticksRemaining: 900 });
+    const before = sim.playerIds.map(id => sim.getPlayer(id)!.points);
+    const events = sim.tick();
+    expect(events).toContainEqual(expect.objectContaining({ type: 'carpenterRepaired', repaired: 0 }));
+    expect(events.filter(event => event.type === 'pointsAwarded')).toMatchObject([
+      { playerId: sim.playerIds[0], amount: 200, reason: 'carpenter' },
+      { playerId: sim.playerIds[1], amount: 200, reason: 'carpenter' },
+    ]);
+    expect(sim.playerIds.map(id => sim.getPlayer(id)!.points)).toEqual([before[0] + 200, before[1] + 200, before[2]]);
   });
 });

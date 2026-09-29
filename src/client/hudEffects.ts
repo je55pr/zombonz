@@ -249,3 +249,46 @@ export class Crosshair {
     });
   }
 }
+
+/** Seconds the nuke's white-out holds at full strength, then takes to ease back to the scene. */
+const NUKE_HOLD_SECONDS = 0.15;
+const NUKE_FADE_SECONDS = 1.6;
+
+/** How white the screen is this long after a nuke: solid, then a smooth fade to nothing. */
+export function nukeFlashOpacity(secondsSince: number): number {
+  if (secondsSince < 0) return 0;
+  if (secondsSince <= NUKE_HOLD_SECONDS) return 1;
+  const t = (secondsSince - NUKE_HOLD_SECONDS) / NUKE_FADE_SECONDS;
+  return t >= 1 ? 0 : 1 - t * t * (3 - 2 * t);
+}
+
+/**
+ * The nuke's white flash over the whole view. It sits under the HUD text, so points and ammo stay
+ * readable through it, and it hides itself when the fade is done so it can never stay stuck on.
+ */
+export class NukeFlash {
+  private readonly mesh: THREE.Mesh;
+  private startedAt: number | null = null;
+
+  constructor(scene: THREE.Scene) {
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthTest: false, depthWrite: false }));
+    // Under the HUD canvas quad (render order 0), over the 3D view rendered before the HUD scene.
+    this.mesh.renderOrder = -1; this.mesh.frustumCulled = false; this.mesh.visible = false;
+    scene.add(this.mesh);
+  }
+
+  /** Restarts the flash; a second nuke while the first is still fading goes back to full white. */
+  trigger(now: number): void { this.startedAt = now; }
+
+  get active(): boolean { return this.mesh.visible; }
+
+  update(now: number, visible: boolean): void {
+    const opacity = this.startedAt === null || !visible ? 0 : nukeFlashOpacity((now - this.startedAt) / 1000);
+    if (this.startedAt !== null && (now - this.startedAt) / 1000 > NUKE_HOLD_SECONDS + NUKE_FADE_SECONDS) this.startedAt = null;
+    (this.mesh.material as THREE.MeshBasicMaterial).opacity = opacity;
+    this.mesh.visible = opacity > 0.004;
+  }
+
+  clear(): void { this.startedAt = null; this.mesh.visible = false; }
+}

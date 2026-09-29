@@ -71,7 +71,7 @@ variation is seeded in the game core for repeatable results. The handling is
 prototype tuning, not a frame-exact recreation.
 Reload early with R (or automatically when the magazine empties), knife with V,
 throw a grenade with T or middle mouse, switch weapons
-with Q, interact with E, and restart after game over with Enter.
+with Q or the mouse wheel, interact with E, and restart after game over with Enter.
 A killing blow puts you into last stand with a pistol: a teammate can revive you by holding E beside
 you, you bleed out after 30 seconds, and solo play ends there unless you drank Quick Revive
 (see [Asylum](docs/asylum-map.md#last-stand)).
@@ -79,7 +79,7 @@ M mutes game audio. Escape releases the mouse and opens the pause menu, with Res
 Restart, Settings and Quit to Main Menu. Losing focus or hiding the tab also pauses the game,
 so zombies do not advance while you are away. Input releases when focus is lost.
 
-G toggles god mode (restores health and prevents damage). F toggles noclip:
+L toggles god mode (restores health and prevents damage). K toggles noclip:
 WASD flies in the direction you look, Space rises and C descends. Active modes appear
 on the HUD. Turning noclip off lands you on a valid surface; if you are inside a wall
 or outside the map, it returns you to where you enabled noclip. Both modes reset on restart.
@@ -153,7 +153,7 @@ and temporary damage tint. Original synthesized audio gives simple gun, melee,
 damage, box and round cues; it unlocks after user input and can be muted with M.
 Quiet synthesized wind and electrical hum fill the empty bunker after audio unlock;
 they fade out while solo play is paused. Practical lamps occasionally flicker.
-Zombie kills can also drop Max Ammo, Double Points, Insta-Kill or Nuke pickups, using the
+Zombie kills can also drop Max Ammo, Double Points, Insta-Kill, Nuke or Carpenter pickups, using the
 classic rules. Each time the team's total earned points pass a threshold (2000 above the
 starting points, growing 14% after each drop), the next kill drops one. Any kill also has
 a 3% chance. At most four drop per round, and every kind appears once before any repeats.
@@ -164,7 +164,12 @@ rewards for 30 seconds. Kills outside a window place the pickup just inside it
 so the reward is reachable. Insta-Kill makes gunshots and knife hits lethal to
 zombies for 30 seconds, without bypassing walls or weapon range.
 A Nuke kills all currently active zombies and awards 400 points to every living player;
-it does not award a kill bonus for each zombie.
+it does not award a kill bonus for each zombie, and the screen flashes white and fades back.
+A Carpenter rebuilds every damaged barrier to full boards and pays 200 points to each player
+who is not down. It only drops once five barriers have lost every board (or all of them, on a
+map with fewer), so a kind that cannot drop yet is passed over in the deck. The wonder weapons
+are as likely as any other gun in the box for now, and each solo game starts from a fresh random
+seed, so the box and drops differ between games (dev builds can pin one with `?seed=<n>`).
 Players start with two frag grenades and gain two more each new round, carrying at most four.
 Grenades follow a fixed-tick arc, bounce off solid geometry and explode after two
 seconds. Walls block blast damage; standing too close to your own grenade hurts.

@@ -26,13 +26,13 @@ export const DEFAULT_ECONOMY_CONFIG: Readonly<EconomyConfig> = {
 };
 
 export type EconomyEvent =
-  | { type: 'pointsAwarded'; playerId: PlayerState['id']; amount: number; reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair' | 'nuke'; balance: number }
+  | { type: 'pointsAwarded'; playerId: PlayerState['id']; amount: number; reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair' | 'nuke' | 'carpenter'; balance: number }
   | { type: 'pointsSpent'; playerId: PlayerState['id']; amount: number; reason: string; balance: number }
   | { type: 'pointsSpendRejected'; playerId: PlayerState['id']; amount: number; reason: string; balance: number };
 function award(
   player: PlayerState,
   amount: number,
-  reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair' | 'nuke',
+  reason: 'hit' | 'kill' | 'headshot' | 'melee' | 'repair' | 'nuke' | 'carpenter',
 ): EconomyEvent {
   player.points += amount;
   player.pointsEarned += amount;
@@ -78,6 +78,10 @@ export function awardRepairPoints(player: PlayerState, round: number, multiplier
 
 export function awardNukePoints(player: PlayerState): EconomyEvent[] {
   return player.alive ? [award(player, 400, 'nuke')] : [];
+}
+/** The Carpenter pays every player who is on their feet 200 points once the boards are back. */
+export function awardCarpenterPoints(player: PlayerState): EconomyEvent[] {
+  return player.alive && !player.downed ? [award(player, 200, 'carpenter')] : [];
 }
 export function spendPoints(
   player: PlayerState,

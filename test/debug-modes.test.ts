@@ -75,10 +75,10 @@ describe('G / F debug modes', () => {
     expect(buildHudSnapshot(sim, sim.playerIds[0])).toMatchObject({ godMode: false, noclip: false });
   });
 
-  it('maps G/F to one toggle per physical press, including browser repeats', () => {
+  it('maps L (god mode) and K (fly) to one toggle per physical press, including browser repeats', () => {
     const target = new EventTarget(), pointer = new EventTarget();
     const browser = new BrowserInput({ pointerElement: pointer as HTMLElement }, target as Window);
-    for (const [code, action] of [['KeyG', 'toggleGodMode'], ['KeyF', 'toggleNoclip']] as const) {
+    for (const [code, action] of [['KeyL', 'toggleGodMode'], ['KeyK', 'toggleNoclip']] as const) {
       target.dispatchEvent(Object.assign(new Event('keydown'), { code, repeat: false }));
       expect(browser.consume().actions[action]?.pressed).toBe(true);
       target.dispatchEvent(Object.assign(new Event('keydown'), { code, repeat: true }));

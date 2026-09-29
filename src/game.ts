@@ -6,6 +6,7 @@ import { LightPool } from './client/lightPool.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { aimedFov } from './client/aim.ts';
+import { DEFAULT_KEY_BINDINGS } from './client/bindings.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
@@ -88,6 +89,20 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
     try { await task(); } catch { /* reported in game */ }
     onProgress(++done, tasks.length);
   }
+}
+
+/** Dev previews keep one seed so a given view always looks the same. */
+const PREVIEW_SEED = 0x5a0b0a2;
+/**
+ * The seed a solo match starts from. Every roll of the box and every drop derives from it, so a
+ * fixed one would replay the same match; each session takes a fresh random one. Dev builds can pin
+ * it with `?seed=<n>` to reproduce a run.
+ */
+function soloSeed(preview: boolean): number {
+  if (preview) return PREVIEW_SEED;
+  const pinned = import.meta.env.DEV ? new URLSearchParams(location.search).get('seed') : null;
+  if (pinned !== null && Number.isFinite(Number(pinned))) return Number(pinned) >>> 0;
+  return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
 /**
@@ -178,7 +193,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   // Everyone in a co-op game builds the same match; the host's runs it, clients' copies follow it.
   const lobbyPlayers = net ? net.role === 'host' ? net.players : net.start.players : [];
   const simulation = net ? createMatch(map, lobbyPlayers.length, net.role === 'host' ? net.seed : net.start.seed) : new GameSimulation({
-    seed: 0x5a0b0a2,
+    seed: soloSeed(preview !== null),
     map: { ...simulationMap(map), zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns },
     // `&teammate=idle|run|down` adds a teammate three metres ahead, to inspect their figure.
     playerSpawns: [preview?.position ?? map.playerSpawn, ...(previewTeammate && preview ? [{
@@ -331,7 +346,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   }
 
   const clock = new FixedStepClock({ tickRate: 60 });
-  const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022 * settings.sensitivity, previewFireKey: !!preview });
+  const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022 * settings.sensitivity, previewFireKey: !!preview,
+    bindings: DEFAULT_KEY_BINDINGS });
   const audio = new GameAudio(canvas);
   audio.setPaused(!preview);
   if (!preview) audio.startFromGesture();
@@ -341,7 +357,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     if (!net) { clock.reset(); previousPositions.clear(); audio.setPaused(paused); }
     hooks.onPauseChange?.(paused);
   }, !preview, () => !preview, !preview);
-  const hud = new CanvasHud(renderer, map.name);
+  const hud = new CanvasHud(renderer, map.name, DEFAULT_KEY_BINDINGS);
   const feedback = new HudFeedback();
   const netCleanup: Array<() => void> = [];
   if (net?.role === 'host') net.host.attach(simulation);

@@ -1,16 +1,15 @@
 import type { ActionState, GameAction, InputFrame } from '../core/input.ts';
+import { DEFAULT_KEY_BINDINGS, actionsByKey, type KeyBindings } from './bindings.ts';
 
-const KEY_ACTIONS: Partial<Record<string, GameAction>> = {
-  KeyW: 'moveForward', KeyS: 'moveBackward', KeyA: 'moveLeft', KeyD: 'moveRight',
-  ShiftLeft: 'sprint', ShiftRight: 'sprint',
-  KeyR: 'reload', KeyE: 'interact', KeyV: 'melee', KeyT: 'throwGrenade', KeyQ: 'switchWeapon', Enter: 'restart',
-  KeyG: 'toggleGodMode', KeyF: 'toggleNoclip', Space: 'flyUp', KeyC: 'flyDown',
-};
+/** Wheel ticks closer together than this count as one flick, so a free-spinning wheel swaps once. */
+const WHEEL_SWITCH_GAP_MS = 180;
 
 export interface BrowserInputOptions {
   pointerElement: HTMLElement;
   lookSensitivity?: number;
   previewFireKey?: boolean;
+  /** Which keys trigger which actions; the defaults if omitted. */
+  bindings?: KeyBindings;
 }
 
 export class BrowserInput {
@@ -21,17 +20,21 @@ export class BrowserInput {
   private lookYaw = 0;
   private lookPitch = 0;
   private lookSensitivity: number;
+  private keyActions: ReadonlyMap<string, GameAction>;
+  private lastWheelSwitch = -Infinity;
 
   constructor(
     private readonly options: BrowserInputOptions,
     private readonly target: Window = window,
   ) {
     this.lookSensitivity = options.lookSensitivity ?? 0.0022;
+    this.keyActions = actionsByKey(options.bindings ?? DEFAULT_KEY_BINDINGS);
     target.addEventListener('keydown', this.onKeyDown);
     target.addEventListener('keyup', this.onKeyUp);
     target.addEventListener('mousedown', this.onMouseDown);
     target.addEventListener('mouseup', this.onMouseUp);
     target.addEventListener('mousemove', this.onMouseMove);
+    target.addEventListener('wheel', this.onWheel);
     target.addEventListener('blur', this.onBlur);
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', this.onVisibilityChange);
@@ -39,6 +42,11 @@ export class BrowserInput {
     }
     options.pointerElement.addEventListener('click', this.onPointerClick);
     options.pointerElement.addEventListener('contextmenu', this.onContextMenu);
+  }
+
+  /** Applies new key bindings; keys already held keep their old action until released. */
+  setBindings(bindings: KeyBindings): void {
+    this.keyActions = actionsByKey(bindings);
   }
 
   setSensitivity(value: number): void {
@@ -75,7 +83,7 @@ export class BrowserInput {
   };
 
   private actionForKey(code: string): GameAction | undefined {
-    return code === 'KeyP' && this.options.previewFireKey ? 'fire' : KEY_ACTIONS[code];
+    return code === 'KeyP' && this.options.previewFireKey ? 'fire' : this.keyActions.get(code);
   }
   private onKeyDown = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), true, event.repeat);
   private onKeyUp = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), false, false);
@@ -84,6 +92,18 @@ export class BrowserInput {
     if (event.button === 0) this.set('fire', true, false);
     if (event.button === 2) this.set('aim', true, false);
     if (event.button === 1) this.set('throwGrenade', true, false);
+  };
+  /**
+   * Either way of the wheel swaps weapons. The inventory holds two guns, so there is no direction to
+   * pick; a longer one would want to cycle by the sign of `deltaY`.
+   */
+  private onWheel = (event: WheelEvent) => {
+    if (document.pointerLockElement !== this.options.pointerElement) return;
+    if (event.timeStamp - this.lastWheelSwitch < WHEEL_SWITCH_GAP_MS) return;
+    this.lastWheelSwitch = event.timeStamp;
+    // A wheel has no held state: it is a press and release at once.
+    this.set('switchWeapon', true, false);
+    this.set('switchWeapon', false, false);
   };
   private onMouseUp = (event: MouseEvent) => {
     if (event.button === 0) this.set('fire', false, false);
@@ -126,6 +146,7 @@ export class BrowserInput {
     this.target.removeEventListener('mousedown', this.onMouseDown);
     this.target.removeEventListener('mouseup', this.onMouseUp);
     this.target.removeEventListener('mousemove', this.onMouseMove);
+    this.target.removeEventListener('wheel', this.onWheel);
     this.target.removeEventListener('blur', this.onBlur);
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', this.onVisibilityChange);
