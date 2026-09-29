@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { fitShadowCamera, placeMoon } from '../src/client/shadowFit.ts';
 import { buildGreybox } from '../src/client/greybox.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
-import { BUNKER_MAP } from '../src/maps/bunker.ts';
+import { BUNKER_MAP } from '../src/maps/bunkerLegacy.ts';
 
 function moon(focus = { x: 0, z: 0 }): THREE.DirectionalLight {
   const light = new THREE.DirectionalLight(0xffffff, 1);

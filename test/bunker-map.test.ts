@@ -6,7 +6,7 @@ import {
   greyboxCollisionBoxes,
   BUNKER_WINDOWS, BUNKER_DOORS, BUNKER_MYSTERY_BOXES, BUNKER_STAIRS, UPPER_HEIGHT,
   BUNKER_BARRIERS, BUNKER_ZOMBIE_SPAWNS, BUNKER_NAVIGATION,
-} from '../src/maps/bunker.ts';
+} from '../src/maps/bunkerLegacy.ts';
 import { walkSurfaceHeight, sampleWalkHeight } from '../src/core/collision.ts';
 import { PLAN_SCALE, ps, px, pz } from '../src/maps/bunkerPlan.ts';
 

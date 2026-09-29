@@ -6,7 +6,7 @@ import {
 import {
   BUNKER_MYSTERY_BOXES, BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_WALL_WEAPONS, BUNKER_WALL_WEAPON_FACING,
   UPPER_HEIGHT, greyboxCollisionBoxes,
-} from '../src/maps/bunker.ts';
+} from '../src/maps/bunkerLegacy.ts';
 
 const origin = { x: 0, y: 0, z: 0 };
 

@@ -5,7 +5,7 @@ import { GameSimulation, createInputFrame, createPlayerState, createZombieState,
 } from '../src/core/index.ts';
 import { BUNKER_DOORS, BUNKER_MYSTERY_BOXES, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN,
   BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, BUNKER_STAIRS, BUNKER_SHOT_BLOCKERS,
-  UPPER_HEIGHT, greyboxCollisionBoxes, BUNKER_BARRIERS, BUNKER_BOX_CENTER } from '../src/maps/bunker.ts';
+  UPPER_HEIGHT, greyboxCollisionBoxes, BUNKER_BARRIERS, BUNKER_BOX_CENTER } from '../src/maps/bunkerLegacy.ts';
 import { ps, px, pz } from '../src/maps/bunkerPlan.ts';
 
 // The HELP stair runs south from blockout z 3.1 to 6.65; place a point part way up it.

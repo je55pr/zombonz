@@ -12,7 +12,7 @@ import type { GameMap, MapTree, MapWindow } from './gameMap.ts';
 import { MapBuilder, barriersFromWindows, collisionBoxesFor, compileNavigation, entrySpawns, slabShotBlockers, windowPoint,
   type Opening } from './mapBuild.ts';
 import { Scenery, onGround } from './scenery.ts';
-import { BUNKER_MYSTERY_BOXES } from './bunker.ts';
+import { BUNKER_MAP } from './bunker.ts';
 
 /**
  * Asylum follows WaW Verrückt's plan (docs/asylum-map.md): a two-storey sanatorium on four sides of an
@@ -212,7 +212,7 @@ export const ASYLUM_BOX_SPOTS: readonly MysteryBoxLocation[] = [
   boxSpot('hallway', EAST - 0.725, 0, -16.6, Math.PI),
 ];
 export const ASYLUM_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
-  ...BUNKER_MYSTERY_BOXES[0], id: 'power-box', position: ASYLUM_BOX_SPOTS[0].position, locations: ASYLUM_BOX_SPOTS,
+  ...BUNKER_MAP.mysteryBoxes[0], id: 'power-box', position: ASYLUM_BOX_SPOTS[0].position, locations: ASYLUM_BOX_SPOTS,
 }];
 
 // ---- Power, perks and traps: the switch sits on the power room's panel.

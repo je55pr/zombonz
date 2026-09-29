@@ -3,7 +3,7 @@ import {
   BARRIER_RULES, GameSimulation, WINDOW_ATTACK, ZOMBIE_MOVEMENT, awardRepairPoints, createBarrier,
   createPlayerState, createZombieEntry, createZombieState, tickWindowAttack,
 } from '../src/core/index.ts';
-import { BUNKER_BARRIERS, BUNKER_WINDOW_BOARDS } from '../src/maps/bunker.ts';
+import { BUNKER_BARRIERS, BUNKER_WINDOW_BOARDS } from '../src/maps/bunkerLegacy.ts';
 
 const definition = BUNKER_BARRIERS[0];
 
