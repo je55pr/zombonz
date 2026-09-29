@@ -1,5 +1,6 @@
 import {
-  createMenuState, menuItems, reduceMenu, setDownload, type DownloadStatus, type MenuAction, type MenuEffect, type MenuState,
+  bootstrapProgressFraction, createMenuState, menuItems, reduceMenu, setDownload,
+  type DownloadStatus, type MenuAction, type MenuEffect, type MenuState,
 } from './menu.ts';
 import type { GameSettings } from './settings.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
@@ -107,24 +108,26 @@ export class MenuView {
   private drawDownload(centre: number, y: number, scale: number): void {
     const c = this.context, d = this.state.download;
     const mb = (bytes: number) => (bytes / 1e6).toFixed(1);
-    const fraction = d.phase === 'ready' ? 1
-      : d.phase === 'preparing' ? (d.totalSteps ? (d.preparedSteps ?? 0) / d.totalSteps : 0)
-        : d.totalBytes > 0 ? Math.min(1, d.loadedBytes / d.totalBytes) : 0;
+    const fraction = bootstrapProgressFraction(d);
     const barWidth = Math.min(460 * scale, innerWidth - 32), barHeight = Math.max(6, 8 * scale);
     c.textAlign = 'center';
     let title: string, detail: string;
-    if (d.phase === 'code') { title = 'Downloading game…'; detail = ''; }
+    if (d.phase === 'code') { title = 'Checking game assets…'; detail = ''; }
     else if (d.phase === 'assets') {
-      title = `Downloading models and textures  ${Math.floor(fraction * 100)}%`;
-      detail = `${mb(d.loadedBytes)} / ${mb(d.totalBytes)} MB  ·  ${d.doneFiles} / ${d.totalFiles} files`;
+      title = `Loading game assets  ${Math.floor(fraction * 100)}%`;
+      detail = `${mb(d.loadedBytes)} / ${mb(d.totalBytes)} MB  ·  ${d.doneFiles} / ${d.totalFiles} files  ·  ${d.cachedFiles ?? 0} cached`;
     } else if (d.phase === 'preparing') {
-      title = `Preparing maps  ${Math.floor(fraction * 100)}%`;
-      detail = `Unpacking models and textures  ·  ${d.preparedSteps ?? 0} / ${d.totalSteps ?? 0}`;
+      title = `Preparing game assets  ${Math.floor(fraction * 100)}%`;
+      detail = `${d.preparedSteps ?? 0} / ${d.totalSteps ?? 0} tasks  ·  ${d.totalFiles} files, including audio`;
     } else if (d.phase === 'ready') {
       title = d.failedFiles ? `Ready, with ${d.failedFiles} file${d.failedFiles > 1 ? 's' : ''} missing` : 'Ready';
-      detail = d.failedFiles ? 'Missing models or textures will show as placeholders.'
-        : `${d.totalFiles} files  ·  ${mb(d.loadedBytes)} MB downloaded`;
-    } else { title = 'Download failed'; detail = 'Check your connection, then choose Retry download.'; }
+      detail = `${d.totalFiles} files  ·  ${d.cachedFiles ?? 0} cached`;
+    } else {
+      title = 'Asset preparation failed';
+      detail = d.totalSteps ? `${d.preparedSteps ?? 0} / ${d.totalSteps} preparation tasks  ·  Retry download`
+        : d.totalFiles ? `${d.doneFiles} / ${d.totalFiles} files checked  ·  ${d.failedFiles} failed  ·  Retry download`
+        : 'Check your connection, then choose Retry download.';
+    }
     c.fillStyle = d.phase === 'error' ? '#c4574a' : '#bdb6a1';
     c.font = `700 ${Math.round(17 * scale)}px ${UI_FONT}`;
     c.fillText(title, centre, y);
@@ -175,7 +178,7 @@ export class MenuView {
       c.fillStyle = '#d8d2bd'; c.font = `700 ${Math.round(28 * scale)}px ${UI_FONT}`;
       c.fillText(`Starting ${MAP_CATALOG.find(map => map.id === this.state.map)?.name ?? 'the map'}…`, centre, y);
     }
-    if (screen === 'main') this.drawDownload(centre, height * 0.22 + 112 * scale, scale);
+    if (screen === 'bootstrap') this.drawDownload(centre, height * 0.47, scale);
     const rowHeight = 58 * scale, rowWidth = Math.min(width - 32, (screen === 'settings' ? 560 : 340) * scale);
     menuItems(this.state).forEach((item, index) => {
       const selected = index === this.state.selected;
@@ -206,7 +209,8 @@ export class MenuView {
     });
 
     c.textAlign = 'center'; c.fillStyle = '#6f6a5c'; c.font = `400 ${Math.round(15 * scale)}px ${UI_FONT}`;
-    const hint = screen === 'settings' ? '↑ ↓ select  ·  ← → or click to adjust  ·  Esc back'
+    const hint = screen === 'bootstrap' ? (this.state.download.phase === 'error' ? 'Enter or click to retry' : '')
+      : screen === 'settings' ? '↑ ↓ select  ·  ← → or click to adjust  ·  Esc back'
       : screen === 'loading' ? '' : '↑ ↓ select  ·  Enter or click to choose  ·  Esc back';
     c.fillText(hint, centre, height - 48);
     c.textAlign = 'right'; c.fillText(`BUILD ${this.buildId}`, width - 16, height - 18);

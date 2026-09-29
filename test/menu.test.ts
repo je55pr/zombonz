@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { INITIAL_DOWNLOAD, createMenuState, menuItems, reduceMenu, setDownload, type DownloadStatus } from '../src/client/menu.ts';
+import { INITIAL_DOWNLOAD, bootstrapProgressFraction, createMenuState, menuItems, reduceMenu,
+  setDownload, type DownloadStatus } from '../src/client/menu.ts';
 import {
   DEFAULT_SETTINGS, adjustSetting, loadSettings, normalizeSettings, saveSettings, SETTING_LIMITS,
 } from '../src/client/settings.ts';
@@ -36,6 +37,13 @@ describe('settings', () => {
 const READY: DownloadStatus = { phase: 'ready', loadedBytes: 100, totalBytes: 100, doneFiles: 3, totalFiles: 3, failedFiles: 0 };
 
 describe('start menu', () => {
+  it('keeps one progress meter below 100% until preparation is complete', () => {
+    expect(bootstrapProgressFraction({ ...READY, phase: 'assets' })).toBe(0.8);
+    expect(bootstrapProgressFraction({ ...READY, phase: 'preparing', preparedSteps: 5, totalSteps: 10 })).toBe(0.9);
+    expect(bootstrapProgressFraction({ ...READY, phase: 'preparing', preparedSteps: 10, totalSteps: 10 })).toBe(0.99);
+    expect(bootstrapProgressFraction(READY)).toBe(1);
+  });
+
   it('offers Solo, Multiplayer and Settings, and Solo starts the game on the chosen map', () => {
     const state = createMenuState({ ...DEFAULT_SETTINGS }, READY);
     expect(menuItems(state).map(item => item.label)).toEqual(['Solo', 'Multiplayer', 'Settings']);
@@ -71,22 +79,16 @@ describe('start menu', () => {
     expect(state.selected).toBe(0);
   });
 
-  it('locks Solo and Multiplayer while downloading, leaving Settings usable', () => {
+  it('shows only bootstrap progress until all assets are ready', () => {
     const state = createMenuState({ ...DEFAULT_SETTINGS });
-    expect(menuItems(state).map(item => item.disabled ?? false)).toEqual([true, true, false]);
-    expect(state.selected).toBe(2);
+    expect(state.screen).toBe('bootstrap');
+    expect(menuItems(state)).toEqual([]);
     expect(reduceMenu(state, { type: 'activate', index: 0 })).toBeNull();
-    expect(state.screen).toBe('main');
-    // Keyboard movement and hovering skip the locked rows.
-    reduceMenu(state, { type: 'up' });
-    expect(state.selected).toBe(2);
-    reduceMenu(state, { type: 'hover', index: 1 });
-    expect(state.selected).toBe(2);
+    expect(state.screen).toBe('bootstrap');
     setDownload(state, { ...INITIAL_DOWNLOAD, phase: 'assets', loadedBytes: 50, totalBytes: 100, doneFiles: 1, totalFiles: 3 });
-    expect(menuItems(state)[0].disabled).toBe(true);
-    // Finishing unlocks play and moves the highlight to Solo.
+    expect(menuItems(state)).toEqual([]);
     setDownload(state, READY);
-    expect(menuItems(state)[0].disabled).toBe(false);
+    expect(state.screen).toBe('main');
     expect(state.selected).toBe(0);
     reduceMenu(state, { type: 'activate' });
     expect(reduceMenu(state, { type: 'activate' })).toEqual({ type: 'startSolo', map: 'bunker' });
@@ -95,26 +97,23 @@ describe('start menu', () => {
   it('keeps play locked while downloaded files are unpacked', () => {
     const state = createMenuState({ ...DEFAULT_SETTINGS });
     setDownload(state, { ...READY, phase: 'preparing', preparedSteps: 3, totalSteps: 24 });
-    expect(menuItems(state).slice(0, 2).every(item => item.disabled)).toBe(true);
+    expect(menuItems(state)).toEqual([]);
     expect(reduceMenu(state, { type: 'activate', index: 0 })).toBeNull();
     setDownload(state, READY);
-    expect(menuItems(state)[0].disabled).toBe(false);
+    expect(state.screen).toBe('main');
   });
 
-  it('still unlocks play when some assets fail, but offers a retry if the game itself fails', () => {
-    const partial = createMenuState({ ...DEFAULT_SETTINGS });
-    setDownload(partial, { ...READY, failedFiles: 2 });
-    expect(menuItems(partial)[0].disabled).toBe(false);
+  it('offers retry while bootstrap fails and keeps menus hidden', () => {
     const failed = createMenuState({ ...DEFAULT_SETTINGS });
     setDownload(failed, { ...INITIAL_DOWNLOAD, phase: 'error' });
-    expect(menuItems(failed).map(item => item.id)).toEqual(['solo', 'multiplayer', 'settings', 'retry']);
-    expect(reduceMenu(failed, { type: 'activate', index: 3 })).toEqual({ type: 'retryDownload' });
+    expect(menuItems(failed).map(item => item.id)).toEqual(['retry']);
+    expect(reduceMenu(failed, { type: 'activate', index: 0 })).toEqual({ type: 'retryDownload' });
     expect(failed.download.phase).toBe('code');
     expect(menuItems(failed).map(item => item.id)).not.toContain('retry');
   });
 
   it('adjusts settings with left/right and clicks, saving each change', () => {
-    const state = createMenuState({ ...DEFAULT_SETTINGS });
+    const state = createMenuState({ ...DEFAULT_SETTINGS }, READY);
     reduceMenu(state, { type: 'activate', index: 2 });
     expect(menuItems(state).map(item => item.id)).toEqual(['sensitivity', 'fov', 'volume', 'bindings', 'back']);
     reduceMenu(state, { type: 'down' });
@@ -151,51 +150,113 @@ describe('direct start', () => {
 });
 
 describe('start-screen downloads', () => {
+  it('rejects an invalid build manifest before starting asset downloads', async () => {
+    const { loadBootstrapManifest } = await import('../src/client/preload.ts');
+    const fetcher = (async () => new Response(JSON.stringify({ version: 1,
+      files: { 'assets/broken.glb': { size: 4, sha256: 'wrong' } } }))) as typeof fetch;
+    await expect(loadBootstrapManifest(fetcher)).rejects.toThrow('invalid');
+  });
+
+  async function manifestFor(files: Record<string, number>) {
+    const entries = await Promise.all(Object.entries(files).map(async ([url, size]) => {
+      const digest = await crypto.subtle.digest('SHA-256', new Uint8Array(size));
+      return [url.slice(1), { size,
+        sha256: [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join(''),
+      }] as const;
+    }));
+    const assetFiles = Object.fromEntries(entries);
+    const revisionHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(assetFiles)));
+    const revision = [...new Uint8Array(revisionHash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    return { version: 1 as const, revision, files: assetFiles };
+  }
+
+  function cache() {
+    const entries = new Map<string, Response>();
+    return { entries, match: async (url: string) => entries.get(url)?.clone(),
+      put: async (url: string, response: Response) => { entries.set(url, response.clone()); } };
+  }
+
   function server(files: Record<string, number>, broken: string[] = []) {
     const requests: string[] = [];
     const fetcher = (async (url: string, init?: RequestInit) => {
       requests.push(`${init?.method ?? 'GET'} ${url}`);
-      if (broken.includes(url)) return new Response(null, { status: 404 });
-      const size = files[url];
-      if (init?.method === 'HEAD') return new Response(null, { headers: { 'content-length': String(size) } });
-      return new Response(new Uint8Array(size), { headers: { 'content-length': String(size) } });
+      const path = url.split('?')[0];
+      if (broken.includes(path) || files[path] === undefined) return new Response(null, { status: 404 });
+      return new Response(new Uint8Array(files[path]));
     }) as unknown as typeof fetch;
     return { fetcher, requests };
   }
 
-  it('fetches every file in full, measuring progress in bytes against HEAD sizes', async () => {
+  it('uses exact manifest totals and verifies each download before storing it', async () => {
     const { downloadAssets } = await import('../src/client/preload.ts');
-    const { fetcher, requests } = server({ '/a.glb': 1000, '/b.webp': 3000, '/c.glb': 6000 });
+    const files = { '/assets/a.glb': 1000, '/assets/b.webp': 3000, '/assets/c.mp3': 6000 };
+    const { fetcher, requests } = server(files);
     const seen: number[] = [];
-    const result = await downloadAssets(['/a.glb', '/b.webp', '/c.glb'], p => seen.push(p.loadedBytes / p.totalBytes), fetcher, 2);
-    expect(result).toMatchObject({ loadedBytes: 10000, totalBytes: 10000, doneFiles: 3, totalFiles: 3, failed: [] });
+    const result = await downloadAssets(Object.keys(files), await manifestFor(files),
+      p => seen.push(p.loadedBytes / p.totalBytes), fetcher, cache(), 2);
+    expect(result).toMatchObject({ loadedBytes: 10000, totalBytes: 10000, doneFiles: 3, totalFiles: 3, cachedFiles: 0, failed: [] });
     expect(requests.filter(r => r.startsWith('GET'))).toHaveLength(3);
-    expect(requests.filter(r => r.startsWith('HEAD'))).toHaveLength(3);
+    expect(requests.filter(r => r.startsWith('HEAD'))).toHaveLength(0);
     for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1]);
     expect(seen.at(-1)).toBe(1);
   });
 
-  it('hands each completed file to the store for the game loaders', async () => {
+  it('reuses a warm cache without a network request and refreshes only a stale entry', async () => {
     const { downloadAssets } = await import('../src/client/preload.ts');
-    const { fetcher } = server({ '/a.glb': 1000, '/b.webp': 3000 });
+    const files = { '/assets/a.glb': 1000, '/assets/b.webp': 3000 };
+    const { fetcher, requests } = server(files), assetCache = cache(), manifest = await manifestFor(files);
     const stored = new Map<string, number>();
-    await downloadAssets(['/a.glb', '/b.webp'], () => {}, fetcher, 2, (url, blob) => stored.set(url, blob.size));
-    expect(Object.fromEntries(stored)).toEqual({ '/a.glb': 1000, '/b.webp': 3000 });
-    const { storeAsset, takeAsset, getAsset } = await import('../src/client/assetStore.ts');
+    const store = (url: string, blob: Blob) => stored.set(url, blob.size);
+    await downloadAssets(Object.keys(files), manifest, () => {}, fetcher, assetCache, 2, store);
+    requests.length = 0;
+    const lazy = new Map<string, () => Promise<Blob>>();
+    const storeCached = (url: string, load: () => Promise<Blob>) => lazy.set(url, load);
+    const warm = await downloadAssets(Object.keys(files), manifest, () => {}, fetcher, assetCache, 2, store, storeCached);
+    expect(warm).toMatchObject({ loadedBytes: 4000, totalBytes: 4000, cachedFiles: 2, failed: [] });
+    expect(requests).toEqual([]);
+    expect(lazy.size).toBe(2);
+    expect((await lazy.get('/assets/a.glb')?.())?.size).toBe(1000);
+    assetCache.entries.set('/assets/a.glb', new Response(new Uint8Array(1000), { headers: {
+      'x-zombonz-sha256': '0'.repeat(64), 'x-zombonz-size': '1000',
+    } }));
+    const refreshed = await downloadAssets(Object.keys(files), manifest, () => {}, fetcher, assetCache, 2, store, storeCached);
+    expect(refreshed.cachedFiles).toBe(1);
+    expect(requests).toHaveLength(1);
+    expect(Object.fromEntries(stored)).toEqual({ '/assets/a.glb': 1000, '/assets/b.webp': 3000 });
+    const { storeAsset, takeAsset, getAsset, storeLazyAsset, takeAssetAsync } = await import('../src/client/assetStore.ts');
     storeAsset('/x.glb', new Blob([new Uint8Array(4)]));
     expect(getAsset('/x.glb')?.size).toBe(4);
     expect(takeAsset('/x.glb')?.size).toBe(4);
     expect(takeAsset('/x.glb')).toBeUndefined();
+    let reads = 0;
+    storeLazyAsset('/lazy.glb', async () => { reads++; return new Blob([new Uint8Array(7)]); });
+    expect(reads).toBe(0);
+    expect((await takeAssetAsync('/lazy.glb'))?.size).toBe(7);
+    expect(reads).toBe(1);
   });
 
-  it('reports failures without stalling, and drops them from the total', async () => {
+  it('invalidates the preparation record when the asset revision changes', async () => {
+    const { markPrepared, wasPrepared } = await import('../src/client/preload.ts');
+    const first = await manifestFor({ '/assets/a.glb': 1 });
+    const second = await manifestFor({ '/assets/a.glb': 2 });
+    const values = new Map<string, string>();
+    const storage = { getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); } };
+    expect(wasPrepared(first, storage)).toBe(false);
+    markPrepared(first, storage);
+    expect(wasPrepared(first, storage)).toBe(true);
+    expect(wasPrepared(second, storage)).toBe(false);
+  });
+
+  it('reports failed required files without claiming the bootstrap is complete', async () => {
     const { downloadAssets } = await import('../src/client/preload.ts');
-    const { fetcher } = server({ '/a.glb': 1000, '/b.glb': 2000 }, ['/b.glb']);
-    const result = await downloadAssets(['/a.glb', '/b.glb'], () => {}, fetcher);
-    expect(result.failed).toEqual(['/b.glb']);
+    const files = { '/assets/a.glb': 1000, '/assets/b.glb': 2000 };
+    const { fetcher } = server(files, ['/assets/b.glb']);
+    const result = await downloadAssets(Object.keys(files), await manifestFor(files), () => {}, fetcher);
+    expect(result.failed).toEqual(['/assets/b.glb']);
     expect(result.doneFiles).toBe(2);
     expect(result.loadedBytes).toBe(1000);
-    expect(result.totalBytes).toBe(1000);
+    expect(result.totalBytes).toBe(3000);
   });
 });
 
@@ -203,6 +264,9 @@ describe('start-screen asset list', () => {
   it('covers every weapon, prop, zombie file, environment map and sound, and each exists on disk', async () => {
     const { readAssetJson, assetExists } = await import('../scripts/inspect-assets.mjs');
     const manifest = readAssetJson('public/assets/environment/manifest.json');
+    const bootstrap = readAssetJson('public/assets/bootstrap-manifest.json') as {
+      files: Record<string, { size: number; sha256: string }>;
+    };
     const original = globalThis.fetch;
     globalThis.fetch = (async () => new Response(JSON.stringify(manifest))) as unknown as typeof fetch;
     try {
@@ -212,6 +276,9 @@ describe('start-screen asset list', () => {
       const { AUDIO_CLIPS } = await import('../src/client/audioClips.ts');
       const urls = await gameAssetUrls();
       expect(new Set(urls).size).toBe(urls.length);
+      expect(urls).toContain('/assets/weapons/knife/model.glb');
+      expect(urls).toContain('/assets/audio/knife.mp3');
+      expect(urls).toContain('/assets/audio/flesh-hit.mp3');
       for (const asset of new Set(Object.values(WEAPON_ASSETS))) expect(urls).toContain(`/assets/weapons/${asset}/model.glb`);
       for (const prop of BUNKER_PROPS) expect(urls).toContain(`/assets/props/${prop.asset}/model.glb`);
       for (const clip of ['model', 'idle', 'walk', 'run', 'attack', 'death']) expect(urls).toContain(`/assets/zombies/peter_d/${clip}.glb`);
@@ -219,7 +286,11 @@ describe('start-screen asset list', () => {
       // Every look's model, since a match draws zombies of each.
       for (const clip of ['model', 'idle', 'walk', 'run', 'attack']) expect(urls).toContain(`/assets/zombies/pxltiger/${clip}.glb`);
       expect(urls.filter(url => /\.(webp|jpg|png)$/.test(url)).length).toBeGreaterThanOrEqual(9 + 2);
-      for (const url of urls) expect(assetExists(`public${url}`), url).toBe(true);
+      for (const url of urls) {
+        expect(assetExists(`public${url}`), url).toBe(true);
+        expect(bootstrap.files[url.slice(1)]?.size, `${url} missing from bootstrap manifest`).toBeGreaterThan(0);
+        expect(bootstrap.files[url.slice(1)]?.sha256).toMatch(/^[a-f0-9]{64}$/);
+      }
     } finally {
       globalThis.fetch = original;
     }

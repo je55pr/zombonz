@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader, type GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { deinterleaveGeometry, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { takeAsset } from './assetStore.ts';
+import { takeAssetAsync } from './assetStore.ts';
 
 export type ZombieAssetId = 'peter_d' | 'pxltiger';
 /** The model each zombie look is drawn with: index = `ZombieState.variant` (see core/zombieBody.ts, whose rigs these are). */
@@ -26,9 +26,9 @@ export function loadModel(path: string): Promise<GLTF> {
   if (!pending) {
     const url = `${import.meta.env.BASE_URL}assets/${path}`;
     // Parse the start-screen download when there is one; the GLBs are self-contained.
-    const downloaded = takeAsset(url);
-    pending = downloaded ? downloaded.arrayBuffer().then(buffer => loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1)))
-      : loader.loadAsync(url);
+    pending = takeAssetAsync(url).then(downloaded => downloaded
+      ? downloaded.arrayBuffer().then(buffer => loader.parseAsync(buffer, url.slice(0, url.lastIndexOf('/') + 1)))
+      : loader.loadAsync(url));
     models.set(path, pending);
   }
   return pending;

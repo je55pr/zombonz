@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "build:pages": "vite build --base=/zombonz/",
+    "dev": "node scripts/generate-bootstrap-manifest.mjs && vite",
+    "build": "node scripts/generate-bootstrap-manifest.mjs && tsc --noEmit && vite build",
+    "build:pages": "node scripts/generate-bootstrap-manifest.mjs && vite build --base=/zombonz/",
+    "generate:asset-manifest": "node scripts/generate-bootstrap-manifest.mjs",
     "typecheck": "tsc --noEmit",
     "validate:maps": "node scripts/validate-maps.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm run validate:maps && npm test && npm run build",
+    "check": "npm run generate:asset-manifest && npm run typecheck && npm run validate:maps && npm test && npm run build",
     "benchmark": "node --experimental-strip-types scripts/benchmark.ts"
   },
   "dependencies": {

@@ -4,7 +4,7 @@ import {
 import { MAP_CATALOG, type MapId } from '../maps/catalog.ts';
 
 /** Solo opens 'maps', where choosing a map starts the game; hosting a co-op game picks its map on 'hostMaps'. */
-export type MenuScreen = 'main' | 'maps' | 'multiplayer' | 'hostMaps' | 'settings' | 'loading';
+export type MenuScreen = 'bootstrap' | 'main' | 'maps' | 'multiplayer' | 'hostMaps' | 'settings' | 'loading';
 
 export interface MenuItem {
   id: string;
@@ -24,6 +24,7 @@ export interface DownloadStatus {
   doneFiles: number;
   totalFiles: number;
   failedFiles: number;
+  cachedFiles?: number;
   preparedSteps?: number;
   totalSteps?: number;
 }
@@ -31,6 +32,17 @@ export interface DownloadStatus {
 export const INITIAL_DOWNLOAD: Readonly<DownloadStatus> = {
   phase: 'code', loadedBytes: 0, totalBytes: 0, doneFiles: 0, totalFiles: 0, failedFiles: 0,
 };
+
+/** One continuous bootstrap meter: downloading cannot reach 100% before preparation finishes. */
+export function bootstrapProgressFraction(status: DownloadStatus): number {
+  if (status.phase === 'ready') return 1;
+  const bytes = status.totalBytes > 0 ? Math.min(1, status.loadedBytes / status.totalBytes) : 0;
+  if (status.phase === 'assets') return 0.8 * bytes;
+  if (status.phase === 'preparing' || (status.phase === 'error' && status.totalSteps)) return Math.min(0.99, 0.8 + 0.2 * (status.totalSteps
+    ? Math.min(1, (status.preparedSteps ?? 0) / status.totalSteps) : 0));
+  if (status.phase === 'error') return 0.8 * bytes;
+  return 0;
+}
 
 export interface MenuState {
   screen: MenuScreen;
@@ -56,13 +68,11 @@ const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
 
 export function menuItems(state: MenuState): MenuItem[] {
   switch (state.screen) {
+    case 'bootstrap': return state.download.phase === 'error' ? [{ id: 'retry', label: 'Retry download' }] : [];
     case 'main': {
-      // Play options stay locked until everything is downloaded (a failed asset still allows play).
-      const locked = state.download.phase !== 'ready';
       return [
-        { id: 'solo', label: 'Solo', disabled: locked }, { id: 'multiplayer', label: 'Multiplayer', disabled: locked },
+        { id: 'solo', label: 'Solo' }, { id: 'multiplayer', label: 'Multiplayer' },
         { id: 'settings', label: 'Settings' },
-        ...(state.download.phase === 'error' ? [{ id: 'retry', label: 'Retry download' }] : []),
       ];
     }
     case 'maps':
@@ -85,7 +95,8 @@ export function menuItems(state: MenuState): MenuItem[] {
 }
 
 export function createMenuState(settings: GameSettings, download: DownloadStatus = INITIAL_DOWNLOAD): MenuState {
-  const state: MenuState = { screen: 'main', selected: 0, settings, download: { ...download } };
+  const state: MenuState = { screen: download.phase === 'ready' ? 'main' : 'bootstrap',
+    selected: 0, settings, download: { ...download } };
   state.selected = firstEnabled(state);
   return state;
 }
@@ -100,17 +111,17 @@ function open(state: MenuState, screen: MenuScreen): void {
 
 /** Applies download progress; finishing moves the highlight to Solo so Enter plays straight away. */
 export function setDownload(state: MenuState, download: DownloadStatus): void {
-  const unlocked = state.download.phase !== 'ready' && download.phase === 'ready';
   state.download = { ...download };
+  if (download.phase === 'ready' && state.screen === 'bootstrap') open(state, 'main');
+  if (download.phase !== 'ready' && state.screen === 'main') open(state, 'bootstrap');
   const items = menuItems(state);
-  if (unlocked && state.screen === 'main') state.selected = 0;
-  else if (state.selected >= items.length || items[state.selected]?.disabled) state.selected = firstEnabled(state);
+  if (state.selected >= items.length || items[state.selected]?.disabled) state.selected = firstEnabled(state);
 }
 
 /** Keyboard/mouse intent in, state change plus an effect for the host out. No DOM, so it is unit-testable. */
 export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
   const items = menuItems(state);
-  if (state.screen === 'loading') return null;
+  if (state.screen === 'loading' || items.length === 0) return null;
   const wrap = (index: number) => (index + items.length) % items.length;
   // Keyboard movement skips locked rows.
   const step = (direction: number) => {

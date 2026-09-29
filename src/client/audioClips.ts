@@ -1,4 +1,4 @@
-import { takeAsset } from './assetStore.ts';
+import { takeAssetAsync } from './assetStore.ts';
 
 /** Every recorded clip the game plays (built by scripts/prepare_audio.py into public/assets/audio). */
 export const AUDIO_CLIPS = [
@@ -35,7 +35,7 @@ export function decodeAudioClips(context?: BaseAudioContext): Promise<void> {
   decoding ??= Promise.all(AUDIO_CLIPS.map(async clip => {
     try {
       const url = audioClipUrl(clip);
-      const downloaded = takeAsset(url);
+      const downloaded = await takeAssetAsync(url);
       let data: ArrayBuffer;
       if (downloaded) data = await downloaded.arrayBuffer();
       else {

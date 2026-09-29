@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { bunkerMaterial } from './greybox.ts';
 import { assetUrl, environmentMaterial, lookScale, projectWorldUvs } from './environmentMaterials.ts';
-import { getAsset } from './assetStore.ts';
+import { getAssetAsync } from './assetStore.ts';
 import { loadModel } from './runtimeAssets.ts';
 import type { GameMap } from '../maps/gameMap.ts';
 import type { SimulationState } from '../core/simulation.ts';
@@ -95,8 +95,8 @@ function loadPaint(path: string): Promise<THREE.Texture> {
   let pending = paints.get(path);
   if (!pending) {
     const options: ImageBitmapOptions = { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' };
-    const downloaded = getAsset(assetUrl(path));
-    pending = (downloaded ? createImageBitmap(downloaded, options)
+    pending = getAssetAsync(assetUrl(path)).then(downloaded => downloaded
+      ? createImageBitmap(downloaded, options)
       : new THREE.ImageBitmapLoader().setOptions(options).loadAsync(assetUrl(path))).then(bitmap => {
       const texture = new THREE.Texture(bitmap);
       texture.colorSpace = THREE.SRGBColorSpace; texture.flipY = false; texture.needsUpdate = true;

@@ -51,7 +51,7 @@ function showMenu(): void {
   const view = new MenuView(menuCanvas, loadSettings(), effect => {
     if (effect.type === 'saveSettings') saveSettings(effect.settings);
     if (effect.type === 'openBindings') openBindings();
-    if (effect.type === 'retryDownload') void downloadGame(view);
+    if (effect.type === 'retryDownload') location.reload();
     if (effect.type === 'startSolo' && game) void startSession(game, effect.map);
     if (effect.type === 'hostGame') void openLobby({ kind: 'host', map: effect.map });
     if (effect.type === 'joinGame') void openLobby({ kind: 'join' });
@@ -128,36 +128,46 @@ async function startSession(module: GameModule, map: MapId, net?: NetPlay): Prom
 }
 
 /**
- * Runs on the start screen: fetch the game code, then every model and texture it uses, so the browser
- * cache holds them before Solo or Multiplayer can be chosen. A missing asset still unlocks play.
+ * Runs before the main menu: validate the build manifest, reuse cached assets, download missing files,
+ * and prepare the page's models, textures and audio before Solo or Multiplayer can be chosen.
  */
 async function downloadGame(view: MenuView): Promise<void> {
-  view.setDownload({ ...INITIAL_DOWNLOAD });
+  let latest: DownloadStatus = { ...INITIAL_DOWNLOAD };
+  const report = (status: DownloadStatus) => { latest = status; view.setDownload(status); };
+  report(latest);
   try {
     game ??= await import('./game.ts');
   } catch (error) {
     console.error('Unable to download the game code', error);
-    view.setDownload({ ...INITIAL_DOWNLOAD, phase: 'error' });
+    report({ ...latest, phase: 'error' });
     return;
   }
-  let urls: string[] = [];
   try {
-    urls = await game.gameAssetUrls();
+    const manifest = await game.loadBootstrapManifest();
+    const cache = await game.openAssetCache();
+    // The required URL list comes from the environment manifest. Load that small file first, then
+    // display progress against the complete list with exact sizes from the build manifest.
+    const environmentUrl = `${import.meta.env.BASE_URL}assets/environment/manifest.json`;
+    const environment = await game.downloadAssets([environmentUrl], manifest, () => {}, fetch, cache);
+    if (environment.failed.length) throw new Error('Environment manifest unavailable.');
+    const urls = await game.gameAssetUrls();
+    const result = await game.downloadAssets(urls, manifest, progress => report({
+      phase: 'assets', ...progress, failedFiles: progress.failed.length,
+    }), fetch, cache);
+    if (result.failed.length) throw new Error(`${result.failed.length} required assets unavailable.`);
+    const downloaded = { ...result, failedFiles: 0 };
+    if (result.cachedFiles !== result.totalFiles || !game.wasPrepared(manifest)) {
+      await game.prepareGameAssets((preparedSteps, totalSteps) => report({
+        phase: 'preparing', ...downloaded, preparedSteps, totalSteps,
+      }));
+      game.markPrepared(manifest);
+    }
+    readyDownload = { phase: 'ready', ...downloaded };
+    report(readyDownload);
   } catch (error) {
-    // Without the environment manifest the list is incomplete; the game still loads what it can.
-    console.warn('Unable to list game assets', error);
+    console.error('Unable to bootstrap game assets', error);
+    report({ ...latest, phase: 'error' });
   }
-  const result = await game.downloadAssets(urls, progress => view.setDownload({
-    phase: 'assets', ...progress, failedFiles: progress.failed.length,
-  }));
-  if (result.failed.length) console.warn('Assets that failed to download', result.failed);
-  const downloaded = { ...result, failedFiles: result.failed.length };
-  // Unpack everything the opening moments need, so Bunker appears fully textured with the real pistol.
-  await game.prepareGameAssets((preparedSteps, totalSteps) => view.setDownload({
-    phase: 'preparing', ...downloaded, preparedSteps, totalSteps,
-  }));
-  readyDownload = { phase: 'ready', ...downloaded };
-  view.setDownload(readyDownload);
 }
 
 // Development inspection URLs (?preview=...) skip the menu and open the map directly.

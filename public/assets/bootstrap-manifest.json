@@ -1,0 +1,906 @@
+{
+  "version": 1,
+  "revision": "d2979aa2c12e917173f1674c21edb7432126120c83fdbf6992182bd24d76f8e8",
+  "files": {
+    "assets/audio/ambience-sting-1.mp3": {
+      "size": 36951,
+      "sha256": "deb1b454d462d675548d0fba0a961e8d31d1c654d75eca63e38120b6ab6822bd"
+    },
+    "assets/audio/ambience-sting-2.mp3": {
+      "size": 28311,
+      "sha256": "b15730b8a4f6de4bcf180f7d21c8cfa605160c6afc8550be8230241ca660d880"
+    },
+    "assets/audio/buy-denied.mp3": {
+      "size": 2636,
+      "sha256": "c9de66f4a7a592a2381fc088f291863ea1d1d4e8d80cc220e45522d1c967e6f9"
+    },
+    "assets/audio/door-metal.mp3": {
+      "size": 4940,
+      "sha256": "a43053d7aff3ca8dc950b3ee767d8345f23fc1f6f169ad602c25e25d4061668b"
+    },
+    "assets/audio/door-open.mp3": {
+      "size": 8684,
+      "sha256": "299498c184b8c870e23090314c129384571b8551c98502518644e36867e211ee"
+    },
+    "assets/audio/door-unlock.mp3": {
+      "size": 4076,
+      "sha256": "86d879826a955ad1552097343414cda0542e341049ee9c801c75ab4dd2f692a0"
+    },
+    "assets/audio/electric-boom.mp3": {
+      "size": 16748,
+      "sha256": "9268c56a65b05f0096889695a121f7ef9ba5159c88503ffce715e860dc4e24d8"
+    },
+    "assets/audio/electric-hit.mp3": {
+      "size": 10412,
+      "sha256": "f8b9781c94f978784fe1ee4ba46289b53fc377555b2c3c7875e1cc4edc3afadf"
+    },
+    "assets/audio/electric-powerup.mp3": {
+      "size": 13580,
+      "sha256": "6d83f594e3f933e8dfdda07da1596bdf73cefe2936d5a67b9570932cadcdaa94"
+    },
+    "assets/audio/explosion-large.mp3": {
+      "size": 10700,
+      "sha256": "bf7462d07ff3c880b1f4b94b24958fb09aceef670f71331d30988137301f77a5"
+    },
+    "assets/audio/explosion-small.mp3": {
+      "size": 8972,
+      "sha256": "54b91283907e254cfb8cccfd2ed12fe8e470015251397dbdf95f91fc82972776"
+    },
+    "assets/audio/flesh-hit.mp3": {
+      "size": 5516,
+      "sha256": "6703ac132ec5ffa2cef665c0a243fe43d96d00eec323165691192e29049e6e17"
+    },
+    "assets/audio/gun-30-06.mp3": {
+      "size": 9728,
+      "sha256": "a1ed7a7f1640d5880a74a9050a80c00559511ef35459e2c792c609a434fab8ea"
+    },
+    "assets/audio/gun-ak.mp3": {
+      "size": 7464,
+      "sha256": "1cb8ee266c154f6f158fbb5e895a926cab17b968effe5989659caab532dd2587"
+    },
+    "assets/audio/gun-battle-rifle.mp3": {
+      "size": 9734,
+      "sha256": "7e12bc1dca542860c43a3d768c7e24eaa789f865f7fc027aaf3248332feeb0bd"
+    },
+    "assets/audio/gun-carbine.mp3": {
+      "size": 8874,
+      "sha256": "b592f94339f61b2541559273e8d6e9a00b4605da4c95220980d44419a02a1883"
+    },
+    "assets/audio/gun-commando.mp3": {
+      "size": 7453,
+      "sha256": "22a2948dc96c6dc4b05f73b50835e893ea7834e0503d79e6356524ab986785ef"
+    },
+    "assets/audio/gun-double.mp3": {
+      "size": 11465,
+      "sha256": "45ed298a01e9c493bda9cb3af41d6f1efe2557c271c7635db90a46d211e2b396"
+    },
+    "assets/audio/gun-kar98k.mp3": {
+      "size": 10585,
+      "sha256": "db271acf5387371360f41146551606b134fde4f72c40e03d3eebea0eab816a32"
+    },
+    "assets/audio/gun-mosin.mp3": {
+      "size": 10591,
+      "sha256": "a5868c89ac14cd9ffe5f6eaed1192975d817ee62cf8ffb0263ce4bad799946ea"
+    },
+    "assets/audio/gun-mp5k.mp3": {
+      "size": 5712,
+      "sha256": "ae9df2d99ca1aabfd4ebd26e06fdec3655b324a4ffe18a9758fb345f183bbf65"
+    },
+    "assets/audio/gun-pistol.mp3": {
+      "size": 9728,
+      "sha256": "f196a6662c672189d084886c95a5179a404428f936fb8531aff2ad8bf240ba51"
+    },
+    "assets/audio/gun-ppsh.mp3": {
+      "size": 5729,
+      "sha256": "a96a58a3dd84c82d96fb5592b93984b3b6796453918b89429c5e64b49cecafcd"
+    },
+    "assets/audio/gun-pump.mp3": {
+      "size": 11466,
+      "sha256": "a6b40a5fdadc347b47a8a5f9e919b4294402807ed6aa84ba4372addd7057e147"
+    },
+    "assets/audio/gun-revolver.mp3": {
+      "size": 10623,
+      "sha256": "b74d3fe08e1c6e56cc00e332c54c9f8cd4fe0c0bb7cfd5811cbb216f307f0276"
+    },
+    "assets/audio/gun-skorpion.mp3": {
+      "size": 5698,
+      "sha256": "505f396ad7cabb3138f1ba1392f7edcd1f529f94b7e6d2766dbf79e9e2966cff"
+    },
+    "assets/audio/gun-smg-45.mp3": {
+      "size": 6603,
+      "sha256": "37f360aaf30c5c6474f335ca77da9b7fbc9196c663b97a9ef7ce6a1c8474a669"
+    },
+    "assets/audio/gun-spas.mp3": {
+      "size": 10595,
+      "sha256": "b067e15ecb1f8e33ee546aae6d26e97630a39493f2130c6cee6f19ab4462ddc1"
+    },
+    "assets/audio/gun-springfield.mp3": {
+      "size": 10594,
+      "sha256": "a4a3244a3d3875988d3739ced31d7f6fdea55c8f8940afbc349214ee3073c79a"
+    },
+    "assets/audio/irrlicht-fire.mp3": {
+      "size": 6956,
+      "sha256": "301af40b08f3752b8ea3bc67406fd5f814ddc873eaf47668d675c66d955ca75c"
+    },
+    "assets/audio/knife.mp3": {
+      "size": 2924,
+      "sha256": "0b0f9a49f51797bb569d7e33dc29123ee558908e4327332df68ca18215b83d4f"
+    },
+    "assets/audio/mechanical-button.mp3": {
+      "size": 4018,
+      "sha256": "e550c131528ada438f90aa853764c67e875eb0ca01e743e616f24679366d75b9"
+    },
+    "assets/audio/mechanical-click.mp3": {
+      "size": 6034,
+      "sha256": "f8611db7b15a4df49e8616f501e2399aba1674687cf3ad62b7939b2fb1e1d6fd"
+    },
+    "assets/audio/molniya-fire.mp3": {
+      "size": 10412,
+      "sha256": "557049bd3ac27892df74006948730543e1561ddfc5b1a9441302e142abdbcf0f"
+    },
+    "assets/audio/pickup.mp3": {
+      "size": 4076,
+      "sha256": "6b9abb43e4702845561d3c58d085de5c306fd0ff821345003b2dd3df2f5a3e1a"
+    },
+    "assets/audio/reload-mag.mp3": {
+      "size": 2636,
+      "sha256": "7334e7a7a520704cabd77402fa6008033610119f6fc75d849443769c3c23d95a"
+    },
+    "assets/audio/reload-round.mp3": {
+      "size": 2924,
+      "sha256": "b8914eaba492f52008e588cf59816a21c8d2ad1fd9264e73bd168f92a09b1b34"
+    },
+    "assets/audio/shotgun-rack.mp3": {
+      "size": 9597,
+      "sha256": "d8fd0e906c257918de87f394bbad1dcdaf519ee4a29dcaa8a153888bfa612d1d"
+    },
+    "assets/audio/shotgun-shell.mp3": {
+      "size": 9604,
+      "sha256": "a425fca396b100d3d9ab0264b1215ff2a3d6b5cdb989df50c153a9831a8b9e96"
+    },
+    "assets/audio/step-dirt-1.mp3": {
+      "size": 4364,
+      "sha256": "6cf104a826412f1f1a4c738bf42725a439f2026cfb0b0e7c0a049d1692c34ac6"
+    },
+    "assets/audio/step-dirt-2.mp3": {
+      "size": 4076,
+      "sha256": "5f6ebff740a10b4d215c063ee214648dd6d98a3b250ddf8839d76fa6e53a9a49"
+    },
+    "assets/audio/step-dirt-3.mp3": {
+      "size": 3212,
+      "sha256": "ab569eedf469c0ee04ef0b2ec9f3bfe76a6aa0bb460086c16abe72acc397c93b"
+    },
+    "assets/audio/step-dirt-4.mp3": {
+      "size": 3500,
+      "sha256": "6262da8ae25488c2eaa17811ea0cc0e242a7f909864536001f4be5acd53e5c15"
+    },
+    "assets/audio/step-stone-1.mp3": {
+      "size": 3788,
+      "sha256": "9d853906d28f9120e53905d069439cb31ecb6b79727523db64cc15d39bd75e17"
+    },
+    "assets/audio/step-stone-2.mp3": {
+      "size": 3500,
+      "sha256": "4e8f1fca53f75fba225bc217cd6fe9882ed7f7e6ad0daca7ab37a7149d61637c"
+    },
+    "assets/audio/step-stone-3.mp3": {
+      "size": 3500,
+      "sha256": "86833a3adb8b88573c2343cdc43b072cbd321247b41753bc8ca2504cff0c2bbb"
+    },
+    "assets/audio/step-stone-4.mp3": {
+      "size": 3212,
+      "sha256": "b2e7938bd2113afc23af887f8cd9aa3374fd5458b3ab26c7783ff5ae9c0a7d8f"
+    },
+    "assets/audio/vent-loop.mp3": {
+      "size": 45823,
+      "sha256": "24d1a93337b97c5f1cf271f32b9f2803421beb7600903b58d12756d281dd663a"
+    },
+    "assets/audio/wind-loop.mp3": {
+      "size": 54524,
+      "sha256": "e27114f01d9b554cfcb9d15ac49425cfa56c0c681d9d4e5995e2339d945f6bee"
+    },
+    "assets/audio/wood-crack-1.mp3": {
+      "size": 7820,
+      "sha256": "524cc9074f344ce11a4393b47a817a8227f47855bc1b6126e8b222463dbaa385"
+    },
+    "assets/audio/wood-crack-2.mp3": {
+      "size": 7820,
+      "sha256": "6c71305e9453133c4787f2fd050a72847631ba18cf6e097262d268168af23a46"
+    },
+    "assets/audio/wood-crack-3.mp3": {
+      "size": 7820,
+      "sha256": "1bbf0c719a24622f4b4e12ab585bd517fdf1f28b26c0b85132d255a30eb5c426"
+    },
+    "assets/audio/wood-crack-4.mp3": {
+      "size": 7820,
+      "sha256": "52adda6a399ecf0ec84a318b94eec153c8e8e4c61eb2a25599326283e91bfa82"
+    },
+    "assets/audio/wood-impact-1.mp3": {
+      "size": 7820,
+      "sha256": "b2c0cf509c17e0b4320bb7fa716d87b4e9d452b081998a3b5949e0271ca45105"
+    },
+    "assets/audio/wood-impact-2.mp3": {
+      "size": 7820,
+      "sha256": "f75346423ae0fe065c6c39ee2d204255379cff7a2e3142370947ed10b88418bc"
+    },
+    "assets/audio/zombie-attack-1.mp3": {
+      "size": 4695,
+      "sha256": "35690c754567d9cb8cab8e1b78601d1a86cc2bf045b7aeb6da6f65458130ed46"
+    },
+    "assets/audio/zombie-attack-2.mp3": {
+      "size": 5559,
+      "sha256": "fda17b007b71cc0000d4509ec54bd6bb0cda1ecaaa83c642fc50973355b0e682"
+    },
+    "assets/audio/zombie-attack-3.mp3": {
+      "size": 5271,
+      "sha256": "646ab9dc86fa63ddc2fa0730a2d2e9f61327da54e02a74b815aede71c5ebc02b"
+    },
+    "assets/audio/zombie-death-1.mp3": {
+      "size": 6135,
+      "sha256": "eeb09b7aca43195d037f83e17a9b82e267db916d6d6d9724cb4f366d56221b64"
+    },
+    "assets/audio/zombie-death-2.mp3": {
+      "size": 6135,
+      "sha256": "a0d51dff755812eb57575145a2813438c322708634fe2a83e8ba6771035b2d8f"
+    },
+    "assets/audio/zombie-distant.mp3": {
+      "size": 24812,
+      "sha256": "b690b648d9d9460eb8df702a132bc593fa5cd5b4987c590338299033d3a54dde"
+    },
+    "assets/audio/zombie-voice-1.mp3": {
+      "size": 7575,
+      "sha256": "1b150c747a63bc53703583591be3347acbf826bc3e794104bb7e1d965b59bd96"
+    },
+    "assets/audio/zombie-voice-2.mp3": {
+      "size": 6711,
+      "sha256": "7ead0a2c1c6e41ef2785074a23d99d04746903f299b70733be8253cf5d966a7c"
+    },
+    "assets/audio/zombie-voice-3.mp3": {
+      "size": 7287,
+      "sha256": "f3a0ac725cc214c5db055ef8fb0ea0a4c332c309e578815734aac52679905827"
+    },
+    "assets/audio/zombie-voice-4.mp3": {
+      "size": 7287,
+      "sha256": "64edf69fc8406831747716792f9763ed5ac86f6c90c6099b7253607842852f46"
+    },
+    "assets/audio/zombie-voice-5.mp3": {
+      "size": 7863,
+      "sha256": "7cbbd2ce4c97fdc4f35056b731391efb1696a9ffa18e70a397c656346f2f2f26"
+    },
+    "assets/audio/zombie-voice-6.mp3": {
+      "size": 13335,
+      "sha256": "34a00e8da46d078ddffa93c196370cf18de16399421e5b33e6aaabeea2221439"
+    },
+    "assets/audio/zombie-voice-7.mp3": {
+      "size": 8439,
+      "sha256": "8022f395fd3367e5b93b3833b3478a6c9846f50fd28f6e98e470c5748221192e"
+    },
+    "assets/audio/zombie-voice-8.mp3": {
+      "size": 9591,
+      "sha256": "634c9ea79a804c1ee895862235e1f4a592d9df84b93614e4dbb57d43eac35261"
+    },
+    "assets/environment/decals/graffiti/basecolor.webp": {
+      "size": 75866,
+      "sha256": "25042d782e7b496f7516ca0061f46549f02e9b8bd8a9965c4e8d7b6b548060c9"
+    },
+    "assets/environment/decals/graffiti/normal.webp": {
+      "size": 39114,
+      "sha256": "6999280a15d27801a5f838a1a0952c69c3da5a9a67ffac0f603521601d2fd1f5"
+    },
+    "assets/environment/decals/graffiti/opacity.webp": {
+      "size": 95438,
+      "sha256": "16e9b2b58967dae8325729830f81015f543e351f365ff5a7f8dffb8147cd1b62"
+    },
+    "assets/environment/decals/graffiti/roughness.webp": {
+      "size": 52168,
+      "sha256": "579445b4548077b58e1c2921c335b6e13cbf844e74c525870ed63a4f992b9244"
+    },
+    "assets/environment/decals/leaking-grime/basecolor.webp": {
+      "size": 35242,
+      "sha256": "1f714aca710fe4f61431369acf0c8892e1ecf7d5f76787e2ad7d930cbb603b89"
+    },
+    "assets/environment/decals/leaking-grime/normal.webp": {
+      "size": 38974,
+      "sha256": "39355339a0bd8a22c569306a226cc19048f951d031e429b708c5583492fc83e2"
+    },
+    "assets/environment/decals/leaking-grime/opacity.webp": {
+      "size": 52258,
+      "sha256": "655ff354c2c3a65e196952334123e7d6aec11c07bb42eb1c363af6e6fae725f9"
+    },
+    "assets/environment/decals/leaking-grime/roughness.webp": {
+      "size": 8984,
+      "sha256": "8f8b9c482e01826e7b1b543e98e340bbc243536932d6d9f20e2e4b6441634ca1"
+    },
+    "assets/environment/decals/rust-decal/ao.webp": {
+      "size": 46834,
+      "sha256": "8f8d99077fee251974b0f35d14f0808c83ed1684f54414a928c8d6f2f1a92d7c"
+    },
+    "assets/environment/decals/rust-decal/basecolor.webp": {
+      "size": 80192,
+      "sha256": "89dc586c18a8ad4db74b8cb20ac8c614753b1569d4f00363723a78dbccc4b7e9"
+    },
+    "assets/environment/decals/rust-decal/normal.webp": {
+      "size": 73984,
+      "sha256": "7cd9084692ab8835a3a2a8b3c27e8c251f8030da93e2952b8f05aa57b912f1d8"
+    },
+    "assets/environment/decals/rust-decal/opacity.webp": {
+      "size": 37580,
+      "sha256": "e6cb5300de78f032c2b0cc79471bdb322feab24b6dbdb5ffaedcdb588c05a772"
+    },
+    "assets/environment/decals/rust-decal/roughness.webp": {
+      "size": 33736,
+      "sha256": "ada9078dad5cd833f55c6b56a468795dfee82d4c44a3f6044d0a257778106a86"
+    },
+    "assets/environment/decals/smear-grime/basecolor.webp": {
+      "size": 69048,
+      "sha256": "ebf584dfed43d849af3674a320cb63f20f05cb055d5c57af7cf4dbdfe6418a51"
+    },
+    "assets/environment/decals/smear-grime/normal.webp": {
+      "size": 42558,
+      "sha256": "80eb5662dcaa08413ac26a5b67aef83d2ad0751b3c456aa924273982ca79aa14"
+    },
+    "assets/environment/decals/smear-grime/opacity.webp": {
+      "size": 67420,
+      "sha256": "bfddc4f8b8ad3edfb75fae72ba8811806cb575a9f3ff6aa2c7d9048cd29a5781"
+    },
+    "assets/environment/decals/surface-imperfections/basecolor.webp": {
+      "size": 399428,
+      "sha256": "7473dd3a3da23a639e79da3ff1c3567fe58bc9c9dada831327760384f5cc133d"
+    },
+    "assets/environment/decals/surface-imperfections/normal.webp": {
+      "size": 8228,
+      "sha256": "e0f3b007061f9bf167a31eb4ff7f87f889e4266d7b929593e96b8e95a4edc6e8"
+    },
+    "assets/environment/decals/surface-imperfections/opacity.webp": {
+      "size": 489922,
+      "sha256": "c4aba7bc515f7e20502fd343771041744ca5baccc921dc460822b9a93cf29c57"
+    },
+    "assets/environment/decals/surface-imperfections/roughness.webp": {
+      "size": 356540,
+      "sha256": "13169f901f36f0c4ef17a8801ef05aff330a602079ccd685ab0c7b0766add9d2"
+    },
+    "assets/environment/manifest.json": {
+      "size": 12712,
+      "sha256": "4818c3a947207da8a722eb2438ae42d2c937ddc7ccbe152ac4cf6e245f19dd18"
+    },
+    "assets/environment/materials/broken-plaster-brick/arm.webp": {
+      "size": 463668,
+      "sha256": "b70a48af90760317e0fefdb06b3b6b59fc55a4bc6b1320504f31ba2370e39886"
+    },
+    "assets/environment/materials/broken-plaster-brick/basecolor.webp": {
+      "size": 461300,
+      "sha256": "175a39ca0e203b1ca0e00f38f8d7d71e68e0dd71c1d943bfc5f3f7e91551b321"
+    },
+    "assets/environment/materials/broken-plaster-brick/normal.webp": {
+      "size": 287122,
+      "sha256": "876f81e201adc352fea133d867e00f78d7a034adacd24fbb34530bbcb9f9994a"
+    },
+    "assets/environment/materials/cave-rock/arm.webp": {
+      "size": 147012,
+      "sha256": "5df90c0f6d49e0ca00c4a912ca6561a8392341572fb711082570b1eaf417562e"
+    },
+    "assets/environment/materials/cave-rock/basecolor.webp": {
+      "size": 89668,
+      "sha256": "3b9d9abc2d4f290569065b1aeb1c79288edd428f679406c485ef6b677ae3cd11"
+    },
+    "assets/environment/materials/cave-rock/normal.webp": {
+      "size": 388168,
+      "sha256": "d3ba5d460e19c04e0fd85dc3adee281073862a3361e757262a3280f4fbf0cfa5"
+    },
+    "assets/environment/materials/cobblestone/arm.webp": {
+      "size": 110630,
+      "sha256": "987122f1d9bf94d4ad59ad81418dedacabecf20fd7e8d7e18ce8f689ed5eccf4"
+    },
+    "assets/environment/materials/cobblestone/basecolor.webp": {
+      "size": 306978,
+      "sha256": "3d923c2900ee09a4e40c5a5eef188c34fb1e9c73db38b9fab2de820c1fc7712e"
+    },
+    "assets/environment/materials/cobblestone/normal.webp": {
+      "size": 233938,
+      "sha256": "7184396dc98f94c576616bcf207539c5bd0cf2883c704053142e395994cadb5a"
+    },
+    "assets/environment/materials/concrete-rubble/arm.webp": {
+      "size": 335210,
+      "sha256": "ffcf5e3307589b3db465de501b2d62b314169a5ba5e44b84014079acc739c0cd"
+    },
+    "assets/environment/materials/concrete-rubble/basecolor.webp": {
+      "size": 282754,
+      "sha256": "b68eee004f3d37f5397bb2ac41f938913660089a3d6cd5057969fce9a5c97f86"
+    },
+    "assets/environment/materials/concrete-rubble/normal.webp": {
+      "size": 679166,
+      "sha256": "9809ef5ce4d0f80660d03f47f905bdd5acdd63e7a1bcfbc7ed3469f48339bc2a"
+    },
+    "assets/environment/materials/cracked-concrete-floor/arm.webp": {
+      "size": 190906,
+      "sha256": "83130d3d8777f78a3ef1c14a45de8220ef25cce1cfa6d5df5bac266db087d6d7"
+    },
+    "assets/environment/materials/cracked-concrete-floor/basecolor.webp": {
+      "size": 166578,
+      "sha256": "0eda3b68be56c8eebd927ce660e6655daa19e99b91950bc157d104b499fa0c5d"
+    },
+    "assets/environment/materials/cracked-concrete-floor/normal.webp": {
+      "size": 193560,
+      "sha256": "6f1103cd132a51063783e45810ea04ba361ade811757b429c3c55a9668423128"
+    },
+    "assets/environment/materials/dirt/arm.webp": {
+      "size": 130672,
+      "sha256": "35c5af25a37e5eb18c224dd3a4758187ea6816f88cc26d345e23f449f59d4c06"
+    },
+    "assets/environment/materials/dirt/basecolor.webp": {
+      "size": 238672,
+      "sha256": "d98a6c2ca67a289c2c12c4170a3fbe5fa817fd863e0f0a07f4fc49e7fd8b9f9e"
+    },
+    "assets/environment/materials/dirt/normal.webp": {
+      "size": 528034,
+      "sha256": "73f23fdb8ce318b500eef65913d5c01f9e4ed73f9def66445f29524b370402c9"
+    },
+    "assets/environment/materials/dirty-tiles/arm.webp": {
+      "size": 106266,
+      "sha256": "6067884f33f0de4a1c15d0938ef68579c9e274010eb5457a9db6862aecb6d082"
+    },
+    "assets/environment/materials/dirty-tiles/basecolor.webp": {
+      "size": 101520,
+      "sha256": "f683cafea26d48b96ed1b8aae84d75685ab2e556a951719635e486205a2fc712"
+    },
+    "assets/environment/materials/dirty-tiles/normal.webp": {
+      "size": 98958,
+      "sha256": "c0b2c45cbb03d72fe0040d01830f8f06814cded9a97fe75659076b5a7aeb9e48"
+    },
+    "assets/environment/materials/forest-floor/arm.webp": {
+      "size": 289360,
+      "sha256": "612378ff859339763e84b696f0e2a2949aca48a4e1ee4e5ea89d29c70b5dac50"
+    },
+    "assets/environment/materials/forest-floor/basecolor.webp": {
+      "size": 456376,
+      "sha256": "773e40f5701e64180f0c05616a17c978d36402366cebd694a0989556f3e0c2b4"
+    },
+    "assets/environment/materials/forest-floor/normal.webp": {
+      "size": 591820,
+      "sha256": "5d73398251c51f1159e07cecf0b53511acc8daa5ca410d38da34134883b11ff4"
+    },
+    "assets/environment/materials/old-linoleum/arm.webp": {
+      "size": 58062,
+      "sha256": "9f646e4d82a97350c906dad358be85961e67ea5c951c64f1594a0320f4b27a3b"
+    },
+    "assets/environment/materials/old-linoleum/basecolor.webp": {
+      "size": 84140,
+      "sha256": "77fa91d15c03c1c87b558f58c81c094cc87fdf05503c2033007780dd5374b7cb"
+    },
+    "assets/environment/materials/old-linoleum/normal.webp": {
+      "size": 28832,
+      "sha256": "98230bfb6d1f047a40679834967bd2b3684e8e0ff7b9b27c5005fbef558a281e"
+    },
+    "assets/environment/materials/old-planks/arm.webp": {
+      "size": 79858,
+      "sha256": "1ffb369e578acc1d97f4c2222c40a50a1f9d47c74be58a3d8ae6dc40e3649f36"
+    },
+    "assets/environment/materials/old-planks/basecolor.webp": {
+      "size": 135014,
+      "sha256": "84a305f81571d75e671bf558dd038bdf98730e3c44309c2d88a1437f3cecb0eb"
+    },
+    "assets/environment/materials/old-planks/normal.webp": {
+      "size": 227454,
+      "sha256": "ad7c81e7a0680e2aa2cbd521c53aa7e94b094560056a4d5d23ef7d0a5fb6e28b"
+    },
+    "assets/environment/materials/old-wood-floor/arm.webp": {
+      "size": 52816,
+      "sha256": "aabd5c10d5f7d1acad188c57f3212febdb8bcfcdd5a9717ffd1a4a71e42c5566"
+    },
+    "assets/environment/materials/old-wood-floor/basecolor.webp": {
+      "size": 281068,
+      "sha256": "87cd7bd8246ce28ee6f8be32d8fd66129b99d2f2ff7b44f32e9baec4b6a05f8b"
+    },
+    "assets/environment/materials/old-wood-floor/normal.webp": {
+      "size": 100100,
+      "sha256": "772d9a6ba51731de42ddad84d790299a6008cbc97eefe37af99970a83e74b6b5"
+    },
+    "assets/environment/materials/peeling-paint-wall/arm.webp": {
+      "size": 210210,
+      "sha256": "3efa5d26f4ee7ec6e6d2985ef0ed4b24b61ee5f00e229afc7759004cc01ede80"
+    },
+    "assets/environment/materials/peeling-paint-wall/basecolor.webp": {
+      "size": 51390,
+      "sha256": "607bb8c73dbdaacb0ad86c704affa74c63d63e59202fd4aa5a6daba0b48e5810"
+    },
+    "assets/environment/materials/peeling-paint-wall/normal.webp": {
+      "size": 356104,
+      "sha256": "09cb155ac7a62c6472aff10e3d698da740feb1ff6c3c620d2d0315ea72876277"
+    },
+    "assets/environment/materials/rusted-metal/arm.webp": {
+      "size": 205066,
+      "sha256": "e52844fbf3f290fb152a0c433894eff64f267d901855421d1f9465cbb7e1f403"
+    },
+    "assets/environment/materials/rusted-metal/basecolor.webp": {
+      "size": 227372,
+      "sha256": "c658585c93538955cbede02228e1b03c8569dd25848602059678299c995b91e4"
+    },
+    "assets/environment/materials/rusted-metal/normal.webp": {
+      "size": 24112,
+      "sha256": "a23992c767e1772275af1af5bc33be2a2c5b2bc154afd731e606b969657d21f2"
+    },
+    "assets/environment/materials/sofa-upholstery/arm.webp": {
+      "size": 503848,
+      "sha256": "248fbf9885dccdbe19fdca8024345f1b895244a781ed78fcca0c2e4378548bd1"
+    },
+    "assets/environment/materials/sofa-upholstery/basecolor.webp": {
+      "size": 336914,
+      "sha256": "447565c81f05cf7b962c249ae427fb79dd396067d208a841363aad60d345a61f"
+    },
+    "assets/environment/materials/sofa-upholstery/normal.webp": {
+      "size": 324084,
+      "sha256": "19e69103918abc84df93602335a64b32695915645ce70e72b477db5a6ffd881f"
+    },
+    "assets/environment/materials/splintered-wood/arm.webp": {
+      "size": 327706,
+      "sha256": "050d87ae5d2197988c9f3fb8cd67e1d62230edd3dfc7df072fe9d3f50ece9409"
+    },
+    "assets/environment/materials/splintered-wood/basecolor.webp": {
+      "size": 359776,
+      "sha256": "5b7fc59b509930212c52e16d203441d3a902029b720ffa66b370b6f59214ea43"
+    },
+    "assets/environment/materials/splintered-wood/normal.webp": {
+      "size": 58774,
+      "sha256": "c8b465f5eb87b8d7cd086d7d653f14a6190730bf639b078b3f07e0a0e13d4932"
+    },
+    "assets/environment/materials/weathered-concrete-a/arm.webp": {
+      "size": 349978,
+      "sha256": "18f66fa7c44757f429e2d15729f3a873f38ae8ee7555ed9db18652445edc9757"
+    },
+    "assets/environment/materials/weathered-concrete-a/basecolor.webp": {
+      "size": 260836,
+      "sha256": "b10dea4b6e659a2fa035d1828c89883a4917dd011a24dc604e5d2bd0df48cdca"
+    },
+    "assets/environment/materials/weathered-concrete-a/normal.webp": {
+      "size": 535512,
+      "sha256": "a9420875b577767ddfdd93f750d89fd160df65060d5bdf660601a3432232f710"
+    },
+    "assets/environment/materials/weathered-concrete-b/arm.webp": {
+      "size": 134850,
+      "sha256": "fa99c2a2736bc564b6998a5d766f5973de3d40f26c8d9ba90f8ac50f5bf856f9"
+    },
+    "assets/environment/materials/weathered-concrete-b/basecolor.webp": {
+      "size": 179714,
+      "sha256": "2fd7b640bf6f944bd354d47a8d457eb5d286be2962ca70f267818b10e9cdea10"
+    },
+    "assets/environment/materials/weathered-concrete-b/normal.webp": {
+      "size": 86260,
+      "sha256": "472d1c2caa952ac5b0d9a079f3fba576b2df423b4dc48f93d4a8e9008b433551"
+    },
+    "assets/environment/sky/moonlit-night.webp": {
+      "size": 71788,
+      "sha256": "6d39095576c8cf1d925b2734159d571bf3ddc9402447d5162db0a003d57becca"
+    },
+    "assets/players/ranger/model.glb": {
+      "size": 1367548,
+      "sha256": "c248e03d645cba1d01f3925e68f92e41156c2174b7b745e247255f72366b3a03"
+    },
+    "assets/props/ammo-box/model.glb": {
+      "size": 336924,
+      "sha256": "d7b2d600339bc260c9ada34f293bdd1a79dd3b45f4051a5ec4bd536d540dafcc"
+    },
+    "assets/props/barrel-stove/model.glb": {
+      "size": 737088,
+      "sha256": "db3d453ed717a8b64eb6bd61ded047eb3419c2e6c05f05471d7f32a52a7b37d2"
+    },
+    "assets/props/bench-vice/model.glb": {
+      "size": 736748,
+      "sha256": "4c78ae5da2462e687bd8a52154a461d5ed47823231ce0a1b85c932e753c3ba1a"
+    },
+    "assets/props/caged-ceiling-light/model.glb": {
+      "size": 1273328,
+      "sha256": "605477785d46d5419eb4fb0deb65c76a55d879a3b96cf87599774ded3828e84b"
+    },
+    "assets/props/cardboard-box/model.glb": {
+      "size": 750140,
+      "sha256": "69bfd49ac5a89f70faabacde69cc4dd910908d02bbe60cfd53fbd7154b317430"
+    },
+    "assets/props/cement-bag/model.glb": {
+      "size": 198216,
+      "sha256": "4202eab89bc32e0a7a1cb1a9ca9195251edf669e26ba28dfed96d87886edd86e"
+    },
+    "assets/props/crowbar/model.glb": {
+      "size": 399884,
+      "sha256": "b3be3cf7b2d5b1251b435a1479a844b9c5caf8b673296e015735a7dec2534c9f"
+    },
+    "assets/props/crutches/model.glb": {
+      "size": 615900,
+      "sha256": "af8e794ea82d4124cdb3ddfc82b1f333ff48dc93e9b2142f9099d31e95aca624"
+    },
+    "assets/props/dead-tree/model.glb": {
+      "size": 1077948,
+      "sha256": "b33dfa4735fa299f21f6baaba2c566b69e78a7d32614153122581b44d0d6a818"
+    },
+    "assets/props/drawer-cabinet/model.glb": {
+      "size": 589436,
+      "sha256": "ce4261873a8392f57ef55e9397a217b64548d583dde3384a91dfa3b2cae82c31"
+    },
+    "assets/props/explosive-barrel/model.glb": {
+      "size": 567872,
+      "sha256": "375c21dc06a2e415786a8e2871a50d9d7a674c8be3e5100f68c5842ded059beb"
+    },
+    "assets/props/field-radio/model.glb": {
+      "size": 2882088,
+      "sha256": "60dfc8287b496d4871e203d88fcc838be0c25245291130ca4d13fcc32d3d4500"
+    },
+    "assets/props/generator/model.glb": {
+      "size": 1092908,
+      "sha256": "779356df3cd456537246fd68d15ebedfc3eed404812d33f1cbede42b69ac084b"
+    },
+    "assets/props/hand-truck/model.glb": {
+      "size": 1265192,
+      "sha256": "51ed9ac275cb83ce9e0d7585bacbf6913dfcf52aa2e1241292472454aab13db8"
+    },
+    "assets/props/hanging-lamp/model.glb": {
+      "size": 1008996,
+      "sha256": "42816b54d3381eaed033280af5bfa922889457582cfd63f3a58c00e8cc0b9df5"
+    },
+    "assets/props/hospital-bed/model.glb": {
+      "size": 950884,
+      "sha256": "ec19e291c647c1f8dd3d003bf4bd55f7f06076bf784172f597f4e5df888403f5"
+    },
+    "assets/props/incandescent-bulb/model.glb": {
+      "size": 420412,
+      "sha256": "86b63b5fa93f702096102d10473b4efc55e6f4ea235d9766d5d240dfbafb9381"
+    },
+    "assets/props/industrial-pipes/model.glb": {
+      "size": 1467148,
+      "sha256": "e679d8701b496722843de0c9b199ea72e18cf1c733c9dc9832f2a31c94bd394c"
+    },
+    "assets/props/metal-jerrycan/model.glb": {
+      "size": 1159092,
+      "sha256": "61460d935c37d06bc87d498deb9057cc96ad8c97e6132f0429db33b8289c78f3"
+    },
+    "assets/props/office-desk/model.glb": {
+      "size": 423648,
+      "sha256": "571993f25056e0dd292c2d032bf0ef7e3e982eb5d83ac2fb1188817e44d92b95"
+    },
+    "assets/props/power-box/model.glb": {
+      "size": 833240,
+      "sha256": "5be828a698d724e44a858101db107c5ac28d511c8b9535e719788368c8c2037e"
+    },
+    "assets/props/shelf/model.glb": {
+      "size": 519136,
+      "sha256": "c16ba3a3e2f1b82417b531fd31cda68c6140be85d9a366c647661a2f9d691e12"
+    },
+    "assets/props/steel-shelves/model.glb": {
+      "size": 365976,
+      "sha256": "278d844b959c8fc7501f63aa0108be3169a217fb8c3f42f226e5150f6374fd74"
+    },
+    "assets/props/tree-stump/model.glb": {
+      "size": 1047064,
+      "sha256": "934d9b93dcfab234c6ad931cc826a2508940adf156801a297494c5f944eb9853"
+    },
+    "assets/props/utility-box/model.glb": {
+      "size": 504432,
+      "sha256": "2c9e62364cd259c621e78b73f8a09374eb2be3295097e5f79231304db51539ef"
+    },
+    "assets/props/vehicles/gaz-67/model.glb": {
+      "size": 2192248,
+      "sha256": "597d35e98833295fbf67ca8964b1f14a32064f9e84a9a08f84c75c0d9d83acb1"
+    },
+    "assets/props/vehicles/soviet-offroad/model.glb": {
+      "size": 631424,
+      "sha256": "010e9d7d5d4bb916b5a1d1f1f601ca9720fc946ab0b4c20f64d8db3d4bb53d2f"
+    },
+    "assets/props/vehicles/t-12/model.glb": {
+      "size": 2592976,
+      "sha256": "2868bb82d9b68b77d61bb0471ae54f7e4f7b4abb6468623aa8ff678b3a37e442"
+    },
+    "assets/props/vending-machine/model.glb": {
+      "size": 608108,
+      "sha256": "0d19d98359cf04bf3929ce2cded9e6b313184889031277d38b06cdeef99fd75b"
+    },
+    "assets/props/vending-machine/paint-double-tap.webp": {
+      "size": 65888,
+      "sha256": "aeb9598f7a3b4204cc441ab3e2cd4e0d08ba4da0f3e36c4746101e039aa941c0"
+    },
+    "assets/props/vending-machine/paint-juggernog.webp": {
+      "size": 61896,
+      "sha256": "4092ee547aa313f8d89e201f9a9a8ec510a02e7e9bb2abe422313febf58f4522"
+    },
+    "assets/props/vending-machine/paint-quick-revive.webp": {
+      "size": 63364,
+      "sha256": "5a1077d69a914e790e08ba134b162f40817498403dd6c091d0e3648146530f71"
+    },
+    "assets/props/vending-machine/paint-speed-cola.webp": {
+      "size": 55000,
+      "sha256": "8a587195eccd7ec610853720de979d26f614d1ddc09b0eb46990fc7e81e89d16"
+    },
+    "assets/props/wall-clock/model.glb": {
+      "size": 324196,
+      "sha256": "8c1a0a308c4b3f515b78a165af3d7033244f0cb5157628892f84ac1e4b39fa0d"
+    },
+    "assets/props/wall-lamp/model.glb": {
+      "size": 840356,
+      "sha256": "b58a50085366ddcd654d9e115a61dca5bda7cfef2f9a0226cb091c2743210cc0"
+    },
+    "assets/props/wheelchair/model.glb": {
+      "size": 778180,
+      "sha256": "24273ef70f8f6ee7531a63dc820854de9ab31161a80c723a1b9e224558bc3075"
+    },
+    "assets/props/wooden-chair/model.glb": {
+      "size": 612380,
+      "sha256": "2539c3a5bad955be4e4b68e493cf48d509cab40bf388aa530b7fae6e44a46a9d"
+    },
+    "assets/props/wooden-crate/model.glb": {
+      "size": 361064,
+      "sha256": "bc586bc184048e1c1b5931b1a0291c9be5dcf90c8f160fb49ca82e556eb1c2a8"
+    },
+    "assets/props/wooden-ladder/model.glb": {
+      "size": 906904,
+      "sha256": "448473b9c549ed6d8d8764f34627be17edfb3052c5e6c9320a96fceb962b5133"
+    },
+    "assets/props/wooden-plank/model.glb": {
+      "size": 563040,
+      "sha256": "5c9c4b35581001b5438fafb7f369513a2cac9ee7a2ff7f30cfedc62e926b9778"
+    },
+    "assets/props/wooden-table/model.glb": {
+      "size": 372604,
+      "sha256": "ad71902009c29ad4ad6251ae945fe7f6c89598ccb9e5754d1335da7a31768cdd"
+    },
+    "assets/weapons/ak74u/model.glb": {
+      "size": 686624,
+      "sha256": "24be8d596be079b713b1e4189933ba97f8abc50604dd30c316ea2a575ee7cad0"
+    },
+    "assets/weapons/bar/model.glb": {
+      "size": 1527132,
+      "sha256": "088da24c02140ad5b18d2f038181ed2ae0bd8ec06a6f067456b82a25703dd2bd"
+    },
+    "assets/weapons/commando/model.glb": {
+      "size": 1625164,
+      "sha256": "959e86e788c85434aef847fa31667786942f9dbc8c397ea221a5b7bb9317fb3f"
+    },
+    "assets/weapons/double-barrel/model.glb": {
+      "size": 1538024,
+      "sha256": "02b598c45fbc281b7d82c80b90dd94b3dda1dd5f232fa6e8e84c91f764add683"
+    },
+    "assets/weapons/fal/model.glb": {
+      "size": 1492348,
+      "sha256": "a5a643fdcef7ee7846639e5a9b45947935c5e1fcc80c556c8ce60c905b290b5b"
+    },
+    "assets/weapons/fg42/model.glb": {
+      "size": 3569672,
+      "sha256": "8cc2f43e862de5f797012f561259ba67db6c612d991c1f69cdcd4226ff471b17"
+    },
+    "assets/weapons/irrlicht/model.glb": {
+      "size": 2062472,
+      "sha256": "f31b7207485eaa6169b7ace61a144b3b1a252f550b0db894021a741d6043ed1f"
+    },
+    "assets/weapons/ithaca37/model.glb": {
+      "size": 768040,
+      "sha256": "c323964d924c496ae33f9f386b84f57b360026bdd35ecdff6fa859e3e2f1dacb"
+    },
+    "assets/weapons/kar98k/model.glb": {
+      "size": 2455792,
+      "sha256": "1acd0c6389b251a73583aa5fe693aec7684601e0c21847eac85ce1bd925706d5"
+    },
+    "assets/weapons/knife/model.glb": {
+      "size": 118900,
+      "sha256": "bf50d1dd4220c6b2457b3e2f6a550bc78bc0ee7583bed5985b82232a082cc28f"
+    },
+    "assets/weapons/m1-carbine/model.glb": {
+      "size": 908416,
+      "sha256": "0a47360c5136e79a883ef335a050a403f570e2888f4921152fb166fc9c69267f"
+    },
+    "assets/weapons/m1-garand/model.glb": {
+      "size": 1319312,
+      "sha256": "637507c079bdd6676b66b4d73a094d5e27cd42c603acfe3307632314fe4a54f7"
+    },
+    "assets/weapons/m14/model.glb": {
+      "size": 2081196,
+      "sha256": "726db2913fc26071a9990a0f273ea3005fad647a31276590279e4a645a4a2bb1"
+    },
+    "assets/weapons/m1911/model.glb": {
+      "size": 4362000,
+      "sha256": "4c2f9be61f3c9a4edaceb2f94c1eb64fc41b58f165caaed294f1557a8ae73b2f"
+    },
+    "assets/weapons/magnum-357/model.glb": {
+      "size": 1165964,
+      "sha256": "1dfb431cdecca7c3a5e4a6b8321ee1c262621054347f180b2f17537584bad785"
+    },
+    "assets/weapons/mg42/model.glb": {
+      "size": 2083964,
+      "sha256": "42ae8b2569c88ac2b2ed81d6b77c909166f7c90b4fc32e4124eee34bb0995f8d"
+    },
+    "assets/weapons/molniya/model.glb": {
+      "size": 1425844,
+      "sha256": "b6722af2eccfde00c0f847347a205887a5ed1fc28c67d249f0e3a2294253995b"
+    },
+    "assets/weapons/mosin/model.glb": {
+      "size": 1368824,
+      "sha256": "bdfd43afd7b0434747aac2c88effaa85319b4d213eee1a17cffa1fd4accff7cd"
+    },
+    "assets/weapons/mp40/model.glb": {
+      "size": 1675508,
+      "sha256": "b02cd03e6398e4cae3e2cfd05240a0bbdac2af44a7e0c9e1ef4bf59c58906866"
+    },
+    "assets/weapons/mp5k/model.glb": {
+      "size": 1984576,
+      "sha256": "362efe92f5cada5d95f12fc570e47fa1d3e1670498adf8f246c009fa92ae24aa"
+    },
+    "assets/weapons/ppsh41/model.glb": {
+      "size": 918744,
+      "sha256": "83f5582bfdd1dfc96aa4e82b97c4c89cd3f7d799d883c4bac5dafe27171d3d3b"
+    },
+    "assets/weapons/python/model.glb": {
+      "size": 1224472,
+      "sha256": "800f4db577b452cbb5e2f83cf2e7c6b4940995e7035b2a76da6b8d3bdc876ddc"
+    },
+    "assets/weapons/rpg7/model.glb": {
+      "size": 2752356,
+      "sha256": "c4805184e3f9f5f7a6d43607e73b8cee951e6f0930592b8bc9ed495405fb2535"
+    },
+    "assets/weapons/rpk/model.glb": {
+      "size": 1486112,
+      "sha256": "cfd35db6ac44e41dcd4b60f8dea79a57ff69974ff128f6f630b699ffdf7005c4"
+    },
+    "assets/weapons/skorpion/model.glb": {
+      "size": 1067220,
+      "sha256": "44257f770d552dc6a7969b16d8250404d5e75bd7c9bb99f907357ee31e7487c9"
+    },
+    "assets/weapons/spas12/model.glb": {
+      "size": 1333284,
+      "sha256": "517f8de8e565a7b214e15ed03b214932415568fa12046d7bfd79dcd785d37b8a"
+    },
+    "assets/weapons/springfield/model.glb": {
+      "size": 1170616,
+      "sha256": "efd2dfd63604dcb42349c750cfb195badf575d7ab581697c3b62d7b6bd972113"
+    },
+    "assets/weapons/stg44/model.glb": {
+      "size": 7530408,
+      "sha256": "2c53089e50ab9be2336ee4e6d0142ff579f81617fdbacca57167835968cb08e6"
+    },
+    "assets/weapons/thompson/model.glb": {
+      "size": 3496216,
+      "sha256": "6f915208d49c1ccfc40ed29822dc1e7839d29a8e86f72b25693c42e33efaa90f"
+    },
+    "assets/weapons/trench-gun/model.glb": {
+      "size": 2451356,
+      "sha256": "e65c7ea7f3174d3544dc136671dcd2e2031977da00122e4b6d7f8ce5648632f6"
+    },
+    "assets/zombies/peter_d/attack.glb": {
+      "size": 239220,
+      "sha256": "c9adc3fdb4bb4019692f7ddaf7f3547263eaf10cfbe756c1babf873e407c5164"
+    },
+    "assets/zombies/peter_d/death.glb": {
+      "size": 290172,
+      "sha256": "f3f294615b9b4c6fc1a63f4d16e1d816b9db6b0bd0d43b95e59775200ec4ca18"
+    },
+    "assets/zombies/peter_d/idle.glb": {
+      "size": 378276,
+      "sha256": "ac09059977aef544edaeaa9beadf54dd5a73c440a953f9b5b0b32a8b97f89684"
+    },
+    "assets/zombies/peter_d/model.glb": {
+      "size": 2101724,
+      "sha256": "cb6656995e84ff332c4c185254c049be8ed0bf06a89bba9dc887e7ac38df483d"
+    },
+    "assets/zombies/peter_d/run.glb": {
+      "size": 142780,
+      "sha256": "6329508c75e7b92d542886d34e55572db726b864163232dd90f5db34ceb0e650"
+    },
+    "assets/zombies/peter_d/walk.glb": {
+      "size": 172700,
+      "sha256": "aa98ac6783fdcb865c6ab7682982df6ed7abf79d85c0f7b374d904f49798d750"
+    },
+    "assets/zombies/pxltiger/attack.glb": {
+      "size": 169540,
+      "sha256": "8535d61cea1f2eb0737495e5d292320e993e34c6d576ebb33681bf10721854e1"
+    },
+    "assets/zombies/pxltiger/idle.glb": {
+      "size": 315836,
+      "sha256": "7d06d40f577c565ee8991a2c4ba5041066f262903d307c1794244c09a7b10ac5"
+    },
+    "assets/zombies/pxltiger/model.glb": {
+      "size": 1975324,
+      "sha256": "7ffdff48fbec957b2dacd4f45dda5339250cafcdb8d8f1079a1dc8d93a5a1651"
+    },
+    "assets/zombies/pxltiger/run.glb": {
+      "size": 218616,
+      "sha256": "25e40eb97c94a197344d6039cb748d01f4fa6e2054cc100b490ca1aeb7ed098b"
+    },
+    "assets/zombies/pxltiger/walk.glb": {
+      "size": 255760,
+      "sha256": "7a85b930741f5ba4e9ffb220327d07889b0a8bfbbf9832edcd83acb499c8d679"
+    }
+  }
+}
