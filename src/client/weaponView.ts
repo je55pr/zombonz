@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { batchStaticMeshes } from './staticBatch.ts';
+import { HANDGUNS } from './aim.ts';
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
 import { WEAPON_DEFINITIONS, reloadTicksFor, weaponName } from '../core/weapon.ts';
 import type { PlayerState } from '../core/types.ts';
@@ -75,13 +76,21 @@ export const VIEWMODEL_LENGTHS: Readonly<Record<string, number>> = {
   // Handguns are drawn larger than life, like the M1911, so they read on screen.
   mp5k: 0.45, skorpion: 0.52, 'magnum-357': 0.42, python: 0.4, irrlicht: 0.42, molniya: 0.4,
 };
-const HANDGUNS = new Set(['starter-pistol', 'magnum-357', 'python', 'irrlicht', 'molniya']);
 /** Rear sight distance in front of the eye when aimed, and how far the sights sit below dead centre. */
 const ADS_EYE_RELIEF = 0.13;
 const ADS_SIGHT_DROP = 0.0015;
 /** Hip-fire offsets from the aimed position (right, down, forward). */
-const HIP_OFFSET_LONG_GUN = { x: 0.11, y: -0.07, z: 0.02 };
-const HIP_OFFSET_HANDGUN = { x: 0.1, y: -0.065, z: -0.06 };
+const HIP_OFFSET_LONG_GUN = { x: 0.1, y: -0.07, z: -0.1 };
+const HIP_OFFSET_HANDGUN = { x: 0.1, y: -0.085, z: -0.24 };
+/**
+ * Guns whose hip pose is neither a handgun's nor a long gun's: the launcher's aimed pose sits high over
+ * the shoulder, and the machine pistols are drawn oversized like the handguns.
+ */
+const HIP_OFFSET_OVERRIDES: Readonly<Record<string, { x: number; y: number; z: number }>> = {
+  rpg7: { x: 0.16, y: 0, z: -0.2 },
+  skorpion: { x: 0.1, y: -0.075, z: -0.2 },
+  mp5k: { x: 0.1, y: -0.075, z: -0.2 },
+};
 const FLASH_COLOURS: Readonly<Record<string, number>> = { irrlicht: 0x7dff9a, molniya: 0x8fd8ff };
 
 // Bake the exported rest pose to ordinary meshes, keeping the magazine separate.
@@ -245,7 +254,7 @@ export class WeaponView {
     const { height, x, rearZ } = this.current.sight;
     const aimed = { x: -x, y: -height - ADS_SIGHT_DROP, z: -ADS_EYE_RELIEF - rearZ };
     // Hip: the same gun held lower-right and a little further out, turned slightly inwards.
-    const hip = HANDGUNS.has(this.id) ? HIP_OFFSET_HANDGUN : HIP_OFFSET_LONG_GUN;
+    const hip = HIP_OFFSET_OVERRIDES[this.id] ?? (HANDGUNS.has(this.id) ? HIP_OFFSET_HANDGUN : HIP_OFFSET_LONG_GUN);
     const away = 1 - this.aimBlend;
     this.pose.position.set(aimed.x + hip.x * away + bob,
       aimed.y + hip.y * away - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob),

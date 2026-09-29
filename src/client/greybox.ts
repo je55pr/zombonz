@@ -26,7 +26,9 @@ export function buildGreybox(boxes: readonly GreyboxBox[], prisms: readonly Grey
     const mesh = new THREE.Mesh(geometry, environmentMaterial(slabLook));
     mesh.position.copy(centre);
     mesh.rotation.set(entry.rotationX ?? 0, 0, entry.rotationZ ?? 0);
-    mesh.receiveShadow = true; mesh.castShadow = entry.material !== 'floor' && entry.material !== 'upperFloor';
+    // Ground floors have nothing beneath them to shade. Upper floors, ceilings and roofs are the
+    // 'upperFloor' slabs, and they must block the moon from the rooms under them.
+    mesh.receiveShadow = true; mesh.castShadow = entry.material !== 'floor';
     group.add(mesh);
     if (entry.underside && entry.underside !== look) {
       // The walked-on face gets its own surface just above the slab, so both stay batchable.
