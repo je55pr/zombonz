@@ -25,6 +25,8 @@ export interface WeaponDefinition {
   aimSpreadMultiplier?: number;
   /** Rays per shot; shotgun pellets each deal `damage`, totalled per zombie. */
   pellets?: number;
+  /** Ordered zombie hits per bullet and the damage fraction retained after each body. Geometry stops it. */
+  penetration?: { maxTargets: number; damageRetention: number };
   /** Impact burst: hurts zombies and the shooter within `radius`, falling off with distance. */
   explosive?: { radius: number; damage: number; selfDamage: number };
   /** Arcs from the first zombie hit to the nearest others, losing `falloff` of its damage per jump. */
@@ -50,99 +52,120 @@ export function hitZoneMultiplier(definition: WeaponDefinition, zone: HitZoneId)
   return definition.hitZoneMultipliers?.[zone] ?? DEFAULT_HIT_ZONE_MULTIPLIERS[zone];
 }
 
-// Stats are WaW-inspired approximations tuned to this game's 60 Hz ticks, not datamined values.
+// Stats are WaW-inspired approximations tuned to this game's 60 Hz ticks. Penetration tiers follow
+// the small/medium/large penetrateType fields in the WaW/BO1 weapon files; counts and retention are
+// explicit balance choices because those files do not specify a zombie body count or loss per body.
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   'starter-pistol': {
     id: 'starter-pistol', name: 'M1911', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
     magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90, hipSpreadRadians: 0.008,
+    penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   kar98k: {
     id: 'kar98k', name: 'Kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
     magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120, hipSpreadRadians: 0.015,
     // WaW: one headshot kills through round 3 (350 health) but not round 4 (450).
-    hitZoneMultipliers: { head: 4 },
+    hitZoneMultipliers: { head: 4 }, penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   springfield: {
     id: 'springfield', name: 'Springfield', damage: 100, range: 80, fireIntervalTicks: 50, trigger: 'semi',
     magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 135, hipSpreadRadians: 0.015,
-    hitZoneMultipliers: { head: 4 },
+    hitZoneMultipliers: { head: 4 }, penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   mosin: {
     id: 'mosin', name: 'Mosin-Nagant', damage: 110, range: 80, fireIntervalTicks: 55, trigger: 'semi',
     magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 140, hipSpreadRadians: 0.015,
-    hitZoneMultipliers: { head: 4 },
+    hitZoneMultipliers: { head: 4 }, penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   'm1-garand': {
     id: 'm1-garand', name: 'M1 Garand', damage: 105, range: 80, fireIntervalTicks: 9, trigger: 'semi',
     magazineSize: 8, startingReserveAmmo: 128, reloadTicks: 150, hipSpreadRadians: 0.014,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   thompson: {
     id: 'thompson', name: 'Thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
     magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120, hipSpreadRadians: 0.03,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   mp40: {
     id: 'mp40', name: 'MP40', damage: 75, range: 65, fireIntervalTicks: 8, trigger: 'auto',
     magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138, hipSpreadRadians: 0.027,
+    penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   ppsh41: {
     id: 'ppsh41', name: 'PPSh-41', damage: 70, range: 60, fireIntervalTicks: 4, trigger: 'auto',
     magazineSize: 71, startingReserveAmmo: 284, reloadTicks: 210, hipSpreadRadians: 0.035,
+    penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   'm1-carbine': {
     id: 'm1-carbine', name: 'M1A1 Carbine', damage: 120, range: 70, fireIntervalTicks: 8, trigger: 'semi',
     magazineSize: 15, startingReserveAmmo: 120, reloadTicks: 150, hipSpreadRadians: 0.016,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   m14: {
     id: 'm14', name: 'M14', damage: 105, range: 80, fireIntervalTicks: 8, trigger: 'semi',
     magazineSize: 8, startingReserveAmmo: 96, reloadTicks: 150, hipSpreadRadians: 0.014,
+    penetration: { maxTargets: 4, damageRetention: 0.85 },
   },
   fal: {
     id: 'fal', name: 'FN FAL', damage: 130, range: 80, fireIntervalTicks: 7, trigger: 'semi',
     magazineSize: 20, startingReserveAmmo: 180, reloadTicks: 165, hipSpreadRadians: 0.016,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   stg44: {
     id: 'stg44', name: 'STG-44', damage: 100, range: 70, fireIntervalTicks: 7, trigger: 'auto',
     magazineSize: 30, startingReserveAmmo: 180, reloadTicks: 150, hipSpreadRadians: 0.03,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   fg42: {
     id: 'fg42', name: 'FG42', damage: 110, range: 75, fireIntervalTicks: 5, trigger: 'auto',
     magazineSize: 20, startingReserveAmmo: 240, reloadTicks: 180, hipSpreadRadians: 0.035,
+    penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   commando: {
     id: 'commando', name: 'Commando', damage: 100, range: 70, fireIntervalTicks: 5, trigger: 'auto',
     magazineSize: 30, startingReserveAmmo: 270, reloadTicks: 150, hipSpreadRadians: 0.028,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   ak74u: {
     id: 'ak74u', name: 'AK-74u', damage: 100, range: 60, fireIntervalTicks: 5, trigger: 'auto',
     magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 150, hipSpreadRadians: 0.03,
+    penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   mp5k: {
     id: 'mp5k', name: 'MP5K', damage: 80, range: 55, fireIntervalTicks: 4, trigger: 'auto',
     magazineSize: 30, startingReserveAmmo: 120, reloadTicks: 150, hipSpreadRadians: 0.03,
+    penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   skorpion: {
     id: 'skorpion', name: 'Skorpion', damage: 60, range: 50, fireIntervalTicks: 4, trigger: 'auto',
     magazineSize: 20, startingReserveAmmo: 200, reloadTicks: 120, hipSpreadRadians: 0.035,
+    penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   'magnum-357': {
     id: 'magnum-357', name: '.357 Magnum', damage: 240, range: 60, fireIntervalTicks: 18, trigger: 'semi',
     magazineSize: 6, startingReserveAmmo: 48, reloadTicks: 180, hipSpreadRadians: 0.012,
+    penetration: { maxTargets: 4, damageRetention: 0.85 },
   },
   python: {
     id: 'python', name: 'Python', damage: 200, range: 60, fireIntervalTicks: 18, trigger: 'semi',
     magazineSize: 6, startingReserveAmmo: 84, reloadTicks: 180, hipSpreadRadians: 0.012,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   rpk: {
     id: 'rpk', name: 'RPK', damage: 110, range: 80, fireIntervalTicks: 5, trigger: 'auto',
     magazineSize: 100, startingReserveAmmo: 400, reloadTicks: 330, hipSpreadRadians: 0.045,
+    penetration: { maxTargets: 4, damageRetention: 0.8 },
   },
   bar: {
     id: 'bar', name: 'BAR', damage: 125, range: 80, fireIntervalTicks: 10, trigger: 'auto',
     magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150, hipSpreadRadians: 0.035,
+    penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   mg42: {
     id: 'mg42', name: 'MG42', damage: 120, range: 90, fireIntervalTicks: 3, trigger: 'auto',
     magazineSize: 125, startingReserveAmmo: 500, reloadTicks: 360, hipSpreadRadians: 0.045,
+    penetration: { maxTargets: 4, damageRetention: 0.8 },
   },
   'double-barrel': {
     id: 'double-barrel', name: 'Double-Barreled Shotgun', damage: 80, range: 22, fireIntervalTicks: 14,
@@ -293,6 +316,19 @@ function nearestWorldDistance(
   return best;
 }
 
+function nearestHazardHit(ray: HitscanRay, hazards: readonly HazardTarget[], range: number,
+  worldDistance: number | null): { hazardId: string; distance: number } | null {
+  let best: { hazardId: string; distance: number } | null = null;
+  for (const hazard of hazards) {
+    const distance = rayAabbDistance(ray, hazard.box.min, hazard.box.max, range);
+    if (distance === null || (worldDistance !== null && distance >= worldDistance)) continue;
+    if (!best || distance < best.distance || distance === best.distance && hazard.state.id < best.hazardId) {
+      best = { hazardId: hazard.state.id, distance };
+    }
+  }
+  return best;
+}
+
 function zombieHitDistance(ray: HitscanRay, zombie: ZombieState, maxDistance: number): number | null {
   const radius = 0.32;
   const height = zombie.entry?.phase === 'vaulting' ? 1.72 * 0.85 : 1.72;
@@ -316,31 +352,36 @@ export function resolveHitscan(
   hazards: readonly HazardTarget[] = [],
 ): HitscanTarget {
   const worldDistance = nearestWorldDistance(ray, worldBoxes, range);
-  let bestHazard: { hazardId: string; distance: number } | null = null;
-  for (const hazard of hazards) {
-    const distance = rayAabbDistance(ray, hazard.box.min, hazard.box.max, range);
-    if (distance === null || (worldDistance !== null && distance >= worldDistance)) continue;
-    if (!bestHazard || distance < bestHazard.distance) bestHazard = { hazardId: hazard.state.id, distance };
-  }
-  let bestZombie: { zombieId: EntityId; distance: number } | null = null;
+  const bestHazard = nearestHazardHit(ray, hazards, range, worldDistance);
+  const targets = resolveHitscanZombies(ray, zombies, worldBoxes, range, hazards);
+  if (targets.length) return targets[0];
+  if (bestHazard) return { kind: 'hazard', ...bestHazard };
+  if (worldDistance !== null) return { kind: 'world', distance: worldDistance };
+  return { kind: 'none', distance: range };
+}
+
+/** All zombie intersections before the first wall or hazard, in stable ray order. */
+export function resolveHitscanZombies(
+  ray: HitscanRay,
+  zombies: readonly ZombieState[],
+  worldBoxes: readonly CollisionBox[],
+  range: number,
+  hazards: readonly HazardTarget[] = [],
+): Array<Extract<HitscanTarget, { kind: 'zombie' }>> {
+  const worldDistance = nearestWorldDistance(ray, worldBoxes, range);
+  const hazardDistance = nearestHazardHit(ray, hazards, range, worldDistance)?.distance ?? null;
+  const hits: Array<Extract<HitscanTarget, { kind: 'zombie' }>> = [];
   for (const zombie of zombies) {
     if (!zombie.alive) continue;
     const distance = zombieHitDistance(ray, zombie, range);
-    if (distance === null || (worldDistance !== null && distance >= worldDistance)) continue;
-    if (!bestZombie || distance < bestZombie.distance || (distance === bestZombie.distance && zombie.id < bestZombie.zombieId)) {
-      bestZombie = { zombieId: zombie.id, distance };
-    }
-  }
-  if (bestHazard && (!bestZombie || bestHazard.distance < bestZombie.distance)) return { kind: 'hazard', ...bestHazard };
-  if (bestZombie) {
-    const zombie = zombies.find(zombie => zombie.id === bestZombie!.zombieId)!;
+    if (distance === null || (worldDistance !== null && distance >= worldDistance)
+      || (hazardDistance !== null && distance >= hazardDistance)) continue;
     const height = 1.72 * (zombie.entry?.phase === 'vaulting' ? 0.85 : 1);
-    const impactY = ray.origin.y + ray.direction.y * bestZombie.distance - zombie.position.y;
+    const impactY = ray.origin.y + ray.direction.y * distance - zombie.position.y;
     const zone = ZOMBIE_HIT_ZONES.find(zone => impactY >= zone.minHeightFraction * height);
-    return { kind: 'zombie', ...bestZombie, hitZone: zone?.id ?? FALLBACK_HIT_ZONE };
+    hits.push({ kind: 'zombie', zombieId: zombie.id, distance, hitZone: zone?.id ?? FALLBACK_HIT_ZONE });
   }
-  if (worldDistance !== null) return { kind: 'world', distance: worldDistance };
-  return { kind: 'none', distance: range };
+  return hits.sort((a, b) => a.distance - b.distance || a.zombieId.localeCompare(b.zombieId));
 }
 /** A full reload's length for this player; Speed Cola halves it. */
 export function reloadTicksFor(player: PlayerState, definition: WeaponDefinition): number {
@@ -486,29 +527,42 @@ export function firePlayerWeapon(
   // Pellets resolve against the pre-shot state, then each zombie takes one combined hit.
   const hits = new Map<EntityId, { damage: number; distance: number; hitZone: HitZoneId }>();
   const hazardHits = new Map<string, { damage: number; point: Vec3 }>();
+  const addHazardHit = (hazardId: string, distance: number, shotRay: HitscanRay, damage: number) => {
+    const { origin, direction } = shotRay;
+    const total = hazardHits.get(hazardId)
+      ?? { damage: 0, point: { x: origin.x + direction.x * distance, y: origin.y + direction.y * distance,
+        z: origin.z + direction.z * distance } };
+    total.damage += damage; hazardHits.set(hazardId, total);
+  };
   let first: { ray: HitscanRay; hit: HitscanTarget } | null = null;
   for (let pellet = 0; pellet < (definition.pellets ?? 1); pellet += 1) {
     const pelletSeed = pellet === 0 ? seed : seed ^ Math.imul(pellet, 0x85ebca6b);
     const pelletRay = spreadHitscanRay(ray, spread, pelletSeed);
     const hit = resolveHitscan(pelletRay, zombies, worldBoxes, definition.range, hazards);
     first ??= { ray: pelletRay, hit };
-    if (hit.kind === 'hazard') {
-      const { origin, direction } = pelletRay, total = hazardHits.get(hit.hazardId)
-        ?? { damage: 0, point: { x: origin.x + direction.x * hit.distance, y: origin.y + direction.y * hit.distance,
-          z: origin.z + direction.z * hit.distance } };
-      total.damage += definition.damage; hazardHits.set(hit.hazardId, total);
+    if (hit.kind === 'hazard') addHazardHit(hit.hazardId, hit.distance, pelletRay, definition.damage);
+    const penetration = definition.penetration;
+    const targets = hit.kind === 'zombie'
+      ? resolveHitscanZombies(pelletRay, zombies, worldBoxes, definition.range, hazards).slice(0, penetration?.maxTargets ?? 1) : [];
+    targets.forEach((target, index) => {
+      const total = hits.get(target.zombieId) ?? { damage: 0, distance: target.distance, hitZone: target.hitZone };
+      total.damage += definition.damage * hitZoneMultiplier(definition, target.hitZone)
+        * (penetration?.damageRetention ?? 1) ** index;
+      total.distance = Math.min(total.distance, target.distance);
+      if (target.hitZone === 'head') total.hitZone = 'head';
+      hits.set(target.zombieId, total);
+    });
+    if (hit.kind === 'zombie' && targets.length < (penetration?.maxTargets ?? 1)) {
+      const obstacle = nearestHazardHit(pelletRay, hazards, definition.range,
+        nearestWorldDistance(pelletRay, worldBoxes, definition.range));
+      if (obstacle) addHazardHit(obstacle.hazardId, obstacle.distance, pelletRay,
+        Math.round(definition.damage * (penetration?.damageRetention ?? 1) ** targets.length));
     }
-    if (hit.kind !== 'zombie') continue;
-    const total = hits.get(hit.zombieId) ?? { damage: 0, distance: hit.distance, hitZone: hit.hitZone };
-    total.damage += definition.damage * hitZoneMultiplier(definition, hit.hitZone);
-    total.distance = Math.min(total.distance, hit.distance);
-    if (hit.hitZone === 'head') total.hitZone = 'head';
-    hits.set(hit.zombieId, total);
   }
-  for (const [zombieId, hit] of hits) {
+  for (const [zombieId, hit] of [...hits].sort((a, b) => a[1].distance - b[1].distance || a[0].localeCompare(b[0]))) {
     const zombie = zombies.find((candidate) => candidate.id === zombieId && candidate.alive);
     if (!zombie) continue;
-    const applied = Math.min(zombie.health, instaKill ? zombie.health : hit.damage);
+    const applied = Math.min(zombie.health, instaKill ? zombie.health : Math.round(hit.damage));
     zombie.health -= applied;
     events.push({
       type: 'weaponHit', playerId: player.id, weaponId: definition.id,

@@ -83,7 +83,7 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
     () => loadModel(TEAMMATE_MODEL),
     () => loadZombieAsset(zombie),
     () => prepareWeaponModel('starter-pistol'),
-    // The chalk wall buys hang the real guns.
+    // Model-derived chalk outlines need the weapon assets ready before the map appears.
     ...[...new Set(allMaps.flatMap(map => map.wallWeapons.map(wall => wall.weaponId)))].map(id => () => prepareWeaponModel(id)),
     // Every sound, so the first shot and the first moan play on the first frame of the map.
     () => decodeAudioClips(),

@@ -1,7 +1,7 @@
 import { SeededRng } from './rng.ts';
 import type { Vec3 } from './types.ts';
 
-export interface ZombieSpawnPoint extends Vec3 { barrierId?: string }
+export interface ZombieSpawnPoint extends Vec3 { barrierId?: string; minRound?: number }
 
 /** Fixed-cadence, linear round sizes; useful for tests and development previews. */
 export interface LinearSpawnConfig {

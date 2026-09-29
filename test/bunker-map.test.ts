@@ -5,6 +5,7 @@ import {
   BUNKER_WALK_SURFACES,
   greyboxCollisionBoxes,
   BUNKER_WINDOWS, BUNKER_DOORS, BUNKER_MYSTERY_BOXES, BUNKER_STAIRS, UPPER_HEIGHT,
+  BUNKER_BARRIERS, BUNKER_ZOMBIE_SPAWNS, BUNKER_NAVIGATION,
 } from '../src/maps/bunker.ts';
 import { walkSurfaceHeight, sampleWalkHeight } from '../src/core/collision.ts';
 import { PLAN_SCALE, ps, px, pz } from '../src/maps/bunkerPlan.ts';
@@ -53,6 +54,23 @@ describe('Bunker greybox contract', () => {
     expect(BUNKER_MYSTERY_BOXES).toHaveLength(1);
     expect(BUNKER_MYSTERY_BOXES[0].position.x).toBeLessThan(0);
     expect(BUNKER_MYSTERY_BOXES[0].position.z).toBeGreaterThan(6);
+  });
+
+  it('connects every upstairs entry to indoor navigation and delays its spawn points', () => {
+    const nodes = new Map(BUNKER_NAVIGATION.nodes.map(node => [node.id, node]));
+    for (const window of BUNKER_WINDOWS.filter(window => window.y === UPPER_HEIGHT)) {
+      const barrier = BUNKER_BARRIERS.find(barrier => barrier.id === window.id);
+      expect(barrier).toBeDefined();
+      expect(barrier!.maxBoards).toBe(6);
+      expect(BUNKER_ZOMBIE_SPAWNS.filter(spawn => spawn.barrierId === window.id)).toHaveLength(3);
+      expect(BUNKER_ZOMBIE_SPAWNS.filter(spawn => spawn.barrierId === window.id)
+        .every(spawn => spawn.minRound === 4)).toBe(true);
+      const seen = new Set([window.id]), queue = [window.id];
+      for (const id of queue) for (const next of nodes.get(id)?.neighbors ?? []) {
+        if (!seen.has(next)) { seen.add(next); queue.push(next); }
+      }
+      expect(seen.has('spawn'), window.id).toBe(true);
+    }
   });
 
   it('is laid out at WaW scale: a roomy spawn wing and a long HELP wing, with real-size openings', () => {

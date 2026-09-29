@@ -16,15 +16,15 @@ import { LightSource, type LightPool } from './lightPool.ts';
 import { createMineModel } from './explosiveModels.ts';
 import { equipmentName } from '../core/equipment.ts';
 
-// Wall guns are shown life-size; viewmodels are modelled at roughly 0.86x.
+// Chalk signs are life-size; viewmodels are modelled at roughly 0.86x.
 const WALL_GUN_SCALE = 1.15;
 const CHALK = 0xc9c7a7;
 
 /**
- * Hangs a copy of the gun's model on a wall-buy sign, muzzle to the right, over a chalk silhouette
- * drawn slightly larger on the wall behind it, as WaW's chalk outlines frame their guns.
+ * Projects the shared weapon model into a shallow two-layer silhouette. The inset dark shape leaves
+ * only an irregular chalk contour; the physical model is never placed on the wall.
  */
-function mountWallGun(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Material): void {
+function mountWallChalk(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Material, inset: THREE.Material): void {
   const model = weapon.root.clone(true);
   model.position.set(0, 0, 0); model.rotation.set(0, 0, 0); model.scale.set(1, 1, 1);
   model.updateMatrixWorld(true);
@@ -37,12 +37,19 @@ function mountWallGun(sign: THREE.Group, weapon: PreparedWeapon, chalk: THREE.Ma
     object.position.set(-offset.x, -offset.y, wallDepth - offset.z);
     sign.add(object);
   };
-  place(model, new THREE.Vector3().setScalar(WALL_GUN_SCALE), 0.015 + size.x * WALL_GUN_SCALE / 2);
-  const outline = weapon.root.clone(true);
-  outline.traverse(object => { if (object instanceof THREE.Mesh) object.material = chalk; });
-  // Flattened onto the wall, and grown so a chalk rim shows around the gun.
-  const rim = (size.z * WALL_GUN_SCALE + 0.07) / size.z;
-  place(outline, new THREE.Vector3(0.002, (size.y * WALL_GUN_SCALE + 0.05) / size.y, rim), 0.004);
+  const silhouette = (material: THREE.Material, height: number, length: number, depth: number) => {
+    const outline = model.clone(true);
+    outline.traverse(object => {
+      if (object instanceof THREE.Mesh) {
+        object.material = material;
+        object.castShadow = false;
+        object.receiveShadow = false;
+      }
+    });
+    place(outline, new THREE.Vector3(0.002, height / size.y, length / size.z), depth);
+  };
+  silhouette(chalk, size.y * WALL_GUN_SCALE + 0.08, size.z * WALL_GUN_SCALE + 0.08, 0.004);
+  silhouette(inset, size.y * WALL_GUN_SCALE - 0.015, size.z * WALL_GUN_SCALE - 0.015, 0.009);
 }
 
 /** The perk machine model, and each perk's paint for it (see scripts/weapon-convert/import-vending.mjs). */
@@ -178,21 +185,22 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
     }
   }
   for (const text of map.labels) label(text.text, text.x, text.y, text.z, text.yaw, text.width, text.height, text.color);
-  const chalk = new THREE.MeshBasicMaterial({ color: CHALK });
+  const chalk = new THREE.MeshBasicMaterial({ color: CHALK, side: THREE.DoubleSide });
+  const chalkInset = new THREE.MeshBasicMaterial({ color: 0x24231e, side: THREE.DoubleSide });
   const wallGuns: Promise<unknown>[] = [];
   for (const weapon of map.wallWeapons) {
     const sign = new THREE.Group();
     sign.position.set(weapon.position.x, weapon.position.y + 0.4, weapon.position.z);
     sign.rotation.y = map.wallWeaponFacing[weapon.id] ?? 0;
     group.add(sign);
-    // The real gun over its chalk outline; a chalk bar with a blocky rifle only if the model can't load.
+    // The sign remains chalk after purchase, since it also sells replacement ammo.
     const pending = prepareWeaponModel(weapon.weaponId);
     const fallback = () => {
       box(sign, chalk, 0, 0, 0, 1.75, 0.17, 0.015);
-      box(sign, wood, -0.5, -0.015, 0.025, 0.55, 0.18, 0.055);
-      box(sign, iron, 0.25, 0.025, 0.025, 1.15, 0.065, 0.055);
+      box(sign, chalk, -0.5, -0.015, 0.025, 0.55, 0.18, 0.015);
+      box(sign, chalk, 0.25, 0.025, 0.025, 1.15, 0.065, 0.015);
     };
-    if (pending) wallGuns.push(pending.then(model => mountWallGun(sign, model, chalk), error => {
+    if (pending) wallGuns.push(pending.then(model => mountWallChalk(sign, model, chalk, chalkInset), error => {
       console.warn(`Unable to load the ${weapon.weaponId} wall gun`, error); fallback();
     }));
     else fallback();

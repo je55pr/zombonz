@@ -1,5 +1,5 @@
 import type { DamageEvent } from './health.ts';
-import { hasPerk, type PerkId } from './perks.ts';
+import { hasPerk, SOLO_QUICK_REVIVE_LIMIT, type PerkId } from './perks.ts';
 import type { EntityId, PlayerState, WeaponState } from './types.ts';
 
 /**
@@ -14,7 +14,7 @@ export const DOWN_RULES = {
   quickReviveTicks: 1.5 * 60,
   /** Solo Quick Revive, as in Black Ops: the player gets back up by themselves, at most three times. */
   selfReviveTicks: 10 * 60,
-  soloQuickReviveLimit: 3,
+  soloQuickReviveLimit: SOLO_QUICK_REVIVE_LIMIT,
   reviveRange: 1.6,
   /** The last-stand pistol and its spare ammo. */
   pistol: 'starter-pistol', pistolReserve: 48,

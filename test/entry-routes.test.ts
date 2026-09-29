@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GameSimulation, hasClearNavigationLine, type Vec3 } from '../src/core/index.ts';
+import { GameSimulation, createInputFrame, hasClearNavigationLine, type Vec3 } from '../src/core/index.ts';
 import type { BarrierDefinition } from '../src/core/barrier.ts';
 import { MAPS } from '../src/maps/index.ts';
 import type { GameMap } from '../src/maps/gameMap.ts';
@@ -27,6 +27,25 @@ function legs(map: GameMap): Array<{ barrier: BarrierDefinition; label: string; 
 }
 
 describe.each(Object.values(MAPS))('$name entry routes', map => {
+  if (map.id === 'bunker') it.each(map.barriers.filter(barrier => barrier.position.y > 0)
+    .map(barrier => ({ id: barrier.id })))('repairs upstairs barrier $id from its landing', ({ id }) => {
+    const definition = map.barriers.find(barrier => barrier.id === id)!;
+    const sim = new GameSimulation({ seed: 22,
+      map: { collisionBoxes: map.collisionBoxes, walkSurfaces: map.walkSurfaces, zombieSpawns: [],
+        barriers: map.barriers, doors: map.doors, navigationGraph: map.navigation, shotBlockers: map.shotBlockers },
+      playerSpawns: [definition.insidePoint], roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
+    const barrier = sim.state.barriers.find(barrier => barrier.id === id)!;
+    barrier.boards = barrier.maxBoards - 1;
+    const frame = createInputFrame(0);
+    frame.actions.interact = { pressed: true, held: true, released: false, value: 1 };
+    let repaired = false;
+    for (let tick = 0; tick <= 60; tick++) {
+      repaired ||= sim.tick({ [sim.playerIds[0]]: frame }).some(event => event.type === 'barrierBoardRepaired'
+        && event.barrierId === id);
+    }
+    expect(repaired).toBe(true);
+    expect(barrier.boards).toBe(barrier.maxBoards);
+  });
   it('brings every entry\'s zombies from well out, three spots each, inside the grounds', () => {
     for (const barrier of map.barriers) {
       const spawns = map.zombieSpawns.filter(spawn => spawn.barrierId === barrier.id);
@@ -61,7 +80,8 @@ describe.each(Object.values(MAPS))('$name entry routes', map => {
   it.each(map.barriers.map(barrier => ({ id: barrier.id })))('brings a zombie all the way in through $id', ({ id }) => {
     const sim = new GameSimulation({ seed: 21,
       map: { collisionBoxes: [...map.collisionBoxes], walkSurfaces: map.walkSurfaces, navigationGraph: map.navigation,
-        zombieSpawns: map.zombieSpawns.filter(spawn => spawn.barrierId === id).slice(0, 1), barriers: map.barriers,
+        zombieSpawns: map.zombieSpawns.filter(spawn => spawn.barrierId === id).slice(0, 1)
+          .map(spawn => ({ ...spawn, minRound: 1 })), barriers: map.barriers,
         doors: map.doors, shotBlockers: map.shotBlockers },
       playerSpawns: [map.playerSpawn], roundConfig: { initialWaitTicks: 1, intermissionTicks: 9999 },
       spawnConfig: { baseZombieCount: 1, additionalPerRound: 0, spawnIntervalTicks: 1, maxAlive: 1 } });
