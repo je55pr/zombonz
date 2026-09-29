@@ -115,7 +115,7 @@ describe('render performance contracts', () => {
     const state: HudSnapshot = { health: 100, maxHealth: 100, perks: '', lastStand: null, reviveProgress: 0, team: '', pingMs: null, canRestart: true, points: 500, kills: 0, headshots: 0,
       round: 1, weapon: 'starter-pistol',
       magazineAmmo: 8, reserveAmmo: 32, holsteredWeapon: null, reloading: false,
-      grenadeCharges: 2,
+      grenadeCharges: 2, mineCharges: 0,
       roundPhase: 'waiting', interactionPrompt: null, nearbyPowerup: null, bonusStatus: null, instaKillStatus: null,
       gameOver: false, paused: false, godMode: false, noclip: false,
       sprinting: false, aiming: false };

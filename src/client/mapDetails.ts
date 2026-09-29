@@ -13,6 +13,8 @@ import { PERKS, type PerkId } from '../core/perks.ts';
 import { WindowBoards, windowSeed } from './windowBoards.ts';
 import { boardMask } from '../core/barrier.ts';
 import { LightSource, type LightPool } from './lightPool.ts';
+import { createMineModel } from './explosiveModels.ts';
+import { equipmentName } from '../core/equipment.ts';
 
 // Wall guns are shown life-size; viewmodels are modelled at roughly 0.86x.
 const WALL_GUN_SCALE = 1.15;
@@ -196,6 +198,21 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
     else fallback();
     const name = writing(weaponName(weapon.weaponId).toUpperCase(), 1.65, 0.24);
     name.position.set(0, -0.38, 0.03); sign.add(name);
+  }
+  // Equipment for sale: a shelf on the wall with a pair of Bouncing Betties standing on it, under their name.
+  for (const buy of map.equipment ?? []) {
+    const sign = new THREE.Group();
+    sign.position.set(buy.position.x, buy.position.y + 0.4, buy.position.z);
+    sign.rotation.y = map.equipmentFacing?.[buy.id] ?? 0;
+    group.add(sign);
+    box(sign, wood, 0, -0.2, 0.16, 0.9, 0.05, 0.3);
+    for (const bracket of [-0.35, 0.35]) box(sign, iron, bracket, -0.29, 0.06, 0.05, 0.14, 0.05);
+    for (const x of [-0.2, 0.2]) {
+      const mine = createMineModel();
+      mine.root.scale.setScalar(2); mine.root.position.set(x, -0.175, 0.16); mine.root.rotation.y = x * 7;
+      mine.lampMaterial.color.setHex(0x8a1410); sign.add(mine.root);
+    }
+    const name = writing(equipmentName(buy.item).toUpperCase(), 1.65, 0.24); name.position.set(0, -0.5, 0.03); sign.add(name);
   }
   // The iron-bound random box. Its authoritative state drives the lid, where it stands and the bear.
   // The chest stands on its floor: a box centre is the middle of its 1.04 m-tall collision box.

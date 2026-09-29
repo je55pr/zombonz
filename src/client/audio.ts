@@ -1,9 +1,10 @@
 import type { EntityId, PlayerState, Vec3, WorldState, ZombieState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 import { WEAPON_DEFINITIONS } from '../core/weapon.ts';
-import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip, type AudioClip } from './audioClips.ts';
+import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip, renderedSynthClip, type AudioClip } from './audioClips.ts';
+import { SYNTH_CLIPS, SYNTH_RATE, type SynthClip } from './explosionSynth.ts';
 
-type Clip = AudioClip;
+type Clip = AudioClip | SynthClip;
 
 /** Each gun plays its own family's close-up recording (see scripts/prepare_audio.py). */
 const GUN_CLIPS: Readonly<Record<string, Clip>> = {
@@ -59,8 +60,13 @@ const MIX = {
   gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.35, knife: 0.5, hit: 0.35, headshot: 0.5,
   hurt: 0.6, footstep: 0.28, sprintStep: 0.34, zombieVoice: 0.6, zombieStep: 0.3, zombieDeath: 0.55,
   boardBreak: 0.55, boardRepair: 0.4, door: 0.6, box: 0.4, pickup: 0.5, reject: 0.35, roundStart: 0.5,
-  zombieAttack: 0.55, sting: 0.22,
+  zombieAttack: 0.55, sting: 0.22, clink: 0.32, ping: 0.5, fire: 0.2, mine: 0.4,
 } as const;
+/** How quickly a blast fades with distance (see playAt): big ones carry much further than a footstep. */
+const BLAST_ROLLOFF = { grenade: 0.16, mine: 0.16, barrel: 0.1, vehicle: 0.07 } as const;
+/** Events with a place in the world: everyone hears them, whoever caused them, from where they happened. */
+const WORLD_EVENTS: ReadonlySet<string> = new Set(['grenadeThrown', 'grenadeBounced', 'grenadeExploded', 'weaponExploded',
+  'minePlaced', 'mineArmed', 'mineTriggered', 'mineExploded', 'hazardHit', 'hazardIgnited', 'hazardExploded']);
 /** Positional sounds fade with distance and are culled past this (the map is about 35 m across). */
 const HEARING_RANGE = 36;
 
@@ -151,6 +157,17 @@ export class GameAudio {
         else this.trims.set(clip, normalisingGain(loudestWindowDb(buffer.getChannelData(0), buffer.sampleRate)));
       } catch { /* A clip that can't be measured plays at its recorded level. */ }
     }
+    // The synthesized explosions, pings and fire, rendered by the start screen (see explosionSynth.ts).
+    for (const clip of SYNTH_CLIPS) {
+      const samples = renderedSynthClip(clip);
+      if (!samples) continue;
+      try {
+        const buffer = context.createBuffer(1, samples.length, SYNTH_RATE);
+        buffer.copyToChannel(samples as Float32Array<ArrayBuffer>, 0);
+        this.clips.set(clip, buffer);
+        this.trims.set(clip, normalisingGain(loudestWindowDb(samples, SYNTH_RATE)));
+      } catch { /* A clip that can't be built stays silent. */ }
+    }
   }
 
   private loopClip(clip: Clip): void {
@@ -188,13 +205,35 @@ export class GameAudio {
     return true;
   }
 
-  private playAt(clip: Clip, volume: number, point: Vec3 | undefined, player: PlayerState | undefined): boolean {
+  private playAt(clip: Clip, volume: number, point: Vec3 | undefined, player: PlayerState | undefined, rate = 1,
+    rolloff = 0.24): boolean {
     if (!point || !player) return false;
     const dx = point.x - player.position.x, dz = point.z - player.position.z;
     const distance = Math.hypot(dx, dz);
     if (distance > HEARING_RANGE) return false;
     const pan = distance > 0.01 ? (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / distance : 0;
-    return this.playClip(clip, volume / (1 + distance * 0.24), pan);
+    return this.playClip(clip, volume / (1 + distance * rolloff), pan, rate);
+  }
+
+  /**
+   * An explosion: the synthesized blast (thump, crack, roar and tail) with a recorded bang laid over it for
+   * the real-world edge, from where it happened.
+   */
+  private boom(blast: 'blast-frag' | 'blast-barrel' | 'blast-vehicle' | 'blast-mine', recorded: 'explosion-small' | 'explosion-large',
+    recordedLevel: number, rate: number, rolloff: number, point: Vec3 | undefined, player: PlayerState | undefined, level = 1): void {
+    this.playAt(blast, MIX.explosion * level, point, player, 1, rolloff);
+    this.playAt(recorded, MIX.explosion * recordedLevel * level, point, player, rate, rolloff);
+  }
+
+  /** Crackling from anything burning within earshot; called every frame with what is alight and where. */
+  burning(fires: ReadonlyArray<{ id: string; position: Vec3 }>, playerId: EntityId, world: WorldState): void {
+    const entity = world.entities[playerId];
+    const player = entity?.kind === 'player' ? entity : undefined;
+    if (!this.context || this.muted || this.paused || !player) return;
+    fires.forEach((fire, index) => {
+      if ((world.tick + index * 17) % 47 !== 0) return;
+      this.playAt(variant('fire-crackle', 2, world.tick / 47 + index), MIX.fire, fire.position, player, 0.94 + ((world.tick / 47 + index) % 3) * 0.05, 0.3);
+    });
   }
 
   setPaused(paused: boolean): void {
@@ -253,7 +292,7 @@ export class GameAudio {
         continue;
       }
       if ('playerId' in event && event.playerId !== playerId && event.type !== 'powerupCollected'
-        && event.type !== 'powerActivated') continue;
+        && event.type !== 'powerActivated' && !WORLD_EVENTS.has(event.type)) continue;
       switch (event.type) {
         case 'weaponFired': { const { clip, rate } = gunClip(event.weaponId); this.playClip(clip, MIX.gunfire, 0, rate); break; }
         case 'weaponHit': this.playClip('flesh-hit', event.hitZone === 'head' ? MIX.headshot : MIX.hit); break;
@@ -283,12 +322,37 @@ export class GameAudio {
           // Boards hammered back up.
           this.playClip('wood-impact-1', MIX.boardRepair); this.playClip('wood-impact-2', MIX.boardRepair, 0, 0.9); break;
         case 'nukeDetonated': this.playClip('explosion-large', MIX.explosion, 0, 0.75); break;
-        case 'grenadeThrown': this.playClip('door-metal', MIX.reload * 0.5, 0, 1.4); break;
+        case 'grenadeThrown':
+          // The pin and spoon flying off, and a thrower's grunt of effort is left to the imagination.
+          this.playAt('grenade-ping', MIX.ping, world.entities[event.playerId]?.position, player, 0.96 + (world.tick % 4) * 0.03, 0.4);
+          break;
+        case 'grenadeBounced':
+          this.playAt('grenade-bounce', MIX.clink * Math.min(1, event.speed / 6), event.position, player, 0.88 + (world.tick % 5) * 0.06, 0.3);
+          break;
         case 'weaponExploded':
-          this.playAt(event.weaponId === 'irrlicht' ? 'electric-boom' : 'explosion-small', MIX.explosion, event.position, player);
+          if (event.weaponId === 'irrlicht') this.playAt('electric-boom', MIX.explosion, event.position, player);
+          else this.boom('blast-frag', 'explosion-small', 0.5, 0.8, BLAST_ROLLOFF.grenade, event.position, player, 1.1);
           break;
         case 'weaponChained': this.playClip('electric-hit', MIX.electric); break;
-        case 'grenadeExploded': this.playAt('explosion-small', MIX.explosion, event.position, player); break;
+        case 'grenadeExploded': this.boom('blast-frag', 'explosion-small', 0.5, 1, BLAST_ROLLOFF.grenade, event.position, player); break;
+        case 'mineExploded': this.boom('blast-mine', 'explosion-small', 0.45, 1.05, BLAST_ROLLOFF.mine, event.position, player); break;
+        case 'minePlaced':
+          this.playAt('mechanical-button', MIX.mine, event.position, player, 0.8);
+          this.playAt('mechanical-click', MIX.mine * 0.8, event.position, player, 0.7);
+          break;
+        case 'mineArmed': this.playAt('mechanical-click', MIX.mine * 0.6, event.position, player, 1.5, 0.4); break;
+        case 'mineTriggered': this.playAt('mine-pop', MIX.explosion * 0.9, event.position, player, 1, 0.16); break;
+        case 'hazardHit':
+          this.playAt(event.kind === 'barrel' ? 'barrel-ping' : 'metal-clang', MIX.ping, event.position, player,
+            0.92 + ((world.tick * 7) % 5) * 0.04, 0.14);
+          break;
+        case 'hazardIgnited': this.playAt('flame-ignite', MIX.explosion * 0.7, event.position, player, 1, 0.14); break;
+        case 'hazardExploded':
+          if (event.kind === 'barrel') this.boom('blast-barrel', 'explosion-large', 0.4, 0.95, BLAST_ROLLOFF.barrel, event.position, player);
+          else this.boom('blast-vehicle', 'explosion-large', 0.55, 0.8, BLAST_ROLLOFF.vehicle, event.position, player);
+          break;
+        case 'equipmentPurchased': this.playClip('pickup', MIX.pickup); this.playClip('mechanical-click', MIX.reloadDone, 0, 0.8); break;
+        case 'equipmentFull': this.playClip('buy-denied', MIX.reject); break;
         // Boards break where the zombie tearing them stands, so a far window is faint and panned.
         case 'barrierBoardRemoved': this.playAt(event.boards === 0 ? variant('wood-impact', 2, world.tick) : variant('wood-crack', 4, world.tick + event.boards),
           MIX.boardBreak, world.entities[event.zombieId]?.position, player); break;

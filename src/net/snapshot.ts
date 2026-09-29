@@ -1,4 +1,5 @@
 import { boardMask } from '../core/barrier.ts';
+import { HAZARD_PHASES } from '../core/hazard.ts';
 import type { GrenadePool } from '../core/grenade.ts';
 import type { MysteryBoxState } from '../core/mysteryBox.ts';
 import type { PowerupState } from '../core/powerups.ts';
@@ -29,6 +30,8 @@ export interface WorldSnapshot {
   boxes: BoxMotion[];
   /** Active ticks, cooldown ticks, owner. */
   traps: Array<[number, number, EntityId | null]>;
+  /** Health, phase (an index into HAZARD_PHASES), burn ticks, last attacker. */
+  hazards: Array<[number, number, number, EntityId | null]>;
   power: boolean;
   powerups: PowerupState;
   grenades: GrenadePool;
@@ -54,6 +57,7 @@ export function captureSnapshot(simulation: GameSimulation): WorldSnapshot {
       ownerId: box.ownerId, rolls: box.rolls, locationIndex: box.locationIndex, usesHere: box.usesHere, moves: box.moves,
       teddy: box.teddy })),
     traps: state.traps.map(trap => [trap.activeTicks, trap.cooldownTicks, trap.ownerId]),
+    hazards: state.hazards.map(hazard => [hazard.health, HAZARD_PHASES.indexOf(hazard.phase), hazard.burnTicks, hazard.attackerId]),
     power: state.power.on,
     powerups: state.powerups,
     grenades: state.grenades,
@@ -84,6 +88,10 @@ export function applySnapshot(simulation: GameSimulation, snapshot: WorldSnapsho
   snapshot.boxes.forEach((motion, index) => { if (state.mysteryBoxes[index]) Object.assign(state.mysteryBoxes[index], motion); });
   snapshot.traps.forEach(([activeTicks, cooldownTicks, ownerId], index) => {
     if (state.traps[index]) Object.assign(state.traps[index], { activeTicks, cooldownTicks, ownerId });
+  });
+  snapshot.hazards.forEach(([health, phase, burnTicks, attackerId], index) => {
+    const hazard = state.hazards[index];
+    if (hazard) Object.assign(hazard, { health, phase: HAZARD_PHASES[phase] ?? 'intact', burnTicks, attackerId });
   });
   state.power.on = snapshot.power;
   state.powerups = snapshot.powerups;

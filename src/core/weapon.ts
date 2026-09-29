@@ -4,6 +4,10 @@ import type { EntityId, PlayerState, Vec3, WeaponState, ZombieState } from './ty
 import { SeededRng } from './rng.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
 import { PLAYER_MOVEMENT } from './player.ts';
+import { blastPlayers, blastZombies, chestOf } from './blast.ts';
+import { blastHazards, damageHazard, type HazardEvent, type HazardTarget } from './hazard.ts';
+import { clearLine, rayAabbDistance } from './ray.ts';
+export { rayAabbDistance } from './ray.ts';
 
 export interface WeaponDefinition {
   id: string;
@@ -228,6 +232,7 @@ export interface HitscanRay {
 export type HitscanTarget =
   | { kind: 'world'; distance: number }
   | { kind: 'zombie'; distance: number; zombieId: EntityId; hitZone: HitZoneId }
+  | { kind: 'hazard'; distance: number; hazardId: string }
   | { kind: 'none'; distance: number };
 
 export type WeaponEvent =
@@ -242,7 +247,8 @@ export type WeaponEvent =
   | { type: 'weaponExploded'; playerId: EntityId; weaponId: string; position: Vec3; radius: number }
   | { type: 'weaponChained'; playerId: EntityId; weaponId: string; points: Vec3[] }
   | { type: 'zombieDamaged'; zombieId: EntityId; playerId: EntityId; damage: number; health: number }
-  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: HitZoneId | 'melee' };
+  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: HitZoneId | 'melee' }
+  | HazardEvent;
 
 function normalize(direction: Vec3): Vec3 {
   const length = Math.hypot(direction.x, direction.y, direction.z);
@@ -273,30 +279,6 @@ export function spreadHitscanRay(ray: HitscanRay, radians: number, seed: number)
   }) };
 }
 
-export function rayAabbDistance(
-  ray: HitscanRay,
-  min: Vec3,
-  max: Vec3,
-  maxDistance: number,
-): number | null {
-  let tMin = 0;
-  let tMax = maxDistance;
-  for (const axis of ['x', 'y', 'z'] as const) {
-    const origin = ray.origin[axis];
-    const direction = ray.direction[axis];
-    if (Math.abs(direction) < 1e-12) {
-      if (origin < min[axis] || origin > max[axis]) return null;
-      continue;
-    }
-    let near = (min[axis] - origin) / direction;
-    let far = (max[axis] - origin) / direction;
-    if (near > far) [near, far] = [far, near];
-    tMin = Math.max(tMin, near);
-    tMax = Math.min(tMax, far);
-    if (tMin > tMax) return null;
-  }
-  return tMin <= maxDistance ? tMin : null;
-}
 function nearestWorldDistance(
   ray: HitscanRay,
   boxes: readonly CollisionBox[],
@@ -322,13 +304,24 @@ function zombieHitDistance(ray: HitscanRay, zombie: ZombieState, maxDistance: nu
   );
 }
 
+/**
+ * What a shot meets first. Hazards (barrels, cars) stop a shot as zombies do, and are hit by it; they are
+ * not among `worldBoxes`, which are the walls.
+ */
 export function resolveHitscan(
   ray: HitscanRay,
   zombies: readonly ZombieState[],
   worldBoxes: readonly CollisionBox[],
   range: number,
+  hazards: readonly HazardTarget[] = [],
 ): HitscanTarget {
   const worldDistance = nearestWorldDistance(ray, worldBoxes, range);
+  let bestHazard: { hazardId: string; distance: number } | null = null;
+  for (const hazard of hazards) {
+    const distance = rayAabbDistance(ray, hazard.box.min, hazard.box.max, range);
+    if (distance === null || (worldDistance !== null && distance >= worldDistance)) continue;
+    if (!bestHazard || distance < bestHazard.distance) bestHazard = { hazardId: hazard.state.id, distance };
+  }
   let bestZombie: { zombieId: EntityId; distance: number } | null = null;
   for (const zombie of zombies) {
     if (!zombie.alive) continue;
@@ -338,6 +331,7 @@ export function resolveHitscan(
       bestZombie = { zombieId: zombie.id, distance };
     }
   }
+  if (bestHazard && (!bestZombie || bestHazard.distance < bestZombie.distance)) return { kind: 'hazard', ...bestHazard };
   if (bestZombie) {
     const zombie = zombies.find(zombie => zombie.id === bestZombie!.zombieId)!;
     const height = 1.72 * (zombie.entry?.phase === 'vaulting' ? 0.85 : 1);
@@ -413,16 +407,7 @@ export function wantsToFire(player: PlayerState, pressed: boolean, held: boolean
   return definition.trigger === 'semi' ? pressed : held || pressed;
 }
 
-function chest(position: Vec3): Vec3 {
-  return { x: position.x, y: position.y + 0.9, z: position.z };
-}
-
-function clearLine(from: Vec3, to: Vec3, boxes: readonly CollisionBox[]): boolean {
-  const distance = Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
-  if (distance < 0.001) return true;
-  const direction = { x: (to.x - from.x) / distance, y: (to.y - from.y) / distance, z: (to.z - from.z) / distance };
-  return boxes.every(box => rayAabbDistance({ origin: from, direction }, box.min, box.max, distance - 0.01) === null);
-}
+const chest = chestOf;
 
 function damageZombie(events: Array<WeaponEvent | DamageEvent>, player: PlayerState, weaponId: string,
   zombie: ZombieState, damage: number, distance: number, instaKill: boolean): void {
@@ -437,23 +422,23 @@ function damageZombie(events: Array<WeaponEvent | DamageEvent>, player: PlayerSt
   }
 }
 
-/** Splash around an impact (a directly struck zombie takes it too); walls block it, and it hurts a close shooter. */
+/**
+ * Splash around an impact (a directly struck zombie takes it too); walls block it, it hurts a close shooter,
+ * and it sets off hazards in reach. The reach and falloff are the shared blast rules (see blast.ts).
+ */
 function explodeAt(events: Array<WeaponEvent | DamageEvent>, player: PlayerState, definition: WeaponDefinition,
-  impact: Vec3, zombies: readonly ZombieState[], boxes: readonly CollisionBox[], instaKill: boolean): void {
+  impact: Vec3, zombies: readonly ZombieState[], boxes: readonly CollisionBox[], instaKill: boolean,
+  hazards: readonly HazardTarget[]): void {
   const blast = definition.explosive!;
   events.push({ type: 'weaponExploded', playerId: player.id, weaponId: definition.id, position: { ...impact }, radius: blast.radius });
-  for (const zombie of zombies) {
-    if (!zombie.alive) continue;
-    const target = chest(zombie.position);
-    const distance = Math.hypot(target.x - impact.x, target.y - impact.y, target.z - impact.z);
-    if (distance >= blast.radius || !clearLine(impact, target, boxes)) continue;
-    damageZombie(events, player, definition.id, zombie, blast.damage * (1 - distance / blast.radius), distance, instaKill);
+  for (const { target: zombie, distance, scale } of blastZombies(impact, blast.radius, zombies, boxes)) {
+    damageZombie(events, player, definition.id, zombie, blast.damage * scale, distance, instaKill);
   }
-  const self = chest(player.position);
-  const selfDistance = Math.hypot(self.x - impact.x, self.y - impact.y, self.z - impact.z);
-  if (selfDistance < blast.radius && clearLine(impact, self, boxes)) {
-    events.push(...damagePlayer(player, Math.round(blast.selfDamage * (1 - selfDistance / blast.radius))));
+  for (const { scale } of blastPlayers(impact, blast.radius, [player], boxes)) {
+    events.push(...damagePlayer(player, Math.round(blast.selfDamage * scale)));
   }
+  events.push(...blastHazards(impact, { radius: blast.radius, damage: blast.damage, playerDamage: blast.selfDamage }, player.id,
+    hazards, boxes));
 }
 
 /** Jumps from zombie to nearest zombie in line of sight, weakening each time. */
@@ -485,6 +470,7 @@ export function firePlayerWeapon(
   worldBoxes: readonly CollisionBox[],
   instaKill = false,
   spreadSeed = 0,
+  hazards: readonly HazardTarget[] = [],
 ): Array<WeaponEvent | DamageEvent> {
   const definition = WEAPON_DEFINITIONS[player.weapon.weaponId];
   if (!definition || player.weapon.cooldownTicks > 0 || !player.alive) return [];
@@ -499,12 +485,19 @@ export function firePlayerWeapon(
   player.spreadBloom = Math.min(SPREAD_RULES.maxBloom, player.spreadBloom + SPREAD_RULES.bloomPerShot);
   // Pellets resolve against the pre-shot state, then each zombie takes one combined hit.
   const hits = new Map<EntityId, { damage: number; distance: number; hitZone: HitZoneId }>();
+  const hazardHits = new Map<string, { damage: number; point: Vec3 }>();
   let first: { ray: HitscanRay; hit: HitscanTarget } | null = null;
   for (let pellet = 0; pellet < (definition.pellets ?? 1); pellet += 1) {
     const pelletSeed = pellet === 0 ? seed : seed ^ Math.imul(pellet, 0x85ebca6b);
     const pelletRay = spreadHitscanRay(ray, spread, pelletSeed);
-    const hit = resolveHitscan(pelletRay, zombies, worldBoxes, definition.range);
+    const hit = resolveHitscan(pelletRay, zombies, worldBoxes, definition.range, hazards);
     first ??= { ray: pelletRay, hit };
+    if (hit.kind === 'hazard') {
+      const { origin, direction } = pelletRay, total = hazardHits.get(hit.hazardId)
+        ?? { damage: 0, point: { x: origin.x + direction.x * hit.distance, y: origin.y + direction.y * hit.distance,
+          z: origin.z + direction.z * hit.distance } };
+      total.damage += definition.damage; hazardHits.set(hit.hazardId, total);
+    }
     if (hit.kind !== 'zombie') continue;
     const total = hits.get(hit.zombieId) ?? { damage: 0, distance: hit.distance, hitZone: hit.hitZone };
     total.damage += definition.damage * hitZoneMultiplier(definition, hit.hitZone);
@@ -528,6 +521,12 @@ export function firePlayerWeapon(
       events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: hit.hitZone });
     }
   }
+  for (const [hazardId, hit] of hazardHits) {
+    const target = hazards.find(candidate => candidate.state.id === hazardId);
+    if (!target) continue;
+    events.push({ type: 'hazardHit', hazardId, kind: target.definition.kind, playerId: player.id, damage: hit.damage, position: hit.point },
+      ...damageHazard(target, hit.damage, player.id));
+  }
   if (first && definition.chain && first.hit.kind === 'zombie') {
     const struck = zombies.find(zombie => zombie.id === (first!.hit as { zombieId: EntityId }).zombieId)!;
     chainFrom(events, player, definition, first.ray.origin, struck, zombies, worldBoxes, instaKill);
@@ -536,7 +535,7 @@ export function firePlayerWeapon(
     // Burst just in front of the surface or zombie that stopped the shot.
     const distance = Math.max(0, first.hit.distance - 0.05), { origin, direction } = first.ray;
     const impact = { x: origin.x + direction.x * distance, y: origin.y + direction.y * distance, z: origin.z + direction.z * distance };
-    explodeAt(events, player, definition, impact, zombies, worldBoxes, instaKill);
+    explodeAt(events, player, definition, impact, zombies, worldBoxes, instaKill, hazards);
   }
   return events;
 }

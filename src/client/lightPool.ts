@@ -20,6 +20,8 @@ const HYSTERESIS = 3;
  */
 export class LightSource extends THREE.Object3D {
   readonly color: THREE.Color;
+  /** Metres of rank added over the map's lamps, so a brief flash (an explosion) is never left out for want of a slot. */
+  priority = 0;
   constructor(color: THREE.ColorRepresentation, public intensity = 1, public distance = 0, public decay = 2) {
     super();
     this.color = new THREE.Color(color);
@@ -67,6 +69,7 @@ export class LightPool {
       let score = Math.max(0, this.position.distanceTo(this.eye) - reach);
       if (!this.frustum.intersectsSphere(this.sphere.set(this.position, reach))) score += OFFSCREEN_PENALTY;
       if (this.slots.some(slot => slot.source === source)) score -= HYSTERESIS;
+      score -= source.priority;
       ranked.push({ source, score });
     }
     ranked.sort((a, b) => a.score - b.score);

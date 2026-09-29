@@ -70,7 +70,7 @@ the zooms are tuned by eye, not taken from a game's data). ADS also reduces weap
 variation is seeded in the game core for repeatable results. The handling is
 prototype tuning, not a frame-exact recreation.
 Reload early with R (or automatically when the magazine empties), knife with V,
-throw a grenade with T or middle mouse, switch weapons
+throw a grenade with T or middle mouse, set a Bouncing Betty with G, switch weapons
 with Q or the mouse wheel, interact with E, and restart after game over with Enter.
 A killing blow puts you into last stand with a pistol: a teammate can revive you by holding E beside
 you, you bleed out after 30 seconds, and solo play ends there unless you drank Quick Revive
@@ -176,9 +176,41 @@ who is not down. It only drops once five barriers have lost every board (or all 
 map with fewer), so a kind that cannot drop yet is passed over in the deck. The wonder weapons
 are as likely as any other gun in the box for now, and each solo game starts from a fresh random
 seed, so the box and drops differ between games (dev builds can pin one with `?seed=<n>`).
-Players start with two frag grenades and gain two more each new round, carrying at most four.
-Grenades follow a fixed-tick arc, bounce off solid geometry and explode after two
-seconds. Walls block blast damage; standing too close to your own grenade hurts.
+### Explosives
+
+Everything that goes bang shares one set of blast rules (`src/core/blast.ts`): full damage at the
+centre, falling in a straight line to nothing at the radius, blocked by walls, credited (and paid) to
+whoever set it off. Insta-Kill and Double Points apply to every kind.
+
+- **Frag grenades:** two to start, two more each new round, at most four. A grenade follows a fixed-tick
+  arc, bounces off solid geometry (and rings off it) and explodes after two seconds. Only its thrower
+  is hurt by it. It is a hand-built Mk 2 "pineapple" that tumbles as it flies, settles on its side
+  when it stops, trails sparks from its fuse and glows at the neck as the fuse runs out. In the hand
+  it is shown with its pin and lever, and the gun dips out of the way for the throw.
+- **Bouncing Betties:** sold two at a time (1000 points, 500 to top up a used pair) from a shelf on the
+  wall: in the hallway in Asylum and in the start room in Bunker. G sets one on the floor just in front
+  of you (at your feet if a wall is in the way). It blinks amber while it arms (1.25 s), then glows
+  red. When a zombie comes within 1.7 m it springs to chest height and goes off a third of a second
+  later, killing whatever is close. Players never set one off, but its blast hurts its owner. At most
+  eight per player are out at once, and they last until they go off.
+- **Barrels and vehicles:** `src/core/hazard.ts` defines them as data (a kind, a position and a yaw), so
+  a map only places `{ id, kind, position, yaw }`. Explosive barrels, a jeep and a truck are in the
+  game. They are solid while they stand, take bullets (a barrel about three pistol shots), a blast or
+  a grenade, and burn when their health runs out: a barrel goes off almost at once, a vehicle after
+  three or four seconds of burning. They go off exactly once, hurt every player and zombie near them
+  (and each other, so a row of barrels goes up in turn), and pay the last player who hurt them for
+  what they kill. A barrel leaves a scorched husk and no collision; a vehicle leaves a blackened shell
+  that stays solid and keeps stopping bullets. Scenery vehicles that should not explode stay ordinary
+  props.
+- **Look and sound:** the explosion is drawn by `src/client/blastEffects.ts`: a white flash, a fireball,
+  a column of flame for fuel, smoke that cools from warm to black, sparks, debris that lands on the
+  floor, a shockwave ring, a scorch mark that fades over a minute, a burst of light from the shared
+  light pool and a shake of the camera that grows with how near the blast is. Barrels and cars smoke
+  as they are shot up and burn before they go. The grenade and the Betty are built in code, so are
+  their sounds: `src/client/explosionSynth.ts` renders the explosions (a sub-bass thump, the crack of the
+  blast front, a roaring body, a low tail and falling debris, through a small reverb), the grenade's
+  ping and bounce, the Betty's launch, a barrel's ring and a car's clang, and the crackle of a fire. The
+  recorded bangs are laid under them. Nothing here needs downloaded assets or a licence.
 
 The default zombies now use Peter_D's skinned soldier model with idle, walk, run,
 attack and death clips. Barrier tearing uses the attack clip; vaulting reuses a

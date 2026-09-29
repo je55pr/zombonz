@@ -97,7 +97,8 @@ A snapshot (`src/net/snapshot.ts`) carries only what changes during play:
 - barriers' boards (which slots are up, and which one last fell) and timers
 - the box's motion
 - traps' timers
-- power, power-ups, grenades and departed players
+- power, power-ups, grenades, Bouncing Betties and departed players
+- each barrel's and vehicle's health and burn state (health, phase, burn ticks, who last hurt it)
 
 Interactables are then re-derived with `GameSimulation.refreshInteractables`. A four-player Asylum
 round with 24 zombies encodes to under 16 KB.
@@ -115,7 +116,7 @@ round with 24 zombies encodes to under 16 KB.
   client's own, so the camera never swings.
 - **Correction:** any positional difference is kept as an offset on the camera and decays by 12 per
   second (about 90% gone in 0.2 s). A difference of more than 2 m snaps immediately instead.
-- **Everything else:** remote players, zombies, power-ups and grenades are drawn
+- **Everything else:** remote players, zombies, power-ups, grenades and mines are drawn
   `INTERPOLATION_DELAY_TICKS` (6 ticks, 100 ms) behind the newest snapshot. They are interpolated
   between the snapshots on either side of that time.
   - The drawing clock drifts by at most 10% to follow the snapshot stream, and jumps if it falls

@@ -18,8 +18,12 @@ import {
 import { PLAYER_HEALTH, livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
 import { DOWN_RULES, armDowned, bleedOut, reviveTarget, tickDowns, type DownEvent } from './downs.ts';
 import { createInputFrame, type InputFrame } from './input.ts';
-import { GRENADE_RULES, createGrenadePool, tickGrenades, throwGrenade,
+import { GRENADE_RULES, createGrenadePool, placeMine, tickGrenades, tickMines, throwGrenade,
   type GrenadeEvent, type GrenadePool } from './grenade.ts';
+import { createHazard, hazardSolids, hazardTargets, hazardWrecks, tickHazards,
+  type HazardDefinition, type HazardEvent, type HazardState } from './hazard.ts';
+import { createEquipmentInteractable, createEquipmentState, handleEquipmentInteraction,
+  type EquipmentBuyDefinition, type EquipmentBuyState, type EquipmentEvent } from './equipment.ts';
 import { collectPowerups, createPowerupState, startPowerupRound, tickPowerupLifetime, tryDropPowerup, updatePowerupThreshold,
   DEFAULT_POWERUP_CONFIG, type PowerupConfig, type PowerupEvent, type PowerupState } from './powerups.ts';
 import {
@@ -65,6 +69,10 @@ export interface SimulationMap {
   powerSwitch?: PowerSwitchDefinition;
   perkMachines?: readonly PerkMachineDefinition[];
   traps?: readonly TrapDefinition[];
+  /** Barrels and vehicles that explode when shot; their bodies collide until they go off. */
+  hazards?: readonly HazardDefinition[];
+  /** Equipment (Bouncing Betties) sold from the wall. */
+  equipment?: readonly EquipmentBuyDefinition[];
 }
 
 export interface SimulationState {
@@ -81,6 +89,9 @@ export interface SimulationState {
   power: { on: boolean };
   perkMachines: PerkMachineState[];
   traps: TrapState[];
+  /** One per map hazard, in the map's order. */
+  hazards: HazardState[];
+  equipment: EquipmentBuyState[];
   /** Players who left a co-op match: out for good, even across restarts. */
   leftPlayers: EntityId[];
 }
@@ -103,7 +114,7 @@ export function nextMatchSeed(seed: number): number {
 }
 
 export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
-  | PowerEvent | PerkEvent | TrapEvent | DownEvent;
+  | PowerEvent | PerkEvent | TrapEvent | DownEvent | HazardEvent | EquipmentEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
 export interface GameSimulationOptions {
@@ -187,6 +198,12 @@ export class GameSimulation {
       const trap = createTrap(definition, allocateEntityId(world));
       traps.push(trap.state); addEntity(world, trap.interactable);
     }
+    const equipment: EquipmentBuyState[] = [];
+    for (const definition of this.map.equipment ?? []) {
+      const interactableId = allocateEntityId(world);
+      addEntity(world, createEquipmentInteractable(interactableId, definition));
+      equipment.push(createEquipmentState(definition, interactableId));
+    }
     const power = { on: !this.map.powerSwitch };
     const interactables = Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable');
@@ -194,7 +211,8 @@ export class GameSimulation {
     syncTrapInteractables(traps, interactables, power.on);
     return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
       powerups: createPowerupState(this.playerIds.length * this.economyConfig.startingPoints, this.powerupConfig),
-      grenades: createGrenadePool(), power, perkMachines, traps, leftPlayers: [] };
+      grenades: createGrenadePool(), power, perkMachines, traps, hazards: (this.map.hazards ?? []).map(createHazard),
+      equipment, leftPlayers: [] };
   }
 
   restart(seed = nextMatchSeed(this.state.world.seed)): MatchRestartedEvent {
@@ -237,11 +255,28 @@ export class GameSimulation {
     return entity?.kind === 'player' ? entity : null;
   }
 
-  collisionBoxes(): CollisionBox[] {
+  /** The map's own walls, closed doors and the box: what hazards are placed against. */
+  private wallBoxes(): CollisionBox[] {
     const boxes = this.state.mysteryBoxes.filter(box => box.locations.length && box.phase !== 'away')
       .map(box => mysteryBoxBlocker(box.locations[box.locationIndex]));
     return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors), ...boxes];
   }
+
+  /** Everything solid to walk into: the walls, and every hazard that has not vanished. */
+  collisionBoxes(): CollisionBox[] {
+    return [...this.wallBoxes(), ...hazardSolids(this.map.hazards ?? [], this.state.hazards)];
+  }
+
+  /**
+   * What stops a shot or a blast: the walls, upper floors and the burnt-out shells of vehicles. Whole hazards
+   * are not among them (a shot hits one and a blast reaches it; see hazardTargets).
+   */
+  private shotBlockers(): CollisionBox[] {
+    return [...this.wallBoxes(), ...hazardWrecks(this.map.hazards ?? [], this.state.hazards), ...(this.map.shotBlockers ?? [])];
+  }
+
+  /** The hazards that can be shot or hurt right now. */
+  hazardTargets() { return hazardTargets(this.map.hazards ?? [], this.state.hazards); }
 
   /** Every player entity, dead or alive. */
   players(): PlayerState[] {
@@ -275,7 +310,8 @@ export class GameSimulation {
   private navigationQuery(): NavigationQuery {
     // Opening doors and the box moving both change what blocks the way.
     const doors = [...this.state.doors.map(door => `${door.id}:${door.open}`),
-      ...this.state.mysteryBoxes.map(box => `${box.id}:${box.phase === 'away' ? -1 : box.locationIndex}`)].join('|');
+      ...this.state.mysteryBoxes.map(box => `${box.id}:${box.phase === 'away' ? -1 : box.locationIndex}`),
+      ...this.state.hazards.map(hazard => `${hazard.id}:${hazard.phase === 'exploded'}`)].join('|');
     if (this.navigationCache?.doors !== doors) {
       this.navigationCache = { doors, query: createNavigationQuery(this.map.navigationGraph,
         this.collisionBoxes(), 0.32, this.map.walkSurfaces) };
@@ -354,6 +390,7 @@ export class GameSimulation {
       if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
       if (frame.actions.throwGrenade?.pressed) events.push(...throwGrenade(this.state.grenades, player));
+      if (frame.actions.placeMine?.pressed) events.push(...placeMine(this.state.grenades, player, this.shotBlockers(), this.map.walkSurfaces));
       // Holding use beside a downed teammate revives them, ahead of anything else in reach.
       const downedTeammate = frame.actions.interact?.held ? reviveTarget(player, this.players()) : null;
       if (downedTeammate) {
@@ -379,6 +416,7 @@ export class GameSimulation {
           events.push(...activatePower(player, interaction, this.state.power, this.state.doors, this.interactables()));
           events.push(...buyPerk(player, interaction, this.state.perkMachines, this.state.power.on));
           events.push(...activateTrap(player, interaction, this.state.traps, this.state.power.on));
+          events.push(...handleEquipmentInteraction(player, interaction, this.state.equipment));
         }
       }
     }
@@ -386,7 +424,7 @@ export class GameSimulation {
     for (const player of livingPlayers(world)) {
       const frame = playerFrames.get(player.id)!;
       if (frame.actions.melee?.pressed && !player.downed) {
-        const meleeEvents = meleeAttack(player, this.zombies(), [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
+        const meleeEvents = meleeAttack(player, this.zombies(), this.shotBlockers(),
           this.state.powerups.instaKillTicksRemaining > 0);
         events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig,
           this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
@@ -395,24 +433,33 @@ export class GameSimulation {
       if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
       const weaponEvents = firePlayerWeapon(
         player, rayFromPlayer(player, player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight), this.zombies(),
-        [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])],
+        this.shotBlockers(),
         this.state.powerups.instaKillTicksRemaining > 0,
         world.seed ^ world.tick,
+        this.hazardTargets(),
       );
       events.push(...weaponEvents);
       events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig,
         this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
     }
 
-    if (this.state.grenades.active.length) {
-      const grenadeEvents = tickGrenades(this.state.grenades, this.zombies(), livingPlayers(world),
-        [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])], this.map.walkSurfaces, deltaSeconds,
-        this.state.powerups.instaKillTicksRemaining > 0);
-      events.push(...grenadeEvents);
-      const grenadeCombat = grenadeEvents.filter((event): event is WeaponEvent =>
+    // Everything that goes bang this tick: grenades, Bouncing Betties, then burning barrels and vehicles.
+    const instaKill = this.state.powerups.instaKillTicksRemaining > 0;
+    const blastEvents: SimulationEvent[] = [];
+    const burning = this.state.hazards.some(hazard => hazard.phase === 'burning');
+    if (this.state.grenades.active.length || this.state.grenades.mines.length || burning) {
+      const walls = this.shotBlockers(), targets = this.hazardTargets();
+      if (this.state.grenades.active.length) blastEvents.push(...tickGrenades(this.state.grenades, this.zombies(), livingPlayers(world),
+        walls, this.map.walkSurfaces, deltaSeconds, instaKill, targets));
+      if (this.state.grenades.mines.length) blastEvents.push(...tickMines(this.state.grenades, this.zombies(), livingPlayers(world),
+        walls, instaKill, targets));
+      if (burning) blastEvents.push(...tickHazards(this.map.hazards ?? [], this.state.hazards,
+        { zombies: this.zombies(), players: livingPlayers(world), boxes: walls, instaKill }));
+      events.push(...blastEvents);
+      const blastCombat = blastEvents.filter((event): event is WeaponEvent =>
         event.type === 'grenadeHit' || event.type === 'zombieDamaged' || event.type === 'zombieDied');
-      if (grenadeCombat.length) for (const player of livingPlayers(world)) events.push(...awardCombatPoints(player,
-        grenadeCombat, this.economyConfig, this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
+      if (blastCombat.length) for (const player of livingPlayers(world)) events.push(...awardCombatPoints(player,
+        blastCombat, this.economyConfig, this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
     }
 
     updatePowerupThreshold(this.state.powerups, this.playerIds.map(id => this.getPlayer(id)!), this.powerupConfig);

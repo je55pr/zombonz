@@ -9,7 +9,7 @@ export function simulationMap(map: GameMap): SimulationMap {
     collisionBoxes: [...map.collisionBoxes], shotBlockers: map.shotBlockers, walkSurfaces: map.walkSurfaces,
     zombieSpawns: map.zombieSpawns, barriers: map.barriers, navigationGraph: map.navigation, doors: map.doors,
     wallWeapons: map.wallWeapons, mysteryBoxes: map.mysteryBoxes, powerSwitch: map.powerSwitch,
-    perkMachines: map.perkMachines, traps: map.traps,
+    perkMachines: map.perkMachines, traps: map.traps, hazards: map.hazards, equipment: map.equipment,
   };
 }
 

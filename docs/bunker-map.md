@@ -56,8 +56,10 @@ small debris placements are outside this geometry pass.
 
 Outside, in the fog, is a barbed-wire perimeter on timber posts with a gateway to the
 south, a watchtower, a timber hut, a half-buried concrete pillbox, a ruined brick wall,
-a sandbagged machine-gun nest, sandbags and tank traps across the south field, a jeep
-and a burnt-out light tank. The treeline stands outside the wire.
+a sandbagged machine-gun nest, sandbags and tank traps across the south field, a jeep that explodes when
+shot and a burnt-out light tank. The treeline stands outside the wire. Fuel barrels (in the start room
+and out in the yard) explode when shot too, and a shelf on the start room's north wall sells Bouncing
+Betties for 1000 points (`BUNKER_HAZARDS`, `BUNKER_EQUIPMENT`).
 
 ## Shared geometry and gameplay
 
