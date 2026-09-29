@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { readAssetGeometry } from '../scripts/inspect-assets.mjs';
 import { adsZoom, viewmodelFov } from '../src/client/aim.ts';
-import { WEAPON_SIGHTS, adsPose } from '../src/client/weaponSights.ts';
-import { prepareWeapon, VIEWMODEL_LENGTHS, WeaponView, type PreparedWeapon } from '../src/client/weaponView.ts';
+import { MAX_EYE_RELIEF, MIN_EYE_RELIEF, SIGHT_PERCENT, WEAPON_SIGHTS, adsPose } from '../src/client/weaponSights.ts';
+import { gunForModel, prepareWeapon, VIEWMODEL_LENGTHS, WeaponView, type PreparedWeapon } from '../src/client/weaponView.ts';
 import { createPlayerState } from '../src/core/index.ts';
 
 const ids = Object.keys(VIEWMODEL_LENGTHS);
@@ -92,32 +92,42 @@ describe('iron sight alignment', () => {
     expect(Math.abs(new THREE.Vector3(1, 0, 0).applyQuaternion(weapon.ads.quaternion).y)).toBeLessThan(1e-6);
   });
 
-  it.each(ids)('%s: the eye is 13 to 90 cm behind the rear sight', async id => {
+  it.each(ids)('%s: the eye is 13 to 150 cm behind the rear sight', async id => {
     const { relief } = (await prepared(id)).sights;
-    expect(relief).toBeGreaterThanOrEqual(0.13 - 1e-9);
-    expect(relief).toBeLessThanOrEqual(0.9 + 1e-9);
+    expect(relief).toBeGreaterThanOrEqual(MIN_EYE_RELIEF - 1e-9);
+    expect(relief).toBeLessThanOrEqual(MAX_EYE_RELIEF + 1e-9);
   });
 
-  // Black Ops screenshots (1280 wide) of the same room, aimed: the Kar98k's front sight hood is about 3.1% of the window's
-  // width and the pistol's rear sight about 2.4%. The hood is about 16 mm across in this model and the pistol's rear sight
-  // 20 mm (measured off the models), so those widths must look that big.
-  function percentOfWindow(weapon: PreparedWeapon, id: string, point: THREE.Vector3, width: number, aspect: number) {
+  // A sight of width w at depth d across a window spans w / d / (2 tan(half horizontal angle)) of its width.
+  function percentOfWindow(weapon: PreparedWeapon, gunId: string, point: THREE.Vector3, width: number, aspect: number) {
     const { toView } = aimed(weapon);
     const depth = -toView(point).z;
-    const halfHorizontal = Math.tan(viewmodelFov(1, adsZoom(id), aspect) * Math.PI / 360) * aspect;
+    const halfHorizontal = Math.tan(viewmodelFov(1, adsZoom(gunId), aspect) * Math.PI / 360) * aspect;
     return 100 * (width / depth) / (2 * halfHorizontal);
   }
 
-  it.each([1, 4 / 3, 16 / 9, 21 / 9, 32 / 9])('kar98k: the front sight hood is about as wide as in Black Ops (3.1%%) at %s', async aspect => {
-    const weapon = await prepared('kar98k');
-    expect(percentOfWindow(weapon, 'kar98k', weapon.sights.front, 0.016, aspect)).toBeGreaterThan(2.8);
-    expect(percentOfWindow(weapon, 'kar98k', weapon.sights.front, 0.016, aspect)).toBeLessThan(3.4);
+  // Black Ops screenshots (1280 wide, same room, aimed) put the Kar98k's front ring at about 3.1% of the window's width.
+  // Every other gun is sized to 2.8%, unless its eye relief runs into a limit.
+  it.each(ids)('%s: the sight it is sized by is 2.8%% of the window width aimed (3.1%% for the Kar98k) at every window shape', async id => {
+    const weapon = await prepared(id);
+    const { size, relief } = weapon.sights;
+    const point = size.at === 'front' ? weapon.sights.front : weapon.sights.rear;
+    const target = size.percent ?? SIGHT_PERCENT;
+    for (const aspect of [1, 4 / 3, 16 / 9, 21 / 9, 32 / 9]) {
+      const percent = percentOfWindow(weapon, gunForModel(id), point, size.width / 1000, aspect);
+      const label = `${id} ${size.at} ${size.width} mm at ${aspect}: ${percent.toFixed(2)}%`;
+      if (relief <= MIN_EYE_RELIEF + 1e-9) expect(percent, label).toBeLessThanOrEqual(target + 0.05);
+      else if (relief >= MAX_EYE_RELIEF - 1e-9) expect(percent, label).toBeGreaterThanOrEqual(target - 0.05);
+      else expect(Math.abs(percent - target), label).toBeLessThan(0.05);
+      // A gun that cannot reach the target still shows its sight at a usable size.
+      expect(percent, label).toBeGreaterThan(2.4);
+    }
   });
 
-  it.each([1, 4 / 3, 16 / 9, 21 / 9, 32 / 9])("the starting pistol's rear sight is about as wide as in Black Ops (2.4%%) at %s", async aspect => {
-    const weapon = await prepared('m1911');
-    expect(percentOfWindow(weapon, 'starter-pistol', weapon.sights.rear, 0.0205, aspect)).toBeGreaterThan(2.1);
-    expect(percentOfWindow(weapon, 'starter-pistol', weapon.sights.rear, 0.0205, aspect)).toBeLessThan(2.7);
+  it('the Kar98k is 3.1% and the starting pistol 2.8%, as asked', async () => {
+    const kar = await prepared('kar98k'), pistol = await prepared('m1911');
+    expect(percentOfWindow(kar, 'kar98k', kar.sights.front, 0.016, 16 / 9)).toBeCloseTo(3.1, 1);
+    expect(percentOfWindow(pistol, 'starter-pistol', pistol.sights.rear, 0.0206, 16 / 9)).toBeCloseTo(2.8, 1);
   });
 
   it('a longer eye relief moves the aimed gun forward but leaves the hip pose where it was', async () => {
@@ -146,7 +156,7 @@ describe('iron sight alignment', () => {
     expect(previous).toBeLessThan(1e-4);
   });
 
-  it.each([['kar98k', 'kar98k'], ['m1911', 'starter-pistol']])("%s: the weapon camera is drawn with the aim lens, and the pistol's lens does not zoom", async (folder, gunId) => {
+  it.each([['kar98k', 'kar98k'], ['m1911', 'starter-pistol']])("%s: the weapon camera is drawn with the aim lens, narrowed by the gun's own zoom", async (folder, gunId) => {
     const weapon = await prepared(folder);
     const held = viewHolding(weapon, gunId);
     const renderer = { clearDepth: () => {}, render: () => {} } as unknown as THREE.WebGLRenderer;
@@ -162,8 +172,8 @@ describe('iron sight alignment', () => {
       expect(held.camera.fov).toBeCloseTo(viewmodelFov(1, adsZoom(gunId), aspect), 4);
       expect(held.camera.aspect).toBeCloseTo(aspect);
     }
-    // With no zoom the pistol's aimed lens is the plain 65 degree horizontal one.
-    if (gunId === 'starter-pistol') expect(Math.tan(held.camera.fov * Math.PI / 360) * held.camera.aspect).toBeCloseTo(Math.tan(65 * Math.PI / 360), 4);
+    // Aimed, the horizontal half angle is the 65 degree lens divided by the gun's zoom: 1.74 for the Kar98k, 1.3 for the pistol.
+    expect(Math.tan(held.camera.fov * Math.PI / 360) * held.camera.aspect * adsZoom(gunId)).toBeCloseTo(Math.tan(65 * Math.PI / 360), 4);
   });
 
   it('a gun with no listed sights is still aimed, along the top of its model', () => {

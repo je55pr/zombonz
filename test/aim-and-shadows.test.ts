@@ -8,18 +8,18 @@ import { WEAPON_DEFINITIONS } from '../src/core/index.ts';
 describe('aimed field of view', () => {
   const zoomOf = (hip: number, aimed: number) => Math.tan(hip * Math.PI / 360) / Math.tan(aimed * Math.PI / 360);
 
-  it('narrows the view of a shoulder weapon by 1.74 times (measured from Black Ops screenshots) and leaves a sidearm alone', () => {
+  it('narrows the view of a shoulder weapon by 1.74 times (measured from Black Ops screenshots) and of a sidearm by 1.3', () => {
     // Zoom is the ratio of the half-angle tangents.
     expect(zoomOf(67, aimedFov(67, 'kar98k'))).toBeCloseTo(ADS_ZOOM.longGun);
     expect(ADS_ZOOM.longGun).toBeCloseTo(1.74, 2);
-    expect(aimedFov(67, 'starter-pistol')).toBeCloseTo(67);
-    expect(ADS_ZOOM.handgun).toBe(1);
+    expect(zoomOf(67, aimedFov(67, 'starter-pistol'))).toBeCloseTo(ADS_ZOOM.handgun);
+    expect(ADS_ZOOM.handgun).toBe(1.3);
   });
 
-  it('is much tighter than the old fixed 13 degrees off for every shoulder weapon and every field of view setting', () => {
+  it('is tighter than the hip view for every gun and every field of view setting, and much tighter for a shoulder weapon', () => {
     for (const fov of [55, 67, 90]) {
-      for (const id of Object.keys(WEAPON_DEFINITIONS).filter(id => !HANDGUNS.has(id))) {
-        expect(aimedFov(fov, id), `${id} at ${fov}`).toBeLessThan(fov - 13);
+      for (const id of Object.keys(WEAPON_DEFINITIONS)) {
+        expect(aimedFov(fov, id), `${id} at ${fov}`).toBeLessThan(fov - (HANDGUNS.has(id) ? 8 : 13));
         expect(aimedFov(fov, id), `${id} at ${fov}`).toBeGreaterThan(20);
       }
     }
@@ -27,7 +27,7 @@ describe('aimed field of view', () => {
     expect(aimedFov(90, 'kar98k')).toBeGreaterThan(aimedFov(55, 'kar98k'));
   });
 
-  it('gives the sidearms no zoom and every other gun the same', () => {
+  it('gives the sidearms the smaller zoom and every other gun the same', () => {
     for (const id of HANDGUNS) expect(adsZoom(id)).toBe(ADS_ZOOM.handgun);
     for (const id of ['thompson', 'kar98k', 'mp5k', 'spas12']) expect(adsZoom(id)).toBe(ADS_ZOOM.longGun);
   });
