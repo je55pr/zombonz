@@ -93,7 +93,7 @@ Rendering follows the display refresh rate, with interpolated movement and immed
 mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
 1x pixel density and no MSAA. The moon's shadow map (1024px, 2048px on the larger Asylum) holds only the
 building (ceilings, roofs and upper floors block the moon from the rooms beneath them; ground floors do not
-cast): zombies and teammates take its shadows but cast none, so it is redrawn only when a door,
+cast; the shadow camera is fitted to the building's corners in `src/client/shadowFit.ts`, because anything outside it counts as lit): zombies and teammates take its shadows but cast none, so it is redrawn only when a door,
 window board, the box or the power lever moves (at most 15 times a second while one is moving). A map's
 lamps, perk machines, traps and box glow share four real point lights (`src/client/lightPool.ts`), given
 to the nearest of them each frame, because every lit pixel pays for every point light in the scene.
