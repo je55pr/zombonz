@@ -154,7 +154,6 @@ const LAYOUT_HEIGHT = 900;
 const MAX_HUD_WIDTH = 2560;
 const GRENADE_SLOTS = 4;
 const MINE_SLOTS = 2;
-const CONTROLS = 'WASD MOVE  ·  SHIFT SPRINT  ·  RMB AIM  ·  V KNIFE  ·  T GRENADE  ·  R RELOAD  ·  Q / WHEEL SWITCH  ·  M MUTE';
 
 interface TextStyle {
   size: number;
@@ -279,6 +278,46 @@ export class CanvasHud {
     return width;
   }
 
+  /**
+   * The grenades (and, while any are carried, Bouncing Betties) as a row of little icons, gold when held and an outline when
+   * spent, ending at `edge` (the left of the ammunition) with their centres on `y`. It shows state only: no key hints.
+   */
+  private equipment(snapshot: HudSnapshot, edge: number, y: number): void {
+    const c = this.context, pitch = 32;
+    const groups = [{ slots: GRENADE_SLOTS, held: snapshot.grenadeCharges, icon: this.grenadeIcon.bind(this) }];
+    if (snapshot.mineCharges > 0) groups.push({ slots: MINE_SLOTS, held: snapshot.mineCharges, icon: this.mineIcon.bind(this) });
+    // Grenades sit nearest the ammunition, with the mines beyond them; within each, the held ones come first.
+    const gap = 14;
+    let x = edge - groups.reduce((sum, group) => sum + group.slots * pitch + gap, -gap);
+    for (const group of groups.reverse()) {
+      for (let slot = 0; slot < group.slots; slot++, x += pitch) {
+        c.save(); c.translate(x + pitch / 2 - 4, y);
+        c.fillStyle = GOLD; c.strokeStyle = slot < group.held ? GOLD : FAINT; c.lineWidth = 2; c.lineJoin = 'round';
+        group.icon(slot < group.held);
+        c.restore();
+      }
+      x += gap;
+    }
+  }
+
+  /** A little Mk 2 frag grenade: a body, a neck and a lever. Drawn about (0, 0) in the path's fill and stroke colours. */
+  private grenadeIcon(held: boolean): void {
+    const c = this.context;
+    c.beginPath(); c.ellipse(0, 3, 8, 10, 0, 0, Math.PI * 2);
+    if (held) c.fill(); else c.stroke();
+    c.beginPath(); c.rect(-3.5, -12, 7, 5);
+    if (held) c.fill(); else c.stroke();
+    c.beginPath(); c.moveTo(3.5, -10); c.lineTo(10, -8); c.lineTo(10, 1); c.stroke();
+  }
+
+  /** A Bouncing Betty: a canister with three prongs. */
+  private mineIcon(held: boolean): void {
+    const c = this.context;
+    c.beginPath(); c.rect(-8, -1, 16, 11);
+    if (held) c.fill(); else c.stroke();
+    for (const dx of [-5, 0, 5]) { c.beginPath(); c.moveTo(dx, -1); c.lineTo(dx * 1.4, -10); c.stroke(); }
+  }
+
   /** A rule with fading ends, under overlay titles. */
   private rule(x: number, y: number, width: number, color: string): void {
     const c = this.context, gradient = c.createLinearGradient(x - width / 2, 0, x + width / 2, 0);
@@ -308,12 +347,9 @@ export class CanvasHud {
       c.fillStyle = edge; c.fillRect(0, 0, width, height);
     }
 
-    // Top: the map, the credits key and the controls, kept quiet.
+    // Top: the map and the credits key, kept quiet. (The keys are listed under Controls in the menus, not on screen.)
     this.text(this.mapName.toUpperCase(), 40, 40, { size: 27, font: 'title', color: DIM });
     this.text('F2  CREDITS', 42, 72, { size: 17, weight: 500, color: FAINT, spacing: 2 });
-    // The controls line only fits clear of the map name on wider screens.
-    const controls: TextStyle = { size: 16, weight: 500, color: FAINT, align: 'center', spacing: 1 };
-    if (!snapshot.paused && centre - this.measure(CONTROLS, controls) / 2 > 320) this.text(CONTROLS, centre, 26, controls);
     const key = (action: GameAction) => actionKeyLabel(this.bindings, action);
     const modes = [snapshot.godMode ? `GOD MODE [${key('toggleGodMode')}]` : '', snapshot.noclip ? `NOCLIP [${key('toggleNoclip')}]` : ''].filter(Boolean);
     if (modes.length) this.text(modes.join('   /   '), 42, 105, { size: 21, color: GOLD, spacing: 1 });
@@ -345,7 +381,7 @@ export class CanvasHud {
       c.shadowColor = 'transparent'; c.shadowBlur = 0;
     }
 
-    // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health and grenades.
+    // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health.
     if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 340, { size: 23, color: GOLD, spacing: 3 });
     this.text('ROUND', 44, height - 280, { size: 34, weight: 500, color: INK, spacing: 4 });
     const low = snapshot.health <= 50;
@@ -360,26 +396,6 @@ export class CanvasHud {
     });
     if (healthWidth > 0) this.panel(98, height - 60, healthWidth, 24, 8, low ? BLOOD : INK, null);
     this.text(String(snapshot.health), 352, height - 48, { size: 29, color: low ? BLOOD : INK });
-    let grenadeX = 420 + this.keycap(actionKeyLabel(this.bindings, 'throwGrenade'), 420, height - 48, 24) + 16;
-    for (let slot = 0; slot < GRENADE_SLOTS; slot++, grenadeX += 30) {
-      c.beginPath(); c.arc(grenadeX + 9, height - 48, 9, 0, Math.PI * 2);
-      if (slot < snapshot.grenadeCharges) { c.fillStyle = GOLD; c.fill(); }
-      else { c.strokeStyle = FAINT; c.lineWidth = 2; c.stroke(); }
-    }
-    // Bouncing Betties, while any are carried: their key, then a little mine (a canister with three prongs) for each.
-    if (snapshot.mineCharges > 0) {
-      grenadeX += 12;
-      grenadeX += this.keycap(actionKeyLabel(this.bindings, 'placeMine'), grenadeX, height - 48, 24) + 16;
-      for (let slot = 0; slot < MINE_SLOTS; slot++, grenadeX += 30) {
-        const held = slot < snapshot.mineCharges;
-        c.save(); c.translate(grenadeX + 9, height - 48);
-        c.fillStyle = GOLD; c.strokeStyle = held ? GOLD : FAINT; c.lineWidth = 2;
-        c.beginPath(); c.rect(-8, -1, 16, 11);
-        if (held) c.fill(); else c.stroke();
-        for (const dx of [-5, 0, 5]) { c.beginPath(); c.moveTo(dx, -1); c.lineTo(dx * 1.4, -10); c.stroke(); }
-        c.restore();
-      }
-    }
 
     // Bottom right: points in gold over the weapon, its ammunition and the holstered gun.
     const pointsWidth = this.text(String(snapshot.points), right, height - 190, { size: 52, color: GOLD, align: 'right' });
@@ -402,14 +418,13 @@ export class CanvasHud {
       color: packedGlowCss(snapshot.weapon) ?? DIM, align: 'right', spacing: 2 });
     const reserveWidth = this.text(` / ${snapshot.reserveAmmo}`, right, height - 56,
       { size: 31, weight: 500, color: DIM, align: 'right' });
-    this.text(String(snapshot.magazineAmmo), right - reserveWidth, height - 60,
+    const magazineWidth = this.text(String(snapshot.magazineAmmo), right - reserveWidth, height - 60,
       { size: 62, color: snapshot.magazineAmmo === 0 ? BLOOD : INK, align: 'right' });
+    this.equipment(snapshot, right - reserveWidth - magazineWidth - 30, height - 56);
     if (snapshot.holsteredWeapon) {
       const name = weaponLabel(snapshot.holsteredWeapon);
-      const nameWidth = this.measure(name, { size: 18, weight: 500, spacing: 2 });
       this.text(name, right, height - 22, { size: 18, weight: 500, color: packedGlowCss(snapshot.holsteredWeapon) ?? FAINT,
         align: 'right', spacing: 2 });
-      this.keycap('Q', right - nameWidth - 39, height - 22, 14);
     }
 
     // Centre: notices, pickups and the interaction prompt.

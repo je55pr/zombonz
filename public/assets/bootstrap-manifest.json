@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "revision": "c4f6abfc6f851cb8707893654a0df2a9061f1bcf65cede9dce884c4e5cd22687",
+  "revision": "6ce2926e904bdc07ecaa96cb9ccb1c4c81cf87450dfb2472680e01b5c5a86c75",
   "files": {
     "assets/audio/ambience-sting-1.mp3": {
       "size": 36951,
@@ -150,6 +150,18 @@
       "size": 2924,
       "sha256": "b8914eaba492f52008e588cf59816a21c8d2ad1fd9264e73bd168f92a09b1b34"
     },
+    "assets/audio/round-start-1.mp3": {
+      "size": 19916,
+      "sha256": "7eafa106f34e70b14cbc68fa90d9b3d599e187363a1ffd3592c77e1da71bb28c"
+    },
+    "assets/audio/round-start-2.mp3": {
+      "size": 18476,
+      "sha256": "c02c3d2ef3b99be9e69d7b207bc1f9f2d53198f39b83d2782fc79f149be51766"
+    },
+    "assets/audio/round-start-3.mp3": {
+      "size": 21644,
+      "sha256": "a9670296ae882ca420a6633cd937785c6e97b08ab3109022109d9dd2779998b5"
+    },
     "assets/audio/shotgun-rack.mp3": {
       "size": 9597,
       "sha256": "d8fd0e906c257918de87f394bbad1dcdaf519ee4a29dcaa8a153888bfa612d1d"
@@ -241,10 +253,6 @@
     "assets/audio/zombie-death-2.mp3": {
       "size": 6135,
       "sha256": "a0d51dff755812eb57575145a2813438c322708634fe2a83e8ba6771035b2d8f"
-    },
-    "assets/audio/zombie-distant.mp3": {
-      "size": 24812,
-      "sha256": "b690b648d9d9460eb8df702a132bc593fa5cd5b4987c590338299033d3a54dde"
     },
     "assets/audio/zombie-voice-1.mp3": {
       "size": 7575,

@@ -111,6 +111,11 @@ The HUD follows WaW: the round counter is chalk tally marks for rounds one to fi
 numeral after, flashing when a round is cleared, and every hit, kill and purchase throws a gold
 "+10"/"+50"/"+100" (or red "-950") off the score. The four-line hip crosshair shows the gun's real spread: it
 opens while moving, sprinting and firing, settles back when you stop, and hides when aiming down sights.
+It shows state, not controls: there is no strip of key hints, and no key is drawn for grenades, Bouncing Betties or
+switching weapons (the keys are in Controls, in the main menu and the pause menu). Grenades, and Bouncing Betties while
+any are carried, are a row of little icons on the right, level with the ammunition: gold while held, an outline once spent.
+A round begins with a low bell strike. There are three, taken in turn by round, so a long run does not hear the same one every
+time; they are synthesised by `scripts/make_round_start.py` and need no attribution.
 
 The playable solo map, Bunker, follows WaW's first map: starting room / Help room / upstairs connections.
 The HELP door and each of the two stair barricades cost 1000 points. One fixed mystery
