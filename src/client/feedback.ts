@@ -55,8 +55,6 @@ export class HudFeedback {
           else if (event.method === 'melee') say('KNIFE KILL', 5);
           break;
         case 'playerDamaged': this.hurtUntil = tick + 32; say('TAKE COVER', 6); break;
-        case 'weaponReloadStarted': say('RELOADING', 1); break;
-        case 'weaponReloadCompleted': say('READY', 1); break;
         case 'wallWeaponPurchased': say(`${weaponName(event.weaponId).toUpperCase()} ACQUIRED`, 3); break;
         case 'wallWeaponAmmoPurchased': say('AMMO REFILLED', 3); break;
         case 'wallWeaponAmmoFull': say('AMMO ALREADY FULL', 3); break;
@@ -74,7 +72,7 @@ export class HudFeedback {
         case 'mysteryBoxTeddy': say('BYE BYE — THE BOX IS MOVING', 6); break;
         case 'powerupCollected': say(event.kind === 'maxAmmo' ? 'MAX AMMO'
           : event.kind === 'doublePoints' ? 'DOUBLE POINTS'
-            : event.kind === 'instaKill' ? 'INSTA-KILL' : 'NUKE', 8); break;
+            : event.kind === 'instaKill' ? 'INSTA-KILL' : event.kind === 'carpenter' ? 'CARPENTER' : 'NUKE', 8); break;
       }
     }
     if (message) { this.message = message; this.messageUntil = tick + 105; }

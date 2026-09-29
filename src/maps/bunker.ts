@@ -246,8 +246,7 @@ export const BUNKER_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
     // BO1's version of the map added Cold War guns to the box.
     'm14', 'fal', 'commando', 'ak74u', 'mp5k', 'skorpion', 'rpk', 'spas12', 'ithaca37', 'python', 'rpg7',
     'irrlicht', 'molniya'],
-  // The wonder weapons are rare, as the Ray Gun and Wunderwaffe were.
-  weights: { irrlicht: 0.25, molniya: 0.15 },
+  // Every gun is equally likely for now (#130); `weights` can make the wonder weapons rarer again.
 }];
 export const BUNKER_PLAYER_SPAWN: Vec3 = { x: px(5.2), y: 0, z: pz(4.2) };
 /** WaW/BO1 windows hold six boards. */

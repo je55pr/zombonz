@@ -6,7 +6,7 @@ import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import { WEAPON_DEFINITIONS } from './weapon.ts';
 import { rayAabbDistance } from './weapon.ts';
 
-export type PowerupKind = 'maxAmmo' | 'doublePoints' | 'instaKill' | 'nuke';
+export type PowerupKind = 'maxAmmo' | 'doublePoints' | 'instaKill' | 'nuke' | 'carpenter';
 
 export interface PowerupDrop {
   id: string;
@@ -42,6 +42,11 @@ export interface PowerupConfig {
   kinds: readonly PowerupKind[];
   doublePointsDurationTicks: number;
   instaKillDurationTicks: number;
+  /**
+   * A Carpenter only drops once this many barriers have lost every board (or all of them, on a map
+   * with fewer), so it never arrives with nothing to rebuild.
+   */
+  carpenterMinBroken: number;
 }
 
 /** WaW/BO1 drop rules: 2000-point threshold growing 14% per drop, 3% per-kill luck, four per round. */
@@ -53,15 +58,18 @@ export const DEFAULT_POWERUP_CONFIG: Readonly<PowerupConfig> = {
   // Fifteen seconds solid, then about eleven and a half seconds of blinking.
   lifetimeTicks: 1590,
   pickupRadius: 1.25,
-  kinds: ['maxAmmo', 'doublePoints', 'instaKill', 'nuke'],
+  kinds: ['maxAmmo', 'doublePoints', 'instaKill', 'nuke', 'carpenter'],
   doublePointsDurationTicks: 1800,
   instaKillDurationTicks: 1800,
+  carpenterMinBroken: 5,
 };
 
 export type PowerupEvent =
   | { type: 'powerupSpawned'; dropId: string; kind: PowerupKind; position: Vec3 }
   | { type: 'powerupCollected'; dropId: string; kind: PowerupKind; playerId: EntityId }
   | { type: 'nukeDetonated'; dropId: string; killed: number }
+  /** Every damaged barrier was rebuilt to full; `repaired` is how many needed it. */
+  | { type: 'carpenterRepaired'; dropId: string; repaired: number }
   | { type: 'powerupExpired'; dropId: string; kind: PowerupKind };
 
 /** `teamStartingScore` is every player's starting points combined. */
@@ -99,17 +107,37 @@ export function tickPowerupLifetime(state: PowerupState): PowerupEvent[] {
   return events;
 }
 
-function nextPowerupKind(state: PowerupState, config: PowerupConfig, worldSeed: number): PowerupKind {
-  if (state.cycleIndex >= state.cycle.length) {
-    const deck = [...config.kinds];
-    const rng = new SeededRng(worldSeed ^ Math.imul(state.cyclesDealt + 1, 0x27d4eb2f));
-    for (let i = deck.length - 1; i > 0; i -= 1) {
-      const j = rng.int(0, i + 1);
-      [deck[i], deck[j]] = [deck[j], deck[i]];
+/** Barriers with no boards left at all (an open climb has none to lose, so never counts). */
+function brokenBarrierCount(barriers: readonly BarrierState[]): number {
+  return barriers.filter(barrier => barrier.maxBoards > 0 && barrier.boards === 0).length;
+}
+
+function carpenterNeeded(barriers: readonly BarrierState[], config: PowerupConfig): boolean {
+  const boarded = barriers.filter(barrier => barrier.maxBoards > 0).length;
+  const needed = Math.min(config.carpenterMinBroken, boarded);
+  return needed > 0 && brokenBarrierCount(barriers) >= needed;
+}
+
+/**
+ * Deals from the shuffled deck. A kind that cannot drop right now (a Carpenter with nothing to
+ * rebuild) is passed over and its turn spent, as in Black Ops. Null when nothing in the deck can drop.
+ */
+function nextPowerupKind(state: PowerupState, config: PowerupConfig, worldSeed: number,
+  barriers: readonly BarrierState[]): PowerupKind | null {
+  for (let dealt = 0; dealt <= config.kinds.length; dealt += 1) {
+    if (state.cycleIndex >= state.cycle.length) {
+      const deck = [...config.kinds];
+      const rng = new SeededRng(worldSeed ^ Math.imul(state.cyclesDealt + 1, 0x27d4eb2f));
+      for (let i = deck.length - 1; i > 0; i -= 1) {
+        const j = rng.int(0, i + 1);
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+      }
+      state.cycle = deck; state.cycleIndex = 0; state.cyclesDealt += 1;
     }
-    state.cycle = deck; state.cycleIndex = 0; state.cyclesDealt += 1;
+    const kind = state.cycle[state.cycleIndex++];
+    if (kind !== 'carpenter' || carpenterNeeded(barriers, config)) return kind;
   }
-  return state.cycle[state.cycleIndex++];
+  return null;
 }
 
 /** A kill only creates a pickup; its gameplay effect happens on physical collection. */
@@ -126,9 +154,10 @@ export function tryDropPowerup(
   const rng = new SeededRng(worldSeed ^ Math.imul(zombieNumber, 0x9e3779b9) ^ tick);
   const lucky = rng.int(0, 100) < config.randomDropPercent;
   if (!lucky && !state.dropArmed) return [];
+  const kind = nextPowerupKind(state, config, worldSeed, barriers);
+  if (!kind) return [];
   state.dropArmed = false;
   state.dropsThisRound += 1;
-  const kind = nextPowerupKind(state, config, worldSeed);
   // Zombies shot before entering would otherwise drop an unreachable reward outdoors.
   const entrance = zombie.entry && barriers.find(barrier => barrier.id === zombie.entry!.barrierId);
   const position = { ...(entrance ? entrance.insidePoint : zombie.position) };
@@ -164,6 +193,7 @@ export function collectPowerups(
   boxes: readonly CollisionBox[],
   config: PowerupConfig = DEFAULT_POWERUP_CONFIG,
   zombies: readonly ZombieState[] = [],
+  barriers: readonly BarrierState[] = [],
 ): PowerupEvent[] {
   const events: PowerupEvent[] = [];
   const living = players.filter(player => player.alive).sort((a, b) => a.id.localeCompare(b.id));
@@ -182,6 +212,14 @@ export function collectPowerups(
         killed += 1;
       }
       events.push({ type: 'nukeDetonated', dropId: drop.id, killed });
+    }
+    if (drop.kind === 'carpenter') {
+      let repaired = 0;
+      for (const barrier of barriers) if (barrier.boards < barrier.maxBoards) {
+        barrier.boards = barrier.maxBoards; barrier.repairTicks = 0; barrier.repairerId = null;
+        repaired += 1;
+      }
+      events.push({ type: 'carpenterRepaired', dropId: drop.id, repaired });
     }
     events.push({ type: 'powerupCollected', dropId: drop.id, kind: drop.kind, playerId: collector.id });
   }

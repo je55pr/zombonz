@@ -31,12 +31,15 @@ export class PowerupView {
       metalness: 0.32, emissive: 0xc3261b, emissiveIntensity: 1.3 }),
     nuke: new THREE.MeshStandardMaterial({ color: 0x3e5671, roughness: 0.48,
       metalness: 0.32, emissive: 0x1d6494, emissiveIntensity: 1.3 }),
+    carpenter: new THREE.MeshStandardMaterial({ color: 0x6e4a26, roughness: 0.48,
+      metalness: 0.32, emissive: 0xa8611c, emissiveIntensity: 1.3 }),
   };
   private readonly glow = {
     maxAmmo: new THREE.MeshBasicMaterial({ color: 0xb4e38c }),
     doublePoints: new THREE.MeshBasicMaterial({ color: 0xffd473 }),
     instaKill: new THREE.MeshBasicMaterial({ color: 0xff816b }),
     nuke: new THREE.MeshBasicMaterial({ color: 0x87d7ff }),
+    carpenter: new THREE.MeshBasicMaterial({ color: 0xf0b070 }),
   };
 
   constructor(private readonly scene: THREE.Scene) {}

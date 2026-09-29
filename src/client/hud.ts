@@ -5,6 +5,8 @@ import { weaponName } from '../core/weapon.ts';
 import { maxPlayerHealth } from '../core/health.ts';
 import { reviveProgress } from '../core/downs.ts';
 import type { PerkId } from '../core/perks.ts';
+import type { GameAction } from '../core/input.ts';
+import { DEFAULT_KEY_BINDINGS, actionKeyLabel, type KeyBindings } from './bindings.ts';
 
 /** WaW's perk colours: Jugger-Nog red, Double Tap amber, Speed Cola green, Quick Revive blue. */
 const PERK_ICONS: Readonly<Record<PerkId, { fill: string; mark: string }>> = {
@@ -15,7 +17,7 @@ const PERK_ICONS: Readonly<Record<PerkId, { fill: string; mark: string }>> = {
 };
 import type { FeedbackSnapshot } from './feedback.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
-import { Crosshair, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
+import { Crosshair, NukeFlash, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
 export interface HudSnapshot {
@@ -97,7 +99,7 @@ export function buildHudSnapshot(
     reviveProgress: Math.round(revive * 20) / 20,
     nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO'
       : nearbyDrop.kind === 'doublePoints' ? 'DOUBLE POINTS'
-        : nearbyDrop.kind === 'instaKill' ? 'INSTA-KILL' : 'NUKE' : null,
+        : nearbyDrop.kind === 'instaKill' ? 'INSTA-KILL' : nearbyDrop.kind === 'carpenter' ? 'CARPENTER' : 'NUKE' : null,
     bonusStatus: simulation.state.powerups.doublePointsTicksRemaining > 0
       ? `2X POINTS  ${Math.ceil(simulation.state.powerups.doublePointsTicksRemaining / 60)}s` : null,
     instaKillStatus: simulation.state.powerups.instaKillTicksRemaining > 0
@@ -147,7 +149,7 @@ const LAYOUT_HEIGHT = 900;
 /** Caps the HUD canvas so a repaint's texture upload stays bounded on very large screens. */
 const MAX_HUD_WIDTH = 2560;
 const GRENADE_SLOTS = 4;
-const CONTROLS = 'WASD MOVE  ·  SHIFT SPRINT  ·  RMB AIM  ·  V KNIFE  ·  T GRENADE  ·  R RELOAD  ·  Q SWITCH  ·  M MUTE';
+const CONTROLS = 'WASD MOVE  ·  SHIFT SPRINT  ·  RMB AIM  ·  V KNIFE  ·  T GRENADE  ·  R RELOAD  ·  Q / WHEEL SWITCH  ·  M MUTE';
 
 interface TextStyle {
   size: number;
@@ -178,8 +180,10 @@ export class CanvasHud {
   private readonly popups: PointsPopups;
   private readonly roundCounter: RoundCounter;
   private readonly crosshair: Crosshair;
+  private readonly nukeFlash: NukeFlash;
 
-  constructor(private readonly renderer: THREE.WebGLRenderer, private readonly mapName = 'Bunker') {
+  constructor(private readonly renderer: THREE.WebGLRenderer, private readonly mapName = 'Bunker',
+    private readonly bindings: KeyBindings = DEFAULT_KEY_BINDINGS) {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this.onKeyDown);
     this.canvas.width = 1600;
     this.canvas.height = 900;
@@ -203,6 +207,7 @@ export class CanvasHud {
     this.roundCounter = new RoundCounter(this.scene);
     this.popups = new PointsPopups(this.scene);
     this.crosshair = new Crosshair(this.scene);
+    this.nukeFlash = new NukeFlash(this.scene);
     // The first frames draw with fallback fonts; repaint once the bundled ones are ready.
     void loadUiFonts().then(() => { this.previous = null; });
   }
@@ -303,9 +308,10 @@ export class CanvasHud {
     // The controls line only fits clear of the map name on wider screens.
     const controls: TextStyle = { size: 13, weight: 500, color: FAINT, align: 'center', spacing: 1.5 };
     if (!snapshot.paused && centre - this.measure(CONTROLS, controls) / 2 > 280) this.text(CONTROLS, centre, 26, controls);
-    const modes = [snapshot.godMode ? 'GOD MODE [G]' : '', snapshot.noclip ? 'NOCLIP [F]' : ''].filter(Boolean);
+    const key = (action: GameAction) => actionKeyLabel(this.bindings, action);
+    const modes = [snapshot.godMode ? `GOD MODE [${key('toggleGodMode')}]` : '', snapshot.noclip ? `NOCLIP [${key('toggleNoclip')}]` : ''].filter(Boolean);
     if (modes.length) this.text(modes.join('   /   '), 42, 98, { size: 18, color: GOLD, spacing: 1 });
-    if (snapshot.noclip) this.text('WASD fly · SPACE up · C down', 42, 124, { size: 16, weight: 500, color: DIM });
+    if (snapshot.noclip) this.text(`WASD fly · ${key('flyUp')} up · ${key('flyDown')} down`, 42, 124, { size: 16, weight: 500, color: DIM });
     // Top right: active power-ups as badges.
     let badgeY = 46;
     for (const status of [snapshot.bonusStatus, snapshot.instaKillStatus]) {
@@ -367,8 +373,8 @@ export class CanvasHud {
     });
     if (snapshot.pingMs !== null) this.text(`PING ${Math.round(snapshot.pingMs)} MS`, right, 22, { size: 13, color: DIM, align: 'right', spacing: 2 });
     this.pointsEdge = { x: right - pointsWidth - 10, y: height - 178 };
-    if (snapshot.reloading) this.text('RELOADING', right, height - 138, { size: 16, color: DIM, align: 'right', spacing: 3 });
-    else if (snapshot.magazineAmmo === 0) {
+    // A reload shows in the gun's animation and sound, not in words; an empty magazine still gets its prompt.
+    if (!snapshot.reloading && snapshot.magazineAmmo === 0) {
       this.text(snapshot.reserveAmmo > 0 ? 'R  RELOAD' : 'OUT OF AMMO', right, height - 138,
         { size: 16, color: snapshot.reserveAmmo > 0 ? GOLD : BLOOD, align: 'right', spacing: 3 });
     }
@@ -455,7 +461,7 @@ export class CanvasHud {
     for (const event of events) {
       if ((event.type === 'pointsAwarded' || event.type === 'pointsSpent') && event.playerId === playerId) {
         this.popups.spawn(event.type === 'pointsSpent' ? -event.amount : event.amount, this.pointsEdge, this.layout, now);
-      }
+      } else if (event.type === 'nukeDetonated') this.nukeFlash.trigger(now);
     }
   }
 
@@ -478,6 +484,7 @@ export class CanvasHud {
     const effects = !snapshot.paused && !snapshot.gameOver && !this.credits;
     this.roundCounter.update(snapshot.round, snapshot.roundPhase, this.layout, now, effects);
     this.popups.update(this.layout, now, effects);
+    this.nukeFlash.update(now, effects);
     // WaW hides the hip crosshair when aiming down sights and while sprinting.
     this.crosshair.update(aim?.spread ?? 0, aim?.verticalFov ?? 70, this.layout, now,
       effects && !!aim && !snapshot.aiming && !snapshot.sprinting);
@@ -489,6 +496,7 @@ export class CanvasHud {
     this.previous = null;
     this.credits = false;
     this.popups.clear();
+    this.nukeFlash.clear();
   }
 
   dispose(): void {

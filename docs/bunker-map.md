@@ -75,8 +75,8 @@ All eight ground entries retain exterior approach, individual board tearing,
 single-zombie vault reservation, indoor pursuit and hold-E repairs. Zombies appear about
 15 m out in the fog (the cave breach's at the far end of its collapsed tunnel), at three
 scattered spots per entry, and shamble in. Spawn selection excludes entries whose
-interior landing cannot reach a living player. G god mode,
-F noclip, imported zombies and first-person gun assets are unchanged.
+interior landing cannot reach a living player. L god mode,
+K noclip, imported zombies and first-person gun assets are unchanged.
 
 ## Checks
 

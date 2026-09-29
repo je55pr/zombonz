@@ -105,6 +105,8 @@ export interface GameMap {
   boxCenter: Vec3;
   /** The box's front (where buyers stand) faces (cos yaw, -sin yaw) in x/z. */
   boxYaw: number;
+  /** A box that moves is marked by a pale beam of light over it. Off unless the map asks for it. */
+  boxLocatorBeam?: boolean;
   rails: readonly MapRail[];
   props: readonly PropPlacement[];
   decals: readonly MapDecal[];
