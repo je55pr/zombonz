@@ -16,10 +16,14 @@ export interface PreparedWeapon { root: THREE.Group; magazine: THREE.Group; muzz
 const HIDDEN_PARTS: Readonly<Record<string, RegExp>> = { kar98k: /Scope/, bar: /^Handle/ };
 
 /** Sights for a gun with none listed: along the top of the model, from a third of the way to the muzzle. */
-function defaultSights(length: number): SightPoints {
+function defaultSights(length: number, zoom: number): SightPoints {
   const rear = new THREE.Vector3(0, 0, -length * 0.3), front = new THREE.Vector3(0, 0, -length * 0.95);
-  return { rear, front, relief: eyeRelief(rear, front) };
+  const size = { at: 'front', width: 14 } as const;
+  return { rear, front, size, relief: eyeRelief(rear, front, size, zoom) };
 }
+
+/** The gun this model belongs to: the models are named for the gun, except the starting pistol's (`m1911`). */
+export const gunForModel = (model: string) => Object.keys(WEAPON_ASSETS).find(gun => WEAPON_ASSETS[gun] === model) ?? model;
 
 // Viewmodel lengths in metres, roughly 0.86x each gun's real length.
 export const VIEWMODEL_LENGTHS: Readonly<Record<string, number>> = {
@@ -124,7 +128,8 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
       }
     });
   }
-  const sights = sightPoints(id) ?? defaultSights(length);
+  const zoom = adsZoom(gunForModel(id));
+  const sights = sightPoints(id, zoom) ?? defaultSights(length, zoom);
   return { root, magazine, muzzle: new THREE.Vector3(0, -0.035, -length), sights, ads: adsPose(sights) };
 }
 
@@ -163,7 +168,7 @@ function placeholderWeapon(id: string): PreparedWeapon {
   part(root, 0, -0.045, -0.25, 0.065, 0.09, 0.5);
   part(root, 0, -0.1, -0.06, 0.055, 0.17, 0.09, wood);
   part(magazine, 0, -0.15, -0.23, 0.045, id === 'mp40' ? 0.23 : 0.17, 0.08);
-  const sights = defaultSights(0.5);
+  const sights = defaultSights(0.5, adsZoom(id));
   return { root, magazine, muzzle: new THREE.Vector3(0, -0.045, -0.5), sights, ads: adsPose(sights) };
 }
 

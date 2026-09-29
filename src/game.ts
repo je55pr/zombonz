@@ -6,7 +6,7 @@ import { LightPool } from './client/lightPool.ts';
 import { fitShadowCamera, placeMoon } from './client/shadowFit.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
-import { aimedFov } from './client/aim.ts';
+import { ADS_LOOK_SCALE, aimedFov } from './client/aim.ts';
 import { DEFAULT_KEY_BINDINGS } from './client/bindings.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
@@ -376,6 +376,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
 
   const clock = new FixedStepClock({ tickRate: 60 });
   const input = new BrowserInput({ pointerElement: canvas, lookSensitivity: 0.0022 * settings.sensitivity, previewFireKey: !!preview,
+    // Looking around is slower while aiming, for a steadier, more accurate feel than hip fire.
+    lookScale: () => simulation.getPlayer(playerId)?.aiming ? ADS_LOOK_SCALE : 1,
     bindings: DEFAULT_KEY_BINDINGS });
   const audio = new GameAudio(canvas);
   audio.setPaused(!preview);

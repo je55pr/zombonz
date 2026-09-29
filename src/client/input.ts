@@ -7,6 +7,8 @@ const WHEEL_SWITCH_GAP_MS = 180;
 export interface BrowserInputOptions {
   pointerElement: HTMLElement;
   lookSensitivity?: number;
+  /** Multiplies each mouse movement as it happens (the game slows it while aiming); 1 if omitted. */
+  lookScale?: () => number;
   previewFireKey?: boolean;
   /** Which keys trigger which actions; the defaults if omitted. */
   bindings?: KeyBindings;
@@ -78,8 +80,9 @@ export class BrowserInput {
 
   private onMouseMove = (event: MouseEvent) => {
     if (document.pointerLockElement !== this.options.pointerElement) return;
-    this.lookYaw -= event.movementX * this.lookSensitivity;
-    this.lookPitch -= event.movementY * this.lookSensitivity;
+    const scale = this.options.lookScale?.() ?? 1;
+    this.lookYaw -= event.movementX * this.lookSensitivity * scale;
+    this.lookPitch -= event.movementY * this.lookSensitivity * scale;
   };
 
   private actionForKey(code: string): GameAction | undefined {

@@ -3,10 +3,17 @@ export const HANDGUNS: ReadonlySet<string> = new Set(['starter-pistol', 'magnum-
 
 /**
  * How many times aiming magnifies the world. Measured from Black Ops screenshots of the same room, hip and aimed:
- * the Kar98k's view narrows 1.74 times (a gate 310 px wide becomes 538, a shelf 137 becomes 238), and the pistol's
- * does not change at all. Other shoulder guns are assumed to match the Kar98k.
+ * the Kar98k's view narrows 1.74 times (a gate 310 px wide becomes 538, a shelf 137 becomes 238). Other shoulder guns
+ * are assumed to match. Black Ops' pistol does not zoom at all; sidearms here zoom 1.3 times, a choice, so aiming one
+ * still steadies the view.
  */
-export const ADS_ZOOM = { handgun: 1, longGun: 1.74 } as const;
+export const ADS_ZOOM = { handgun: 1.3, longGun: 1.74 } as const;
+
+/**
+ * How much mouse look is slowed while aiming (0.7 times), on top of the zoom having already narrowed the view.
+ * A choice, to make aimed shooting feel more accurate than hip spraying.
+ */
+export const ADS_LOOK_SCALE = 0.7;
 
 export function adsZoom(weaponId: string): number {
   return HANDGUNS.has(weaponId) ? ADS_ZOOM.handgun : ADS_ZOOM.longGun;

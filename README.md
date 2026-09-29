@@ -66,7 +66,7 @@ hold the right mouse button to aim down sights, and fire with the left mouse but
 Sprint lasts about four seconds, then recharges after a short pause; once exhausted you
 need a second of stamina back before sprinting again. Sprinting also stops when firing, aiming, reloading or changing weapons; aiming slows movement
 and zooms the view in (1.74x for anything but a pistol, from whatever field of view is set, matching Black Ops screenshots
-of the Kar98k; pistols do not zoom, as in Black Ops). Aimed, each gun turns so its own rear sight, front sight and
+of the Kar98k; 1.3x for pistols, which do not zoom at all in Black Ops) and slows looking around to 0.7 of its speed. Aimed, each gun turns so its own rear sight, front sight and
 your eye are one line through the middle of the screen, which is also the line the shot leaves along
 ([how the sights were measured](docs/weapon-sights.md)). ADS also reduces weapon-specific hip-fire spread by 90%; shot
 variation is seeded in the game core for repeatable results. The handling is
