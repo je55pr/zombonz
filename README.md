@@ -65,7 +65,8 @@ If the browser denies mouse capture, click the game canvas to retry. Move with W
 hold the right mouse button to aim down sights, and fire with the left mouse button.
 Sprint lasts about four seconds, then recharges after a short pause; once exhausted you
 need a second of stamina back before sprinting again. Sprinting also stops when firing, aiming, reloading or changing weapons; aiming slows movement
-and narrows the view. ADS also reduces weapon-specific hip-fire spread by 90%; shot
+and zooms the view in (1.55x for a pistol, 1.8x for anything else, from whatever field of view is set;
+the zooms are tuned by eye, not taken from a game's data). ADS also reduces weapon-specific hip-fire spread by 90%; shot
 variation is seeded in the game core for repeatable results. The handling is
 prototype tuning, not a frame-exact recreation.
 Reload early with R (or automatically when the magazine empties), knife with V,
@@ -91,7 +92,8 @@ so CPU and GPU times should not be added together. The panel stays dormant while
 Rendering follows the display refresh rate, with interpolated movement and immediate
 mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
 1x pixel density and no MSAA. The moon's shadow map (1024px, 2048px on the larger Asylum) holds only the
-building: zombies and teammates take its shadows but cast none, so it is redrawn only when a door,
+building (ceilings, roofs and upper floors block the moon from the rooms beneath them; ground floors do not
+cast): zombies and teammates take its shadows but cast none, so it is redrawn only when a door,
 window board, the box or the power lever moves (at most 15 times a second while one is moving). A map's
 lamps, perk machines, traps and box glow share four real point lights (`src/client/lightPool.ts`), given
 to the nearest of them each frame, because every lit pixel pays for every point light in the scene.

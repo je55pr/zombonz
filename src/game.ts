@@ -5,6 +5,7 @@ import { VENDING_MODEL, buildMapDetails } from './client/mapDetails.ts';
 import { LightPool } from './client/lightPool.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
+import { aimedFov } from './client/aim.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
@@ -464,8 +465,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const remote = netFrame ?? { alpha, tick: simulation.state.world.tick - 1 + alpha, previous: previousPositions };
     syncCamera(alpha);
     const playerForCamera = simulation.getPlayer(playerId);
-    // Aiming narrows and sprinting widens the player's chosen field of view, as the defaults 54/67/71 did.
-    const targetFov = playerForCamera?.aiming ? settings.fov - 13 : playerForCamera?.sprinting ? settings.fov + 4 : settings.fov;
+    // Aiming zooms the player's chosen field of view in (more for a rifle than a pistol); sprinting widens it a little.
+    const targetFov = playerForCamera?.aiming ? aimedFov(settings.fov, playerForCamera.weapon.weaponId)
+      : playerForCamera?.sprinting ? settings.fov + 4 : settings.fov;
     const fovBlend = 1 - Math.exp(-12 * Math.min(0.1, Math.max(0, interval / 1000)));
     const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
     if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
