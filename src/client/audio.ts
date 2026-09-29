@@ -56,7 +56,7 @@ export function softCeilingCurve(points = 4097): Float32Array {
 }
 /** One-shot mix levels; everything else sits below the player's own gunfire. */
 const MIX = {
-  gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.7, knife: 0.5, hit: 0.35, headshot: 0.5,
+  gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.35, knife: 0.5, hit: 0.35, headshot: 0.5,
   hurt: 0.6, footstep: 0.28, sprintStep: 0.34, zombieVoice: 0.6, zombieStep: 0.3, zombieDeath: 0.55,
   boardBreak: 0.55, boardRepair: 0.4, door: 0.6, box: 0.4, pickup: 0.5, reject: 0.35, roundStart: 0.5,
   zombieAttack: 0.55, sting: 0.22, clink: 0.32, ping: 0.5, mine: 0.4,
@@ -290,7 +290,9 @@ export class GameAudio {
         case 'playerDamaged': this.playClip('flesh-hit', MIX.hurt); break;
         case 'weaponReloadStarted': this.playClip(WEAPON_DEFINITIONS[event.weaponId]?.pellets ? 'shotgun-shell'
           : ['kar98k', 'springfield', 'mosin'].includes(event.weaponId) ? 'reload-round' : 'reload-mag', MIX.reload); break;
-        case 'weaponReloadCompleted': this.playClip(WEAPON_DEFINITIONS[event.weaponId]?.pellets ? 'shotgun-rack' : 'mechanical-click', MIX.reloadDone); break;
+        case 'weaponReloadCompleted':
+          if (WEAPON_DEFINITIONS[event.weaponId]?.pellets) this.playClip('shotgun-rack', MIX.reloadDone);
+          break;
         case 'pointsSpendRejected': this.playClip('buy-denied', MIX.reject); break;
         case 'mysteryBoxUsed': this.playClip('mechanical-button', MIX.box); break;
         case 'mysteryBoxClaimed': this.playClip('pickup', MIX.pickup); break;

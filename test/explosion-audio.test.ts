@@ -51,11 +51,11 @@ describe('what explosions sound like, until the clips in docs/audio-wanted.md ex
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('plays a distinct completion sound after reload for guns and shotguns', async () => {
+  it('keeps ordinary reload completion quiet and racks shotguns', async () => {
     const at = await startAudio();
     at([{ type: 'weaponReloadCompleted', playerId: 'e:1', weaponId: 'starter-pistol',
       loaded: 4, magazineAmmo: 8, reserveAmmo: 32 }]);
-    expect(heard()).toEqual(['mechanical-click']);
+    expect(heard()).toEqual([]);
     played.length = 0;
     at([{ type: 'weaponReloadCompleted', playerId: 'e:1', weaponId: 'trench-gun',
       loaded: 1, magazineAmmo: 6, reserveAmmo: 24 }]);
