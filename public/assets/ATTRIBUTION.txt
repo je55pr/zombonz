@@ -248,7 +248,7 @@ Compressed, edited MP3 derivatives in /assets/audio. The original downloads rema
 - Shotgun handling: Shotgun Reload Sound effects: https://opengameart.org/content/shotgun-reload-sound-effects
 - Mechanical clicks: 7 mechanical clicks and buzzes: https://opengameart.org/content/7-mechanical-clicks-and-buzzes
 - Footsteps: Fantozzi's Footsteps: https://opengameart.org/content/fantozzis-footsteps-grasssand-stone
-- Zombie voices: Zombies Sound Pack and Zombie moans: https://opengameart.org/content/zombies-sound-pack and https://opengameart.org/content/zombie-moans
+- Zombie voices: Zombies Sound Pack: https://opengameart.org/content/zombies-sound-pack
 - Wood cracks and hits: 35 wooden cracks/hits/destructions: https://opengameart.org/content/35-wooden-crackshitsdestructions
 - Locks, metal, pickups, knife and hit foley: 80 CC0 RPG SFX: https://opengameart.org/content/80-cc0-rpg-sfx
 - Door opening: Door Open, Door Close Set by qubodup: https://lpc.opengameart.org/content/door-open-door-close-set
@@ -258,5 +258,6 @@ Compressed, edited MP3 derivatives in /assets/audio. The original downloads rema
 - Ventilation: Airvent Loop: https://opengameart.org/content/airvent-loop
 - Wind: wind1: https://opengameart.org/content/wind1
 - Ambient stingers: Dark Ambiences by Ogrebane: https://opengameart.org/content/dark-ambiences
+- Round-start bell strikes: original, synthesised for this project by scripts/make_round_start.py (no sampled material)
 
 The reproducible selection and encoding recipe is in scripts/prepare_audio.py.

@@ -61,7 +61,7 @@ export function softCeilingCurve(points = 4097): Float32Array {
 const MIX = {
   gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.35, knife: 0.5, hit: 0.35, headshot: 0.5,
   hurt: 0.6, footstep: 0.28, sprintStep: 0.34, zombieVoice: 0.6, zombieStep: 0.3, zombieDeath: 0.55,
-  boardBreak: 0.55, boardRepair: 0.4, door: 0.6, box: 0.4, pickup: 0.5, reject: 0.35, roundStart: 0.5,
+  boardBreak: 0.55, boardRepair: 0.4, door: 0.6, box: 0.4, pickup: 0.5, reject: 0.35, roundStart: 0.8,
   zombieAttack: 0.55, sting: 0.22, clink: 0.32, ping: 0.5, mine: 0.4,
 } as const;
 /** How quickly a blast fades with distance (see playAt): big ones carry much further than a footstep. */
@@ -347,7 +347,8 @@ export class GameAudio {
         case 'barrierBoardRemoved': this.playAt(event.boards === 0 ? variant('wood-impact', 2, world.tick) : variant('wood-crack', 4, world.tick + event.boards),
           MIX.boardBreak, world.entities[event.zombieId]?.position, player); break;
         case 'barrierBoardRepaired': this.playClip(variant('wood-impact', 2, event.boards), MIX.boardRepair); break;
-        case 'roundPhaseChanged': if (event.to === 'spawning') this.playClip('zombie-distant', MIX.roundStart); break;
+        // A low bell strike as each round begins; it takes one of three, by round, so a long run doesn't hear the same one each time.
+        case 'roundPhaseChanged': if (event.to === 'spawning') this.playClip(variant('round-start', 3, event.round), MIX.roundStart); break;
         case 'matchRestarted': this.lastStepTick = -100; this.lastZombieVoiceTick = -100; this.nextStingTick = 60 * 50;
           this.lastZombieStepTick = -100; break;
       }

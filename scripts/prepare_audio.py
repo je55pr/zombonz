@@ -4,6 +4,7 @@ Requires: pip install py7zr imageio-ffmpeg
 Run: python scripts/prepare_audio.py --downloads C:/Users/Jess/Downloads
      --extras C:/path/to/audio-source-extras
 The original archives stay outside the repo; only compressed MP3 derivatives ship.
+The round-start bell strikes are not from a download: scripts/make_round_start.py synthesises them.
 """
 
 import argparse
@@ -68,7 +69,6 @@ CLIPS = [
       for index, source in enumerate((1, 4, 8, 12, 15, 17, 20, 21), 1)],
     *[("zombies.zip", f"zombies/zombie-{source}.wav", f"zombie-attack-{index}", 1.2) for index, source in enumerate((5, 7, 13), 1)],
     *[("zombies.zip", f"zombies/zombie-{source}.wav", f"zombie-death-{index}", 1.2) for index, source in enumerate((10, 14), 1)],
-    ("darsycho__zombie-moans.ogg", None, "zombie-distant", 3.0),
     *[(WOOD, f"wood_impact/crack{source:02d}.mp3.flac", f"wood-crack-{index}", 0.9) for index, source in enumerate((1, 3, 5, 7), 1)],
     *[(WOOD, f"wood_impact/impactwood{source:02d}.mp3.flac", f"wood-impact-{index}", 0.9) for index, source in enumerate((1, 4), 1)],
     ("80-CC0-RPG-SFX.zip", "lock_01.ogg", "door-unlock", 1.0),
