@@ -91,7 +91,7 @@ host's snapshots.
 
 A snapshot (`src/net/snapshot.ts`) carries only what changes during play:
 
-- every player and zombie
+- every player and zombie (including each zombie's facing, look, lost limbs and swing, which the hit volumes and the client's animation come from, and each player's grace after a blow)
 - the round and the spawn director
 - each door's `open` flag
 - barriers' boards (which slots are up, and which one last fell) and timers

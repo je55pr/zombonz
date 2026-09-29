@@ -124,3 +124,66 @@ the player standing still and the zombies arriving together (`test/zombie-melee.
 | 6 | 43 / 73 (1.2 s) | 31 / 61 (1.0 s) | 23 / 53 (0.9 s) |
 
 Before, two or more zombies in reach put a player down on the first tick they met.
+
+## Dismemberment and crawlers (issues #135 and #139)
+
+Which limbs come off is decided by the core (`src/core/gore.ts`), ported from WaW's `zombie_gib_on_damage`
+(`_zombiemode_spawner.gsc`), so every peer sees the same bodies and the state (`ZombieState.limbs`, a bit for each of head,
+left and right arm, left and right leg) rides in snapshots and replays like any other:
+
+- **A hit must take a tenth of the zombie's health at once** to gib at all. A rifle round takes limbs in the first rounds and
+  not by round ten; the starting pistol never does (WaW excludes every pistol but the .357), nor a knife, fire or the
+  Molniya's lightning.
+- **The head comes off only with the shot that kills** (a bullet, or a blast within 1.4 m of it).
+- **By the part struck:** an arm hit takes that arm; a torso hit opens the torso up or takes an arm, half each; a leg hit takes
+  that leg, and one time in four the other with it, but a leg only to a real blow (a fifth of its health) since it makes a
+  crawler.
+- **A blast takes the limbs nearest its centre** (WaW's `derive_damage_refs`): one, plus one more if it took half the zombie's
+  health, one more if it was within half its radius, and one more if it kills. A grenade among a group leaves torsos, crawlers
+  and lumps. It takes the head of a zombie it kills within 1.4 m of it. Bullets, rocket bursts, grenades, Betties, barrels and
+  cars all use it.
+
+A zombie with a leg gone and life left is a **crawler**: `zombiePose` puts it in the crawl pose (a low body with the head up
+and the arms reaching), it moves at most a metre a second (`CRAWLER.speed`), is only 0.7 m tall to walls (so it passes under
+what a standing zombie cannot), starts a swing from 0.9 m and lands it from 1.1 m rather than 1.1 and 1.3, and cannot swipe
+through a window. It still hunts, hits, tears boards and vaults, and is killed and paid for like any zombie. A zombie shot off
+a wall it is climbing cannot hold on: it falls, dead, and the shooter is credited (`method: 'fall'`).
+
+The client draws all of this (`src/client/skinnedZombieView.ts`, `zombieRig.ts`, `goreEffects.ts`, `goreDirector.ts`):
+
+- A missing limb is hidden, cut at the elbow, knee or neck, and its stump closed with a dark cap. The one-mesh soldier is
+  masked in the shader by a per-vertex limb bit (so all zombies share one program); the walker is drawn one mesh per part, and
+  those meshes are just hidden.
+- The limb that came off is copied from the skeleton in the pose it was in (vertices skinned by hand from the bones) and
+  thrown: along the shot, or away from the blast. It tumbles, lands, lies for eleven seconds and shrinks away. At most three
+  are copied in a frame; the rest of a big blast still bleeds.
+- A bullet sprays blood forward from the hit and back toward the gun (more for the head) and flashes the body. A zombie torn
+  open by a blast throws lumps of flesh, a spray and a pool; every death leaves a pool on the floor.
+- All of it is pooled: 512 droplets, 56 lumps, 18 thrown limbs and 20 pools, oldest recycled first, and nothing is drawn or
+  updated while none is alive (`GORE_BUDGET` in `goreEffects.ts`).
+- A crawler's skeleton is aimed each frame at the joints of the simulation's crawl volumes, its arms taking turns.
+
+There is no reduced-gore setting yet, but `GoreDirector` is the one place the effects are triggered, so one would be a single
+flag there.
+
+## Looks and variety (issue #134)
+
+What a zombie *is* (its model) is part of the simulation, because the models are shaped differently and that decides where a
+shot lands: `ZombieState.variant`, chosen when it spawns by its map's `zombieLooks` weights (Bunker 3 soldiers to 1 walker,
+Asylum 1 to 3). Everything else about how it looks is presentation, drawn from its id (`zombieLooks.ts`), so it is the same on
+every screen and from frame to frame:
+
+- **Colouring** from the map's palette (the Bunker's dead as they were, greener, paler or filthy; the Asylum's paler,
+  gown-grey), with a little brightness of their own.
+- **Build**: 95 to 106% of the height and 96 to 105% of the width.
+- **Tempo and phase**: cycles play at 88 to 114% of pace, starting from a place of their own, so a crowd never walks in step.
+  A cycle's pace is tied to the zombie's real ground speed, so feet stay planted whatever its tempo.
+- **Bearing**: straight, hunched, head tilted, or limping (about half the dead are not straight).
+- **Attack**: the walker's clip is a two-handed flail and each swing is one of its two swipes, alternately; the soldier's is one
+  slow overhead blow. Each zombie's swing is also its own length (see melee above).
+- **Death** at 90 to 120% of speed.
+
+Still wanted, and the reason #134 stays open: more models (other outfits, a nurse and orderlies for the Asylum, women, children,
+burnt and bloated ones), and more clips: a real crawl, several walks, runs, idles, hit reactions, deaths (from front, back,
+blasts) and window and climbing animations. [zombie-art-wanted.md](zombie-art-wanted.md) lists them; the systems above take
+another model or clip as data (a `RigSpec` in `zombieRig.ts`, a rig in the measure script, and a weight in a map).
