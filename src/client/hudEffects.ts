@@ -125,8 +125,8 @@ export class RoundCounter {
   private phase = '';
   private changedAt = 0;
   private mode: 'arrive' | 'flash' | 'steady' = 'steady';
-  /** Layout box the counter occupies: left, top, width, height. */
-  static readonly BOX = { x: 22, top: 150, width: 330, height: 104 };
+  /** The box's top edge is 250 layout units above the bottom of the screen. */
+  static readonly BOX = { x: 34, top: 250, width: 360, height: 160 };
 
   constructor(scene: THREE.Scene) {
     this.texture = new THREE.CanvasTexture(this.canvas);
@@ -147,17 +147,17 @@ export class RoundCounter {
     c.shadowColor = 'rgba(0,0,0,0.85)'; c.shadowBlur = 8; c.shadowOffsetY = 3;
     c.fillStyle = c.strokeStyle = '#ffffff';
     if (round >= 1 && round <= 5) {
-      c.lineCap = 'round'; c.lineWidth = 9;
+      c.lineCap = 'round'; c.lineWidth = 13;
       // Hand-drawn strokes: a fixed small lean and length variation per mark.
       const lean = [0.06, -0.04, 0.08, -0.02, 0.05], stretch = [0, 5, -3, 4, -2];
       for (let i = 0; i < Math.min(round, 4); i++) {
-        const x = 26 + i * 30, top = 16 - stretch[i], bottom = height - 14 + stretch[(i + 2) % 5];
+        const x = 32 + i * 44, top = 20 - stretch[i], bottom = height - 18 + stretch[(i + 2) % 5];
         c.beginPath(); c.moveTo(x + lean[i] * 40, top); c.lineTo(x - lean[i] * 40, bottom); c.stroke();
       }
-      if (round === 5) { c.beginPath(); c.moveTo(10, height - 26); c.lineTo(132, 22); c.stroke(); }
+      if (round === 5) { c.beginPath(); c.moveTo(12, height - 28); c.lineTo(188, 24); c.stroke(); }
     } else {
-      c.font = `400 100px ${TITLE_FONT}`; c.textBaseline = 'middle'; c.textAlign = 'left';
-      c.fillText(String(round), 14, height / 2 + 4);
+      c.font = `400 150px ${TITLE_FONT}`; c.textBaseline = 'middle'; c.textAlign = 'left';
+      c.fillText(String(round), 18, height / 2 + 5);
     }
     this.texture.needsUpdate = true;
     this.drawn = { round, scale };
@@ -174,7 +174,7 @@ export class RoundCounter {
     let grow = 1;
     if (this.mode === 'arrive') {
       const fade = Math.min(1, age / 0.6);
-      material.opacity = fade; grow = 1.25 - 0.25 * fade;
+      material.opacity = fade; grow = 1.18 - 0.18 * fade;
       material.color.copy(WHITE).lerp(ROUND_RED, Math.max(0, Math.min(1, (age - 0.6) / (ARRIVE_SECONDS - 0.6))));
       if (age >= ARRIVE_SECONDS) this.mode = 'steady';
     } else if (this.mode === 'flash') {

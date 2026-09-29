@@ -344,37 +344,37 @@ export class CanvasHud {
     }
 
     // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health and grenades.
-    if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 306, { size: 20, color: GOLD, spacing: 3 });
-    this.text('ROUND', 44, height - 138, { size: 20, weight: 500, color: DIM, spacing: 4 });
+    if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 340, { size: 23, color: GOLD, spacing: 3 });
+    this.text('ROUND', 44, height - 280, { size: 34, weight: 500, color: INK, spacing: 4 });
     const low = snapshot.health <= 50;
-    this.text('HP', 44, height - 38, { size: 19, weight: 500, color: DIM, spacing: 2 });
-    this.panel(74, height - 41, 180, 10, 5, 'rgba(0,0,0,0.55)', EDGE);
-    const healthWidth = 180 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
+    this.text('HP', 44, height - 48, { size: 29, weight: 500, color: INK, spacing: 2 });
+    this.panel(98, height - 60, 238, 24, 8, 'rgba(0,0,0,0.65)', EDGE);
+    const healthWidth = 238 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
     // Perk icons sit in a row above the round counter, in the order they were drunk.
     (snapshot.perks ? snapshot.perks.split(',') as PerkId[] : []).forEach((perk, index) => {
-      const style = PERK_ICONS[perk], x = 44 + index * 52, y = height - 366;
-      this.panel(x, y, 44, 44, 8, style.fill, 'rgba(255,255,255,0.35)');
-      this.text(style.mark, x + 22, y + 23, { size: 20, color: '#fff7e6', align: 'center' });
+      const style = PERK_ICONS[perk], x = 44 + index * 60, y = height - 435;
+      this.panel(x, y, 52, 52, 9, style.fill, 'rgba(255,255,255,0.35)');
+      this.text(style.mark, x + 26, y + 27, { size: 23, color: '#fff7e6', align: 'center' });
     });
-    if (healthWidth > 0) this.panel(74, height - 41, healthWidth, 10, 5, low ? BLOOD : INK, null);
-    this.text(String(snapshot.health), 266, height - 38, { size: 20, color: low ? BLOOD : INK });
-    let grenadeX = 324 + this.keycap(actionKeyLabel(this.bindings, 'throwGrenade'), 324, height - 38, 16) + 12;
-    for (let slot = 0; slot < GRENADE_SLOTS; slot++, grenadeX += 20) {
-      c.beginPath(); c.arc(grenadeX + 6, height - 36, 6, 0, Math.PI * 2);
+    if (healthWidth > 0) this.panel(98, height - 60, healthWidth, 24, 8, low ? BLOOD : INK, null);
+    this.text(String(snapshot.health), 352, height - 48, { size: 29, color: low ? BLOOD : INK });
+    let grenadeX = 420 + this.keycap(actionKeyLabel(this.bindings, 'throwGrenade'), 420, height - 48, 24) + 16;
+    for (let slot = 0; slot < GRENADE_SLOTS; slot++, grenadeX += 30) {
+      c.beginPath(); c.arc(grenadeX + 9, height - 48, 9, 0, Math.PI * 2);
       if (slot < snapshot.grenadeCharges) { c.fillStyle = GOLD; c.fill(); }
-      else { c.strokeStyle = FAINT; c.lineWidth = 1.5; c.stroke(); }
+      else { c.strokeStyle = FAINT; c.lineWidth = 2; c.stroke(); }
     }
     // Bouncing Betties, while any are carried: their key, then a little mine (a canister with three prongs) for each.
     if (snapshot.mineCharges > 0) {
-      grenadeX += 10;
-      grenadeX += this.keycap(actionKeyLabel(this.bindings, 'placeMine'), grenadeX, height - 38, 16) + 12;
-      for (let slot = 0; slot < MINE_SLOTS; slot++, grenadeX += 22) {
+      grenadeX += 12;
+      grenadeX += this.keycap(actionKeyLabel(this.bindings, 'placeMine'), grenadeX, height - 48, 24) + 16;
+      for (let slot = 0; slot < MINE_SLOTS; slot++, grenadeX += 30) {
         const held = slot < snapshot.mineCharges;
-        c.save(); c.translate(grenadeX + 7, height - 36);
-        c.fillStyle = GOLD; c.strokeStyle = held ? GOLD : FAINT; c.lineWidth = 1.5;
-        c.beginPath(); c.rect(-6, -1, 12, 8);
+        c.save(); c.translate(grenadeX + 9, height - 48);
+        c.fillStyle = GOLD; c.strokeStyle = held ? GOLD : FAINT; c.lineWidth = 2;
+        c.beginPath(); c.rect(-8, -1, 16, 11);
         if (held) c.fill(); else c.stroke();
-        for (const dx of [-3.5, 0, 3.5]) { c.beginPath(); c.moveTo(dx, -1); c.lineTo(dx * 1.4, -7); c.stroke(); }
+        for (const dx of [-5, 0, 5]) { c.beginPath(); c.moveTo(dx, -1); c.lineTo(dx * 1.4, -10); c.stroke(); }
         c.restore();
       }
     }
