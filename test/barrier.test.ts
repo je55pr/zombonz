@@ -8,9 +8,11 @@ import { BUNKER_BARRIERS, BUNKER_DOORS, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN, 
 const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: BUNKER_WALK_SURFACES,
   shotBlockers: BUNKER_SHOT_BLOCKERS, zombieSpawns: BUNKER_ZOMBIE_SPAWNS,
   barriers: BUNKER_BARRIERS, doors: BUNKER_DOORS, navigationGraph: BUNKER_NAVIGATION };
+/** A simulation whose zombies all come in through one entry, from the start of its route. */
 function makeSimulation(index = 0, count = 1, initialWaitTicks = 1) {
+  const spawn = BUNKER_ZOMBIE_SPAWNS.find(point => point.barrierId === BUNKER_BARRIERS[index].id)!;
   return new GameSimulation({ seed: 4848,
-    map: { ...map, zombieSpawns: [BUNKER_ZOMBIE_SPAWNS[index]] }, playerSpawns: [BUNKER_PLAYER_SPAWN],
+    map: { ...map, zombieSpawns: [spawn] }, playerSpawns: [BUNKER_PLAYER_SPAWN],
     roundConfig: { initialWaitTicks, intermissionTicks: 9999 },
     spawnConfig: { baseZombieCount: count, additionalPerRound: 0, spawnIntervalTicks: 20, maxAlive: count } });
 }
@@ -72,7 +74,7 @@ describe('exterior entry routes', () => {
     const sim = makeSimulation(0, 3);
     sim.getPlayer(sim.playerIds[0])!.health = 100000;
     let crossings = 0, entered = 0;
-    for (let tick = 0; tick < 1700; tick++) {
+    for (let tick = 0; tick < 2600; tick++) {
       const events = sim.tick();
       crossings += events.filter(event => event.type === 'zombieVaultStarted').length;
       entered += events.filter(event => event.type === 'zombieEntered').length;
@@ -97,7 +99,7 @@ describe('exterior entry routes', () => {
     const sim = makeSimulation(0, 2);
     const player = sim.getPlayer(sim.playerIds[0])!;
     player.health = 100000;
-    for (let tick = 0; tick < 1200 && sim.state.barriers[0].vaultingZombieId === null; tick++) sim.tick();
+    for (let tick = 0; tick < 2400 && sim.state.barriers[0].vaultingZombieId === null; tick++) sim.tick();
     const victim = sim.zombies().find(zombie => zombie.id === sim.state.barriers[0].vaultingZombieId)!;
     expect(victim).toBeDefined();
     const target = { x: victim.position.x, y: victim.position.y + 1.25, z: victim.position.z };
@@ -159,7 +161,7 @@ describe('barrier persistence and rebuilding', () => {
   it('never repairs into a zombie currently crossing the sill', () => {
     const sim = makeSimulation();
     const player = sim.getPlayer(sim.playerIds[0])!; player.health = 100000;
-    for (let i = 0; i < 1200 && sim.state.barriers[0].vaultingZombieId === null; i++) sim.tick();
+    for (let i = 0; i < 2400 && sim.state.barriers[0].vaultingZombieId === null; i++) sim.tick();
     player.position = { ...BUNKER_BARRIERS[0].insidePoint }; player.yaw = 0;
     const hold = createInputFrame(0);
     hold.actions.interact = { pressed: true, held: true, released: false, value: 1 };

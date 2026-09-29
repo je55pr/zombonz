@@ -51,8 +51,13 @@ Only the plan grows:
   stairs, not through exterior climbing routes.
 
 Lengths, ceiling height, some landing clearances, the north upper gallery and damaged
-roof edges remain approximations. The original complete wall-weapon catalogue,
-exterior vehicles and all small debris placements are outside this geometry pass.
+roof edges remain approximations. The original complete wall-weapon catalogue and all
+small debris placements are outside this geometry pass.
+
+Outside, in the fog, is a barbed-wire perimeter on timber posts with a gateway to the
+south, a watchtower, a timber hut, a half-buried concrete pillbox, a ruined brick wall,
+a sandbagged machine-gun nest, sandbags and tank traps across the south field, a jeep
+and a burnt-out light tank. The treeline stands outside the wire.
 
 ## Shared geometry and gameplay
 
@@ -67,8 +72,10 @@ with sampled centre-lines along the stairs. Closed-door edges are filtered by th
 existing cached runtime query. Upper slabs separately occlude bullets.
 
 All eight ground entries retain exterior approach, individual board tearing,
-single-zombie vault reservation, indoor pursuit and hold-E repairs. Spawn selection
-excludes entries whose interior landing cannot reach a living player. G god mode,
+single-zombie vault reservation, indoor pursuit and hold-E repairs. Zombies appear about
+15 m out in the fog (the cave breach's at the far end of its collapsed tunnel), at three
+scattered spots per entry, and shamble in. Spawn selection excludes entries whose
+interior landing cannot reach a living player. G god mode,
 F noclip, imported zombies and first-person gun assets are unchanged.
 
 ## Checks

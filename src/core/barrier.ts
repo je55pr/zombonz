@@ -2,7 +2,8 @@ import { moveWithCollision, type CollisionBox } from './collision.ts';
 import { createInteractableState } from './interaction.ts';
 import type { EntityId, InteractableState, Vec3, ZombieState } from './types.ts';
 
-export const BARRIER_RULES = { tearTicks: 75, repairTicks: 60, vaultTicks: 90, vaultHeight: 1 } as const;
+/** `climbSpeed` (m/s) is how fast a zombie climbs a wall on its way in, such as onto a roof below an upstairs window. */
+export const BARRIER_RULES = { tearTicks: 75, repairTicks: 60, vaultTicks: 90, vaultHeight: 1, climbSpeed: 1 } as const;
 
 export interface BarrierDefinition {
   id: string;
@@ -13,7 +14,10 @@ export interface BarrierDefinition {
   maxBoards: number;
   /** How long the crossing takes; a climb up a wall takes longer than a vault through a window. */
   vaultTicks?: number;
-  /** Ordered, collision-free exterior waypoints ending at the window. */
+  /**
+   * Ordered, collision-free exterior waypoints ending at the window, starting where zombies appear. A
+   * waypoint directly above (or below) the one before it is a climb, straight up (or down) a wall.
+   */
   approachPath: readonly Vec3[];
   insidePoint: Vec3;
 }
@@ -78,6 +82,15 @@ function moveToward(zombie: ZombieState, point: Vec3, dt: number, boxes: readonl
   return Math.hypot(next.x - point.x, next.z - point.z) < 0.025;
 }
 
+/** Straight up (or down) a wall toward a waypoint above (or below); true on arrival. */
+function climbToward(zombie: ZombieState, point: Vec3, dt: number): boolean {
+  const dy = point.y - zombie.position.y, step = BARRIER_RULES.climbSpeed * dt;
+  const y = Math.abs(dy) <= step ? point.y : zombie.position.y + Math.sign(dy) * step;
+  zombie.velocity = { x: 0, y: (y - zombie.position.y) / dt, z: 0 };
+  zombie.position = { ...zombie.position, y };
+  return y === point.y;
+}
+
 /** Releases the crossing slot if its occupant was shot; no dead zombie can jam a window. */
 export function prepareBarriers(barriers: BarrierState[], zombies: readonly ZombieState[]): void {
   for (const barrier of barriers) {
@@ -98,7 +111,9 @@ export function updateZombieEntry(zombie: ZombieState, barrier: BarrierState,
     const waypoint = barrier.approachPath[entry.waypointIndex];
     const point = { ...waypoint, x: waypoint.x + barrier.outward.z * entry.lane,
       z: waypoint.z - barrier.outward.x * entry.lane };
-    if (moveToward(zombie, point, dt, boxes)) {
+    // Any difference in height is a climb, which ends exactly at the waypoint's height.
+    const arrived = point.y !== zombie.position.y ? climbToward(zombie, point, dt) : moveToward(zombie, point, dt, boxes);
+    if (arrived) {
       entry.waypointIndex += 1;
       if (entry.waypointIndex >= barrier.approachPath.length) {
         entry.phase = 'breaking'; entry.phaseTicks = 0; stop(zombie);

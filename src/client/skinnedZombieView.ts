@@ -11,6 +11,8 @@ const RUN_CYCLE_PACE = 1.84;
 export function zombieAnimation(zombie: ZombieState): ZombieAnimation {
   if (!zombie.alive) return 'death';
   if (zombie.entry?.phase === 'breaking' || (!zombie.entry && zombie.attackCooldownTicks > 25)) return 'attack';
+  // Climbing a wall on the way in: clawing upward reads better than walking on air.
+  if (zombie.entry?.phase === 'approach' && Math.abs(zombie.velocity.y) > 0.05) return 'attack';
   const moving = Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0.05;
   return moving || zombie.entry?.phase === 'vaulting' ? (zombie.gait === 'walk' ? 'walk' : 'run') : 'idle';
 }

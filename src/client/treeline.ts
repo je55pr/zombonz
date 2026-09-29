@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadModel } from './runtimeAssets.ts';
+import type { GameMap } from '../maps/gameMap.ts';
 
 /** The treeline's models, for the start-screen download and warm-up. */
 export const TREELINE_ASSETS = ['dead-tree', 'tree-stump'] as const;
@@ -89,9 +90,11 @@ export function scatterTreeSectors(group: THREE.Group, geometry: THREE.BufferGeo
 
 /**
  * The dead forest around a map, beyond its walls and into the fog: standing dead trees, fallen logs and
- * broken stumps, all instanced. Without the bark model the trees still stand, in plain dark wood.
+ * broken stumps, all instanced, plus the map's own planted trees. A map with walled grounds keeps its
+ * forest outside them. Without the bark model the trees still stand, in plain dark wood.
  */
-export async function buildTreeline(scene: THREE.Scene, focus: { x: number; z: number; radius: number }): Promise<void> {
+export async function buildTreeline(scene: THREE.Scene, map: Pick<GameMap, 'focus' | 'grounds' | 'trees'>): Promise<void> {
+  const { focus, grounds } = map;
   const group = new THREE.Group(); group.name = 'treeline'; scene.add(group);
   const [log, stump] = await Promise.allSettled(TREELINE_ASSETS.map(id => loadModel(`props/${id}/model.glb`)));
   const logParts = log.status === 'fulfilled' ? modelParts(log.value.scene) : [];
@@ -104,8 +107,17 @@ export async function buildTreeline(scene: THREE.Scene, focus: { x: number; z: n
     }
   }
   const random = seeded(0x7ee5);
+  // How far out from the focus, in a direction, the grounds end (with a margin for branches).
+  const groundsEdge = (dx: number, dz: number): number => {
+    if (!grounds) return 0;
+    const edge = (min: number, max: number, from: number, d: number) => d > 0 ? (max - from) / d : d < 0 ? (min - from) / d : Infinity;
+    return Math.min(edge(grounds.minX - 3, grounds.maxX + 3, focus.x, dx), edge(grounds.minZ - 3, grounds.maxZ + 3, focus.z, dz));
+  };
   const place = (radius: number, spread: number, scale: number, lying = false) => {
-    const angle = random() * Math.PI * 2, distance = radius + random() * spread;
+    const angle = random() * Math.PI * 2;
+    // Pushed beyond the grounds (and scattered again out there), rather than through the boundary wall.
+    const edge = groundsEdge(Math.cos(angle), Math.sin(angle));
+    const distance = Math.max(radius, edge + random() * 3) + random() * spread;
     const size = scale * (0.8 + random() * 0.45);
     return new THREE.Matrix4().compose(
       new THREE.Vector3(focus.x + Math.cos(angle) * distance, lying ? -0.05 : -0.1, focus.z + Math.sin(angle) * distance),
@@ -116,6 +128,10 @@ export async function buildTreeline(scene: THREE.Scene, focus: { x: number; z: n
   const variants = Array.from({ length: 5 }, () => deadTreeGeometry(random));
   const near: THREE.Matrix4[][] = variants.map(() => []);
   for (let i = 0; i < 18; i++) near[i % variants.length].push(place(focus.radius * 1.3, 10, 1.1));
+  (map.trees ?? []).forEach((tree, index) => near[index % variants.length].push(new THREE.Matrix4().compose(
+    new THREE.Vector3(tree.x, (tree.y ?? 0) - 0.1, tree.z),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler((random() - 0.5) * 0.1, random() * Math.PI * 2, 0)),
+    new THREE.Vector3(tree.scale, tree.scale, tree.scale))));
   // The deep ring is seen through fog: retain its placement/silhouette but use fewer limb faces.
   const far: THREE.Matrix4[][] = [[], []];
   for (let i = 0; i < 60; i++) far[i % far.length].push(place(focus.radius * 1.62, 28, 1.25));

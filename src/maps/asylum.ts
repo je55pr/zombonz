@@ -6,8 +6,10 @@ import type { PerkId, PerkMachineDefinition } from '../core/perks.ts';
 import type { TrapDefinition } from '../core/traps.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { PropPlacement } from './bunkerProps.ts';
-import type { GameMap } from './gameMap.ts';
-import { MapBuilder, barriersFromWindows, collisionBoxesFor, compileNavigation, slabShotBlockers, type Opening } from './mapBuild.ts';
+import type { GameMap, MapTree, MapWindow } from './gameMap.ts';
+import { MapBuilder, barriersFromWindows, collisionBoxesFor, compileNavigation, entrySpawns, slabShotBlockers, windowPoint,
+  type Opening } from './mapBuild.ts';
+import { Scenery, onGround } from './scenery.ts';
 import { BUNKER_MYSTERY_BOXES } from './bunker.ts';
 
 /**
@@ -125,6 +127,8 @@ b.ceiling(WEST, 16, 3, SOUTH, UP + HIGH);
 // ---- The courtyard: cobbles, and a stone fountain (drawn round by the renderer).
 const FOUNTAIN = { x: (YARD.minX + YARD.maxX) / 2, z: (YARD.minZ + YARD.maxZ) / 2 };
 b.box(FOUNTAIN.x, -0.1, FOUNTAIN.z, YARD.maxX - YARD.minX, 0.2, YARD.maxZ - YARD.minZ, 'floor', false, 'cobblestone');
+// The fountain's basin (5.4 m across the lip) stands in the zombies' way.
+b.box(FOUNTAIN.x, 0.35, FOUNTAIN.z, 5.4, 0.7, 5.4, 'wall').visible = false;
 
 // ---- The box starts in the power room, by the power switch's panel.
 export const ASYLUM_UPPER_HEIGHT = UP;
@@ -275,30 +279,127 @@ export const ASYLUM_PROPS: readonly PropPlacement[] = [
   // The traps' switches: a small utility box on the wall under each status lamp.
   prop('german-trap-box', 'utility-box', WEST + 0.31, UP + 0.9, 1.2, 0.46, 0.56, 0.22, Math.PI / 2, false),
   prop('right-trap-box', 'utility-box', EAST - 0.31, UP + 0.9, -5.5, 0.46, 0.56, 0.22, -Math.PI / 2, false),
+  // Left out in the courtyard, and an abandoned staff car in the grounds.
+  prop('courtyard-wheelchair', 'wheelchair', -11.5, 0, -4.4, 0.82, 1.1, 1.09, 2.4),
+  prop('grounds-car', 'vehicles/soviet-offroad', -14, 0, 38.5, 2.01, 2, 4.2, 1.35, true, true),
 ];
 
 // Verrückt's upstairs entries, where zombies climb in off the roofs: one on the German balcony, two
 // in Left Upstairs, two on the right balcony, and one each in the Speed Cola room, kitchen and power room.
 export const ASYLUM_UPPER_ENTRIES = ['german-balcony-west', 'left-upstairs-west', 'left-upstairs-north', 'power-north',
   'kitchen-north', 'speed-cola-east', 'right-balcony-east', 'right-balcony-south'];
-for (const w of b.windows.filter(w => ASYLUM_UPPER_ENTRIES.includes(w.id))) {
-  // A roof ledge outside the window for the climbers to stand on.
-  const along = w.axis === 'x' ? 2.8 : 3, depth = 3;
-  const cx = w.x + w.outward.x * (depth / 2 + 0.12), cz = w.z + w.outward.z * (depth / 2 + 0.12);
-  b.box(cx, UP - 0.15, cz, w.axis === 'x' ? along : depth, 0.3, w.axis === 'x' ? depth : along, 'upperFloor', false);
+// Single-storey brick wings along the outside walls, roofed at the upper floor's level, under every
+// upstairs entry: zombies walk in from the grounds, climb a wing's outer wall and cross its roof.
+const WINGS = [
+  { minX: WEST - 5.2, maxX: WEST - 0.2, minZ: NORTH - 0.2, maxZ: -2, chimneys: [[-32.7, -16]] },
+  { minX: WEST - 5.2, maxX: 14, minZ: NORTH - 5.2, maxZ: NORTH - 0.2, chimneys: [[-17.5, -34.7], [0, -34.7]] },
+  { minX: EAST + 0.2, maxX: EAST + 5.2, minZ: NORTH - 0.2, maxZ: -7, chimneys: [[32.7, -17]] },
+  // Beside the BAR room, under the right balcony's south window.
+  { minX: 25.2, maxX: EAST + 0.2, minZ: 9.2, maxZ: 15, chimneys: [] as number[][] },
+];
+for (const wing of WINGS) {
+  const cx = (wing.minX + wing.maxX) / 2, cz = (wing.minZ + wing.maxZ) / 2, sx = wing.maxX - wing.minX, sz = wing.maxZ - wing.minZ;
+  b.box(cx, (UP - 0.3) / 2, cz, sx, UP - 0.3, sz, 'wall', true, 'broken-plaster-brick');
+  b.box(cx, UP - 0.15, cz, sx, 0.3, sz, 'upperFloor', false, 'cracked-concrete-floor');
+  for (const [x, z] of wing.chimneys) b.box(x, UP + 1, z, 0.9, 2, 0.9, 'wall', true, 'broken-plaster-brick');
 }
+/** A wing's outer face, as a distance out from the window line of each upstairs entry above it. */
+const WING_FACE: Readonly<Record<string, number>> = Object.fromEntries(ASYLUM_UPPER_ENTRIES.map(id => [id, id === 'right-balcony-south' ? 7 : 5.2]));
+const windowById = (id: string): MapWindow => b.windows.find(w => w.id === id)!;
+/**
+ * How zombies come in, beyond the last 2.4 m every route shares: from 16-18 m out in the grounds to the
+ * ground windows, across the courtyard (around the fountain) to its windows, and for the upstairs
+ * windows, in from the grounds to the wing below, straight up its wall, then across its roof.
+ */
+const ENTRY_ROUTES: Readonly<Record<string, Vec3[]>> = {
+  ...Object.fromEntries(['german-west', 'hallway-east'].map(id => [id, [windowPoint(windowById(id), 18, 0.6)]])),
+  // The south front's zombies start a little closer, short of the gatehouse and the car.
+  ...Object.fromEntries(['german-south', 'american-south-a', 'american-south-b'].map(id => [id, [windowPoint(windowById(id), 16, 0.6)]])),
+  ...Object.fromEntries(ASYLUM_UPPER_ENTRIES.map(id => {
+    const w = windowById(id), face = WING_FACE[id] + 0.45, ground = (d: number) => ({ ...windowPoint(w, d, 0.6), y: 0 });
+    return [id, [ground(id === 'right-balcony-south' ? 26 : 20), ground(face), windowPoint(w, face, 0.6)]];
+  })),
+  'german-alcove': [windowPoint(windowById('german-alcove'), 13.8, 0.6)],
+  'german-courtyard': [onGround(-8.5, -16.8), onGround(-6.2, -8)],
+  'american-courtyard': [windowPoint(windowById('american-courtyard'), 13.8, 0.6)],
+  'hallway-courtyard': [onGround(3, -16.8), onGround(9.5, -11.4)],
+};
 // The German balcony's other entry: zombies climb the courtyard wall and over the railing.
 const RAILING = { x: YARD.minX, z: -16 };
 export const ASYLUM_RAILING_ENTRY: BarrierDefinition = {
   id: 'german-balcony-railing', position: { x: RAILING.x, y: UP, z: RAILING.z }, outward: { x: 1, y: 0, z: 0 },
   width: 1.4, maxBoards: 0, vaultTicks: 150,
-  approachPath: [{ x: RAILING.x + 5, y: 0, z: RAILING.z + 0.6 }, { x: RAILING.x + 2.4, y: 0, z: RAILING.z + 0.6 },
-    { x: RAILING.x + 0.6, y: 0, z: RAILING.z }],
+  approachPath: [onGround(-6, -16.8), { x: RAILING.x + 5, y: 0, z: RAILING.z + 0.6 },
+    { x: RAILING.x + 2.4, y: 0, z: RAILING.z + 0.6 }, { x: RAILING.x + 0.6, y: 0, z: RAILING.z }],
   insidePoint: { x: RAILING.x - 0.95, y: UP, z: RAILING.z },
 };
 // A drainpipe up the wall marks the climb.
 b.box(RAILING.x + 0.28, UP / 2 + 0.5, RAILING.z - 0.75, 0.12, UP + 1, 0.12, 'metal', false);
-const barriers = [...barriersFromWindows(b.windows, 6, ASYLUM_UPPER_ENTRIES), ASYLUM_RAILING_ENTRY];
+const barriers = [...barriersFromWindows(b.windows, 6, ASYLUM_UPPER_ENTRIES, ENTRY_ROUTES), ASYLUM_RAILING_ENTRY];
+/** Where zombies appear besides the start of each route (see entrySpawns), where the default scatter won't fit. */
+const SPAWN_SPOTS: Readonly<Record<string, Vec3[]>> = {
+  // Across the courtyard, clear of the fountain and the beds.
+  'german-balcony-railing': [onGround(-8.2, -18.2), onGround(-3.6, -18.6)],
+  'hallway-courtyard': [onGround(0.8, -18.4), onGround(4.6, -18.9)],
+  'german-courtyard': [onGround(-10.8, -18.4), onGround(-6.8, -18.9)],
+};
+
+// ---- The courtyard, overgrown: raised beds of dead shrubs, benches and lamps, clear of every route.
+const yard = new Scenery();
+const COURTYARD_BEDS = [
+  { minX: 10.5, maxX: 15.3, minZ: -19.4, maxZ: -14 },
+  { minX: 9.2, maxX: 15.3, minZ: -9.3, maxZ: -4.8 },
+  { minX: -12.8, maxX: -10, minZ: -13.5, maxZ: -6.5 },
+];
+for (const bed of COURTYARD_BEDS) yard.bed(bed);
+yard.bench(-1.5, -18.8, 'x');
+yard.bench(3.3, -7.1, 'z');
+yard.lampPost(-9.5, -4.5);
+yard.lampPost(10, -13.2);
+b.shell.push(...yard.boxes);
+
+// ---- The grounds: a brick wall all round with a gateway to the south, a gatehouse, outbuildings and a
+// drive up to the boarded main entrance. Zombies cross them to the building.
+export const ASYLUM_GROUNDS = { minX: -56, maxX: 56, minZ: -60, maxZ: 45 };
+const grounds = new Scenery();
+const GR = ASYLUM_GROUNDS;
+grounds.wall('x', GR.minZ, GR.minX, GR.maxX);
+grounds.wall('z', GR.minX, GR.minZ, GR.maxZ);
+grounds.wall('z', GR.maxX, GR.minZ, GR.maxZ);
+grounds.wall('x', GR.maxZ, GR.minX, GR.maxX, { gaps: [[0, 7.2]] });
+grounds.gate('x', GR.maxZ, 0, 5);
+grounds.building({ minX: 5.5, maxX: 11.5, minZ: 38, maxZ: 42.5 }, { windows: [['north', 1.8], ['north', 4.2]], door: ['west', 2.2] });
+grounds.building({ minX: -46, maxX: -42, minZ: 26, maxZ: 29.5 }, { height: 2.4, walls: 'old-planks', pitch: 1.1, door: ['east', 1.7] });
+grounds.building({ minX: 38, maxX: 45, minZ: -52, maxZ: -42 }, { height: 3.6, pitch: 2.4, roof: 'weathered-concrete-b',
+  windows: [['west', 2.5], ['west', 7.5]], door: ['south', 3.5] });
+// A greenhouse, long since stripped of its glass: a brick base and an iron frame.
+grounds.box(-46, 0.35, -51, 8, 0.7, 6, 'broken-plaster-brick', true);
+for (let x = -50; x <= -42 + 1e-6; x += 2) {
+  for (const z of [-54, -48]) grounds.box(x, 1.7, z, 0.08, 2, 0.08, 'rusted-metal');
+  // Rafters rising 1 m over 3 m to the ridge.
+  for (const side of [-1, 1]) grounds.box(x, 3.2, -51 + side * 1.5, 0.08, 0.08, 3.16, 'rusted-metal', false, { rotationX: side * 0.32 });
+}
+for (const z of [-54, -48]) grounds.box(-46, 2.7, z, 8, 0.08, 0.08, 'rusted-metal');
+grounds.box(-46, 3.7, -51, 8, 0.08, 0.08, 'rusted-metal');
+// The drive from the gateway to the main entrance, and the lamps along it.
+grounds.box(0.5, 0.01, 32.3, 4.4, 0.02, 25.4, 'dirt', false, {}, 'floor');
+for (const z of [26, 33, 40]) for (const x of [-2.6, 3.6]) grounds.lampPost(x, z);
+// The main entrance on the south front: a stone doorway, boarded up, at the top of three steps.
+for (let step = 0; step < 3; step++) {
+  grounds.box(0.5, 0.075 + step * 0.15, SOUTH + 0.2 + 1.05 - step * 0.35, 4.2 - step * 0.4, 0.15, 2.1 - step * 0.7, 'weathered-concrete-b', false, {}, 'floor');
+}
+for (const side of [-1, 1]) grounds.box(0.5 + side * 1.55, 1.75, SOUTH + 0.35, 0.5, 3.5, 0.3, 'weathered-concrete-a');
+grounds.box(0.5, 3.75, SOUTH + 0.35, 3.6, 0.5, 0.35, 'weathered-concrete-a');
+grounds.box(0.5, 1.75, SOUTH + 0.24, 2.6, 3.1, 0.08, 'old-planks');
+/** Dead trees in the courtyard beds (their soil is 0.4 m up) and about the grounds, clear of every route. */
+const ASYLUM_TREES: readonly MapTree[] = [
+  { x: 12.9, z: -16.7, scale: 0.8, y: 0.4 }, { x: 11.3, z: -14.9, scale: 0.4, y: 0.4 }, { x: 14.4, z: -18.6, scale: 0.35, y: 0.4 },
+  { x: 12.3, z: -7, scale: 0.7, y: 0.4 }, { x: 10.1, z: -5.7, scale: 0.4, y: 0.4 },
+  { x: -11.5, z: -10, scale: 0.75, y: 0.4 }, { x: -12.1, z: -7.4, scale: 0.4, y: 0.4 }, { x: -10.8, z: -12.6, scale: 0.4, y: 0.4 },
+  { x: -44, z: 2, scale: 1 }, { x: -40, z: 36, scale: 1.1 }, { x: -22, z: 34, scale: 0.9 }, { x: 22, z: 30, scale: 1 },
+  { x: 44, z: 20, scale: 1.1 }, { x: 46, z: -16, scale: 0.95 }, { x: -44, z: -40, scale: 1 }, { x: -14, z: -50, scale: 1.05 },
+  { x: 22, z: -50, scale: 0.9 }, { x: 36, z: 38, scale: 1 },
+];
 const collision = collisionBoxesFor(b.shell, ASYLUM_PROPS);
 /** Both sides of every boarded door, for navigation through narrow doorways. */
 const doorSides = ASYLUM_DOORS.filter(d => d.id !== 'german-stairs' && d.id !== 'american-stairs').flatMap(d => {
@@ -327,10 +428,11 @@ const ASYLUM_NAVIGATION = compileNavigation(b.surfaces, [...collision, ...ASYLUM
 
 export const ASYLUM_MAP: GameMap = {
   id: 'asylum', name: 'Asylum', upperHeight: UP,
-  greybox: b.shell, prisms: b.prisms, collisionBoxes: collision,
+  greybox: b.shell, prisms: b.prisms, collisionBoxes: [...collision, ...collisionBoxesFor(grounds.boxes, [])],
   shotBlockers: slabShotBlockers(b.surfaces, UP), walkSurfaces: b.surfaces, navigation: ASYLUM_NAVIGATION,
   playerSpawn: ASYLUM_PLAYER_SPAWN, windows: b.windows, windowBoards: 6,
-  barriers, zombieSpawns: barriers.map(barrier => ({ ...barrier.approachPath[0], barrierId: barrier.id })),
+  barriers, zombieSpawns: barriers.flatMap(barrier => entrySpawns(barrier, SPAWN_SPOTS[barrier.id])),
+  scenery: grounds.boxes,
   doors: ASYLUM_DOORS,
   doorStyles: Object.fromEntries(ASYLUM_DOORS.map(d => [d.id, d.id.endsWith('stairs')
     ? { kind: 'debris' as const, yaw: 0, width: d.blocker.max.x - d.blocker.min.x }
@@ -364,6 +466,8 @@ export const ASYLUM_MAP: GameMap = {
     { minX: -29, maxX: 29, minZ: -31, maxZ: -21, y: UP, count: 30 },
   ],
   focus: { x: 0, z: -6.5, radius: 32 },
+  grounds: ASYLUM_GROUNDS,
+  trees: ASYLUM_TREES,
   previews: {
     american: { position: { x: 9, y: 0, z: 12 }, yaw: 0 },
     hallway: { position: { x: 18, y: 0, z: 5 }, yaw: 0 },

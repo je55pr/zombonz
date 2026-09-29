@@ -30,8 +30,10 @@ export type SurfaceLook = typeof SURFACE_LOOKS[number];
 export const STAIR_DEPTH = 0.5;
 
 export interface GreyboxBox {
-  center: Vec3; size: Vec3; material: GreyboxMaterial; collides?: boolean; rotationZ?: number; visible?: boolean;
+  center: Vec3; size: Vec3; material: GreyboxMaterial; collides?: boolean; rotationZ?: number; rotationX?: number; visible?: boolean;
   look?: SurfaceLook;
+  /** A gabled roof filling the box instead of a block: a triangular prism whose ridge runs along x or z. */
+  shape?: 'gableX' | 'gableZ';
   /** A floor slab's other faces (the ceiling below it), when they differ from its walked-on top. */
   underside?: SurfaceLook;
 }
@@ -53,6 +55,8 @@ export interface MapLabel { text: string; x: number; y: number; z: number; yaw: 
  * faces local +x) or a pile of sofa and crate debris across a stairway.
  */
 export interface DoorStyle { kind: 'planks' | 'debris'; yaw: number; width: number; label?: string }
+/** A dead tree planted in the map (presentation only; zombie routes keep clear of them). */
+export interface MapTree { x: number; z: number; scale: number; /** The ground it stands on (0 by default). */ y?: number }
 /** A floor area scattered with low rubble (below the step height, so it never blocks anyone). */
 export interface ScatterArea { minX: number; maxX: number; minZ: number; maxZ: number; y: number; count: number }
 export interface PreviewView { position: Vec3; yaw: number }
@@ -67,6 +71,11 @@ export interface GameMap {
   name: string;
   upperHeight: number;
   greybox: readonly GreyboxBox[];
+  /**
+   * What players see but never reach: outbuildings, boundary walls, fences and garden dressing. Drawn in
+   * coarser batches than the building; the ones that collide are in `collisionBoxes` too.
+   */
+  scenery?: readonly GreyboxBox[];
   prisms: readonly GreyboxPrism[];
   collisionBoxes: readonly CollisionBox[];
   /** Upper floors that stop bullets from below. */
@@ -105,6 +114,10 @@ export interface GameMap {
   rubble: readonly ScatterArea[];
   /** Middle and half-size of the building, for the key light's shadow frustum and the treeline. */
   focus: { x: number; z: number; radius: number };
+  /** The grounds inside a boundary wall or fence: the treeline stands outside them. */
+  grounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
+  /** Dead trees planted inside the grounds. */
+  trees?: readonly MapTree[];
   /** Development inspection views (`?preview=`), beyond the ones every map gets at its player spawn. */
   previews: Readonly<Record<string, PreviewView>>;
 }

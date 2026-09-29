@@ -52,8 +52,38 @@ There are seventeen zombie windows and one open climb, as in the original's room
 - **Upstairs (eight):** one on the German balcony, two in Left Upstairs, two on the right balcony,
   and one each in the Speed Cola room, the kitchen and the power room.
 
-Zombies climb into the upstairs windows off a short roof ledge outside. A window only takes zombies
-once players can reach the room behind it. The other upstairs windows are decorative.
+A window only takes zombies once players can reach the room behind it. The other upstairs windows
+are decorative.
+
+## How zombies come in
+
+As in the original's early rounds, zombies appear well away from the building and shamble in, rather
+than appearing at the boards:
+
+- **Ground floor, outside:** from 16-18 m out in the grounds.
+- **Courtyard:** from the far side of the courtyard, around the fountain. The courtyard windows and
+  the German balcony railing are reached this way.
+- **Upstairs:** single-storey brick wings run along the outside walls under every upstairs entry, with
+  flat roofs at the upper floor's level. Zombies walk in from about 20 m out, climb straight up the
+  wing's outer wall and cross its roof to the window.
+
+Each entry has three spots where its zombies appear, scattered about the start of its route, so a
+round's zombies come in spread out rather than single file. Routes, spawn spots, lanes and planted
+trees are checked against every wall and piece of scenery by `test/entry-routes.test.ts`.
+
+## Surroundings
+
+What players see but never reach:
+
+- **The courtyard:** raised beds of dead shrubs and trees, benches and old lamp posts around the
+  fountain, and an abandoned wheelchair, all clear of the zombies' routes.
+- **The grounds:** a brick boundary wall with concrete piers all the way round, about 26 m out, with
+  a wrought-iron gateway to the south. A gatehouse stands by the gateway, and a drive with lamp posts
+  runs up to the boarded main entrance on the south front. There is also a timber shed, a brick
+  morgue in the north-east corner, a stripped greenhouse frame, dead trees and an old car.
+- **The wings:** chimneys on their roofs, seen from the upstairs windows.
+
+The treeline stands outside the boundary wall.
 
 ## Power, perks, traps and the box
 

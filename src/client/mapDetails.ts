@@ -354,9 +354,10 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
   // Leaf litter all around; the treeline (src/client/treeline.ts) and night sky (sky.ts) stand beyond it.
   const ground = new THREE.PlaneGeometry(180, 180);
   ground.rotateX(-Math.PI / 2);
-  projectWorldUvs(ground, new THREE.Vector3(map.focus.x, -0.2, map.focus.z), lookScale('forest-floor'));
+  // Just below floor level, so zombies and scenery outside stand on it (floors and cobbles cover it indoors).
+  projectWorldUvs(ground, new THREE.Vector3(map.focus.x, -0.02, map.focus.z), lookScale('forest-floor'));
   const outside = new THREE.Mesh(ground, environmentMaterial('forest-floor'));
-  outside.position.set(map.focus.x, -0.2, map.focus.z); outside.receiveShadow = true; group.add(outside);
+  outside.position.set(map.focus.x, -0.02, map.focus.z); outside.receiveShadow = true; group.add(outside);
   // A round stone fountain: a basin with a lip, still dark water, and a pillar with a bowl.
   if (map.fountain) {
     const stone = environmentMaterial('weathered-concrete-a');

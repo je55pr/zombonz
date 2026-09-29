@@ -6,7 +6,9 @@ import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
-import { BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
+import { BUNKER_OUTSIDE_PROPS, BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
+import { barriersFromWindows, entrySpawns, windowPoint } from './mapBuild.ts';
+import { Scenery, onGround } from './scenery.ts';
 import { ps, px, pz } from './bunkerPlan.ts';
 import { STAIR_DEPTH } from './gameMap.ts';
 import { BUNKER_DECALS } from './bunkerProps.ts';
@@ -250,22 +252,61 @@ export const BUNKER_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
 export const BUNKER_PLAYER_SPAWN: Vec3 = { x: px(5.2), y: 0, z: pz(4.2) };
 /** WaW/BO1 windows hold six boards. */
 export const BUNKER_WINDOW_BOARDS = 6;
-// Upper windows stay decorative until exterior climbing is implemented.
-export const BUNKER_BARRIERS: readonly BarrierDefinition[] = windows.filter(w => w.y === 0).map(w => {
-  const point = (distance: number, sideways = 0): Vec3 => ({
-    x: w.x + w.outward.x * distance + w.outward.z * sideways, y: w.y,
-    z: w.z + w.outward.z * distance - w.outward.x * sideways,
-  });
-  return { id: w.id, position: { x: w.x, y: w.y, z: w.z }, outward: w.outward, width: w.width, maxBoards: BUNKER_WINDOW_BOARDS,
-    approachPath: [point(5, 0.6), point(2.4, 0.6), point(0.85)], insidePoint: point(-0.95) };
-});
-export const BUNKER_ZOMBIE_SPAWNS: readonly ZombieSpawnPoint[] = BUNKER_BARRIERS.map(b => ({ ...b.approachPath[0], barrierId: b.id }));
+const windowById = (id: string): BunkerWindow => windows.find(w => w.id === id)!;
+/**
+ * Zombies shamble in from about 15 m out in the fog (the HELP room's east window from the yard, around
+ * the corner); the cave breach's come from the far end of its collapsed tunnel.
+ */
+const ENTRY_ROUTES: Readonly<Record<string, Vec3[]>> = {
+  ...Object.fromEntries(['start-north', 'start-east', 'start-wide', 'start-south', 'start-corner', 'help-north']
+    .map(id => [id, [windowPoint(windowById(id), 15, 0.6)]])),
+  'help-east': [onGround(11, -15)],
+  'help-cave': [onGround(-15.8, 1.15)],
+};
+// Upper windows stay decorative.
+// The cave breach's landing keeps to the middle of its wide window, clear of the stair annex beside it.
+export const BUNKER_BARRIERS: readonly BarrierDefinition[] = barriersFromWindows(windows, BUNKER_WINDOW_BOARDS, [], ENTRY_ROUTES,
+  { 'help-cave': 0.2 });
+/** Three spots per entry where its zombies appear (see entrySpawns); the tunnel is too narrow to scatter far. */
+export const BUNKER_ZOMBIE_SPAWNS: readonly ZombieSpawnPoint[] = BUNKER_BARRIERS.flatMap(b =>
+  entrySpawns(b, b.id === 'help-cave' ? [onGround(-15.3, 0.4), onGround(-14.6, 1.9)] : undefined));
+
+// ---- Outside: a barbed-wire perimeter with a gateway to the south, a watchtower, a timber hut, a
+// half-buried pillbox and a ruined wall, out in the fog where the zombies come from.
+export const BUNKER_GROUNDS = { minX: -32, maxX: 46, minZ: -40, maxZ: 36 };
+const outside = new Scenery();
+const GR = BUNKER_GROUNDS;
+outside.fence('x', GR.minZ, GR.minX, GR.maxX);
+outside.fence('z', GR.minX, GR.minZ, GR.maxZ);
+outside.fence('z', GR.maxX, GR.minZ, GR.maxZ);
+outside.fence('x', GR.maxZ, GR.minX, 6);
+outside.fence('x', GR.maxZ, 10, GR.maxX);
+for (const x of [6, 10]) outside.box(x, 1.2, GR.maxZ, 0.24, 2.4, 0.24, 'splintered-wood', true);
+outside.watchtower(40, -34);
+outside.building({ minX: 28, maxX: 37, minZ: 18, maxZ: 23 }, { height: 2.6, walls: 'old-planks', pitch: 1.2,
+  windows: [['north', 2.5], ['north', 6.5]], door: ['west', 2.5] });
+// The pillbox: three concrete walls with a firing slit, under a slab that has slumped at one end.
+outside.box(-23.5, 0.9, 14.2, 5, 1.8, 0.5, 'weathered-concrete-b', true);
+outside.box(-23.5, 0.35, 18.8, 5, 0.7, 0.5, 'weathered-concrete-b', true);
+outside.box(-23.5, 1.55, 18.8, 5, 0.5, 0.5, 'weathered-concrete-b', true);
+for (const x of [-25.75, -21.25]) outside.box(x, 0.9, 16.5, 0.5, 1.8, 4.1, 'weathered-concrete-b', true);
+outside.box(-23.5, 2.05, 16.5, 5.6, 0.35, 5.2, 'weathered-concrete-a', false, { rotationZ: 0.12 });
+// A sandbagged machine-gun nest, and a sandbag wall and tank traps across the field to the south,
+// beyond where the zombies come from.
+outside.sandbags(26, -21.6, 'x', 7); outside.sandbags(25.7, -21.2, 'z', 5); outside.sandbags(30.3, -21.2, 'z', 5);
+outside.sandbags(12.5, 30.5, 'x', 7, 2);
+for (const x of [-6, -1.5, 18, 29.5, 34]) outside.tankTrap(x, 31.5);
+// A ruined brick wall, broken down to different heights.
+for (const [z, length, height] of [[-22.5, 3, 2.2], [-19, 3.5, 1.3], [-15.6, 2.6, 0.8], [-12, 4, 1.8], [-8.2, 2.8, 1]]) {
+  outside.box(-27, height / 2, z, 0.45, height, length, 'broken-plaster-brick', true);
+}
 export const BUNKER_MARKERS: readonly MapMarker[] = [
   ...BUNKER_BARRIERS.map(b => ({ id: b.id, type: 'zombieSpawn' as const, position: b.approachPath[0], label: 'Barricaded entry' })),
   ...BUNKER_DOORS.map(d => ({ id: d.id, type: 'door' as const, position: d.position, label: d.prompt! })),
   ...BUNKER_WALL_WEAPONS.map(w => ({ id: w.id, type: 'wallBuy' as const, position: w.position, label: w.prompt! })),
   { id: 'box-help', type: 'mysteryBox', position: BUNKER_MYSTERY_BOXES[0].position, label: 'Mystery Box [950]' },
 ];
+/** Collision for the given boxes; by default the bunker and the props inside it. */
 export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = BUNKER_GREYBOX): CollisionBox[] {
   const result = boxes.filter(b => b.collides).map(b => ({
     min: { x: b.center.x - b.size.x / 2, y: b.center.y - b.size.y / 2, z: b.center.z - b.size.z / 2 },
@@ -274,6 +315,9 @@ export function greyboxCollisionBoxes(boxes: readonly GreyboxBox[] = BUNKER_GREY
   if (boxes === BUNKER_GREYBOX) result.push(...BUNKER_PROPS.filter(p => p.solid).map(propCollisionBox));
   return result;
 }
+/** Everything solid, for the simulation: the bunker, its props and the scenery outside. */
+export const BUNKER_COLLISION: readonly CollisionBox[] = [...greyboxCollisionBoxes(), ...greyboxCollisionBoxes(outside.boxes),
+  ...BUNKER_OUTSIDE_PROPS.filter(p => p.solid).map(propCollisionBox)];
 // Rectangular slabs stay single blockers; only the bevelled floor needs narrow strips.
 const slabBlockers: CollisionBox[] = [];
 for (const s of surfaces.filter(s => s.startHeight === UPPER_HEIGHT && s.endHeight === UPPER_HEIGHT)) {
@@ -320,10 +364,11 @@ export const BUNKER_NAVIGATION: NavigationGraph = { nodes };
 /** Bunker as a whole, for the game and the map menu. The BUNKER_* exports above remain for tests. */
 export const BUNKER_MAP: GameMap = {
   id: 'bunker', name: 'Bunker', upperHeight: UPPER_HEIGHT,
-  greybox: BUNKER_GREYBOX, prisms: BUNKER_PRISMS, collisionBoxes: greyboxCollisionBoxes(),
+  greybox: BUNKER_GREYBOX, prisms: BUNKER_PRISMS, collisionBoxes: BUNKER_COLLISION,
   shotBlockers: BUNKER_SHOT_BLOCKERS, walkSurfaces: BUNKER_WALK_SURFACES, navigation: BUNKER_NAVIGATION,
   playerSpawn: BUNKER_PLAYER_SPAWN, windows: BUNKER_WINDOWS, windowBoards: BUNKER_WINDOW_BOARDS,
   barriers: BUNKER_BARRIERS, zombieSpawns: BUNKER_ZOMBIE_SPAWNS,
+  scenery: outside.boxes,
   doors: BUNKER_DOORS,
   doorStyles: {
     'help-room': { kind: 'planks', yaw: 0, width: 2.4, label: 'HELP' },
@@ -333,7 +378,7 @@ export const BUNKER_MAP: GameMap = {
   },
   wallWeapons: BUNKER_WALL_WEAPONS, wallWeaponFacing: BUNKER_WALL_WEAPON_FACING,
   mysteryBoxes: BUNKER_MYSTERY_BOXES, boxCenter: BUNKER_BOX_CENTER, boxYaw: Math.PI / 2,
-  rails: BUNKER_RAILS, props: BUNKER_PROPS, decals: BUNKER_DECALS,
+  rails: BUNKER_RAILS, props: [...BUNKER_PROPS, ...BUNKER_OUTSIDE_PROPS], decals: BUNKER_DECALS,
   labels: [
     { text: 'HELP', x: px(0.215), y: 2.3, z: pz(2.2), yaw: Math.PI / 2, width: 1.6, height: 0.45 },
     { text: 'YOU MUST ASCEND', x: px(5.6), y: 2.4, z: pz(-2.385), yaw: 0, width: 2.7, height: 0.38 },
@@ -345,6 +390,9 @@ export const BUNKER_MAP: GameMap = {
     { minX: px(-5.7), maxX: px(-0.9), minZ: pz(-10.5), maxZ: pz(4.5), y: UPPER_HEIGHT, count: 33 },
   ],
   focus: { x: 7, z: -2, radius: 21 },
+  grounds: BUNKER_GROUNDS,
+  trees: [{ x: -24, z: -2, scale: 1 }, { x: 34, z: -14, scale: 0.95 }, { x: -12, z: 28, scale: 1.05 }, { x: 28, z: 30, scale: 0.9 },
+    { x: -26, z: -34, scale: 1 }, { x: 18, z: -32, scale: 1.1 }],
   previews: {
     help: { position: { x: px(-1.8), y: 0, z: pz(-7.8) }, yaw: Math.PI - 0.12 },
     upstairs: { position: { x: px(2), y: UPPER_HEIGHT, z: pz(3.8) }, yaw: -0.5 },

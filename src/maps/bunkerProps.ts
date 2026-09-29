@@ -58,6 +58,12 @@ export const BUNKER_PROPS: readonly PropPlacement[] = onPlan([
   prop('yard-barrel-a', 'explosive-barrel', 15, 0, -8, 0.58, 0.9, 0.58, 0, false, true),
   prop('yard-barrel-b', 'explosive-barrel', 15.7, 0, -8.25, 0.58, 0.9, 0.58, 0, false, true),
 ]);
+
+/** Out in the fog, beyond Bunker's walls (in built coordinates, not the blockout): a jeep left by the gateway and a burnt-out light tank. */
+export const BUNKER_OUTSIDE_PROPS: readonly PropPlacement[] = [
+  prop('gateway-jeep', 'vehicles/gaz-67', 8.5, 0, 31, 1.68, 1.56, 3.35, 0.4, true, true),
+  prop('wrecked-tank', 'vehicles/t-12', -20, 0, -28, 2.16, 2.22, 5, 2.4, true, true),
+];
 export function propCollisionBox(prop: PropPlacement): CollisionBox {
   const c = Math.abs(Math.cos(prop.yaw)), s = Math.abs(Math.sin(prop.yaw));
   const halfX = (prop.size.x * c + prop.size.z * s) / 2, halfZ = (prop.size.x * s + prop.size.z * c) / 2;
