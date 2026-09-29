@@ -2,6 +2,7 @@ import type { EntityId } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
 import { PERKS } from '../core/perks.ts';
+import { equipmentName } from '../core/equipment.ts';
 
 export interface FeedbackSnapshot {
   message: string | null;
@@ -36,7 +37,7 @@ export class HudFeedback {
     };
     for (const event of events) {
       // Word of a teammate going down, getting up or bleeding out.
-      const teammate = 'playerId' in event && event.playerId !== playerId ? this.names.get(event.playerId) : undefined;
+      const teammate = 'playerId' in event && event.playerId && event.playerId !== playerId ? this.names.get(event.playerId) : undefined;
       if (teammate) {
         if (event.type === 'playerDowned') say(`${teammate.toUpperCase()} IS DOWN`, 8);
         else if (event.type === 'playerBledOut') say(`${teammate.toUpperCase()} BLED OUT`, 8);
@@ -58,6 +59,8 @@ export class HudFeedback {
         case 'wallWeaponPurchased': say(`${weaponName(event.weaponId).toUpperCase()} ACQUIRED`, 3); break;
         case 'wallWeaponAmmoPurchased': say('AMMO REFILLED', 3); break;
         case 'wallWeaponAmmoFull': say('AMMO ALREADY FULL', 3); break;
+        case 'equipmentPurchased': say(`${equipmentName(event.item).toUpperCase()}S ACQUIRED`, 3); break;
+        case 'equipmentFull': say(`ALREADY CARRYING THE MOST ${equipmentName(event.item).toUpperCase()}S`, 3); break;
         case 'mysteryBoxUsed': say('THE BOX IS ROLLING', 3); break;
         case 'mysteryBoxClaimed': say(`${weaponName(event.weaponId).toUpperCase()} CLAIMED`, 4); break;
         case 'mysteryBoxUnavailable': say('NO NEW WEAPONS IN BOX', 3); break;

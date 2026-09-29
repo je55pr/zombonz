@@ -1,4 +1,5 @@
 import type { CollisionBox } from '../core/collision.ts';
+import type { HazardDefinition } from '../core/hazard.ts';
 import type { Vec3 } from '../core/types.ts';
 import { px, pz } from './bunkerPlan.ts';
 import type { MapDecal } from './gameMap.ts';
@@ -32,7 +33,6 @@ export const BUNKER_PROPS: readonly PropPlacement[] = onPlan([
   prop('workbench-vice', 'bench-vice', 2.15, 0.55, -2.02, 0.2, 0.285, 0.396, 0, false),
   prop('spawn-shelves', 'shelf', 17.73, 0, 1.7, 1.01, 2.08, 0.26, -Math.PI / 2),
   prop('spawn-hand-truck', 'hand-truck', 17.35, 0, 3.7, 0.6, 1.4, 0.7, -Math.PI / 2),
-  prop('spawn-barrel', 'explosive-barrel', 7.7, 0, 7.2, 0.58, 0.9, 0.58),
   prop('spawn-crate-a', 'wooden-crate', 14.8, 0, 7.15, 0.85, 0.24, 0.4),
   prop('spawn-crate-b', 'wooden-crate', 14.8, 0.24, 7.15, 0.8, 0.23, 0.36, 0, false),
   prop('spawn-fuel', 'metal-jerrycan', 15.55, 0, 7.25, 0.35, 0.46, 0.18),
@@ -55,13 +55,22 @@ export const BUNKER_PROPS: readonly PropPlacement[] = onPlan([
   prop('lamp-upper', 'wall-lamp', -0.35, 5.5, 2.5, 0.273, 0.43, 0.14, -Math.PI / 2, false),
   // A real hanging lamp, in its own proportions (the caged light was squeezed into a flat bar).
   prop('hanging-light', 'hanging-lamp', 5, 2.24, 2, 0.4, 0.76, 0.4, 0, false),
-  prop('yard-barrel-a', 'explosive-barrel', 15, 0, -8, 0.58, 0.9, 0.58, 0, false, true),
-  prop('yard-barrel-b', 'explosive-barrel', 15.7, 0, -8.25, 0.58, 0.9, 0.58, 0, false, true),
 ]);
 
-/** Out in the fog, beyond Bunker's walls (in built coordinates, not the blockout): a jeep left by the gateway and a burnt-out light tank. */
+/**
+ * What explodes when shot (core/hazard.ts): fuel barrels in the start room and out in the yard, and the jeep
+ * left by the gateway. Their bodies are solid while they stand, so they are not among the props.
+ */
+export const BUNKER_HAZARDS: readonly HazardDefinition[] = [
+  { id: 'spawn-barrel', kind: 'barrel', position: { x: px(7.7), y: 0, z: pz(7.2) }, yaw: 0 },
+  { id: 'yard-barrel-a', kind: 'barrel', position: { x: px(15), y: 0, z: pz(-8) }, yaw: 0 },
+  { id: 'yard-barrel-b', kind: 'barrel', position: { x: px(15.7), y: 0, z: pz(-8.25) }, yaw: 0 },
+  // Out in the fog beyond the walls (in built coordinates, not the blockout), left by the gateway.
+  { id: 'gateway-jeep', kind: 'jeep', position: { x: 8.5, y: 0, z: 31 }, yaw: 0.4 },
+];
+
+/** Out in the fog, beyond Bunker's walls (in built coordinates, not the blockout): a burnt-out light tank. */
 export const BUNKER_OUTSIDE_PROPS: readonly PropPlacement[] = [
-  prop('gateway-jeep', 'vehicles/gaz-67', 8.5, 0, 31, 1.68, 1.56, 3.35, 0.4, true, true),
   prop('wrecked-tank', 'vehicles/t-12', -20, 0, -28, 2.16, 2.22, 5, 2.4, true, true),
 ];
 export function propCollisionBox(prop: PropPlacement): CollisionBox {

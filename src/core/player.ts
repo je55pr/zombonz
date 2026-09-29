@@ -42,6 +42,7 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     recoveryDelayTicks: 0,
     meleeCooldownTicks: 0,
     grenadeCharges: GRENADE_RULES.starting,
+    mineCharges: 0,
     repairRewardRound: 0,
     repairPointsEarned: 0,
     points: startingPoints,

@@ -7,6 +7,8 @@ import type { PowerSwitchDefinition } from '../core/door.ts';
 import type { PerkMachineDefinition } from '../core/perks.ts';
 import type { TrapDefinition } from '../core/traps.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
+import type { EquipmentBuyDefinition } from '../core/equipment.ts';
+import type { HazardDefinition } from '../core/hazard.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { PropPlacement } from './bunkerProps.ts';
@@ -101,6 +103,14 @@ export interface GameMap {
   /** The yaw each perk machine's front faces (0 faces +z). Its buy point stands in front of it. */
   perkMachineFacing?: Readonly<Record<string, number>>;
   traps?: readonly TrapDefinition[];
+  /**
+   * Barrels and vehicles that explode when shot (see core/hazard.ts). They are not in `collisionBoxes`: the
+   * simulation adds each one's body while it stands, so shooting one clears its collision.
+   */
+  hazards?: readonly HazardDefinition[];
+  /** Equipment (Bouncing Betties) sold from the wall, and the yaw each chalk outline faces, away from its wall. */
+  equipment?: readonly EquipmentBuyDefinition[];
+  equipmentFacing?: Readonly<Record<string, number>>;
   /** Where the box starts. A box with `locations` moves between them; the renderer follows its state. */
   boxCenter: Vec3;
   /** The box's front (where buyers stand) faces (cos yaw, -sin yaw) in x/z. */

@@ -6,7 +6,9 @@ import type { MysteryBoxDefinition } from '../core/mysteryBox.ts';
 import type { Vec3 } from '../core/types.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { ZombieSpawnPoint } from '../core/spawning.ts';
-import { BUNKER_OUTSIDE_PROPS, BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
+import { BUNKER_HAZARDS, BUNKER_OUTSIDE_PROPS, BUNKER_PROPS, propCollisionBox } from './bunkerProps.ts';
+import { hazardBox } from '../core/hazard.ts';
+import type { EquipmentBuyDefinition } from '../core/equipment.ts';
 import { barriersFromWindows, entrySpawns, windowPoint } from './mapBuild.ts';
 import { Scenery, onGround } from './scenery.ts';
 import { ps, px, pz } from './bunkerPlan.ts';
@@ -238,6 +240,11 @@ export const BUNKER_WALL_WEAPON_FACING: Readonly<Record<string, number>> = {
   'upper-trench-gun': 0, 'upper-bar': Math.PI / 2, 'start-m1-carbine': Math.PI, 'start-m14': -Math.PI / 2,
   'help-mp5k': 0, 'upper-ak74u': Math.PI / 2,
 };
+/** Bouncing Betties, sold from the wall of the start room, beside the Kar98k's chalk. */
+export const BUNKER_EQUIPMENT: readonly EquipmentBuyDefinition[] = [
+  { id: 'start-betty', item: 'bouncing-betty', position: { x: px(6.6), y: 1, z: pz(-2.36) }, cost: 1000, refillCost: 500 },
+];
+export const BUNKER_EQUIPMENT_FACING: Readonly<Record<string, number>> = { 'start-betty': 0 };
 export const BUNKER_MYSTERY_BOXES: readonly MysteryBoxDefinition[] = [{
   // Buyers stand in front of the box, which sits against the HELP room's south wall.
   id: 'help-box', position: { x: BUNKER_BOX_CENTER.x, y: 0.6, z: BUNKER_BOX_CENTER.z - 0.77 }, cost: 950,
@@ -333,7 +340,7 @@ for (const s of surfaces.filter(s => s.startHeight === UPPER_HEIGHT && s.endHeig
 export const BUNKER_SHOT_BLOCKERS: readonly CollisionBox[] = slabBlockers;
 
 // Sparse floor grid + exact stair centre-lines, compiled once from real geometry.
-const nodes: NavigationNode[] = [], collision = greyboxCollisionBoxes();
+const nodes: NavigationNode[] = [], collision = [...greyboxCollisionBoxes(), ...BUNKER_HAZARDS.map(hazardBox)];
 function add(id: string, position: Vec3): void {
   if (hasClearNavigationLine(position, position, collision, 0.34)) nodes.push({ id, position, neighbors: [] });
 }
@@ -376,6 +383,7 @@ export const BUNKER_MAP: GameMap = {
     'help-stairs': { kind: 'debris', yaw: 0, width: HELP_STAIR.maxX - HELP_STAIR.minX },
   },
   wallWeapons: BUNKER_WALL_WEAPONS, wallWeaponFacing: BUNKER_WALL_WEAPON_FACING,
+  hazards: BUNKER_HAZARDS, equipment: BUNKER_EQUIPMENT, equipmentFacing: BUNKER_EQUIPMENT_FACING,
   mysteryBoxes: BUNKER_MYSTERY_BOXES, boxCenter: BUNKER_BOX_CENTER, boxYaw: Math.PI / 2,
   rails: BUNKER_RAILS, props: [...BUNKER_PROPS, ...BUNKER_OUTSIDE_PROPS], decals: BUNKER_DECALS,
   labels: [

@@ -25,10 +25,13 @@ describe('key bindings', () => {
     expect(DEFAULT_KEY_BINDINGS.toggleNoclip).toEqual(['KeyK']);
     expect(DEFAULT_KEY_BINDINGS.toggleGodMode).toEqual(['KeyL']);
     const { input, key } = setup();
-    key('KeyG'); key('KeyF');
+    // The old debug keys do nothing now (G sets a Bouncing Betty, not a cheat).
+    key('KeyF'); key('KeyJ');
     expect(input.consume().actions).toEqual({});
     key('KeyK'); key('KeyL'); key('Space'); key('KeyC');
     expect(Object.keys(input.consume().actions).sort()).toEqual(['flyDown', 'flyUp', 'toggleGodMode', 'toggleNoclip']);
+    key('KeyG');
+    expect(input.consume().actions.placeMine?.pressed).toBe(true);
     input.dispose();
   });
 

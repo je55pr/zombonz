@@ -40,6 +40,8 @@ export interface PlayerState extends EntityBase {
   recoveryDelayTicks: number;
   meleeCooldownTicks: number;
   grenadeCharges: number;
+  /** Bouncing Betties carried (see MINE_RULES). */
+  mineCharges: number;
   repairRewardRound: number;
   repairPointsEarned: number;
   points: number;

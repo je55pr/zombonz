@@ -3,6 +3,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { batchStaticMeshes } from './staticBatch.ts';
 import { HANDGUNS } from './aim.ts';
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
+import { createGrenadeModel, createMineModel } from './explosiveModels.ts';
 import { WEAPON_DEFINITIONS, reloadTicksFor, weaponName } from '../core/weapon.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
@@ -92,6 +93,33 @@ const HIP_OFFSET_OVERRIDES: Readonly<Record<string, { x: number; y: number; z: n
   mp5k: { x: 0.1, y: -0.075, z: -0.2 },
 };
 const FLASH_COLOURS: Readonly<Record<string, number>> = { irrlicht: 0x7dff9a, molniya: 0x8fd8ff };
+
+export type TossKind = 'grenade' | 'mine';
+/** How long each toss lasts, in seconds: the gun dips out of the way, the thing is thrown or set down, the gun comes back. */
+export const TOSS_SECONDS: Readonly<Record<TossKind, number>> = { grenade: 0.55, mine: 0.72 };
+
+const smooth = (from: number, to: number, t: number) => { const x = Math.max(0, Math.min(1, (t - from) / (to - from))); return x * x * (3 - 2 * x); };
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/**
+ * The hand's toss, `seconds` after it began: how far the gun has dipped (0 to 1) and where the grenade or mine in the
+ * hand is (in view space, x right, y up, z forward is negative), or null when it is not in view. A grenade is
+ * raised, then whipped away just as the real one leaves; a mine is held out, then lowered to the floor.
+ */
+export function handToss(kind: TossKind, seconds: number): { dip: number; item: { x: number; y: number; z: number; spin: number; scale: number } | null } {
+  if (seconds < 0 || seconds >= TOSS_SECONDS[kind]) return { dip: 0, item: null };
+  if (kind === 'grenade') {
+    const dip = smooth(0, 0.14, seconds) * (1 - smooth(0.3, 0.55, seconds));
+    if (seconds >= 0.3) return { dip, item: null };
+    const rise = smooth(0, 0.18, seconds), whip = smooth(0.18, 0.3, seconds);
+    return { dip, item: { x: lerp(lerp(0.17, 0.12, rise), 0.03, whip), y: lerp(lerp(-0.2, -0.09, rise), 0.05, whip),
+      z: lerp(lerp(-0.6, -0.64, rise), -1.9, whip), spin: rise * 0.5 + whip * 5, scale: lerp(1, 0.7, whip) } };
+  }
+  const dip = smooth(0, 0.2, seconds) * (1 - smooth(0.46, 0.72, seconds));
+  if (seconds >= 0.46) return { dip, item: null };
+  const lower = smooth(0.24, 0.46, seconds);
+  return { dip, item: { x: lerp(0.1, 0.03, lower), y: lerp(-0.13, -0.34, lower), z: lerp(-0.7, -1.05, lower), spin: 0.4, scale: 1 } };
+}
 
 // Bake the exported rest pose to ordinary meshes, keeping the magazine separate.
 // BAR's 58 source parts then batch to two draws, without a needless gun skeleton.
@@ -198,6 +226,10 @@ export class WeaponView {
   private aimBlend = 0;
   private sprintBlend = 0;
   private generation = 0;
+  private tossTick = -100;
+  private tossKind: TossKind = 'grenade';
+  /** What is in the hand during a toss, built when first needed. */
+  private held: Record<TossKind, THREE.Group | null> = { grenade: null, mine: null };
   notice: string | null = null;
 
   constructor() {
@@ -233,7 +265,21 @@ export class WeaponView {
   }
   events(events: readonly SimulationEvent[], playerId: string, tick: number): void {
     if (events.some(event => event.type === 'matchRestarted')) this.firedTick = -100;
-    for (const event of events) if (event.type === 'weaponFired' && event.playerId === playerId) this.firedTick = tick;
+    for (const event of events) {
+      if (event.type === 'weaponFired' && event.playerId === playerId) this.firedTick = tick;
+      if (event.type === 'grenadeThrown' && event.playerId === playerId) { this.tossTick = tick; this.tossKind = 'grenade'; }
+      if (event.type === 'minePlaced' && event.playerId === playerId) { this.tossTick = tick; this.tossKind = 'mine'; }
+    }
+  }
+
+  /** The grenade (pin in, lever down) or mine in the hand, added to the viewmodel scene on first use. */
+  private heldItem(kind: TossKind): THREE.Group {
+    let item = this.held[kind];
+    if (!item) {
+      item = kind === 'grenade' ? createGrenadeModel({ pinned: true }).root : createMineModel().root;
+      item.name = `held-${kind}`; item.visible = false; this.scene.add(item); this.held[kind] = item;
+    }
+    return item;
   }
   update(player: PlayerState, tick: number, deltaSeconds = 1 / 60): void {
     if (player.weapon.weaponId !== this.id) this.equip(player.weapon.weaponId);
@@ -261,14 +307,31 @@ export class WeaponView {
       aimed.z + hip.z * away + kick * (0.045 - this.aimBlend * 0.025));
     this.pose.rotation.set(kick * (0.10 - this.aimBlend * 0.06) + reload * 0.35 - this.sprintBlend * 0.22,
       0.12 * away, -reload * 0.45 + this.sprintBlend * 0.12);
+    // Throwing a grenade or setting a mine: the gun dips out of the way while the thing is in the hand.
+    const toss = handToss(this.tossKind, Math.max(0, (tick - this.tossTick) / 60));
+    this.pose.position.x += toss.dip * 0.08; this.pose.position.y -= toss.dip * 0.32;
+    this.pose.rotation.x -= toss.dip * 0.35; this.pose.rotation.z -= toss.dip * 0.2;
+    for (const kind of ['grenade', 'mine'] as const) {
+      const shown = kind === this.tossKind && toss.item !== null;
+      if (!shown && !this.held[kind]) continue;
+      const item = this.heldItem(kind);
+      item.visible = shown;
+      if (shown && toss.item) {
+        item.position.set(toss.item.x, toss.item.y, toss.item.z); item.scale.setScalar(toss.item.scale);
+        item.rotation.set(-0.3 + toss.item.spin * 0.6, 0.6 + toss.item.spin, 0.25 - toss.item.spin * 0.4);
+      }
+    }
     this.current.magazine.position.y = -reload * 0.18;
     this.flash.position.copy(this.current.muzzle); this.flash.position.z -= 0.04;
     this.flash.scale.set(0.025, 0.025, 0.065);
-    this.flash.visible = sinceShot < 0.055;
+    this.flash.visible = sinceShot < 0.055 && toss.dip < 0.5;
   }
   /** Compiles the viewmodel's shaders and uploads its textures before the game is shown. */
   async warm(renderer: THREE.WebGLRenderer): Promise<void> {
+    // The grenade and mine held during a toss are made now, so their shaders compile with the rest.
+    for (const kind of ['grenade', 'mine'] as const) this.heldItem(kind).visible = true;
     await renderer.compileAsync(this.scene, this.camera);
+    for (const kind of ['grenade', 'mine'] as const) this.heldItem(kind).visible = false;
     this.scene.traverse(object => {
       const material = (object as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
       for (const texture of [material?.map, material?.normalMap, material?.roughnessMap, material?.aoMap, material?.emissiveMap]) {

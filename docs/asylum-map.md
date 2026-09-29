@@ -80,10 +80,19 @@ What players see but never reach:
 - **The grounds:** a brick boundary wall with concrete piers all the way round, about 26 m out, with
   a wrought-iron gateway to the south. A gatehouse stands by the gateway, and a drive with lamp posts
   runs up to the boarded main entrance on the south front. There is also a timber shed, a brick
-  morgue in the north-east corner, a stripped greenhouse frame, dead trees and an old car.
+  morgue in the north-east corner, a stripped greenhouse frame, dead trees and an old truck that
+  explodes when shot (see [Barrels and vehicles](#barrels-and-vehicles)).
 - **The wings:** chimneys on their roofs, seen from the upstairs windows.
 
 The treeline stands outside the boundary wall.
+
+## Barrels and vehicles
+
+Fuel barrels stand in the BAR room (a pair, so one sets off the other) and in the courtyard's north-west
+corner. An abandoned truck sits in the grounds, a few metres from where the German start's south
+windows' zombies appear. All of them explode when shot (`ASYLUM_HAZARDS`; the rules are in the README's
+Explosives section) and are clear of every zombie route. A shelf on the hallway's east wall sells
+Bouncing Betties for 1000 points.
 
 ## Power, perks, traps and the box
 

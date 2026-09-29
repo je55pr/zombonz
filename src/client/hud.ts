@@ -39,6 +39,8 @@ export interface HudSnapshot {
    */
   reloading: boolean;
   grenadeCharges: number;
+  /** Bouncing Betties carried. */
+  mineCharges: number;
   roundPhase: string;
   interactionPrompt: string | null;
   /** In last stand: "BLEEDING OUT 24" or "GETTING BACK UP". */
@@ -92,6 +94,7 @@ export function buildHudSnapshot(
     holsteredWeapon: player.holsteredWeapon?.weaponId ?? null,
     reloading: player.weapon.reloadTicksRemaining > 0,
     grenadeCharges: player.grenadeCharges,
+    mineCharges: player.mineCharges,
     roundPhase: simulation.state.round.phase,
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
     lastStand: player.downed ? player.downed.selfRevive ? 'GETTING BACK UP'
@@ -149,6 +152,7 @@ const LAYOUT_HEIGHT = 900;
 /** Caps the HUD canvas so a repaint's texture upload stays bounded on very large screens. */
 const MAX_HUD_WIDTH = 2560;
 const GRENADE_SLOTS = 4;
+const MINE_SLOTS = 2;
 const CONTROLS = 'WASD MOVE  ·  SHIFT SPRINT  ·  RMB AIM  ·  V KNIFE  ·  T GRENADE  ·  R RELOAD  ·  Q / WHEEL SWITCH  ·  M MUTE';
 
 interface TextStyle {
@@ -354,11 +358,25 @@ export class CanvasHud {
     });
     if (healthWidth > 0) this.panel(74, height - 41, healthWidth, 10, 5, low ? BLOOD : INK, null);
     this.text(String(snapshot.health), 266, height - 36, { size: 17, color: low ? BLOOD : INK });
-    let grenadeX = 318 + this.keycap('T', 318, height - 36, 13) + 12;
+    let grenadeX = 318 + this.keycap(actionKeyLabel(this.bindings, 'throwGrenade'), 318, height - 36, 13) + 12;
     for (let slot = 0; slot < GRENADE_SLOTS; slot++, grenadeX += 20) {
       c.beginPath(); c.arc(grenadeX + 6, height - 36, 6, 0, Math.PI * 2);
       if (slot < snapshot.grenadeCharges) { c.fillStyle = GOLD; c.fill(); }
       else { c.strokeStyle = FAINT; c.lineWidth = 1.5; c.stroke(); }
+    }
+    // Bouncing Betties, while any are carried: their key, then a little mine (a canister with three prongs) for each.
+    if (snapshot.mineCharges > 0) {
+      grenadeX += 10;
+      grenadeX += this.keycap(actionKeyLabel(this.bindings, 'placeMine'), grenadeX, height - 36, 13) + 12;
+      for (let slot = 0; slot < MINE_SLOTS; slot++, grenadeX += 22) {
+        const held = slot < snapshot.mineCharges;
+        c.save(); c.translate(grenadeX + 7, height - 36);
+        c.fillStyle = GOLD; c.strokeStyle = held ? GOLD : FAINT; c.lineWidth = 1.5;
+        c.beginPath(); c.rect(-6, -1, 12, 8);
+        if (held) c.fill(); else c.stroke();
+        for (const dx of [-3.5, 0, 3.5]) { c.beginPath(); c.moveTo(dx, -1); c.lineTo(dx * 1.4, -7); c.stroke(); }
+        c.restore();
+      }
     }
 
     // Bottom right: points in gold over the weapon, its ammunition and the holstered gun.

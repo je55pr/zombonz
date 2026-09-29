@@ -219,10 +219,14 @@ tree stump, iron bed frame, wheelchair, crutches, steel shelves, office desk, wo
 cabinet, wall clock, power box, utility box, portable generator, industrial pipes and hanging lamp.
 Their source pages are in /assets/props/manifest.json.
 
-Background vehicle conversions are CC0 OpenGameArt assets (no longer placed in either map):
+Vehicle conversions are CC0 OpenGameArt assets. The GAZ-67 is Bunker's explosive jeep, the off-road vehicle is
+Asylum's explosive truck, and the T-12 is a burnt-out wreck outside Bunker's wire:
 - GAZ-67: https://opengameart.org/content/lowpoly-soviet-jeep
 - Soviet military off-road vehicle: https://opengameart.org/content/soviet-military-off-road-vehicle
 - T-12 Soviet light tank: https://opengameart.org/content/t-12-soviet-light-tank-lowpoly
+
+The frag grenade (a Mk 2 pineapple) and the Bouncing Betty (an S-mine) are built in code from primitive geometry
+and canvas-painted textures, with no third-party source; so are the explosion sprites and scorch marks.
 
 ## Fonts
 
@@ -245,6 +249,7 @@ Compressed, edited MP3 derivatives in /assets/audio. The original downloads rema
 - Locks, metal, pickups, knife and hit foley: 80 CC0 RPG SFX: https://opengameart.org/content/80-cc0-rpg-sfx
 - Door opening: Door Open, Door Close Set by qubodup: https://lpc.opengameart.org/content/door-open-door-close-set
 - Explosions: 25 CC0 bang / firework SFX by rubberduck, recorded fireworks: https://opengameart.org/node/92774
+  (for now every explosion, of every kind; better recordings are listed in docs/audio-wanted.md)
 - Electric effects: Electricity Game Sound Pack: https://opengameart.org/content/electricity-game-sound-pack
 - Ventilation: Airvent Loop: https://opengameart.org/content/airvent-loop
 - Wind: wind1: https://opengameart.org/content/wind1

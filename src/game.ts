@@ -22,6 +22,10 @@ import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView, prepareWeaponModel } from './client/weaponView.ts';
 import { PowerupView } from './client/powerupView.ts';
 import { GrenadeView } from './client/grenadeView.ts';
+import { BlastEffects, groundFromSurfaces } from './client/blastEffects.ts';
+import { HazardView } from './client/hazardView.ts';
+import { MineView } from './client/mineView.ts';
+import { createGrenadeModel, createMineModel } from './client/explosiveModels.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
 import { buildEnvironmentProps, buildEnvironmentDecals, loadDecalTextures } from './client/environmentProps.ts';
 import {
@@ -291,7 +295,12 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   });
   const weaponView = new WeaponView();
   const powerupView = new PowerupView(scene);
-  const grenadeView = new GrenadeView(scene);
+  // Explosions, fire and debris are drawn by one shared set of instanced meshes; the hazards, mines and thrown
+  // grenades below are what the core says exists, and BlastEffects is what they look like when they go off.
+  const blastEffects = new BlastEffects(scene, { ground: groundFromSurfaces(map.walkSurfaces), lights: lightPool });
+  const hazardView = new HazardView(scene, map.hazards ?? [], blastEffects);
+  const mineView = new MineView(scene);
+  const grenadeView = new GrenadeView(scene, blastEffects);
 
   function zombies(): ZombieState[] {
     return simulation.zombies();
@@ -370,7 +379,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     collision: () => simulation.collisionBoxes(), walkSurfaces: map.walkSurfaces, shotBlockers: map.shotBlockers,
   });
   // Development builds expose the running match for inspection from the browser console.
-  if (import.meta.env.DEV) Object.assign(window, { zombonz: { simulation, playerId, net } });
+  if (import.meta.env.DEV) Object.assign(window, { zombonz: { simulation, playerId, net, effects: blastEffects, weaponView, camera } });
   /** The host holds the first wave until every player has loaded. */
   let hostRunning = net?.role !== 'host';
   if (net) {
@@ -424,6 +433,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     audio.consume(events as SimulationEvent[], playerId, simulation.state.world);
   }
   function resetMatchViews(): void {
+    hazardView.reset(); mineView.clear(); blastEffects.clear();
     previousPositions.clear();
     for (const view of skinnedViews.values()) view.dispose();
     skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
@@ -495,7 +505,14 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     syncZombieViews(remote.alpha, remote.tick, remote.previous);
     syncPlayerViews(remote.alpha, remote.tick, remote.previous);
     powerupView.update(simulation.state.powerups.drops, remote.tick);
-    grenadeView.update(simulation.state.grenades.active, remote.tick);
+    grenadeView.update(simulation.state.grenades.active, remote.tick, interval / 1000);
+    mineView.update(simulation.state.grenades.mines, nowSeconds);
+    hazardView.update(simulation.state.hazards);
+    blastEffects.update(interval / 1000, camera);
+    // A blast near enough shakes the view, dying away over a second or so.
+    const shake = blastEffects.shake();
+    camera.rotation.x += shake.x; camera.rotation.y += shake.y; camera.rotation.z += shake.z;
+
     const actorsEnded = profiling ? performance.now() : 0;
     if (details.update(simulation.state)) shadowsDirty = true;
     lightPool.update(camera, interval / 1000);
@@ -568,10 +585,14 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
 
   const startingWeapon = simulation.getPlayer(playerId)?.weapon.weaponId ?? 'starter-pistol';
   const ready = (async () => {
-    await Promise.allSettled([environmentReady, zombieReady, details.ready, prepareWeaponModel(startingWeapon)]);
+    await Promise.allSettled([environmentReady, zombieReady, details.ready, prepareWeaponModel(startingWeapon), hazardView.ready]);
     shadowsDirty = true; // the wall guns and perk machines are in place now
-    // Upload every texture and compile every shader now, rather than stuttering on the first frames.
+    // Upload every texture and compile every shader now, rather than stuttering on the first frames. A grenade and a
+    // mine sit far below the map for the moment, so their shaders are ready before the first one is thrown.
+    const spares = new THREE.Group(); spares.position.y = -200;
+    spares.add(createGrenadeModel().root, createMineModel().root); scene.add(spares);
     await renderer.compileAsync(scene, camera);
+    spares.removeFromParent();
     scene.traverse(object => {
       const materials = (object as THREE.Mesh).material;
       for (const material of Array.isArray(materials) ? materials : materials ? [materials] : []) {
@@ -630,7 +651,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       if (net?.role === 'host') net.host.close();
       if (net?.role === 'client') net.client.leave();
       for (const view of playerViews.values()) view.dispose();
-      pause.dispose(); input.dispose(); audio.dispose(); hud.dispose();
+      pause.dispose(); input.dispose(); audio.dispose(); hud.dispose(); blastEffects.clear();
       performanceOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose();
       for (const view of skinnedViews.values()) view.dispose();
       skinnedViews.clear(); zombieViews.clear();

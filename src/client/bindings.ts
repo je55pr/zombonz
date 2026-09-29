@@ -6,7 +6,7 @@ export type KeyBindings = Readonly<Partial<Record<GameAction, readonly string[]>
 export const DEFAULT_KEY_BINDINGS: KeyBindings = {
   moveForward: ['KeyW'], moveBackward: ['KeyS'], moveLeft: ['KeyA'], moveRight: ['KeyD'],
   sprint: ['ShiftLeft', 'ShiftRight'],
-  reload: ['KeyR'], interact: ['KeyE'], melee: ['KeyV'], throwGrenade: ['KeyT'], switchWeapon: ['KeyQ'],
+  reload: ['KeyR'], interact: ['KeyE'], melee: ['KeyV'], throwGrenade: ['KeyT'], placeMine: ['KeyG'], switchWeapon: ['KeyQ'],
   restart: ['Enter'],
   // Debug modes: fly with K, be invulnerable with L; Space and C move up and down while flying.
   toggleNoclip: ['KeyK'], toggleGodMode: ['KeyL'], flyUp: ['Space'], flyDown: ['KeyC'],

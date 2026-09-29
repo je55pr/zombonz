@@ -1,6 +1,8 @@
 import type { DoorDefinition, PowerSwitchDefinition } from '../core/door.ts';
 import type { BarrierDefinition } from '../core/barrier.ts';
 import type { WallWeaponDefinition } from '../core/wallWeapon.ts';
+import type { EquipmentBuyDefinition } from '../core/equipment.ts';
+import { hazardBox, type HazardDefinition } from '../core/hazard.ts';
 import { mysteryBoxBlocker, type MysteryBoxDefinition, type MysteryBoxLocation } from '../core/mysteryBox.ts';
 import type { PerkId, PerkMachineDefinition } from '../core/perks.ts';
 import type { TrapDefinition } from '../core/traps.ts';
@@ -252,7 +254,6 @@ export const ASYLUM_PROPS: readonly PropPlacement[] = [
   prop('german-radio', 'field-radio', -4.1, 0.55, 17.9, 0.62, 0.44, 0.42, Math.PI, false),
   prop('american-carton', 'cardboard-box', 4, 0, 18.3, 0.39, 0.35, 0.52),
   prop('hallway-crate', 'wooden-crate', 29.2, 0, -18.8, 0.85, 0.24, 0.4, Math.PI / 2),
-  prop('back-room-barrel', 'explosive-barrel', 24.3, 0, 9.7, 0.58, 0.9, 0.58),
   prop('kitchen-stove', 'barrel-stove', 12, UP, -31.2, 0.6, 0.86, 0.6),
   prop('kitchen-table', 'wooden-table', 4, UP, -31.3, 1.8, 0.55, 0.66),
   prop('power-bags', 'cement-bag', -16.5, UP, -21, 0.47, 0.18, 0.7, 0, false),
@@ -279,10 +280,27 @@ export const ASYLUM_PROPS: readonly PropPlacement[] = [
   // The traps' switches: a small utility box on the wall under each status lamp.
   prop('german-trap-box', 'utility-box', WEST + 0.31, UP + 0.9, 1.2, 0.46, 0.56, 0.22, Math.PI / 2, false),
   prop('right-trap-box', 'utility-box', EAST - 0.31, UP + 0.9, -5.5, 0.46, 0.56, 0.22, -Math.PI / 2, false),
-  // Left out in the courtyard, and an abandoned staff car in the grounds.
+  // Left out in the courtyard.
   prop('courtyard-wheelchair', 'wheelchair', -11.5, 0, -4.4, 0.82, 1.1, 1.09, 2.4),
-  prop('grounds-car', 'vehicles/soviet-offroad', -14, 0, 38.5, 2.01, 2, 4.2, 1.35, true, true),
 ];
+
+/**
+ * What explodes when shot (core/hazard.ts): fuel barrels in the BAR room and in the courtyard's north-west
+ * corner, and an abandoned staff truck in the grounds, a few metres from where the German start's south windows'
+ * zombies appear.
+ */
+export const ASYLUM_HAZARDS: readonly HazardDefinition[] = [
+  { id: 'back-room-barrel-a', kind: 'barrel', position: { x: 24.3, y: 0, z: 9.7 }, yaw: 0 },
+  { id: 'back-room-barrel-b', kind: 'barrel', position: { x: 23.5, y: 0, z: 9.65 }, yaw: 0.4 },
+  { id: 'courtyard-barrel-a', kind: 'barrel', position: { x: -17.6, y: 0, z: -18.4 }, yaw: 0 },
+  { id: 'courtyard-barrel-b', kind: 'barrel', position: { x: -16.7, y: 0, z: -18.7 }, yaw: 0.7 },
+  { id: 'grounds-truck', kind: 'truck', position: { x: -12.5, y: 0, z: 38.6 }, yaw: 1.35 },
+];
+/** Bouncing Betties, sold from the hallway's east wall between the Thompson and the crates. */
+export const ASYLUM_EQUIPMENT: readonly EquipmentBuyDefinition[] = [
+  { id: 'hallway-betty', item: 'bouncing-betty', position: { x: EAST - 0.24, y: G, z: -16.2 }, cost: 1000, refillCost: 500 },
+];
+const ASYLUM_EQUIPMENT_FACING: Readonly<Record<string, number>> = { 'hallway-betty': -Math.PI / 2 };
 
 // Verrückt's upstairs entries, where zombies climb in off the roofs: one on the German balcony, two
 // in Left Upstairs, two on the right balcony, and one each in the Speed Cola room, kitchen and power room.
@@ -418,7 +436,7 @@ export const ASYLUM_STAIR_ROUTES = {
   american: stairRoute('american-stair', 23.5, -8, -16),
 };
 // Routes keep clear of every box spot, wherever the box is.
-const ASYLUM_NAVIGATION = compileNavigation(b.surfaces, [...collision, ...ASYLUM_BOX_SPOTS.map(mysteryBoxBlocker)],
+const ASYLUM_NAVIGATION = compileNavigation(b.surfaces, [...collision, ...ASYLUM_HAZARDS.map(hazardBox), ...ASYLUM_BOX_SPOTS.map(mysteryBoxBlocker)],
   { minX: WEST + 0.8, maxX: EAST, minZ: NORTH + 0.8, maxZ: SOUTH }, [0, UP], [
     { id: 'spawn', position: ASYLUM_PLAYER_SPAWN },
     ...doorSides,
@@ -438,6 +456,7 @@ export const ASYLUM_MAP: GameMap = {
     ? { kind: 'debris' as const, yaw: 0, width: d.blocker.max.x - d.blocker.min.x }
     : { kind: 'planks' as const, yaw: d.blocker.max.x - d.blocker.min.x < 1 ? 0 : Math.PI / 2, width: DOOR_WIDTH }])),
   wallWeapons: ASYLUM_WALL_WEAPONS, wallWeaponFacing: ASYLUM_WALL_WEAPON_FACING,
+  hazards: ASYLUM_HAZARDS, equipment: ASYLUM_EQUIPMENT, equipmentFacing: ASYLUM_EQUIPMENT_FACING,
   mysteryBoxes: ASYLUM_MYSTERY_BOXES, boxCenter: ASYLUM_BOX_CENTER, boxYaw: -Math.PI / 2,
   fountain: FOUNTAIN,
   powerSwitch: ASYLUM_POWER_SWITCH, perkMachines: ASYLUM_PERK_MACHINES, perkMachineFacing: ASYLUM_PERK_FACING, traps: ASYLUM_TRAPS,

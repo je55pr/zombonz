@@ -1,51 +1,64 @@
 import * as THREE from 'three';
-import type { GrenadeState } from '../core/grenade.ts';
+import { GRENADE_RULES, type GrenadeState } from '../core/grenade.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
+import type { BlastEffects } from './blastEffects.ts';
+import { createGrenadeModel } from './explosiveModels.ts';
 
-const BURST_COLOURS: Readonly<Record<string, number>> = { irrlicht: 0x7dff9a };
+/** How long before the blast the grenade's neck starts to glow, in ticks. */
+const FUSE_GLOW_TICKS = 42;
+/** Below this speed (m/s) a grenade has stopped rolling and settles onto its side. */
+const RESTING_SPEED = 0.6;
+
+interface Thrown {
+  root: THREE.Group;
+  fuse: THREE.MeshStandardMaterial;
+  orientation: THREE.Quaternion;
+  /** Where the neck is, for the fuse's sparks. */
+  neck: THREE.Object3D;
+}
+
+const UP = new THREE.Vector3(0, 1, 0);
 
 /**
- * Short-lived combat effects: grenade meshes, blast flashes (grenades, RPG, Irrlicht) and Molniya
- * lightning arcs. Authoritative positions come from the core.
+ * Short-lived combat effects: thrown grenades (tumbling, with a sparking fuse), every explosion (grenade, rocket,
+ * Betty, barrel, car, Irrlicht: see BlastEffects) and Molniya lightning arcs. Authoritative positions come from
+ * the core; this only draws them.
  */
 export class GrenadeView {
-  private readonly projectiles = new Map<string, THREE.Mesh>();
-  private readonly flashes: { mesh: THREE.Mesh; bornTick: number; size: number }[] = [];
+  private readonly projectiles = new Map<string, Thrown>();
   private readonly arcs: { line: THREE.Line; bornTick: number }[] = [];
   private readonly arcMaterial = new THREE.LineBasicMaterial({ color: 0xaee6ff, transparent: true,
     blending: THREE.AdditiveBlending, depthWrite: false });
-  private readonly grenadeGeometry = new THREE.SphereGeometry(0.11, 8, 6);
-  private readonly grenadeMaterial = new THREE.MeshStandardMaterial({ color: 0x353c2a, metalness: 0.4 });
-  private readonly flashGeometry = new THREE.SphereGeometry(1, 12, 8);
+  private readonly axis = new THREE.Vector3();
+  private readonly velocity = new THREE.Vector3();
+  private readonly spin = new THREE.Quaternion();
+  private readonly target = new THREE.Vector3();
+  private readonly lying = new THREE.Quaternion();
+  private readonly heading = new THREE.Vector3();
+  private readonly up = new THREE.Vector3();
 
-  constructor(private readonly scene: THREE.Scene) {}
+  constructor(private readonly scene: THREE.Scene, private readonly effects: BlastEffects) {}
 
   events(events: readonly SimulationEvent[], tick: number): void {
     if (events.some(event => event.type === 'matchRestarted')) {
-      for (const projectile of this.projectiles.values()) projectile.removeFromParent();
+      for (const projectile of this.projectiles.values()) this.dispose(projectile);
       this.projectiles.clear();
-      for (const flash of this.flashes) { flash.mesh.removeFromParent(); (flash.mesh.material as THREE.Material).dispose(); }
-      this.flashes.length = 0;
+      this.effects.clear();
       for (const arc of this.arcs) {
         arc.line.removeFromParent(); arc.line.geometry.dispose(); (arc.line.material as THREE.Material).dispose();
       }
       this.arcs.length = 0;
     }
     for (const event of events) {
-      if (event.type === 'grenadeExploded') this.flash(event.position, 0xffa749, 1, tick);
-      if (event.type === 'weaponExploded') {
-        this.flash(event.position, BURST_COLOURS[event.weaponId] ?? 0xffa749, event.radius / 4, tick);
+      switch (event.type) {
+        case 'grenadeExploded': this.effects.detonate('grenade', event.position, GRENADE_RULES.radius, tick); break;
+        case 'weaponExploded': this.effects.detonate(event.weaponId === 'irrlicht' ? 'energy' : 'rocket', event.position, event.radius, tick); break;
+        case 'mineExploded': this.effects.detonate('mine', event.position, event.radius, tick); break;
+        case 'hazardExploded': this.effects.detonate(event.kind === 'barrel' ? 'barrel' : 'vehicle', event.position, event.radius, tick); break;
+        case 'hazardHit': this.effects.strike(event.position, tick); break;
+        case 'weaponChained': this.arc(event.points, tick); break;
       }
-      if (event.type === 'weaponChained') this.arc(event.points, tick);
     }
-  }
-
-  private flash(position: { x: number; y: number; z: number }, colour: number, size: number, tick: number): void {
-    const material = new THREE.MeshBasicMaterial({ color: colour, transparent: true,
-      opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending });
-    const mesh = new THREE.Mesh(this.flashGeometry, material);
-    mesh.position.set(position.x, position.y, position.z);
-    this.scene.add(mesh); this.flashes.push({ mesh, bornTick: tick, size });
   }
 
   /** A jagged bolt through each struck zombie; the jitter is cosmetic and seeded by the tick. */
@@ -67,29 +80,64 @@ export class GrenadeView {
     this.scene.add(line); this.arcs.push({ line, bornTick: tick });
   }
 
-  update(grenades: readonly GrenadeState[], tick: number): void {
+  private dispose(thrown: Thrown): void {
+    thrown.root.removeFromParent(); thrown.fuse.dispose();
+  }
+
+  /** Where a grenade is drawn, how it is turned, and its fuse: rolling grenades tumble, resting ones lie on their side. */
+  private pose(thrown: Thrown, grenade: GrenadeState, dt: number, fresh: boolean): void {
+    const { root } = thrown;
+    this.velocity.set(grenade.velocity.x, grenade.velocity.y, grenade.velocity.z);
+    const speed = this.velocity.length(), resting = speed < RESTING_SPEED;
+    // A client sees a new position every few ticks; ease toward it rather than jump.
+    this.target.set(grenade.position.x, grenade.position.y - (resting ? 0.055 : 0), grenade.position.z);
+    if (fresh || root.position.distanceTo(this.target) > 2) root.position.copy(this.target);
+    else root.position.lerp(this.target, 1 - Math.exp(-26 * dt));
+    if (!resting) {
+      // Tumbling end over end about the axis across its line of flight, faster the faster it goes.
+      this.axis.crossVectors(this.velocity, UP);
+      if (this.axis.lengthSq() < 1e-6) this.axis.set(1, 0, 0);
+      this.axis.normalize();
+      thrown.orientation.premultiply(this.spin.setFromAxisAngle(this.axis, Math.min(17, speed * 1.5) * dt));
+    } else {
+      // Come to rest with its long axis flat: turn the body's up-axis into the ground plane.
+      this.up.copy(UP).applyQuaternion(thrown.orientation);
+      this.heading.set(this.up.x, 0, this.up.z);
+      if (this.heading.lengthSq() < 1e-4) this.heading.set(1, 0, 0);
+      this.heading.normalize();
+      this.lying.setFromUnitVectors(this.up, this.heading);
+      thrown.orientation.premultiply(this.spin.identity().slerp(this.lying, 1 - Math.exp(-7 * dt)));
+    }
+    thrown.orientation.normalize();
+    root.quaternion.copy(thrown.orientation);
+    // The neck glows red and flickers faster as the fuse runs out.
+    const left = grenade.fuseTicksRemaining;
+    thrown.fuse.emissiveIntensity = left < FUSE_GLOW_TICKS ? 1.2 + Math.sin(left * (0.9 + (FUSE_GLOW_TICKS - left) * 0.08)) * 0.9 : 0;
+  }
+
+  update(grenades: readonly GrenadeState[], tick: number, dt = 1 / 60): void {
     const active = new Set(grenades.map(grenade => grenade.id));
-    for (const [id, mesh] of this.projectiles) if (!active.has(id)) {
-      mesh.removeFromParent(); this.projectiles.delete(id);
+    for (const [id, projectile] of this.projectiles) if (!active.has(id)) {
+      this.dispose(projectile); this.projectiles.delete(id);
     }
     for (const grenade of grenades) {
-      let mesh = this.projectiles.get(grenade.id);
-      if (!mesh) {
-        mesh = new THREE.Mesh(this.grenadeGeometry, this.grenadeMaterial);
-        this.scene.add(mesh); this.projectiles.set(grenade.id, mesh);
+      let thrown = this.projectiles.get(grenade.id);
+      const fresh = !thrown;
+      if (!thrown) {
+        const { root, fuse } = createGrenadeModel();
+        // Each one starts turned differently, so a volley doesn't tumble in step.
+        const seed = Number(grenade.id.slice(2)) * 2.399;
+        const orientation = new THREE.Quaternion().setFromEuler(new THREE.Euler(seed, seed * 1.7, seed * 0.6));
+        thrown = { root, fuse, orientation, neck: root.children[1] };
+        this.scene.add(root); this.projectiles.set(grenade.id, thrown);
       }
-      mesh.position.set(grenade.position.x, grenade.position.y, grenade.position.z);
-      mesh.rotation.x = tick * 0.18; mesh.rotation.z = tick * 0.13;
-    }
-    for (let index = this.flashes.length - 1; index >= 0; index--) {
-      const flash = this.flashes[index], age = Math.max(0, tick - flash.bornTick);
-      if (age >= 12) {
-        flash.mesh.removeFromParent(); (flash.mesh.material as THREE.Material).dispose();
-        this.flashes.splice(index, 1); continue;
+      this.pose(thrown, grenade, Math.min(0.1, dt), fresh);
+      if (grenade.fuseTicksRemaining > 0) {
+        thrown.neck.getWorldPosition(this.target);
+        this.effects.fuse(grenade.id, this.target, tick);
       }
-      flash.mesh.scale.setScalar((0.3 + age * 0.28) * flash.size);
-      (flash.mesh.material as THREE.MeshBasicMaterial).opacity = 0.42 * (1 - age / 12);
     }
+    // Arcs fade over ten ticks.
     for (let index = this.arcs.length - 1; index >= 0; index--) {
       const arc = this.arcs[index], age = Math.max(0, tick - arc.bornTick);
       if (age >= 10) {
