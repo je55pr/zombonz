@@ -59,6 +59,30 @@ describe('hitscan weapons', () => {
     });
   });
 
+  it('lets the M1911 reach two aligned zombies with reduced second-hit damage', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.aiming = true;
+    const targets = [zombie('e:4', -14), zombie('e:3', -9), zombie('e:2', -5)];
+    targets.forEach(target => { target.health = 500; });
+    const events = firePlayerWeapon(player, ray, targets, []);
+    expect(events.filter(event => event.type === 'weaponHit').map(event => event.zombieId)).toEqual(['e:2', 'e:3']);
+    expect(targets.map(target => target.health)).toEqual([500, 395, 350]);
+  });
+
+  it('gives a high-penetration rifle deeper ordered hits, stopped by a wall', () => {
+    const makeShot = (blocked: boolean) => {
+      const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+      player.weapon = createWeaponState('m14'); player.aiming = true;
+      const targets = [zombie('e:5', -17), zombie('e:4', -13), zombie('e:3', -9), zombie('e:2', -5)];
+      targets.forEach(target => { target.health = 1000; });
+      const wall = blocked ? [{ min: { x: -1, y: 0, z: -11 }, max: { x: 1, y: 3, z: -10 } }] : [];
+      const hits = firePlayerWeapon(player, ray, targets, wall).filter(event => event.type === 'weaponHit');
+      return hits.map(hit => [hit.zombieId, hit.damage]);
+    };
+    expect(makeShot(false)).toEqual([['e:2', 315], ['e:3', 268], ['e:4', 228], ['e:5', 193]]);
+    expect(makeShot(true)).toEqual([['e:2', 315], ['e:3', 268]]);
+  });
+
   it('lets world collision block a zombie', () => {
     const target = zombie('e:2', -8);
     const wall = [{

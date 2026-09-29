@@ -110,7 +110,7 @@ describe('perk machines, up close', () => {
     expect(Math.hypot(machine.position.x - stand.x, machine.position.z - stand.z)).toBeLessThan(CLOSE_RANGE);
     expect(sim.interactionCandidate(player.id)?.interactionType).toBe('perk');
     expect(press(sim)).toContainEqual({ type: 'perkBought', playerId: player.id, perk: machine.perk });
-    expect(player.points).toBe(10000 - PERKS[machine.perk].cost);
+    expect(player.points).toBe(10000 - (machine.perk === 'quick-revive' ? 500 : PERKS[machine.perk].cost));
   });
 
   it.each(map.perkMachines!.map(machine => machine.id))('sells %s from a natural distance without exact aim', id => {

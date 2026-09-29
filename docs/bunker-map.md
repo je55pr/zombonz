@@ -47,8 +47,8 @@ Only the plan grows:
 - Surviving roof slabs, large sky openings, wall returns and a cabinet silhouette.
 - Mystery box near the south-east corner of HELP, beside the stair end of the room.
 - Five spawn-room window entries; two HELP windows plus a recessed cave breach.
-- Four upper windows. These remain decorative: zombies reach upstairs via open
-  stairs, not through exterior climbing routes.
+- Four upper windows with exterior climb routes and repairable barriers. Their spawn
+  points become eligible from round four, once the interior landing can reach a player.
 
 Lengths, ceiling height, some landing clearances, the north upper gallery and damaged
 roof edges remain approximations. The original complete wall-weapon catalogue and all
@@ -73,10 +73,10 @@ navigation grid is filtered against collision and support in **both directions**
 with sampled centre-lines along the stairs. Closed-door edges are filtered by the
 existing cached runtime query. Upper slabs separately occlude bullets.
 
-All eight ground entries retain exterior approach, individual board tearing,
+All eight ground entries and four upstairs entries have exterior approaches, individual board tearing,
 single-zombie vault reservation, indoor pursuit and hold-E repairs. Zombies appear about
 15 m out in the fog (the cave breach's at the far end of its collapsed tunnel), at three
-scattered spots per entry, and shamble in. Spawn selection excludes entries whose
+spots per entry, and shamble in. Spawn selection excludes entries whose
 interior landing cannot reach a living player. L god mode,
 K noclip, imported zombies and first-person gun assets are unchanged.
 

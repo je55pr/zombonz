@@ -24,9 +24,16 @@ export interface PerkMachineState { id: string; perk: PerkId; interactableId: En
 export interface PerkEvent { type: 'perkBought'; playerId: EntityId; perk: PerkId }
 
 export const POWER_REQUIRED_PROMPT = 'The power must be on';
+export const SOLO_QUICK_REVIVE_COST = 500;
+export const SOLO_QUICK_REVIVE_LIMIT = 3;
 
-export function perkPrompt(perk: PerkId, powerOn: boolean): string {
-  return powerOn ? `E  ${PERKS[perk].name} [${PERKS[perk].cost}]` : POWER_REQUIRED_PROMPT;
+export function perkCost(perk: PerkId, playerCount: number): number {
+  return perk === 'quick-revive' && playerCount === 1 ? SOLO_QUICK_REVIVE_COST : PERKS[perk].cost;
+}
+export function perkPrompt(perk: PerkId, powerOn: boolean, playerCount = 2, soloUses = 0): string {
+  if (perk === 'quick-revive' && playerCount === 1 && soloUses >= SOLO_QUICK_REVIVE_LIMIT) return 'Quick Revive depleted';
+  return powerOn || perk === 'quick-revive' && playerCount === 1
+    ? `E  ${PERKS[perk].name} [${perkCost(perk, playerCount)}]` : POWER_REQUIRED_PROMPT;
 }
 export function createPerkMachine(definition: PerkMachineDefinition, id: EntityId): {
   state: PerkMachineState; interactable: InteractableState;
@@ -49,11 +56,13 @@ export function playerMaxHealth(player: PlayerState, base: number): number {
 }
 
 export function buyPerk(player: PlayerState, interaction: InteractionEvent, machines: readonly PerkMachineState[],
-  powerOn: boolean): Array<EconomyEvent | PerkEvent> {
+  powerOn: boolean, playerCount = 2): Array<EconomyEvent | PerkEvent> {
   if (interaction.interactionType !== 'perk') return [];
   const machine = machines.find(candidate => candidate.interactableId === interaction.interactableId);
-  if (!machine || !powerOn || !player.alive || hasPerk(player, machine.perk)) return [];
-  const spend = spendPoints(player, PERKS[machine.perk].cost, `perk:${machine.perk}`);
+  const soloRevive = machine?.perk === 'quick-revive' && playerCount === 1;
+  if (!machine || !player.alive || hasPerk(player, machine.perk) || (!powerOn && !soloRevive)
+    || (soloRevive && player.selfRevives >= SOLO_QUICK_REVIVE_LIMIT)) return [];
+  const spend = spendPoints(player, perkCost(machine.perk, playerCount), `perk:${machine.perk}`);
   if (spend.type === 'pointsSpendRejected') return [spend];
   player.perks.push(machine.perk);
   // Jugger-Nog's extra health arrives with the drink.
@@ -63,9 +72,12 @@ export function buyPerk(player: PlayerState, interaction: InteractionEvent, mach
 
 /** Machines show their price once the power is on. */
 export function syncPerkInteractables(machines: readonly PerkMachineState[], interactables: readonly InteractableState[],
-  powerOn: boolean): void {
+  powerOn: boolean, playerCount = 2, soloUses = 0): void {
   for (const machine of machines) {
     const item = interactables.find(candidate => candidate.id === machine.interactableId);
-    if (item) item.prompt = perkPrompt(machine.perk, powerOn);
+    if (item) {
+      item.prompt = perkPrompt(machine.perk, powerOn, playerCount, soloUses);
+      item.enabled = !(machine.perk === 'quick-revive' && playerCount === 1 && soloUses >= SOLO_QUICK_REVIVE_LIMIT);
+    }
   }
 }

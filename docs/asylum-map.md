@@ -98,17 +98,19 @@ Bouncing Betties for 1000 points.
 
 - **Power:** the switch is on the panel in the power room. Until it is thrown, the door between the
   starts cannot be bought, and it opens by itself once the power comes on. The lamps burn low until then.
-- **Perks** need the power on:
+- **Perks** need the power on, except solo Quick Revive:
 
   | Perk | Where | Cost | Effect |
   | --- | --- | --- | --- |
   | Jugger-Nog | German start | 2500 | 250 health: zombies need five hits instead of two |
   | Double Tap Root Beer | German balcony | 2000 | Fire rate a third faster |
-  | Quick Revive | American start | 1500 | Revives teammates twice as fast; solo, gets you back up |
+  | Quick Revive | American start | 500 solo / 1500 co-op | Solo self-revive / co-op teammate revives twice as fast |
   | Speed Cola | Speed Cola room | 3000 | Reloads take half as long |
 
-  Solo, Quick Revive works as in Black Ops: after going down, the player gets back up alone after ten
-  seconds, at most three times (the machine stops selling it after that).
+  Solo Quick Revive is available before power. After going down, the player gets back up alone after ten
+  seconds and loses the perk. It can be bought and used three times; after the third self-revive the
+  machine is depleted and can no longer be interacted with. In co-op it costs 1500, requires power,
+  and only speeds up teammate revives; it never self-revives a player.
 - **Electric traps:** one across each balcony, 1000 points once the power is on. A trap runs for
   25 seconds and then recharges for 25. It kills zombies that walk into it, for no points, and
   hurts players standing in it.

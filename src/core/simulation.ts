@@ -207,7 +207,7 @@ export class GameSimulation {
     const power = { on: !this.map.powerSwitch };
     const interactables = Object.values(world.entities).filter(
       (entity): entity is InteractableState => entity.kind === 'interactable');
-    syncPerkInteractables(perkMachines, interactables, power.on);
+    syncPerkInteractables(perkMachines, interactables, power.on, this.playerIds.length);
     syncTrapInteractables(traps, interactables, power.on);
     return { world, round: createRoundState(), spawnDirector: null, doors, wallWeapons, mysteryBoxes, barriers,
       powerups: createPowerupState(this.playerIds.length * this.economyConfig.startingPoints, this.powerupConfig),
@@ -246,7 +246,8 @@ export class GameSimulation {
     }
     for (const item of items) if (item.interactionType === 'powerSwitch') item.enabled = !this.state.power.on;
     syncBarrierInteractables(this.state.barriers, items);
-    syncPerkInteractables(this.state.perkMachines, items, this.state.power.on);
+    syncPerkInteractables(this.state.perkMachines, items, this.state.power.on, this.playerIds.length,
+      this.players()[0]?.selfRevives ?? 0);
     syncTrapInteractables(this.state.traps, items, this.state.power.on);
   }
 
@@ -407,15 +408,11 @@ export class GameSimulation {
         const interactionEvents = triggerInteraction(player, this.reachableInteractables(player), true);
         events.push(...interactionEvents);
         for (const interaction of interactionEvents) {
-          // Solo Quick Revive sells only as many times as it can be used, as in Black Ops.
-          const machine = this.state.perkMachines.find(entry => entry.interactableId === interaction.interactableId);
-          if (machine?.perk === 'quick-revive' && this.playerIds.length === 1
-            && player.selfRevives >= DOWN_RULES.soloQuickReviveLimit) continue;
           events.push(...handleDoorInteraction(player, interaction, this.state.doors, this.interactables()));
           events.push(...handleWallWeaponInteraction(player, interaction, this.state.wallWeapons));
           events.push(...useMysteryBox(player, interaction, this.state.mysteryBoxes, world.seed));
           events.push(...activatePower(player, interaction, this.state.power, this.state.doors, this.interactables()));
-          events.push(...buyPerk(player, interaction, this.state.perkMachines, this.state.power.on));
+          events.push(...buyPerk(player, interaction, this.state.perkMachines, this.state.power.on, this.playerIds.length));
           events.push(...activateTrap(player, interaction, this.state.traps, this.state.power.on));
           events.push(...handleEquipmentInteraction(player, interaction, this.state.equipment));
         }
@@ -490,6 +487,7 @@ export class GameSimulation {
       // The director still ticks every fixed step. Only resolve routes when it can spawn.
       const availableSpawns = this.map.zombieSpawns.map((spawn, index) => ({ spawn, index }))
         .filter(({ spawn }) => {
+          if (director.round < (spawn.minRound ?? 1)) return false;
           if (!needsSpawn) return true;
           const destination = spawn.barrierId
             ? this.state.barriers.find(barrier => barrier.id === spawn.barrierId)!.insidePoint : spawn;
@@ -542,7 +540,8 @@ export class GameSimulation {
       events.push(...tickTraps(this.state.traps, this.zombies(), livingPlayers(world), world.tick));
       syncTrapInteractables(this.state.traps, this.interactables(), this.state.power.on);
     }
-    if (this.state.perkMachines.length) syncPerkInteractables(this.state.perkMachines, this.interactables(), this.state.power.on);
+    if (this.state.perkMachines.length) syncPerkInteractables(this.state.perkMachines, this.interactables(),
+      this.state.power.on, this.playerIds.length, this.players()[0]?.selfRevives ?? 0);
     // Repair resolves after entry decisions, so rebuilding cannot trap an active vault.
     const repairEvents = repairBarriers(this.state.barriers, repairers, world.seed, world.tick);
     events.push(...repairEvents);

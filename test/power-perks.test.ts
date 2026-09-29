@@ -57,6 +57,35 @@ describe('Asylum power', () => {
 });
 
 describe('Asylum perks', () => {
+  it('sells solo Quick Revive before power, then depletes after three self-revives', () => {
+    const machine = map.perkMachines!.find(candidate => candidate.perk === 'quick-revive')!;
+    const facing = map.perkMachineFacing![machine.id];
+    const stand = standBefore(machine.position, facing, 0, 0.4);
+    const { sim, player } = simAt(stand, facing, 2000);
+    expect(sim.state.power.on).toBe(false);
+    expect(sim.interactionCandidate(player.id)?.prompt).toContain('[500]');
+    expect(interact(sim)).toContainEqual({ type: 'perkBought', playerId: player.id, perk: 'quick-revive' });
+    expect(player.points).toBe(1500);
+    player.perks = []; player.selfRevives = 3;
+    sim.tick();
+    expect(sim.interactionCandidate(player.id)).toBeNull();
+    expect(interact(sim).some(event => event.type === 'perkBought')).toBe(false);
+  });
+
+  it('keeps co-op Quick Revive at 1500 and power-gated', () => {
+    const machine = map.perkMachines!.find(candidate => candidate.perk === 'quick-revive')!;
+    const facing = map.perkMachineFacing![machine.id];
+    const stand = standBefore(machine.position, facing, 0, 0.4);
+    const sim = new GameSimulation({ seed: 5, map: simMap, playerSpawns: [stand, { x: 0, y: 0, z: 0 }],
+      roundConfig: quiet, economyConfig: { startingPoints: 2000, hitReward: 10, killBonus: 50 } });
+    const player = sim.getPlayer(sim.playerIds[0])!; player.yaw = facing;
+    expect(sim.interactionCandidate(player.id)?.prompt).toBe('The power must be on');
+    expect(interact(sim).some(event => event.type === 'perkBought')).toBe(false);
+    sim.state.power.on = true; sim.tick();
+    expect(sim.interactionCandidate(player.id)?.prompt).toContain('[1500]');
+    expect(interact(sim)).toContainEqual({ type: 'perkBought', playerId: player.id, perk: 'quick-revive' });
+    expect(player.points).toBe(500);
+  });
   it('puts each of Verrückt\'s four perks in its room', () => {
     const rooms: Record<string, [number, number, number, number, number]> = {
       juggernog: [-25.8, 3, 3, 19, 0], // German start
@@ -83,14 +112,18 @@ describe('Asylum perks', () => {
     sim.tick();
     expect(player.position.y, 'stands on floor').toBeCloseTo(stand.y);
     expect(Math.hypot(player.position.x - stand.x, player.position.z - stand.z), 'not pushed out').toBeLessThan(0.05);
-    expect(sim.interactionCandidate(player.id)?.prompt).toBe('The power must be on');
-    expect(interact(sim).some(event => event.type === 'perkBought')).toBe(false);
+    if (machine.perk === 'quick-revive') {
+      expect(sim.interactionCandidate(player.id)?.prompt).toContain('[500]');
+    } else {
+      expect(sim.interactionCandidate(player.id)?.prompt).toBe('The power must be on');
+      expect(interact(sim).some(event => event.type === 'perkBought')).toBe(false);
+    }
     sim.state.power.on = true;
     sim.tick();
-    expect(sim.interactionCandidate(player.id)?.prompt).toContain(`[${PERKS[machine.perk].cost}]`);
+    expect(sim.interactionCandidate(player.id)?.prompt).toContain(`[${machine.perk === 'quick-revive' ? 500 : PERKS[machine.perk].cost}]`);
     expect(interact(sim)).toContainEqual({ type: 'perkBought', playerId: player.id, perk: machine.perk });
     expect(player.perks).toEqual([machine.perk]);
-    expect(player.points).toBe(10000 - PERKS[machine.perk].cost);
+    expect(player.points).toBe(10000 - (machine.perk === 'quick-revive' ? 500 : PERKS[machine.perk].cost));
     interact(sim); // A second drink is refused.
     expect(player.perks).toEqual([machine.perk]);
   });

@@ -124,16 +124,19 @@ currently held. The box briefly closes before it can be used again. Wall chalk f
 original map: a Kar98k (200) and M1A1 Carbine (600) in the starting room, a Thompson and a
 double-barreled shotgun (1200 each) in the Help room, and a Trench Gun (1500) and BAR (1800)
 upstairs. BO1-style chalk adds an M14 (500) in the starting room, an MP5K (1000) in the Help room
-and an AK-74u (1200) upstairs. Wall ammo costs half the gun.
+and an AK-74u (1200) upstairs. Wall ammo costs half the gun. Wall buys show a chalk
+contour before and after purchase; the actual gun only appears in the player's hands.
 Shotguns fire eight pellets per shell, deadly up close and weak at range. Buying wall
 ammo refills an owned gun's reserves without replacing its loaded magazine; full
-reserves cannot be purchased again.
+reserves cannot be purchased again. Bullet penetration varies by weapon: a pistol can
+hit a short line, while rifles and heavy weapons reach farther through aligned zombies.
+World geometry stops bullets. See [penetration rules](docs/combat-penetration.md).
 
 The bunker uses imported environment materials and props alongside procedural details,
 boarded windows, overhead beams,
 stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
 Dimensions and props are an approximation, not a one-to-one recreation of the original game.
-Zombies spawn outside and follow eight ground-level window approaches. They tear out
+Zombies spawn outside and follow eight ground-level plus four upstairs window approaches. They tear out
 the six boards one at a time, in a random order (any board still up may go, and rebuilding
 fills a random gap; the match seed decides, so every player sees the same), climb through the
 sill, then pursue players through open rooms and stairs. The boards sit in two groups, three
@@ -145,8 +148,8 @@ several are in reach, the nearest and best-centred one is used.
 Repairs are free and award 10 points per board up to a per-round cap. Once a board is gone,
 a zombie at the window swipes any player within about 1.4 m of it on the inside,
 and it stops tearing while it swipes. Repair from further back to stay safe. Zombies can be shot outside, and only
-one zombie crosses a given window at a time. Upstairs is reached through the stairs;
-upper windows and the ground window behind the north-east stair remain scenery.
+one zombie crosses a given window at a time. Upstairs entries begin spawning from round four,
+when their interior landing can reach a player; the ground window behind the north-east stair remains scenery.
 Rounds follow the classic WaW/BO1 curves: solo rounds hold 6, 8, 13, 18 and 24 zombies,
 then grow faster from round 10, with more per extra co-op player and at most 24 alive at once.
 Rounds are ten seconds apart. Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or

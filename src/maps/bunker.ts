@@ -263,19 +263,32 @@ const windowById = (id: string): BunkerWindow => windows.find(w => w.id === id)!
  * Zombies shamble in from about 15 m out in the fog (the HELP room's east window from the yard, around
  * the corner); the cave breach's come from the far end of its collapsed tunnel.
  */
-const ENTRY_ROUTES: Readonly<Record<string, Vec3[]>> = {
+const ENTRY_ROUTES: Record<string, Vec3[]> = {
   ...Object.fromEntries(['start-north', 'start-east', 'start-wide', 'start-south', 'start-corner', 'help-north']
     .map(id => [id, [windowPoint(windowById(id), 15, 0.6)]])),
   'help-east': [onGround(11, -15)],
   'help-cave': [onGround(-15.8, 1.15)],
 };
-// Upper windows stay decorative.
+// Upper entries approach on the ground, climb the outer wall, then tear through at gallery height.
+// Keep the climb vertical so no zombie can cut through the ground-floor rooms or scenery.
+const UPPER_ENTRIES = ['upper-help-north', 'upper-help-south', 'upper-gallery', 'upper-east'] as const;
+for (const id of UPPER_ENTRIES) {
+  const opening = windowById(id);
+  const climb = windowPoint(opening, id === 'upper-east' ? 11.2 : id === 'upper-help-south' ? 10 : 2.4);
+  ENTRY_ROUTES[id] = [{ ...windowPoint(opening, 15), y: 0 },
+    { ...climb, y: 0 }, { ...climb, y: UPPER_HEIGHT }];
+}
 // The cave breach's landing keeps to the middle of its wide window, clear of the stair annex beside it.
-export const BUNKER_BARRIERS: readonly BarrierDefinition[] = barriersFromWindows(windows, BUNKER_WINDOW_BOARDS, [], ENTRY_ROUTES,
+export const BUNKER_BARRIERS: readonly BarrierDefinition[] = barriersFromWindows(windows, BUNKER_WINDOW_BOARDS, UPPER_ENTRIES, ENTRY_ROUTES,
   { 'help-cave': 0.2 });
 /** Three spots per entry where its zombies appear (see entrySpawns); the tunnel is too narrow to scatter far. */
 export const BUNKER_ZOMBIE_SPAWNS: readonly ZombieSpawnPoint[] = BUNKER_BARRIERS.flatMap(b =>
-  entrySpawns(b, b.id === 'help-cave' ? [onGround(-15.3, 0.4), onGround(-14.6, 1.9)] : undefined));
+  entrySpawns(b, b.id === 'help-cave' ? [onGround(-15.3, 0.4), onGround(-14.6, 1.9)]
+    : b.id === 'upper-help-south' ? [
+      { ...b.approachPath[0], x: b.approachPath[0].x - 1 },
+      { ...b.approachPath[0], x: b.approachPath[0].x - 1.6 },
+    ] : undefined)
+    .map(spawn => b.position.y > 0 ? { ...spawn, minRound: 4 } : spawn));
 
 // ---- Outside: a barbed-wire perimeter with a gateway to the south, a watchtower, a timber hut, a
 // half-buried pillbox and a ruined wall, out in the fog where the zombies come from.
@@ -357,6 +370,7 @@ for (const [id, p] of Object.entries({ spawn: BUNKER_PLAYER_SPAWN, helpWest: { x
   annexTop: { x: px(-5.5), y: UPPER_HEIGHT, z: pz(4.5) },
   // The strip beside the HELP stairwell is narrower than the grid spacing; route through its middle.
   annexLanding: { x: px(-5.5), y: UPPER_HEIGHT, z: (pz(5.4) + pz(6.65)) / 2 } })) add(id, p);
+add('upper-east-landing', { x: 10.5, y: UPPER_HEIGHT, z: pz(4.6) });
 for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
   const a = nodes[i], b = nodes[j];
   if (Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z) > 3.2) continue;
@@ -398,7 +412,7 @@ export const BUNKER_MAP: GameMap = {
   ],
   focus: { x: 7, z: -2, radius: 21 },
   grounds: BUNKER_GROUNDS,
-  trees: [{ x: -24, z: -2, scale: 1 }, { x: 34, z: -14, scale: 0.95 }, { x: -12, z: 28, scale: 1.05 }, { x: 28, z: 30, scale: 0.9 },
+  trees: [{ x: -26, z: -8, scale: 1 }, { x: 34, z: -14, scale: 0.95 }, { x: -12, z: 28, scale: 1.05 }, { x: 28, z: 30, scale: 0.9 },
     { x: -26, z: -34, scale: 1 }, { x: 18, z: -32, scale: 1.1 }],
   previews: {
     help: { position: { x: px(-1.8), y: 0, z: pz(-7.8) }, yaw: Math.PI - 0.12 },

@@ -12,7 +12,7 @@ const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: BUNKER_WALK
 function makeSimulation(index = 0, count = 1, initialWaitTicks = 1) {
   const spawn = BUNKER_ZOMBIE_SPAWNS.find(point => point.barrierId === BUNKER_BARRIERS[index].id)!;
   return new GameSimulation({ seed: 4848,
-    map: { ...map, zombieSpawns: [spawn] }, playerSpawns: [BUNKER_PLAYER_SPAWN],
+    map: { ...map, zombieSpawns: [{ ...spawn, minRound: 1 }] }, playerSpawns: [BUNKER_PLAYER_SPAWN],
     roundConfig: { initialWaitTicks, intermissionTicks: 9999 },
     spawnConfig: { baseZombieCount: count, additionalPerRound: 0, spawnIntervalTicks: 20, maxAlive: count } });
 }
@@ -60,7 +60,7 @@ describe('exterior entry routes', () => {
       const player = sim.getPlayer(sim.playerIds[0])!;
       player.health = 100000;
       let entered = false;
-      for (let tick = 0; tick < 3400; tick++) {
+      for (let tick = 0; tick < (BUNKER_BARRIERS[index].position.y > 0 ? 6000 : 3400); tick++) {
         if (sim.tick().some(event => event.type === 'zombieEntered')) entered = true;
       }
       const zombie = sim.zombies()[0];
