@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "revision": "a6b0e8304c4fe7afdf258d56a00201ba4e24d73e93b4c4c48bd0374160b00ce6",
+  "revision": "d2979aa2c12e917173f1674c21edb7432126120c83fdbf6992182bd24d76f8e8",
   "files": {
     "assets/audio/ambience-sting-1.mp3": {
       "size": 36951,
@@ -773,6 +773,10 @@
     "assets/weapons/kar98k/model.glb": {
       "size": 2455792,
       "sha256": "1acd0c6389b251a73583aa5fe693aec7684601e0c21847eac85ce1bd925706d5"
+    },
+    "assets/weapons/knife/model.glb": {
+      "size": 118900,
+      "sha256": "bf50d1dd4220c6b2457b3e2f6a550bc78bc0ee7583bed5985b82232a082cc28f"
     },
     "assets/weapons/m1-carbine/model.glb": {
       "size": 908416,

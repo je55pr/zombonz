@@ -276,6 +276,9 @@ describe('start-screen asset list', () => {
       const { AUDIO_CLIPS } = await import('../src/client/audioClips.ts');
       const urls = await gameAssetUrls();
       expect(new Set(urls).size).toBe(urls.length);
+      expect(urls).toContain('/assets/weapons/knife/model.glb');
+      expect(urls).toContain('/assets/audio/knife.mp3');
+      expect(urls).toContain('/assets/audio/flesh-hit.mp3');
       for (const asset of new Set(Object.values(WEAPON_ASSETS))) expect(urls).toContain(`/assets/weapons/${asset}/model.glb`);
       for (const prop of BUNKER_PROPS) expect(urls).toContain(`/assets/props/${prop.asset}/model.glb`);
       for (const clip of ['model', 'idle', 'walk', 'run', 'attack', 'death']) expect(urls).toContain(`/assets/zombies/peter_d/${clip}.glb`);

@@ -20,7 +20,7 @@ import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip } from './client/audioC
 import { ZOMBIE_ASSET_IDS, loadModel, loadZombieAsset, zombieAssetFor, type ZombieAsset } from './client/runtimeAssets.ts';
 import { zombieLook } from './client/zombieLooks.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
-import { WeaponView, prepareWeaponModel } from './client/weaponView.ts';
+import { WeaponView, prepareKnifeModel, prepareWeaponModel } from './client/weaponView.ts';
 import { PowerupView } from './client/powerupView.ts';
 import { GrenadeView } from './client/grenadeView.ts';
 import { BlastEffects, groundFromSurfaces } from './client/blastEffects.ts';
@@ -88,6 +88,7 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
     () => loadModel(TEAMMATE_MODEL),
     ...ZOMBIE_ASSET_IDS.map(id => () => loadZombieAsset(id)),
     () => prepareWeaponModel('starter-pistol'),
+    () => prepareKnifeModel(),
     // Model-derived chalk outlines need the weapon assets ready before the map appears.
     ...[...new Set(allMaps.flatMap(map => map.wallWeapons.map(wall => wall.weaponId)))].map(id => () => prepareWeaponModel(id)),
     // Every sound, so the first shot and the first moan play on the first frame of the map.
