@@ -2,7 +2,8 @@ import type { CollisionBox, WalkSurface } from '../core/collision.ts';
 import { DOWN_RULES } from '../core/downs.ts';
 import { tickPlayerRecovery } from '../core/health.ts';
 import type { InputFrame } from '../core/input.ts';
-import { PLAYER_MOVEMENT, updatePlayerMovement } from '../core/player.ts';
+import { PLAYER_MOVEMENT, playerEyeHeight, updatePlayerMovement } from '../core/player.ts';
+import { GRENADE_RULES } from '../core/grenade.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 import type { PlayerState } from '../core/types.ts';
 import {
@@ -47,10 +48,15 @@ export function predictPlayerTick(player: PlayerState, frame: InputFrame, world:
     if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
     if (frame.actions.reload?.pressed) events.push(...beginReload(player));
     if (frame.actions.melee?.pressed) events.push(...meleeAttack(player, [], blockers, false));
+    if (frame.actions.switchWeapon?.pressed || frame.actions.melee?.pressed || frame.actions.reload?.pressed
+      || frame.actions.cancelGrenade?.pressed || player.noclip) player.grenadeWindupTicks = 0;
+    else if (frame.actions.throwGrenade?.pressed && player.grenadeWindupTicks === 0
+      && player.grenadeCharges > 0 && player.switchTicksRemaining === 0) player.grenadeWindupTicks = GRENADE_RULES.windupTicks;
+    if (player.grenadeWindupTicks > 0) player.grenadeWindupTicks -= 1;
   }
   const fire = frame.actions.fire;
-  if (wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) {
-    events.push(...firePlayerWeapon(player, rayFromPlayer(player, player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight),
+  if (player.grenadeWindupTicks === 0 && wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) {
+    events.push(...firePlayerWeapon(player, rayFromPlayer(player, player.downed ? DOWN_RULES.eyeHeight : playerEyeHeight(player)),
       [], blockers, false, seed));
   }
   return events.filter(event => PREDICTED_EVENTS.has(event.type));

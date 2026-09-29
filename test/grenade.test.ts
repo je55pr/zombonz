@@ -1,9 +1,46 @@
 import { describe, expect, it } from 'vitest';
 import { createGrenadePool, createPlayerState, createZombieState, throwGrenade, tickGrenades,
-  GameSimulation, createInputFrame, addEntity } from '../src/core/index.ts';
+  GameSimulation, createInputFrame, addEntity, GRENADE_RULES } from '../src/core/index.ts';
 import { BrowserInput } from '../src/client/input.ts';
 
 describe('fixed-tick grenades', () => {
+  it('keeps one held grenade through wind-up and cancels it on weapon switch', () => {
+    const sim = new GameSimulation({ seed: 5, playerSpawns: [{ x: 0, y: 0, z: 0 }],
+      map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] },
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 1 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    const press = createInputFrame(0);
+    press.actions.throwGrenade = { held: true, pressed: true, released: false, value: 1 };
+    sim.tick({ [player.id]: press });
+    for (let i = 0; i < 5; i++) sim.tick({ [player.id]: press });
+    expect(sim.state.grenades.active).toHaveLength(0);
+    expect(player.grenadeCharges).toBe(2);
+    const switchFrame = createInputFrame(1);
+    switchFrame.actions.switchWeapon = { held: true, pressed: true, released: false, value: 1 };
+    sim.tick({ [player.id]: switchFrame });
+    expect(player.grenadeWindupTicks).toBe(0);
+    for (let i = 0; i < GRENADE_RULES.windupTicks; i++) sim.tick();
+    expect(sim.state.grenades.active).toHaveLength(0);
+    expect(player.grenadeCharges).toBe(2);
+  });
+
+  it('cancels a pending throw when the online pause menu sends cancellation', () => {
+    const sim = new GameSimulation({ seed: 8, playerSpawns: [{ x: 0, y: 0, z: 0 }],
+      map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [] },
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 1 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    const throwFrame = createInputFrame(0);
+    throwFrame.actions.throwGrenade = { held: true, pressed: true, released: false, value: 1 };
+    sim.tick({ [player.id]: throwFrame });
+    const paused = createInputFrame(1);
+    paused.actions.cancelGrenade = { held: false, pressed: true, released: false, value: 0 };
+    sim.tick({ [player.id]: paused });
+    for (let i = 0; i < GRENADE_RULES.windupTicks; i++) sim.tick();
+    expect(player.grenadeWindupTicks).toBe(0);
+    expect(sim.state.grenades.active).toHaveLength(0);
+    expect(player.grenadeCharges).toBe(2);
+  });
+
   it('throws at most two serializable grenades and spends one charge per press', () => {
     const pool = createGrenadePool(), player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     expect(throwGrenade(pool, player)).toMatchObject([{ type: 'grenadeThrown', grenadeId: 'g:1' }]);
@@ -64,7 +101,11 @@ describe('fixed-tick grenades', () => {
     const player = sim.getPlayer(sim.playerIds[0])!;
     const frame = createInputFrame(0);
     frame.actions.throwGrenade = { held: true, pressed: true, released: false, value: 1 };
-    expect(sim.tick({ [player.id]: frame }).map(event => event.type)).toContain('grenadeThrown');
+    expect(sim.tick({ [player.id]: frame }).map(event => event.type)).not.toContain('grenadeThrown');
+    expect(player.grenadeWindupTicks).toBe(GRENADE_RULES.windupTicks - 1);
+    for (let i = 1; i < GRENADE_RULES.windupTicks - 1; i++) sim.tick();
+    expect(sim.state.grenades.active).toHaveLength(0);
+    expect(sim.tick().map(event => event.type)).toContain('grenadeThrown');
     expect(player.grenadeCharges).toBe(1);
     sim.state.grenades.active = [{ id: 'g:99', ownerId: player.id,
       position: { x: 0, y: 0.1, z: -3 }, velocity: { x: 0, y: 0, z: 0 }, fuseTicksRemaining: 1 }];

@@ -7,6 +7,7 @@ export interface PauseMenuActions {
   restart(): void;
   quit(): void;
   settings(settings: GameSettings): void;
+  controls(): void;
 }
 
 /** Focusable DOM pause dialog, separate from the in-world HUD and simulation clock. */
@@ -41,6 +42,7 @@ export class PauseMenuView {
       </div>
       <div class="pause-settings" hidden>
         ${rows}
+        <button type="button" data-action="controls">Controls</button>
         <button type="button" data-action="back">Back</button>
       </div>
       <p data-hint>ESC TO RESUME · TAB TO NAVIGATE</p>
@@ -86,6 +88,7 @@ export class PauseMenuView {
     if (action === 'resume') this.actions.resume();
     else if (action === 'restart') this.actions.restart();
     else if (action === 'settings') this.show('settings');
+    else if (action === 'controls') this.actions.controls();
     else if (action === 'back') this.show('main');
     else if (action === 'quit') this.actions.quit();
   };
@@ -98,6 +101,7 @@ export class PauseMenuView {
   };
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
+    if (document.querySelector('.binding-editor')) return;
     if (!this.open || event.code !== 'Escape' || event.repeat) return;
     event.preventDefault();
     event.stopImmediatePropagation();

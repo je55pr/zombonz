@@ -4,6 +4,7 @@ import type { MapId } from './maps/catalog.ts';
 import { INITIAL_DOWNLOAD } from './client/menu.ts';
 import { loadSettings, saveSettings } from './client/settings.ts';
 import { PauseMenuView } from './client/pauseMenu.ts';
+import { BindingEditor } from './client/bindingEditor.ts';
 import type { DownloadStatus } from './client/menu.ts';
 
 type GameModule = typeof import('./game.ts');
@@ -18,6 +19,7 @@ let menu: MenuView | undefined;
 let menuCanvas: HTMLCanvasElement | undefined;
 let session: ReturnType<GameModule['startGame']> | undefined;
 let pauseMenu: PauseMenuView | undefined;
+let bindingEditor: BindingEditor | undefined;
 let readyDownload: DownloadStatus | undefined;
 let lobby: { dispose(): void } | undefined;
 
@@ -36,6 +38,7 @@ function captureMouse(): void {
 }
 
 function showMenu(): void {
+  bindingEditor?.dispose(); bindingEditor = undefined;
   lobby?.dispose(); lobby = undefined;
   session?.dispose(); session = undefined;
   pauseMenu?.dispose(); pauseMenu = undefined;
@@ -47,6 +50,7 @@ function showMenu(): void {
   gameCanvas!.before(menuCanvas);
   const view = new MenuView(menuCanvas, loadSettings(), effect => {
     if (effect.type === 'saveSettings') saveSettings(effect.settings);
+    if (effect.type === 'openBindings') openBindings();
     if (effect.type === 'retryDownload') void downloadGame(view);
     if (effect.type === 'startSolo' && game) void startSession(game, effect.map);
     if (effect.type === 'hostGame') void openLobby({ kind: 'host', map: effect.map });
@@ -55,6 +59,14 @@ function showMenu(): void {
   menu = view;
   if (readyDownload) view.setDownload(readyDownload);
   else void downloadGame(view);
+}
+
+function openBindings(): void {
+  if (bindingEditor) return;
+  bindingEditor = new BindingEditor(bindings => session?.updateBindings(bindings), () => {
+    bindingEditor = undefined;
+    if (pauseMenu?.open) pauseMenu.element.querySelector<HTMLButtonElement>('[data-action="controls"]')?.focus();
+  });
 }
 
 /** The co-op lobby, over the menu: hosting on the chosen map, or joining someone's game. */
@@ -90,6 +102,7 @@ async function startSession(module: GameModule, map: MapId, net?: NetPlay): Prom
     restart: () => { captureMouse(); session?.restart(); pauseMenu?.setOpen(false); },
     quit: showMenu,
     settings: settings => { saveSettings(settings); session?.updateSettings(settings); },
+    controls: openBindings,
   }, document.body, { online: !!net, canRestart: net?.role !== 'client' });
   try {
     session = module.startGame(gameCanvas!, loadSettings(), map, {

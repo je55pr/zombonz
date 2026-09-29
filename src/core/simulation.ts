@@ -30,7 +30,7 @@ import {
   findInteractionCandidate, triggerInteraction,
   type InteractionCandidate, type InteractionEvent,
 } from './interaction.ts';
-import { PLAYER_MOVEMENT, createPlayerState, updatePlayerMovement } from './player.ts';
+import { PLAYER_MOVEMENT, createPlayerState, playerEyeHeight, updatePlayerMovement } from './player.ts';
 import {
   createRoundState, updateRoundState, type RoundConfig, type RoundEvent, type RoundState,
 } from './rounds.ts';
@@ -344,7 +344,7 @@ export class GameSimulation {
   }
 
   private reachableInteractables(player: PlayerState): InteractableState[] {
-    const eye = { ...player.position, y: player.position.y + PLAYER_MOVEMENT.eyeHeight };
+    const eye = { ...player.position, y: player.position.y + playerEyeHeight(player) };
     return this.interactables().filter(item => {
       if (!item.enabled || Math.hypot(item.position.x - player.position.x,
         item.position.y - player.position.y, item.position.z - player.position.z) > item.interactionRange) return false;
@@ -413,7 +413,15 @@ export class GameSimulation {
       events.push(...tickWeaponState(player));
       if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
-      if (frame.actions.throwGrenade?.pressed) events.push(...throwGrenade(this.state.grenades, player));
+      if (frame.actions.switchWeapon?.pressed || frame.actions.melee?.pressed || frame.actions.reload?.pressed
+        || frame.actions.cancelGrenade?.pressed || player.noclip) player.grenadeWindupTicks = 0;
+      else if (frame.actions.throwGrenade?.pressed && player.grenadeWindupTicks === 0
+        && player.grenadeCharges > 0 && player.switchTicksRemaining === 0) {
+        player.grenadeWindupTicks = GRENADE_RULES.windupTicks;
+      }
+      if (player.grenadeWindupTicks > 0 && --player.grenadeWindupTicks === 0) {
+        events.push(...throwGrenade(this.state.grenades, player));
+      }
       if (frame.actions.placeMine?.pressed) events.push(...placeMine(this.state.grenades, player, this.shotBlockers(), this.map.walkSurfaces));
       // Holding use beside a downed teammate revives them, ahead of anything else in reach.
       const downedTeammate = frame.actions.interact?.held ? reviveTarget(player, this.players()) : null;
@@ -450,9 +458,9 @@ export class GameSimulation {
           this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
       }
       const fire = frame.actions.fire;
-      if (!wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
+      if (player.grenadeWindupTicks > 0 || !wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
       const weaponEvents = firePlayerWeapon(
-        player, rayFromPlayer(player, player.downed ? DOWN_RULES.eyeHeight : PLAYER_MOVEMENT.eyeHeight), this.zombies(),
+        player, rayFromPlayer(player, player.downed ? DOWN_RULES.eyeHeight : playerEyeHeight(player)), this.zombies(),
         this.shotBlockers(),
         this.state.powerups.instaKillTicksRemaining > 0,
         world.seed ^ world.tick,

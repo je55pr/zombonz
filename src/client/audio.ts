@@ -56,7 +56,7 @@ export function softCeilingCurve(points = 4097): Float32Array {
 }
 /** One-shot mix levels; everything else sits below the player's own gunfire. */
 const MIX = {
-  gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.35, knife: 0.5, hit: 0.35, headshot: 0.5,
+  gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.7, knife: 0.5, hit: 0.35, headshot: 0.5,
   hurt: 0.6, footstep: 0.28, sprintStep: 0.34, zombieVoice: 0.6, zombieStep: 0.3, zombieDeath: 0.55,
   boardBreak: 0.55, boardRepair: 0.4, door: 0.6, box: 0.4, pickup: 0.5, reject: 0.35, roundStart: 0.5,
   zombieAttack: 0.55, sting: 0.22, clink: 0.32, ping: 0.5, mine: 0.4,

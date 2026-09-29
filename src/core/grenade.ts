@@ -9,6 +9,7 @@ import { rayFromPlayer, type WeaponEvent } from './weapon.ts';
 export const GRENADE_RULES = {
   /** WaW/BO1: two to start, two more each round, carrying at most four. */
   starting: 2, perRound: 2, maximum: 4, fuseTicks: 120, radius: 4, damage: 350, playerDamage: 100, gravity: 13,
+  windupTicks: 18,
 } as const;
 
 /**
@@ -65,11 +66,12 @@ export function createGrenadePool(): GrenadePool { return { nextId: 1, active: [
 
 export function throwGrenade(pool: GrenadePool, player: PlayerState): GrenadeEvent[] {
   if (!player.alive || player.grenadeCharges <= 0 || player.noclip) return [];
-  const direction = rayFromPlayer(player, 1.3).direction;
+  const throwHeight = player.stance === 'prone' ? 0.4 : player.stance === 'crouch' ? 0.9 : 1.3;
+  const direction = rayFromPlayer(player, throwHeight).direction;
   const grenade: GrenadeState = {
     id: `g:${pool.nextId++}`, ownerId: player.id,
     position: { x: player.position.x + direction.x * 0.55,
-      y: player.position.y + 1.3, z: player.position.z + direction.z * 0.55 },
+      y: player.position.y + throwHeight, z: player.position.z + direction.z * 0.55 },
     velocity: { x: direction.x * 9 || 0, y: 3.5 + direction.y * 7, z: direction.z * 9 || 0 },
     fuseTicksRemaining: GRENADE_RULES.fuseTicks,
   };
