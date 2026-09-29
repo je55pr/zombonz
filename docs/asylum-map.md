@@ -104,7 +104,8 @@ The treeline stands outside the boundary wall.
   25 seconds and then recharges for 25. It kills zombies that walk into it, for no points, and
   hurts players standing in it.
 - **The box** starts in the power room and can move to the German start, the German balcony,
-  Left Upstairs or the hallway. A pale beam of light shows where it is. The teddy bear follows
+  Left Upstairs or the hallway. Nothing marks where it went: players have to find it, as in
+  Verrückt (a map can turn on a locator beam with `boxLocatorBeam`). The teddy bear follows
   Black Ops' odds as best I recall them: never in a spot's first four rolls, then 15%. At the
   starting spot, the roll after the eighth always brings the bear. After a move, the odds rise to
   30% after eight rolls and 50% after thirteen. The bear refunds the roll, then the box leaves and

@@ -249,3 +249,10 @@ describe('Asylum routes', () => {
       [target], map.shotBlockers, 60).kind).toBe('world');
   });
 });
+
+describe('Asylum box locator', () => {
+  it('moves the box between spots with nothing marking where it went', () => {
+    expect(map.mysteryBoxes[0].locations?.length).toBeGreaterThan(1);
+    expect(map.boxLocatorBeam).toBeFalsy();
+  });
+});

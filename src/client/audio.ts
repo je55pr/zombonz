@@ -279,6 +279,9 @@ export class GameAudio {
         case 'mysteryBoxClaimed': this.playClip('pickup', MIX.pickup); break;
         case 'doorOpened': this.playClip('door-unlock', MIX.door); this.playClip('door-open', MIX.door * 0.8); break;
         case 'powerupCollected': this.playClip('electric-powerup', MIX.electric * 0.6); this.playClip('pickup', MIX.pickup * 0.6); break;
+        case 'carpenterRepaired':
+          // Boards hammered back up.
+          this.playClip('wood-impact-1', MIX.boardRepair); this.playClip('wood-impact-2', MIX.boardRepair, 0, 0.9); break;
         case 'nukeDetonated': this.playClip('explosion-large', MIX.explosion, 0, 0.75); break;
         case 'grenadeThrown': this.playClip('door-metal', MIX.reload * 0.5, 0, 1.4); break;
         case 'weaponExploded':

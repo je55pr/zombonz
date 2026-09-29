@@ -202,11 +202,13 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
   const moves = (map.mysteryBoxes[0]?.locations?.length ?? 0) > 1;
   // A fixed box's body is part of the greybox; one that moves carries its own.
   if (moves) { chest.userData.dynamic = true; box(chest, wood, 0, 0.52, 0, 0.95, 1.04, 2.35); }
-  // A box that moves marks where it is with WaW's pale beam of light.
-  // A soft glow that always faces the viewer, so it never shows the edges of a solid.
-  const beam = new THREE.Sprite(new THREE.SpriteMaterial({ map: beamFade(), color: 0xcfe0ff, transparent: true, opacity: 0.5,
-    blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-  beam.center.set(0.5, 0); beam.scale.set(1.8, 24, 1); beam.position.set(0, 0.6, 0); beam.visible = moves; chest.add(beam);
+  // A map can mark a box that moves with a pale beam of light, so players can find it (Verrückt does not).
+  if (moves && map.boxLocatorBeam) {
+    // A soft glow that always faces the viewer, so it never shows the edges of a solid.
+    const beam = new THREE.Sprite(new THREE.SpriteMaterial({ map: beamFade(), color: 0xcfe0ff, transparent: true, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    beam.center.set(0.5, 0); beam.scale.set(1.8, 24, 1); beam.position.set(0, 0.6, 0); chest.add(beam);
+  }
   // The teddy bear that comes up instead of a gun, before the box leaves.
   const fur = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 1 });
   const teddy = new THREE.Group(); teddy.visible = false; chest.add(teddy);

@@ -12,7 +12,7 @@ import { buyPerk, createPerkMachine, syncPerkInteractables,
 import { activateTrap, createTrap, syncTrapInteractables, tickTraps,
   type TrapDefinition, type TrapEvent, type TrapState } from './traps.ts';
 import {
-  DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints, awardNukePoints,
+  DEFAULT_ECONOMY_CONFIG, awardCombatPoints, awardRepairPoints, awardNukePoints, awardCarpenterPoints,
   type EconomyConfig, type EconomyEvent,
 } from './economy.ts';
 import { PLAYER_HEALTH, livingEntityCount, livingPlayers, tickPlayerRecovery, type DamageEvent } from './health.ts';
@@ -423,8 +423,11 @@ export class GameSimulation {
     }
     if (this.state.powerups.drops.length) {
       const pickupEvents = collectPowerups(this.state.powerups, livingPlayers(world), this.collisionBoxes(),
-        this.powerupConfig, this.zombies());
+        this.powerupConfig, this.zombies(), this.state.barriers);
       events.push(...pickupEvents);
+      if (pickupEvents.some(event => event.type === 'carpenterRepaired')) for (const player of livingPlayers(world)) {
+        events.push(...awardCarpenterPoints(player));
+      }
       if (pickupEvents.some(event => event.type === 'nukeDetonated')) for (const player of livingPlayers(world)) {
         events.push(...awardNukePoints(player));
       }

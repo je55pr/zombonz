@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GameSimulation, WEAPON_DEFINITIONS, createPlayerState, createWeaponState, createZombieState, firePlayerWeapon,
-  rayFromPlayer, weaponName, zombieHealthForRound as zombieHealth, type ZombieState,
+  GameSimulation, SeededRng, WEAPON_DEFINITIONS, createMysteryBox, createPlayerState, createWeaponState, createZombieState,
+  firePlayerWeapon, rayFromPlayer, useMysteryBox, weaponName, zombieHealthForRound as zombieHealth, type ZombieState,
 } from '../src/core/index.ts';
 import {
   BUNKER_MYSTERY_BOXES, BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_WALL_WEAPONS, BUNKER_WALL_WEAPON_FACING,
@@ -91,14 +91,43 @@ describe('weapon arsenal', () => {
     }
   });
 
-  it('stocks the box with every weapon except the starting pistol, wonder weapons rarest', () => {
+  /** Rolls a fresh Bunker box once per seed and tallies what came out. */
+  function rollBox(seeds: number[]): { first: string[]; counts: Record<string, number> } {
+    const first: string[] = [], counts: Record<string, number> = {};
+    for (const seed of seeds) {
+      const box = createMysteryBox(BUNKER_MYSTERY_BOXES[0], 'e:5');
+      const player = createPlayerState('e:1', origin, 5000);
+      const events = useMysteryBox(player, { type: 'interactionTriggered', playerId: player.id,
+        interactableId: 'e:5', interactionType: 'mysteryBox', actionId: 'box:help-box' }, [box.state], seed);
+      const used = events.find(event => event.type === 'mysteryBoxUsed');
+      if (used?.type !== 'mysteryBoxUsed') throw new Error('The box did not roll.');
+      first.push(used.weaponId); counts[used.weaponId] = (counts[used.weaponId] ?? 0) + 1;
+    }
+    return { first, counts };
+  }
+
+  it('stocks the box with every weapon except the starting pistol, all equally likely', () => {
     const box = BUNKER_MYSTERY_BOXES[0];
     expect([...box.weapons].sort()).toEqual(Object.keys(WEAPON_DEFINITIONS).filter(id => id !== 'starter-pistol').sort());
-    const weights = box.weapons.map(id => box.weights?.[id] ?? 1);
-    expect(box.weights?.irrlicht).toBeLessThan(1);
-    expect(box.weights?.molniya).toBeLessThan(box.weights!.irrlicht);
-    // Roughly one roll in a hundred or fewer gives a given wonder weapon.
-    expect(box.weights!.molniya / weights.reduce((a, b) => a + b, 0)).toBeLessThan(0.01);
+    expect(box.weights ?? {}).toEqual({});
+  });
+
+  it('gives every gun, both wonder weapons included, about the same share of fresh-seed rolls', () => {
+    const pool = BUNKER_MYSTERY_BOXES[0].weapons, perGun = 400;
+    const seeds = new SeededRng(0xc0ffee), draws = pool.length * perGun;
+    const { counts } = rollBox(Array.from({ length: draws }, () => seeds.nextUint32()));
+    for (const id of pool) {
+      expect(counts[id] ?? 0, id).toBeGreaterThan(perGun * 0.7);
+      expect(counts[id] ?? 0, id).toBeLessThan(perGun * 1.3);
+    }
+    expect(counts.irrlicht).toBeGreaterThan(0);
+    expect(counts.molniya).toBeGreaterThan(0);
+  });
+
+  it('opens differently from one fresh seed to the next', () => {
+    const seeds = new SeededRng(99);
+    const { first } = rollBox(Array.from({ length: 60 }, () => seeds.nextUint32()));
+    expect(new Set(first).size).toBeGreaterThan(15);
   });
 });
 
