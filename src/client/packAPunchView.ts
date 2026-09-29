@@ -132,7 +132,7 @@ export function buildPackAPunchMachines(parent: THREE.Group, map: GameMap, light
     shell.add(studs);
 
     const light = lightPool.add(new LightSource(PACK_A_PUNCH_GLOW.idle, 0, 6, 2));
-    light.position.set(0, 1.4, 1.1); root.add(light);
+    light.position.set(0, 2.0, 1.5); root.add(light);
     const display = new THREE.Group(); display.name = 'pack-a-punch-display'; display.userData.dynamic = true; display.visible = false;
     display.position.set(DISPLAY.x, DISPLAY.y, DISPLAY.z); root.add(display);
     views.push({ root, shell, glowMaterials, light, needles, lamps, wheel, display, guns: new Map(), shown: null, lastKey: '' });
@@ -166,7 +166,7 @@ export function buildPackAPunchMachines(parent: THREE.Group, map: GameMap, light
       const level = !powered ? 0 : machine.phase === 'upgrading' ? 1.4 + pulse * 1.4 : machine.phase === 'ready' ? 2 : 0.55 + pulse * 0.2;
       for (const material of view.glowMaterials) { material.emissive.setHex(colour); material.emissiveIntensity = level; }
       view.light.color.setHex(colour);
-      view.light.intensity = !powered ? 0 : machine.phase === 'upgrading' ? 5 + pulse * 5 : machine.phase === 'ready' ? 7 : 2;
+      view.light.intensity = !powered ? 0 : machine.phase === 'upgrading' ? 5 + pulse * 5 : machine.phase === 'ready' ? 4 : 2;
       // Working: the body shudders, the wheel spins and the needles climb; idle, they rest.
       view.lamps.off.color.setHex(powered ? 0x400808 : 0xff2a18);
       view.lamps.working.color.setHex(powered && machine.phase === 'upgrading' ? (pulse > 0.5 ? 0xffb030 : 0xa06010) : 0x402808);

@@ -6,7 +6,8 @@ import { MIN_EYE_RELIEF, adsPose, eyeRelief, sightPoints, type AimPose, type Sig
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
 import { createGrenadeModel, createMineModel } from './explosiveModels.ts';
 import { MELEE_RULES, reloadTicksFor, weaponDefinition, weaponName } from '../core/weapon.ts';
-import { baseWeaponId, isUpgradedWeapon } from '../core/upgrades.ts';
+import { baseWeaponId, isUpgradedWeapon, upgradeGlow } from '../core/upgrades.ts';
+import { makePackedMaterial } from './packedMaterial.ts';
 import { GRENADE_RULES } from '../core/grenade.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
@@ -192,7 +193,7 @@ export function prepareWeaponModel(id: string): Promise<PreparedWeapon> | null {
   if (!pending) {
     pending = loadModel(`weapons/${asset}/model.glb`).then(gltf => {
       const weapon = prepareWeapon(gltf.scene, asset);
-      return isUpgradedWeapon(id) ? applyPackedLook(weapon) : weapon;
+      return isUpgradedWeapon(id) ? applyPackedLook(weapon, upgradeGlow(id) ?? 0xffffff) : weapon;
     });
     pending.then(weapon => readyWeapons.set(key, weapon), () => {});
     preparedWeapons.set(key, pending);
@@ -212,20 +213,16 @@ function modelKey(id: string): string | null {
   return asset ? isUpgradedWeapon(id) ? `${asset}+pap` : asset : null;
 }
 
-/** What Pack-a-Punch does to a gun's look: a cool cast and a faint violet glow, over its own textures (any stronger and they are lost). */
-const PACKED_TINT = new THREE.Color(0xdde2ff);
-const PACKED_GLOW = new THREE.Color(0x5a48d0);
-export function applyPackedLook(weapon: PreparedWeapon): PreparedWeapon {
+/**
+ * What Pack-a-Punch does to a gun's look: a dark space-age finish over the whole gun with glowing circuit lines in its own
+ * `glow` colour (see packedMaterial.ts). On copies: the base gun's own materials are shared with its model and must never be
+ * written to.
+ */
+export function applyPackedLook(weapon: PreparedWeapon, glow: number): PreparedWeapon {
   weapon.root.traverse(object => {
     if (!(object instanceof THREE.Mesh)) return;
-    // Copies: the base gun's own materials are shared with its model and must never be written to.
-    const packed = (Array.isArray(object.material) ? object.material : [object.material]).map(material => {
-      if (!(material instanceof THREE.MeshStandardMaterial)) return material;
-      const copy = material.clone();
-      copy.color.multiply(PACKED_TINT);
-      copy.emissive.copy(PACKED_GLOW); copy.emissiveIntensity = copy.emissiveMap ? 0.2 : 0.015;
-      return copy;
-    });
+    const packed = (Array.isArray(object.material) ? object.material : [object.material]).map(material =>
+      material instanceof THREE.MeshStandardMaterial ? makePackedMaterial(material, glow) : material);
     object.material = Array.isArray(object.material) ? packed : packed[0];
   });
   return weapon;
@@ -307,7 +304,9 @@ export class WeaponView {
   }
   private equip(id: string): void {
     this.id = id; this.firedTick = -100;
-    (this.flash.material as THREE.MeshBasicMaterial).color.setHex(FLASH_COLOURS[this.gun] ?? 0xffd57a);
+    // A Pack-a-Punched gun flashes in its own glow colour, whatever its base gun flashes.
+    (this.flash.material as THREE.MeshBasicMaterial).color.setHex(
+      (isUpgradedWeapon(id) ? upgradeGlow(id) : undefined) ?? FLASH_COLOURS[this.gun] ?? 0xffd57a);
     const generation = ++this.generation;
     this.current?.root.removeFromParent();
     let fallback = this.fallbacks.get(id);

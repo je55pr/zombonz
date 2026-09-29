@@ -14,7 +14,8 @@ import { gunClip } from '../src/client/audio.ts';
 import { LightPool, LightSource } from '../src/client/lightPool.ts';
 import { PACK_A_PUNCH_GLOW, buildPackAPunchMachines } from '../src/client/packAPunchView.ts';
 import { WeaponView, applyPackedLook, gunForModel, prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from '../src/client/weaponView.ts';
-import { UPGRADE_SPECS, createPlayerState, createWeaponState, upgradeIdFor, PACK_A_PUNCH_RULES } from '../src/core/index.ts';
+import { makePackedMaterial, packedGlowCss } from '../src/client/packedMaterial.ts';
+import { UPGRADE_SPECS, createPlayerState, createWeaponState, upgradeGlow, upgradeIdFor, PACK_A_PUNCH_RULES } from '../src/core/index.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { BUNKER_MAP } from '../src/maps/bunker.ts';
 import { createMatch } from '../src/maps/match.ts';
@@ -46,19 +47,78 @@ describe('an upgraded gun in the client', () => {
     for (const base of Object.keys(UPGRADE_SPECS)) expect(gunClip(`${base}-pap`).clip, base).toBe(gunClip(base).clip);
   });
 
-  it('tints a copy of the model, and never writes to the base gun\'s own materials', () => {
-    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.4 });
+  it('gives a copy of the model a dark finish, and never writes to the base gun\'s own materials', () => {
+    const colourMap = new THREE.Texture(), normalMap = new THREE.Texture(), aoMap = new THREE.Texture();
+    const material = new THREE.MeshStandardMaterial({ color: 0xffffff, map: colourMap, normalMap, aoMap, metalnessMap: colourMap,
+      roughnessMap: colourMap, emissiveMap: colourMap, metalness: 1, roughness: 1 });
     const root = new THREE.Group(); root.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), material));
     const weapon = { root, magazine: new THREE.Group() } as unknown as PreparedWeapon;
-    applyPackedLook(weapon);
+    applyPackedLook(weapon, 0xff2bd6);
     const packed = (root.children[0] as THREE.Mesh).material as THREE.MeshStandardMaterial;
     expect(packed).not.toBe(material);
-    expect(material.emissiveIntensity).toBe(1);
-    expect(material.emissive.getHex()).toBe(0x000000);
+    // The base gun is untouched.
     expect(material.color.getHex()).toBe(0xffffff);
-    expect(packed.emissive.getHex()).not.toBe(0x000000);
-    expect(packed.color.b).toBeGreaterThan(packed.color.r);
-    expect(packed.metalness).toBe(1);
+    expect(material.map).toBe(colourMap);
+    expect(material.emissiveMap).toBe(colourMap);
+    expect(material.metalness).toBe(1);
+    expect(material.onBeforeCompile).not.toBe(packed.onBeforeCompile);
+    // The copy is almost black all over: its own colours are gone, its normal and occlusion detail is kept, and it is metallic.
+    expect(Math.max(packed.color.r, packed.color.g, packed.color.b)).toBeLessThan(0.05);
+    expect(packed.map).toBeNull();
+    expect(packed.metalnessMap).toBeNull();
+    expect(packed.roughnessMap).toBeNull();
+    expect(packed.emissiveMap).toBeNull();
+    expect(packed.normalMap).toBe(normalMap);
+    expect(packed.aoMap).toBe(aoMap);
+    expect(packed.metalness).toBeGreaterThan(0.5);
+    expect(packed.emissive.getHex()).toBe(0x000000);
+    expect(packed.userData.packedGlow.getHex()).toBe(0xff2bd6);
+  });
+
+  it('draws circuit lines in the glow colour from the shader, and says so when three.js has moved the places it hooks into', () => {
+    const packed = makePackedMaterial(new THREE.MeshStandardMaterial(), 0xff2bd6);
+    const other = makePackedMaterial(new THREE.MeshStandardMaterial(), 0x22e6ff);
+    // One program serves every glow colour: the colour is a uniform of each material.
+    expect(packed.customProgramCacheKey()).toBe(other.customProgramCacheKey());
+    const shader = { vertexShader: THREE.ShaderLib.standard.vertexShader, fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} as Record<string, { value: unknown }> };
+    packed.onBeforeCompile(shader as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer);
+    expect(shader.vertexShader).toContain('vPapPos = position;');
+    expect(shader.fragmentShader).toContain('papCircuit(vPapPos');
+    // The lines are added to the emissive light after its map, and use the glow.
+    expect(shader.fragmentShader.indexOf('#include <emissivemap_fragment>')).toBeLessThan(shader.fragmentShader.indexOf('papCircuit(vPapPos'));
+    expect((shader.uniforms.papGlow.value as THREE.Color).getHex()).toBe(0xff2bd6);
+    const before = performance.now() / 1000;
+    packed.onBeforeRender({} as never, {} as never, {} as never, {} as never, {} as never, {} as never);
+    expect(shader.uniforms.papTime.value as number).toBeGreaterThanOrEqual(before);
+    // With the hooks missing the material is left as it was and a warning is given, not an error.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const bare = { vertexShader: 'void main() {}', fragmentShader: 'void main() {}', uniforms: {} as Record<string, unknown> };
+    expect(() => other.onBeforeCompile(bare as unknown as THREE.WebGLProgramParametersWithUniforms, {} as THREE.WebGLRenderer)).not.toThrow();
+    expect(bare.fragmentShader).toBe('void main() {}');
+    expect(bare.uniforms).toEqual({});
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
+  });
+
+  it('gives every gun a bright glow of its own row, and more than a few different ones', () => {
+    const glows = new Set<number>();
+    for (const [base, spec] of Object.entries(UPGRADE_SPECS)) {
+      expect(spec.glow, base).toBeGreaterThanOrEqual(0);
+      expect(spec.glow, base).toBeLessThanOrEqual(0xffffff);
+      const channels = [spec.glow >> 16 & 255, spec.glow >> 8 & 255, spec.glow & 255];
+      const top = Math.max(...channels), low = Math.min(...channels);
+      expect(top / 255, `${base} is bright`).toBeGreaterThanOrEqual(0.85);
+      expect((top - low) / top, `${base} is vivid`).toBeGreaterThanOrEqual(0.35);
+      expect(upgradeGlow(base), base).toBe(spec.glow);
+      expect(upgradeGlow(`${base}-pap`), base).toBe(spec.glow);
+      glows.add(spec.glow);
+    }
+    expect(glows.size).toBeGreaterThanOrEqual(15);
+    expect(UPGRADE_SPECS.mp5k.glow).toBe(0xff2bd6);
+    expect(upgradeGlow('knife')).toBeUndefined();
+    expect(packedGlowCss('mp5k-pap')).toBe('#ff2bd6');
+    expect(packedGlowCss('mp5k')).toBeNull();
+    expect(packedGlowCss('unknown-pap')).toBeNull();
   });
 
   it('keeps a prepared model of its own, apart from the base gun\'s, made from the same file', async () => {
@@ -69,11 +129,13 @@ describe('an upgraded gun in the client', () => {
     // The same gun, the same sights and lens: only the look differs.
     expect(packed.sights.rear.toArray()).toEqual(base.sights.rear.toArray());
     expect(packed.sights.relief).toBe(base.sights.relief);
-    const glow = (weapon: PreparedWeapon) => { let strongest = 0; weapon.root.traverse(object => {
-      if (object instanceof THREE.Mesh && object.material instanceof THREE.MeshStandardMaterial) strongest = Math.max(strongest, object.material.emissiveIntensity * object.material.emissive.r
-        + object.material.emissiveIntensity * object.material.emissive.b); }); return strongest; };
-    expect(glow(base)).toBe(0);
-    expect(glow(packed)).toBeGreaterThan(0);
+    // Every part of the upgraded gun has the finish, glowing the colour of its row; none of the base gun's does.
+    const glows = (weapon: PreparedWeapon) => { const found: Array<number | undefined> = []; weapon.root.traverse(object => {
+      if (object instanceof THREE.Mesh) found.push((object.material as THREE.Material).userData.packedGlow?.getHex()); }); return found; };
+    expect(glows(base).length).toBeGreaterThan(0);
+    expect(glows(base).every(glow => glow === undefined)).toBe(true);
+    expect(glows(packed).length).toBeGreaterThan(0);
+    expect(glows(packed).every(glow => glow === UPGRADE_SPECS.kar98k.glow)).toBe(true);
     expect(prepareWeaponModel('kar98k-pap')).toBe(prepareWeaponModel('kar98k-pap'));
   });
 
@@ -87,6 +149,28 @@ describe('an upgraded gun in the client', () => {
     view.render({ clearDepth: () => {}, render: () => {} } as unknown as THREE.WebGLRenderer, 16 / 9);
     expect(adsZoom('starter-pistol')).toBe(ADS_ZOOM.handgun);
     expect(camera.fov).toBeCloseTo(viewmodelFov(1, ADS_ZOOM.handgun, 16 / 9), 4);
+  });
+});
+
+describe('the muzzle flash of an upgraded gun', () => {
+  const flashOf = (view: WeaponView) => ((view as unknown as { flash: THREE.Mesh }).flash.material as THREE.MeshBasicMaterial).color.getHex();
+  function equipped(weaponId: string): WeaponView {
+    const view = new WeaponView(), player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.weapon = createWeaponState(weaponId);
+    view.update(player, 0, 1 / 60);
+    return view;
+  }
+
+  it('is in the gun\'s own glow colour, so a magenta MP5K flashes magenta', () => {
+    expect(flashOf(equipped('mp5k-pap'))).toBe(0xff2bd6);
+    expect(flashOf(equipped('kar98k-pap'))).toBe(UPGRADE_SPECS.kar98k.glow);
+    expect(flashOf(equipped('starter-pistol-pap'))).toBe(UPGRADE_SPECS['starter-pistol'].glow);
+  });
+
+  it('is unchanged for the guns as found, whatever their upgrade\'s colour', () => {
+    expect(flashOf(equipped('mp5k'))).toBe(0xffd57a);
+    expect(flashOf(equipped('irrlicht'))).toBe(0x7dff9a);
+    expect(flashOf(equipped('molniya'))).toBe(0x8fd8ff);
   });
 });
 
@@ -145,8 +229,9 @@ describe('the machine on screen', () => {
     expect(display.visible).toBe(false);
     const total = PACK_A_PUNCH_RULES.upgradeTicks;
     const holding = () => display.children.filter(child => child.visible);
+    // 1 for a gun with the upgraded finish, 0 for the plain one.
     const glowOf = (object: THREE.Object3D) => { let glow = 0; object.traverse(child => {
-      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) glow = Math.max(glow, child.material.emissiveIntensity * (child.material.emissive.r + child.material.emissive.g + child.material.emissive.b)); }); return glow; };
+      if (child instanceof THREE.Mesh && (child.material as THREE.Material).userData.packedGlow) glow = 1; }); return glow; };
     // The gun goes in: the plain one, sliding into the front.
     Object.assign(machine, { phase: 'upgrading', ownerId: owner, weaponId: 'kar98k-pap', cooldownTicks: total - 6 });
     expect(view.update(sim.state)).toBe(true);

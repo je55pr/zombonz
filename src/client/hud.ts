@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { EntityId } from '../core/types.ts';
 import type { GameSimulation } from '../core/simulation.ts';
 import { weaponName } from '../core/weapon.ts';
-import { isUpgradedWeapon } from '../core/upgrades.ts';
+import { packedGlowCss } from './packedMaterial.ts';
 import { maxPlayerHealth } from '../core/health.ts';
 import { reviveProgress } from '../core/downs.ts';
 import type { PerkId } from '../core/perks.ts';
@@ -145,8 +145,6 @@ const INK = '#ece4cf';
 const DIM = 'rgba(236,228,207,0.6)';
 const FAINT = 'rgba(236,228,207,0.4)';
 const GOLD = '#f2c55c';
-/** A Pack-a-Punched gun's name. */
-const PACKED = '#a9b8ff';
 const BLOOD = '#d8382b';
 const PANEL = 'rgba(10,9,8,0.64)';
 const EDGE = 'rgba(236,228,207,0.2)';
@@ -401,7 +399,7 @@ export class CanvasHud {
         { size: 20, color: snapshot.reserveAmmo > 0 ? GOLD : BLOOD, align: 'right', spacing: 2 });
     }
     this.text(weaponLabel(snapshot.weapon), right, height - 112, { size: 24, weight: 500,
-      color: isUpgradedWeapon(snapshot.weapon) ? PACKED : DIM, align: 'right', spacing: 2 });
+      color: packedGlowCss(snapshot.weapon) ?? DIM, align: 'right', spacing: 2 });
     const reserveWidth = this.text(` / ${snapshot.reserveAmmo}`, right, height - 56,
       { size: 31, weight: 500, color: DIM, align: 'right' });
     this.text(String(snapshot.magazineAmmo), right - reserveWidth, height - 60,
@@ -409,7 +407,7 @@ export class CanvasHud {
     if (snapshot.holsteredWeapon) {
       const name = weaponLabel(snapshot.holsteredWeapon);
       const nameWidth = this.measure(name, { size: 18, weight: 500, spacing: 2 });
-      this.text(name, right, height - 22, { size: 18, weight: 500, color: isUpgradedWeapon(snapshot.holsteredWeapon) ? PACKED : FAINT,
+      this.text(name, right, height - 22, { size: 18, weight: 500, color: packedGlowCss(snapshot.holsteredWeapon) ?? FAINT,
         align: 'right', spacing: 2 });
       this.keycap('Q', right - nameWidth - 39, height - 22, 14);
     }

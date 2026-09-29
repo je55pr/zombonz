@@ -69,6 +69,11 @@ describe('Pack-a-Punch upgrades', () => {
     for (const id of Object.keys(UPGRADE_SPECS)) expect(WEAPON_DEFINITIONS[id], `${id} is a gun`).toBeDefined();
   });
 
+  it('names a bright glow for every upgrade, for its circuit lines and its muzzle flash', () => {
+    for (const [id, spec] of Object.entries(UPGRADE_SPECS)) expect(spec.glow, id).toBeGreaterThan(0);
+    expect(UPGRADED_WEAPON_DEFINITIONS['mp5k-pap'].name).toBe('Hornet');
+  });
+
   it('keeps upgraded guns out of the guns that can be found, and looks them up like any other', () => {
     expect(Object.keys(WEAPON_DEFINITIONS).some(id => isUpgradedWeapon(id))).toBe(false);
     expect(weaponDefinition('kar98k-pap')).toBe(UPGRADED_WEAPON_DEFINITIONS['kar98k-pap']);
