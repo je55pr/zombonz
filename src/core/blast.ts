@@ -4,6 +4,7 @@ import { clearLine } from './ray.ts';
 import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
 import type { WeaponEvent } from './weapon.ts';
 import { zombieChest } from './zombieBody.ts';
+import { dismember, type GoreEvent } from './gore.ts';
 
 /**
  * How an explosion hurts, whatever set it off (a grenade, a rocket, a Bouncing Betty, a barrel or a
@@ -65,7 +66,7 @@ export interface BlastContext {
   instaKill: boolean;
 }
 
-export type BlastEvent = Extract<WeaponEvent, { type: 'grenadeHit' | 'zombieDamaged' | 'zombieDied' }> | DamageEvent;
+export type BlastEvent = Extract<WeaponEvent, { type: 'grenadeHit' | 'zombieDamaged' | 'zombieDied' }> | DamageEvent | GoreEvent;
 
 /**
  * The blast of a grenade, a Betty, a barrel or a car. Zombies in reach are hurt and credited to `credit`
@@ -78,6 +79,7 @@ export function detonate(centre: Vec3, rules: BlastRules, credit: EntityId, vict
   for (const { target: zombie, scale } of blastZombies(centre, rules.radius, context.zombies, context.boxes)) {
     const damage = Math.min(zombie.health, context.instaKill ? zombie.health : Math.round(rules.damage * scale));
     if (damage <= 0) continue;
+    const healthBefore = zombie.health;
     zombie.health -= damage;
     events.push({ type: 'grenadeHit', playerId: credit, zombieId: zombie.id, damage },
       { type: 'zombieDamaged', zombieId: zombie.id, playerId: credit, damage, health: zombie.health });
@@ -85,6 +87,7 @@ export function detonate(centre: Vec3, rules: BlastRules, credit: EntityId, vict
       zombie.alive = false; zombie.velocity = { x: 0, y: 0, z: 0 };
       events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: credit, method: 'body' });
     }
+    events.push(...dismember(zombie, { source: 'explosion', credit, damage, healthBefore, point: centre, scale, gibs: true }));
   }
   const exposed = victims === 'all' ? context.players : context.players.filter(player => player.id === credit);
   for (const { target: player, scale } of blastPlayers(centre, rules.radius, exposed, context.boxes)) {

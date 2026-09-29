@@ -282,6 +282,26 @@ export class GameSimulation {
   /** The hazards that can be shot or hurt right now. */
   hazardTargets() { return hazardTargets(this.map.hazards ?? [], this.state.hazards); }
 
+  /**
+   * A zombie that loses its legs on its way up a wall cannot hold on (a crawler drags itself along, and never climbs): it
+   * falls, dead, and the player who shot them off is credited with it. Returns those deaths, to be scored like any kill.
+   */
+  private dropCrawlingClimbers(events: readonly SimulationEvent[]): SimulationEvent[] {
+    const deaths: SimulationEvent[] = [];
+    for (const event of events) {
+      if (event.type !== 'zombieDismembered' || !event.crawler) continue;
+      const zombie = this.state.world.entities[event.zombieId];
+      if (zombie?.kind !== 'zombie' || !zombie.alive || zombie.entry?.phase !== 'approach') continue;
+      const barrier = this.state.barriers.find(candidate => candidate.id === zombie.entry!.barrierId);
+      const path = barrier?.approachPath ?? [];
+      if (!path.some((point, index) => index > 0 && Math.abs(point.y - path[index - 1].y) > 0.05)) continue;
+      zombie.health = 0; zombie.alive = false; zombie.velocity = { x: 0, y: 0, z: 0 };
+      zombie.position = { ...zombie.position, y: Math.min(...path.map(point => point.y)) };
+      deaths.push({ type: 'zombieDied', zombieId: zombie.id, playerId: event.playerId, method: 'fall' });
+    }
+    return deaths;
+  }
+
   /** Every player entity, dead or alive. */
   players(): PlayerState[] {
     return this.playerIds.map(id => this.getPlayer(id)).filter((player): player is PlayerState => !!player);
@@ -438,6 +458,7 @@ export class GameSimulation {
         world.seed ^ world.tick,
         this.hazardTargets(),
       );
+      weaponEvents.push(...this.dropCrawlingClimbers(weaponEvents) as typeof weaponEvents);
       events.push(...weaponEvents);
       events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig,
         this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
@@ -455,6 +476,7 @@ export class GameSimulation {
         walls, instaKill, targets));
       if (burning) blastEvents.push(...tickHazards(this.map.hazards ?? [], this.state.hazards,
         { zombies: this.zombies(), players: livingPlayers(world), boxes: walls, instaKill }));
+      blastEvents.push(...this.dropCrawlingClimbers(blastEvents));
       events.push(...blastEvents);
       const blastCombat = blastEvents.filter((event): event is WeaponEvent =>
         event.type === 'grenadeHit' || event.type === 'zombieDamaged' || event.type === 'zombieDied');

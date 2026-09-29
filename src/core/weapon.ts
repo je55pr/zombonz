@@ -8,6 +8,7 @@ import { blastPlayers, blastZombies } from './blast.ts';
 import { blastHazards, damageHazard, type HazardEvent, type HazardTarget } from './hazard.ts';
 import { clearLine, rayAabbDistance } from './ray.ts';
 import { rayZombieBody, zombieChest, type BodyPart } from './zombieBody.ts';
+import { dismember, type GoreEvent } from './gore.ts';
 export { rayAabbDistance } from './ray.ts';
 
 export interface WeaponDefinition {
@@ -35,6 +36,8 @@ export interface WeaponDefinition {
   chain?: { targets: number; radius: number; falloff: number };
   /** Damage multipliers per hit zone; missing zones use DEFAULT_HIT_ZONE_MULTIPLIERS. */
   hitZoneMultipliers?: Partial<Record<HitZoneId, number>>;
+  /** False for a gun that never takes limbs off (WaW: every pistol but the .357); default true. */
+  gibs?: boolean;
 }
 
 export type HitZoneId = 'head' | 'body';
@@ -61,7 +64,7 @@ export function hitZoneMultiplier(definition: WeaponDefinition, zone: HitZoneId)
 // explicit balance choices because those files do not specify a zombie body count or loss per body.
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   'starter-pistol': {
-    id: 'starter-pistol', name: 'M1911', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
+    id: 'starter-pistol', name: 'M1911', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi', gibs: false,
     magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90, hipSpreadRadians: 0.045,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
@@ -276,7 +279,8 @@ export type WeaponEvent =
   | { type: 'weaponExploded'; playerId: EntityId; weaponId: string; position: Vec3; radius: number }
   | { type: 'weaponChained'; playerId: EntityId; weaponId: string; points: Vec3[] }
   | { type: 'zombieDamaged'; zombieId: EntityId; playerId: EntityId; damage: number; health: number }
-  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: HitZoneId | 'melee' }
+  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: HitZoneId | 'melee' | 'fall' }
+  | GoreEvent
   | HazardEvent;
 
 function normalize(direction: Vec3): Vec3 {
@@ -451,9 +455,10 @@ export function wantsToFire(player: PlayerState, pressed: boolean, held: boolean
 }
 
 function damageZombie(events: Array<WeaponEvent | DamageEvent>, player: PlayerState, weaponId: string,
-  zombie: ZombieState, damage: number, distance: number, instaKill: boolean): void {
+  zombie: ZombieState, damage: number, distance: number, instaKill: boolean, blast?: { centre: Vec3; scale: number }): void {
   const applied = Math.min(zombie.health, instaKill ? zombie.health : Math.round(damage));
   if (applied <= 0) return;
+  const healthBefore = zombie.health;
   zombie.health -= applied;
   events.push({ type: 'weaponHit', playerId: player.id, weaponId, zombieId: zombie.id, damage: applied, distance, hitZone: 'body' },
     { type: 'zombieDamaged', zombieId: zombie.id, playerId: player.id, damage: applied, health: zombie.health });
@@ -461,6 +466,9 @@ function damageZombie(events: Array<WeaponEvent | DamageEvent>, player: PlayerSt
     zombie.alive = false; zombie.velocity = { x: 0, y: 0, z: 0 };
     events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: 'body' });
   }
+  // A blast (a rocket's burst) takes limbs as any blast does; chained lightning does not.
+  if (blast) events.push(...dismember(zombie, { source: 'explosion', credit: player.id, damage: applied, healthBefore, point: blast.centre,
+    scale: blast.scale, gibs: true }));
 }
 
 /**
@@ -473,7 +481,7 @@ function explodeAt(events: Array<WeaponEvent | DamageEvent>, player: PlayerState
   const blast = definition.explosive!;
   events.push({ type: 'weaponExploded', playerId: player.id, weaponId: definition.id, position: { ...impact }, radius: blast.radius });
   for (const { target: zombie, distance, scale } of blastZombies(impact, blast.radius, zombies, boxes)) {
-    damageZombie(events, player, definition.id, zombie, blast.damage * scale, distance, instaKill);
+    damageZombie(events, player, definition.id, zombie, blast.damage * scale, distance, instaKill, { centre: impact, scale });
   }
   for (const { scale } of blastPlayers(impact, blast.radius, [player], boxes)) {
     events.push(...damagePlayer(player, Math.round(blast.selfDamage * scale)));
@@ -565,6 +573,7 @@ export function firePlayerWeapon(
     const zombie = zombies.find((candidate) => candidate.id === zombieId && candidate.alive);
     if (!zombie) continue;
     const applied = Math.min(zombie.health, instaKill ? zombie.health : Math.round(hit.damage));
+    const healthBefore = zombie.health;
     zombie.health -= applied;
     events.push({
       type: 'weaponHit', playerId: player.id, weaponId: definition.id,
@@ -577,6 +586,8 @@ export function firePlayerWeapon(
       zombie.velocity = { x: 0, y: 0, z: 0 };
       events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: hit.hitZone });
     }
+    events.push(...dismember(zombie, { source: 'bullet', credit: player.id, damage: applied, healthBefore, part: hit.part, point: hit.point,
+      direction: hit.direction, gibs: definition.gibs !== false && !definition.chain }));
   }
   for (const [hazardId, hit] of hazardHits) {
     const target = hazards.find(candidate => candidate.state.id === hazardId);

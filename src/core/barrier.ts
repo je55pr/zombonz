@@ -1,7 +1,7 @@
 import { moveWithCollision, type CollisionBox } from './collision.ts';
 import { ANY_FACING, createInteractableState } from './interaction.ts';
 import { SeededRng, hashString as idHash, mix32 } from './rng.ts';
-import { faceToward } from './zombieBody.ts';
+import { faceToward, zombieSpeed } from './zombieBody.ts';
 import type { EntityId, InteractableState, Vec3, ZombieState } from './types.ts';
 
 /** `climbSpeed` (m/s) is how fast a zombie climbs a wall on its way in, such as onto a roof below an upstairs window. */
@@ -117,7 +117,7 @@ function moveToward(zombie: ZombieState, point: Vec3, dt: number, boxes: readonl
   const dx = point.x - zombie.position.x, dz = point.z - zombie.position.z;
   const distance = Math.hypot(dx, dz);
   if (distance < 0.025) { stop(zombie); return true; }
-  const step = Math.min(distance, zombie.moveSpeed * dt);
+  const step = Math.min(distance, zombieSpeed(zombie) * dt);
   const delta = { x: dx / distance * step, y: 0, z: dz / distance * step };
   const next = moveWithCollision(zombie.position, delta, 0.32, 1.72, boxes);
   zombie.velocity = { x: (next.x - zombie.position.x) / dt, y: 0, z: (next.z - zombie.position.z) / dt };

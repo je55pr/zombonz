@@ -5,7 +5,7 @@ import { damagePlayer, type DamageEvent } from './health.ts';
 import { mix32, hashString } from './rng.ts';
 import { hasClearNavigationLine, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { SeededRng } from './rng.ts';
-import { LEGS_MASK, faceToward } from './zombieBody.ts';
+import { CRAWLER, LEGS_MASK, faceToward, zombieSpeed } from './zombieBody.ts';
 import { ZOMBIE_MELEE, swingTiming } from './zombieMelee.ts';
 import type { EntityId, PlayerState, Vec3, ZombieGait, ZombieState } from './types.ts';
 
@@ -156,8 +156,9 @@ export function updateZombiePursuit(
   const dx = waypoint.x - zombie.position.x;
   const dz = waypoint.z - zombie.position.z;
   const planarDistance = Math.hypot(dx, dz);
-  const velocityX = planarDistance > 0 ? (dx / planarDistance) * zombie.moveSpeed : 0;
-  const velocityZ = planarDistance > 0 ? (dz / planarDistance) * zombie.moveSpeed : 0;
+  const speed = zombieSpeed(zombie);
+  const velocityX = planarDistance > 0 ? (dx / planarDistance) * speed : 0;
+  const velocityZ = planarDistance > 0 ? (dz / planarDistance) * speed : 0;
   zombie.velocity.x = velocityX;
   zombie.velocity.z = velocityZ;
   if (planarDistance > 0) faceToward(zombie, Math.atan2(dx, dz), deltaSeconds);
@@ -166,7 +167,7 @@ export function updateZombiePursuit(
     zombie.position,
     requested,
     ZOMBIE_MOVEMENT.radius,
-    ZOMBIE_MOVEMENT.height,
+    zombie.limbs & LEGS_MASK ? CRAWLER.height : ZOMBIE_MOVEMENT.height,
     collisionBoxes,
   );
   next.y = sampleWalkHeight(next.x, next.z, zombie.position.y, walkSurfaces);

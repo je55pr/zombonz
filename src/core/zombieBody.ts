@@ -26,6 +26,17 @@ export function faceToward(zombie: Pick<ZombieState, 'yaw'>, heading: number, de
   zombie.yaw = Math.atan2(Math.sin(yaw), Math.cos(yaw));
 }
 
+/**
+ * A zombie that has lost a leg drags itself along on its arms (WaW: `has_legs = false`, allowed only the crawl stance): never
+ * faster than `speed` metres a second, and only `height` tall, so it fits under what a standing zombie does not.
+ */
+export const CRAWLER = { speed: 1, height: 0.7 } as const;
+
+/** How fast a zombie moves: its gait's speed, or a crawler's if it has lost a leg. */
+export function zombieSpeed(zombie: Pick<ZombieState, 'moveSpeed' | 'limbs'>): number {
+  return zombie.limbs & LEGS_MASK ? Math.min(zombie.moveSpeed, CRAWLER.speed) : zombie.moveSpeed;
+}
+
 export type BodyPart = 'head' | 'torso' | 'armL' | 'armR' | 'legL' | 'legR';
 
 /** Bits of `ZombieState.limbs`: a set bit is a limb the zombie has lost. */
