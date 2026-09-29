@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   GameSimulation, createInputFrame, createPlayerState, createZombieState, updatePlayerMovement, updateZombiePursuit,
   closedDoorBlockers, createDoorState, createNavigationQuery, hasWalkableConnection, navigationWaypoint, resolveHitscan,
-  sampleWalkHeight,
+  sampleWalkHeight, weaponName, WEAPON_DEFINITIONS,
 } from '../src/core/index.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { MAPS, MAP_CATALOG } from '../src/maps/index.ts';
@@ -89,12 +89,15 @@ describe('Asylum follows Verrückt', () => {
       'american-hallway': 750, 'bar-room': 750, 'american-stairs': 1000, 'right-upstairs': 750, kitchen: 1000, 'power-east': 750,
     });
     expect(Object.fromEntries(map.wallWeapons.map(w => [w.id, `${w.weaponId}:${w.weaponCost}`]))).toMatchObject({
-      'german-kar98k': 'kar98k:200', 'german-gewehr': 'm1-garand:600', 'american-garand': 'm1-garand:600',
+      'german-kar98k': 'kar98k:200', 'german-garand': 'm1-garand:600', 'american-garand': 'm1-garand:600',
       'american-springfield': 'springfield:200', 'hallway-thompson': 'thompson:1200', 'back-room-bar': 'bar:2500',
       'german-balcony-mp40': 'mp40:1000', 'left-upstairs-stg44': 'stg44:1200', 'left-upstairs-trench-gun': 'trench-gun:1500',
-      'speed-cola-sawed-off': 'double-barrel:1200',
+      'speed-cola-double-barrel': 'double-barrel:1200',
     });
     expect(map.wallWeapons).toHaveLength(14);
+    for (const wall of map.wallWeapons) {
+      expect(wall.prompt, wall.id).toBe(`E  ${weaponName(wall.weaponId)} [${wall.weaponCost}] / Ammo [${wall.ammoCost}]`);
+    }
     expect(map.mysteryBoxes).toHaveLength(1);
     const ids = [...map.barriers, ...map.doors, ...map.wallWeapons].map(item => item.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -247,6 +250,30 @@ describe('Asylum routes', () => {
       expect(player.position.y, wall.id).toBeCloseTo(stand.y);
       expect(sim.interactionCandidate(player.id)?.prompt, wall.id).toContain(`[${wall.weaponCost}]`);
     }
+  });
+
+  it.each(['german-garand', 'speed-cola-double-barrel'])('buys and refills the actual %s weapon', id => {
+    const wall = map.wallWeapons.find(candidate => candidate.id === id)!;
+    const facing = map.wallWeaponFacing[wall.id];
+    const stand = { x: wall.position.x + Math.sin(facing) * 1.2, y: wall.position.y - 1,
+      z: wall.position.z + Math.cos(facing) * 1.2 };
+    const sim = new GameSimulation({ seed: 1, playerSpawns: [stand],
+      map: { ...simMap, zombieSpawns: [], wallWeapons: [wall], doors: [], barriers: [] },
+      roundConfig: { initialWaitTicks: 9999, intermissionTicks: 1 },
+      economyConfig: { startingPoints: 5000, hitReward: 10, killBonus: 50 } });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    player.yaw = facing;
+    expect(interact(sim)).toContainEqual({ type: 'wallWeaponPurchased', playerId: player.id,
+      wallWeaponId: wall.id, weaponId: wall.weaponId });
+    expect(player.weapon.weaponId).toBe(wall.weaponId);
+    expect(player.points).toBe(5000 - wall.weaponCost);
+    player.weapon.reserveAmmo = 0;
+    const refill = createInputFrame(1);
+    refill.actions.interact = { pressed: true, held: true, released: false, value: 1 };
+    expect(sim.tick({ [player.id]: refill })).toContainEqual({ type: 'wallWeaponAmmoPurchased',
+      playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId });
+    expect(player.weapon.reserveAmmo).toBe(WEAPON_DEFINITIONS[wall.weaponId].startingReserveAmmo);
+    expect(player.points).toBe(5000 - wall.weaponCost - wall.ammoCost);
   });
 
   it('stops bullets fired up through the right balcony from the hallway', () => {

@@ -27457,7 +27457,7 @@
         "minFacingDot": 0.25
       },
       {
-        "id": "german-gewehr",
+        "id": "german-garand",
         "position": {
           "x": -11.24,
           "y": 1,
@@ -27466,7 +27466,7 @@
         "weaponId": "m1-garand",
         "weaponCost": 600,
         "ammoCost": 300,
-        "prompt": "E  Gewehr 43 [600] / Ammo [300]",
+        "prompt": "E  M1 Garand [600] / Ammo [300]",
         "interactionRange": 2.5,
         "minFacingDot": 0.25
       },
@@ -27592,7 +27592,7 @@
         "weaponId": "trench-gun",
         "weaponCost": 1500,
         "ammoCost": 750,
-        "prompt": "E  Trench Gun [1500] / Ammo [750]",
+        "prompt": "E  M1897 Trench Gun [1500] / Ammo [750]",
         "interactionRange": 2.5,
         "minFacingDot": 0.25
       },
@@ -27606,7 +27606,7 @@
         "weaponId": "trench-gun",
         "weaponCost": 1500,
         "ammoCost": 750,
-        "prompt": "E  Trench Gun [1500] / Ammo [750]",
+        "prompt": "E  M1897 Trench Gun [1500] / Ammo [750]",
         "interactionRange": 2.5,
         "minFacingDot": 0.25
       },
@@ -27625,7 +27625,7 @@
         "minFacingDot": 0.25
       },
       {
-        "id": "speed-cola-sawed-off",
+        "id": "speed-cola-double-barrel",
         "position": {
           "x": 29.76,
           "y": 5,
@@ -27634,7 +27634,7 @@
         "weaponId": "double-barrel",
         "weaponCost": 1200,
         "ammoCost": 600,
-        "prompt": "E  Sawed-Off Shotgun [1200] / Ammo [600]",
+        "prompt": "E  Double-Barreled Shotgun [1200] / Ammo [600]",
         "interactionRange": 2.5,
         "minFacingDot": 0.25
       }
@@ -35733,7 +35733,7 @@
     },
     "wallWeaponFacing": {
       "german-kar98k": 3.141592653589793,
-      "german-gewehr": -1.5707963267948966,
+      "german-garand": -1.5707963267948966,
       "american-garand": -1.5707963267948966,
       "american-springfield": 1.5707963267948966,
       "hallway-thompson": -1.5707963267948966,
@@ -35745,7 +35745,7 @@
       "left-upstairs-trench-gun": 0,
       "right-balcony-trench-gun": -1.5707963267948966,
       "right-balcony-bar": -1.5707963267948966,
-      "speed-cola-sawed-off": -1.5707963267948966
+      "speed-cola-double-barrel": -1.5707963267948966
     },
     "fountain": {
       "x": -1.5,
