@@ -60,7 +60,7 @@ export type MenuAction =
 /** What the host should do after an action: start the solo game, persist settings or retry the download. */
 export type MenuEffect = { type: 'startSolo'; map: MapId } | { type: 'saveSettings'; settings: GameSettings }
   | { type: 'retryDownload' } | { type: 'hostGame'; map: MapId } | { type: 'joinGame' }
-  | { type: 'openBindings' } | null;
+  | { type: 'openBindings' } | { type: 'testConnection' } | null;
 
 const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
   sensitivity: 'Mouse sensitivity', fov: 'Field of view', volume: 'Volume',
@@ -78,7 +78,8 @@ export function menuItems(state: MenuState): MenuItem[] {
     case 'maps':
       return [...MAP_CATALOG.map(map => ({ id: `map:${map.id}`, label: map.name })), { id: 'back', label: 'Back' }];
     case 'multiplayer':
-      return [{ id: 'host', label: 'Host Game' }, { id: 'join', label: 'Join Game' }, { id: 'back', label: 'Back' }];
+      return [{ id: 'host', label: 'Host Game' }, { id: 'join', label: 'Join Game' },
+        { id: 'testConnection', label: 'Test my connection' }, { id: 'back', label: 'Back' }];
     case 'hostMaps':
       return [...MAP_CATALOG.map(map => ({ id: `host:${map.id}`, label: map.name })), { id: 'back', label: 'Back' }];
     case 'settings':
@@ -162,6 +163,7 @@ export function reduceMenu(state: MenuState, action: MenuAction): MenuEffect {
       if (item.id === 'multiplayer') { open(state, 'multiplayer'); return null; }
       if (item.id === 'host') { open(state, 'hostMaps'); return null; }
       if (item.id === 'join') return { type: 'joinGame' };
+      if (item.id === 'testConnection') return { type: 'testConnection' };
       const hosted = MAP_CATALOG.find(map => `host:${map.id}` === item.id);
       if (hosted) return { type: 'hostGame', map: hosted.id };
       if (item.id === 'settings') { open(state, 'settings'); return null; }

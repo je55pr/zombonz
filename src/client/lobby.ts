@@ -10,6 +10,8 @@ export interface LobbyCallbacks {
   hostStarted(host: NetHost, players: LobbyPlayer[], seed: number, map: MapId): void;
   clientStarted(client: NetClient, start: StartInfo): void;
   back(): void;
+  /** Opens "Test my connection" over the lobby. */
+  testConnection(): void;
 }
 
 const NAME_KEY = 'zombonz.playerName';
@@ -75,6 +77,7 @@ export class LobbyView {
       <p class="lobby-status" data-status role="status"></p>
       <div class="lobby-actions">
         ${hosting ? '<button type="button" data-action="start" disabled>Start game</button>' : ''}
+        <button type="button" data-action="test">Test connection</button>
         <button type="button" data-action="back">Back</button>
       </div>
       <p class="lobby-hint">Everyone needs this same version of the game. Connections go straight between players' browsers.</p>
@@ -199,6 +202,7 @@ export class LobbyView {
         this.callbacks.hostStarted(host, players, seed, (this.mode as { map: MapId }).map);
         break;
       }
+      case 'test': this.callbacks.testConnection(); break;
       case 'back': this.back(); break;
     }
   }

@@ -22,6 +22,7 @@ let pauseMenu: PauseMenuView | undefined;
 let bindingEditor: BindingEditor | undefined;
 let readyDownload: DownloadStatus | undefined;
 let lobby: { dispose(): void } | undefined;
+let connectionTest: { dispose(): void } | undefined;
 
 /** A short message over whatever is showing, such as why a co-op game ended. */
 function showNotice(text: string): void {
@@ -40,6 +41,7 @@ function captureMouse(): void {
 function showMenu(): void {
   bindingEditor?.dispose(); bindingEditor = undefined;
   lobby?.dispose(); lobby = undefined;
+  connectionTest?.dispose(); connectionTest = undefined;
   session?.dispose(); session = undefined;
   pauseMenu?.dispose(); pauseMenu = undefined;
   if (document.pointerLockElement === gameCanvas) document.exitPointerLock();
@@ -55,6 +57,7 @@ function showMenu(): void {
     if (effect.type === 'startSolo' && game) void startSession(game, effect.map);
     if (effect.type === 'hostGame') void openLobby({ kind: 'host', map: effect.map });
     if (effect.type === 'joinGame') void openLobby({ kind: 'join' });
+    if (effect.type === 'testConnection') void openConnectionTest();
   }, buildId);
   menu = view;
   if (readyDownload) view.setDownload(readyDownload);
@@ -67,6 +70,14 @@ function openBindings(): void {
     bindingEditor = undefined;
     if (pauseMenu?.open) pauseMenu.element.querySelector<HTMLButtonElement>('[data-action="controls"]')?.focus();
   });
+}
+
+/** "Test my connection", over the menu or the lobby. */
+async function openConnectionTest(): Promise<void> {
+  if (connectionTest) return;
+  const { ConnectionTestView } = await import('./client/connectionTest.ts');
+  if (connectionTest) return;
+  connectionTest = new ConnectionTestView(buildId, () => { connectionTest = undefined; });
 }
 
 /** The co-op lobby, over the menu: hosting on the chosen map, or joining someone's game. */
@@ -85,6 +96,7 @@ async function openLobby(mode: { kind: 'host'; map: MapId } | { kind: 'join' }):
       void startSession(module, start.map, { role: 'client', client, start });
     },
     back: () => { lobby = undefined; },
+    testConnection: () => { void openConnectionTest(); },
   });
 }
 

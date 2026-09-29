@@ -34,6 +34,32 @@ seconds) before showing its code, so one code carries every address.
 Public STUN servers tell each browser its internet-facing address. There is no TURN relay yet, so
 networks that block direct connections (some office, school and mobile networks) cannot connect.
 
+## Testing a connection
+
+**Multiplayer → Test my connection** (and the **Test connection** button in the lobby) checks whether this network is likely
+to let a player join or host, and writes the answer as plain text with one button to copy it. A friend who can't connect runs
+it and sends the text back. It takes a second or two, uses only public STUN servers (the game's two from Google and one from
+Cloudflare) and leaves every IP address out of the text. The code is in `src/network/diagnostics.ts` (the checks and the
+wording) and `src/client/connectionTest.ts` (the dialog).
+
+It runs:
+
+- **A lookup of the public address, per server.** Each STUN server is asked on its own, so a report says which ones answered
+  and how fast, and which failed and with what error.
+- **A comparison of ports.** All the servers are asked from one socket. A router that keeps one public port whichever server
+  is asked ("same") lets a direct connection be made. One that gives a new port to each destination (a "symmetric NAT",
+  common on mobile data, hotspots and some broadband) usually blocks it; that is the case a relay would fix. Fewer than two
+  answering servers is reported as "could not compare".
+- **A connection to itself with the game's own codes.** It makes an invite, answers it, connects the two and sends a message
+  on each channel, and reports how long the invite took to make and to connect. This catches a browser or extension that blocks
+  WebRTC, and a slow invite (the invite waits up to four seconds for the addresses). It runs after the lookups, not with them,
+  so its timing is the game's own.
+
+The first line of the text is the result: `GOOD`, `MAYBE` (only IPv6 was found, or IPv6 is the only way through, or the
+ports could not be compared) or `PROBLEM` (offline, WebRTC blocked, no public address found, or a symmetric NAT with no IPv6),
+with a sentence on why. Both players' networks matter: a good result on one side and a problem on the other still fails, so
+ask both to run it.
+
 ## Transport
 
 `src/network/link.ts` defines a `PeerLink`: one connection to one peer. `LinkHostTransport` gathers
@@ -152,4 +178,4 @@ Development builds expose `window.zombonz` (`{ simulation, playerId, net }`) for
 - A TURN relay for networks that block direct connections (#46).
 - Reconnecting after a drop.
 - An automated two-browser test (#44).
-- A fuller diagnostics overlay (#45); for now there is a ping readout.
+- A fuller in-game diagnostics overlay (#45); for now there is a ping readout, and the connection test above.

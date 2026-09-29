@@ -6,7 +6,7 @@ import type { DeliveryClass, TransportPayload } from './transport.ts';
  * Browser-to-browser links set up by copy-paste codes, with no server of our own. Public STUN servers
  * tell each browser its internet-facing address; players on one home network don't even need those.
  */
-const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
+export const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 const GATHER_TIMEOUT_MS = 4000;
 
 /** The host's side of one invitation: a code to send, and the reply code to paste back. */
