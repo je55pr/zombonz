@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { readAssetGeometry } from '../scripts/inspect-assets.mjs';
+import { adsZoom, viewmodelFov } from '../src/client/aim.ts';
 import { WEAPON_SIGHTS, adsPose } from '../src/client/weaponSights.ts';
 import { prepareWeapon, VIEWMODEL_LENGTHS, WeaponView, type PreparedWeapon } from '../src/client/weaponView.ts';
 import { createPlayerState } from '../src/core/index.ts';
@@ -26,14 +27,14 @@ function prepared(id: string): Promise<PreparedWeapon> {
 const ASPECTS = [1, 4 / 3, 16 / 9, 21 / 9, 32 / 9];
 
 /** A WeaponView holding a prepared gun, so its real pose maths can be run in a test. */
-function viewHolding(weapon: PreparedWeapon) {
+function viewHolding(weapon: PreparedWeapon, gunId = 'test') {
   const view = new WeaponView(), player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
   // The view only loads models from the network; hand it this one.
-  Object.assign(view as unknown as { id: string; current: PreparedWeapon }, { id: 'test', current: weapon });
-  player.weapon.weaponId = 'test';
+  Object.assign(view as unknown as { id: string; current: PreparedWeapon }, { id: gunId, current: weapon });
+  player.weapon.weaponId = gunId;
   const internals = view as unknown as { pose: THREE.Group; camera: THREE.PerspectiveCamera };
   return {
-    player, camera: internals.camera, pose: internals.pose,
+    player, camera: internals.camera, pose: internals.pose, view,
     step: (tick: number) => { view.update(player, tick, 1 / 60); internals.pose.updateMatrixWorld(true); },
     toView: (point: THREE.Vector3) => internals.pose.localToWorld(point.clone()),
   };
@@ -91,10 +92,32 @@ describe('iron sight alignment', () => {
     expect(Math.abs(new THREE.Vector3(1, 0, 0).applyQuaternion(weapon.ads.quaternion).y)).toBeLessThan(1e-6);
   });
 
-  it.each(ids)('%s: the eye is 13 to 42 cm behind the rear sight', async id => {
+  it.each(ids)('%s: the eye is 13 to 90 cm behind the rear sight', async id => {
     const { relief } = (await prepared(id)).sights;
     expect(relief).toBeGreaterThanOrEqual(0.13 - 1e-9);
-    expect(relief).toBeLessThanOrEqual(0.42 + 1e-9);
+    expect(relief).toBeLessThanOrEqual(0.9 + 1e-9);
+  });
+
+  // Black Ops screenshots (1280 wide) of the same room, aimed: the Kar98k's front sight hood is about 3.1% of the window's
+  // width and the pistol's rear sight about 2.4%. The hood is about 16 mm across in this model and the pistol's rear sight
+  // 20 mm (measured off the models), so those widths must look that big.
+  function percentOfWindow(weapon: PreparedWeapon, id: string, point: THREE.Vector3, width: number, aspect: number) {
+    const { toView } = aimed(weapon);
+    const depth = -toView(point).z;
+    const halfHorizontal = Math.tan(viewmodelFov(1, adsZoom(id), aspect) * Math.PI / 360) * aspect;
+    return 100 * (width / depth) / (2 * halfHorizontal);
+  }
+
+  it.each([1, 4 / 3, 16 / 9, 21 / 9, 32 / 9])('kar98k: the front sight hood is about as wide as in Black Ops (3.1%%) at %s', async aspect => {
+    const weapon = await prepared('kar98k');
+    expect(percentOfWindow(weapon, 'kar98k', weapon.sights.front, 0.016, aspect)).toBeGreaterThan(2.8);
+    expect(percentOfWindow(weapon, 'kar98k', weapon.sights.front, 0.016, aspect)).toBeLessThan(3.4);
+  });
+
+  it.each([1, 4 / 3, 16 / 9, 21 / 9, 32 / 9])("the starting pistol's rear sight is about as wide as in Black Ops (2.4%%) at %s", async aspect => {
+    const weapon = await prepared('m1911');
+    expect(percentOfWindow(weapon, 'starter-pistol', weapon.sights.rear, 0.0205, aspect)).toBeGreaterThan(2.1);
+    expect(percentOfWindow(weapon, 'starter-pistol', weapon.sights.rear, 0.0205, aspect)).toBeLessThan(2.7);
   });
 
   it('a longer eye relief moves the aimed gun forward but leaves the hip pose where it was', async () => {
@@ -121,6 +144,26 @@ describe('iron sight alignment', () => {
       previous = off;
     }
     expect(previous).toBeLessThan(1e-4);
+  });
+
+  it.each([['kar98k', 'kar98k'], ['m1911', 'starter-pistol']])("%s: the weapon camera is drawn with the aim lens, and the pistol's lens does not zoom", async (folder, gunId) => {
+    const weapon = await prepared(folder);
+    const held = viewHolding(weapon, gunId);
+    const renderer = { clearDepth: () => {}, render: () => {} } as unknown as THREE.WebGLRenderer;
+    const view = held.view as unknown as { render: (renderer: THREE.WebGLRenderer, aspect: number) => void };
+    for (const aspect of [4 / 3, 16 / 9, 21 / 9]) {
+      held.player.aiming = false;
+      for (let tick = 0; tick < 240; tick++) held.step(tick);
+      view.render(renderer, aspect);
+      expect(held.camera.fov).toBeCloseTo(viewmodelFov(0, adsZoom(gunId), aspect), 4);
+      held.player.aiming = true;
+      for (let tick = 0; tick < 240; tick++) held.step(tick);
+      view.render(renderer, aspect);
+      expect(held.camera.fov).toBeCloseTo(viewmodelFov(1, adsZoom(gunId), aspect), 4);
+      expect(held.camera.aspect).toBeCloseTo(aspect);
+    }
+    // With no zoom the pistol's aimed lens is the plain 65 degree horizontal one.
+    if (gunId === 'starter-pistol') expect(Math.tan(held.camera.fov * Math.PI / 360) * held.camera.aspect).toBeCloseTo(Math.tan(65 * Math.PI / 360), 4);
   });
 
   it('a gun with no listed sights is still aimed, along the top of its model', () => {

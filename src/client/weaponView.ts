@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { batchStaticMeshes } from './staticBatch.ts';
-import { HANDGUNS } from './aim.ts';
+import { HANDGUNS, VIEWMODEL_HIP_FOV, adsZoom, viewmodelFov } from './aim.ts';
 import { MIN_EYE_RELIEF, adsPose, eyeRelief, sightPoints, type AimPose, type SightPoints } from './weaponSights.ts';
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
 import { createGrenadeModel, createMineModel } from './explosiveModels.ts';
@@ -17,8 +17,8 @@ const HIDDEN_PARTS: Readonly<Record<string, RegExp>> = { kar98k: /Scope/, bar: /
 
 /** Sights for a gun with none listed: along the top of the model, from a third of the way to the muzzle. */
 function defaultSights(length: number): SightPoints {
-  const rear = new THREE.Vector3(0, 0, -length * 0.3);
-  return { rear, front: new THREE.Vector3(0, 0, -length * 0.95), relief: eyeRelief(rear) };
+  const rear = new THREE.Vector3(0, 0, -length * 0.3), front = new THREE.Vector3(0, 0, -length * 0.95);
+  return { rear, front, relief: eyeRelief(rear, front) };
 }
 
 // Viewmodel lengths in metres, roughly 0.86x each gun's real length.
@@ -169,7 +169,7 @@ function placeholderWeapon(id: string): PreparedWeapon {
 
 export class WeaponView {
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(52, 1, 0.01, 10);
+  private readonly camera = new THREE.PerspectiveCamera(VIEWMODEL_HIP_FOV, 1, 0.01, 10);
   private readonly pose = new THREE.Group();
   private readonly flash = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6),
     new THREE.MeshBasicMaterial({ color: 0xffd57a, transparent: true, opacity: 0.9, depthWrite: false }));
@@ -299,7 +299,9 @@ export class WeaponView {
 
   render(renderer: THREE.WebGLRenderer, aspect: number): void {
     if (!this.active) return;
-    if (this.camera.aspect !== aspect) { this.camera.aspect = aspect; this.camera.updateProjectionMatrix(); }
+    // The gun's own lens narrows as it is raised (see `viewmodelFov`), which is what makes its sights large when aimed.
+    const fov = viewmodelFov(this.aimBlend, adsZoom(this.id), aspect);
+    if (this.camera.aspect !== aspect || this.camera.fov !== fov) { this.camera.aspect = aspect; this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     renderer.clearDepth(); renderer.render(this.scene, this.camera);
   }
 }

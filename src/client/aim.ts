@@ -2,11 +2,11 @@
 export const HANDGUNS: ReadonlySet<string> = new Set(['starter-pistol', 'magnum-357', 'python', 'irrlicht', 'molniya']);
 
 /**
- * How many times aiming magnifies the view. Iron sights on a shoulder weapon pull in further than a
- * pistol's, which is held out at arm's length. Tuned by eye against the hip view, not taken from a
- * game's data.
+ * How many times aiming magnifies the world. Measured from Black Ops screenshots of the same room, hip and aimed:
+ * the Kar98k's view narrows 1.74 times (a gate 310 px wide becomes 538, a shelf 137 becomes 238), and the pistol's
+ * does not change at all. Other shoulder guns are assumed to match the Kar98k.
  */
-export const ADS_ZOOM = { handgun: 1.55, longGun: 1.8 } as const;
+export const ADS_ZOOM = { handgun: 1, longGun: 1.74 } as const;
 
 export function adsZoom(weaponId: string): number {
   return HANDGUNS.has(weaponId) ? ADS_ZOOM.handgun : ADS_ZOOM.longGun;
@@ -19,4 +19,25 @@ export function adsZoom(weaponId: string): number {
 export function aimedFov(hipFovDegrees: number, weaponId: string): number {
   const half = hipFovDegrees * Math.PI / 360;
   return 2 * Math.atan(Math.tan(half) / adsZoom(weaponId)) * 180 / Math.PI;
+}
+
+/** The lens the gun itself is drawn with at the hip: a fixed vertical field of view, in degrees. */
+export const VIEWMODEL_HIP_FOV = 52;
+
+/**
+ * Black Ops draws the gun with a horizontal field of view of 65 degrees (its default) and, when aiming, narrows
+ * it by the aim zoom. A gun drawn that way has sights of the same width on screen at any window shape, which is
+ * what the aimed view here is matched to.
+ */
+export const VIEWMODEL_AIMED_HFOV = 65;
+
+/**
+ * The gun's vertical field of view in degrees, `aimBlend` of the way (0 to 1) from the hip lens to the aimed one. Aimed,
+ * the gun is drawn with the same magnification as the world (`zoom`, from `adsZoom`), which is what makes its sights
+ * large; `aspect` is the window's width over its height.
+ */
+export function viewmodelFov(aimBlend: number, zoom: number, aspect: number): number {
+  const hip = Math.tan(VIEWMODEL_HIP_FOV * Math.PI / 360);
+  const aimed = Math.tan(VIEWMODEL_AIMED_HFOV * Math.PI / 360) / (zoom * aspect);
+  return 2 * Math.atan(hip + (aimed - hip) * aimBlend) * 180 / Math.PI;
 }

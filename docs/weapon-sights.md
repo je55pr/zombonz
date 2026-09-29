@@ -18,18 +18,39 @@ eye, the rear sight and the front sight are one line down the middle of the scre
 same axis, so what is under the sights is what is hit. There is no fixed nudge or per-gun height any more; what a gun
 needs is its two points.
 
-**Eye relief** (how far the rear sight is from the eye) is where a shouldered gun would put the eye: about 12 cm in
-front of the butt, so a rear sight far up the barrel (Kar98k, MG42) is looked at from far away and a peep sight on the
-receiver from close, within 13 to 42 cm. (On the exact line of sight, a fixed 13 cm puts the Kar98k's eye directly over
-its receiver, which then fills the view.) Handguns and machine pistols are held out at arm's length and list their own
-(28 and 24 cm); at 13 cm a pistol's rear sight fills the screen.
+## How big the sights are (matched to Black Ops)
 
-The viewmodel has its own camera with a fixed vertical field of view, so none of this depends on the field-of-view
-setting (which only zooms the world while aiming) and the sights stay on the centre at any window shape.
+Lining the sights up did not make them the right size. Black Ops screenshots of the Kar98k aimed (same room, 1280 px wide)
+show its iron sights about 3.1% of the window's width, against about 0.8% in ours at that point; its rear sight block is
+about 8%. Three things set the size, all changed to match:
 
-The hip pose is the aimed pose plus a fixed offset, as before. A gun's own `relief` moves the aimed pose but not the
-hip pose. Raising the gun blends position and rotation together, and the rear sight closes in on the centre of the
-screen without overshooting it (a test checks that for a rifle, the pistol and a shotgun).
+- **The world zooms by 1.74 times when a shoulder gun is aimed.** Measured from a hip and an aimed screenshot of the
+  same view: a gate 310 px wide became 538 px and a shelf 137 px became 238 px, both about the screen centre (so a pure
+  zoom). It was 1.8, so this barely moves. **A pistol does not zoom at all**: the two pistol screenshots have the same view
+  hip and aimed. It was 1.55 (`ADS_ZOOM` in `src/client/aim.ts`). Every non-sidearm gun, including the machine pistols,
+  gets the shoulder gun's zoom; I have no screenshots of those.
+- **The gun is drawn with the same magnification as the world when it is aimed.** The gun has its own camera, which had
+  a fixed 52 degree vertical field of view, so aiming zoomed the world but not the gun and its sights stayed small.
+  Aimed, the gun's camera is now Black Ops' 65 degree horizontal field of view narrowed by the aim zoom (`viewmodelFov`),
+  so the sights are the same fraction of the window's *width* at any window shape (a fixed vertical field of view would
+  make them smaller on an ultrawide). It blends back to the 52 degree lens at the hip, where the gun is unchanged. It does
+  not depend on the field-of-view setting, which only zooms the world.
+- **The eye is further from the rear sight.** Eye relief is 0.7 times the distance from the rear sight to the front sight
+  (13 to 90 cm), which keeps the rear sight in the same proportion to the front one on every gun. It is 67 cm for the
+  handguns, which are held out at arm's length (Black Ops' pistol rear sight is about 2.4% of the width, ours is 2.3%),
+  and 30 cm for the Skorpion, whose model is very large and whose rear sight housing filled the screen.
+
+The hip pose does not move: it is still the aimed pose plus a fixed offset, and relief only moves the aimed pose. Raising the
+gun blends position, rotation and lens together, and the rear sight closes in on the centre of the screen without
+overshooting it (a test checks that for a rifle, the pistol and a shotgun).
+
+## Checking the size
+
+`test/weapon-sights.test.ts` projects a 16 mm front sight hood on the Kar98k and the 20.5 mm rear sight of the pistol
+through the weapon camera at square, 4:3, 16:9, 21:9 and 32:9, and requires 2.8 to 3.4% and 2.1 to 2.7% of the window's
+width. It also checks that the weapon camera really is on the aim lens when a gun is aimed. To measure it yourself in the
+dev server, isolate one sight with a clipping slab through it, draw it white through `weaponView`'s camera at 1280x720
+and count pixels.
 
 ## Numbers per gun
 
