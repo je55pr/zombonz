@@ -316,6 +316,19 @@ function nearestWorldDistance(
   return best;
 }
 
+function nearestHazardHit(ray: HitscanRay, hazards: readonly HazardTarget[], range: number,
+  worldDistance: number | null): { hazardId: string; distance: number } | null {
+  let best: { hazardId: string; distance: number } | null = null;
+  for (const hazard of hazards) {
+    const distance = rayAabbDistance(ray, hazard.box.min, hazard.box.max, range);
+    if (distance === null || (worldDistance !== null && distance >= worldDistance)) continue;
+    if (!best || distance < best.distance || distance === best.distance && hazard.state.id < best.hazardId) {
+      best = { hazardId: hazard.state.id, distance };
+    }
+  }
+  return best;
+}
+
 function zombieHitDistance(ray: HitscanRay, zombie: ZombieState, maxDistance: number): number | null {
   const radius = 0.32;
   const height = zombie.entry?.phase === 'vaulting' ? 1.72 * 0.85 : 1.72;
@@ -339,12 +352,7 @@ export function resolveHitscan(
   hazards: readonly HazardTarget[] = [],
 ): HitscanTarget {
   const worldDistance = nearestWorldDistance(ray, worldBoxes, range);
-  let bestHazard: { hazardId: string; distance: number } | null = null;
-  for (const hazard of hazards) {
-    const distance = rayAabbDistance(ray, hazard.box.min, hazard.box.max, range);
-    if (distance === null || (worldDistance !== null && distance >= worldDistance)) continue;
-    if (!bestHazard || distance < bestHazard.distance) bestHazard = { hazardId: hazard.state.id, distance };
-  }
+  const bestHazard = nearestHazardHit(ray, hazards, range, worldDistance);
   const targets = resolveHitscanZombies(ray, zombies, worldBoxes, range, hazards);
   if (targets.length) return targets[0];
   if (bestHazard) return { kind: 'hazard', ...bestHazard };
@@ -361,11 +369,7 @@ export function resolveHitscanZombies(
   hazards: readonly HazardTarget[] = [],
 ): Array<Extract<HitscanTarget, { kind: 'zombie' }>> {
   const worldDistance = nearestWorldDistance(ray, worldBoxes, range);
-  let hazardDistance: number | null = null;
-  for (const hazard of hazards) {
-    const distance = rayAabbDistance(ray, hazard.box.min, hazard.box.max, range);
-    if (distance !== null && (hazardDistance === null || distance < hazardDistance)) hazardDistance = distance;
-  }
+  const hazardDistance = nearestHazardHit(ray, hazards, range, worldDistance)?.distance ?? null;
   const hits: Array<Extract<HitscanTarget, { kind: 'zombie' }>> = [];
   for (const zombie of zombies) {
     if (!zombie.alive) continue;
@@ -523,18 +527,20 @@ export function firePlayerWeapon(
   // Pellets resolve against the pre-shot state, then each zombie takes one combined hit.
   const hits = new Map<EntityId, { damage: number; distance: number; hitZone: HitZoneId }>();
   const hazardHits = new Map<string, { damage: number; point: Vec3 }>();
+  const addHazardHit = (hazardId: string, distance: number, shotRay: HitscanRay, damage: number) => {
+    const { origin, direction } = shotRay;
+    const total = hazardHits.get(hazardId)
+      ?? { damage: 0, point: { x: origin.x + direction.x * distance, y: origin.y + direction.y * distance,
+        z: origin.z + direction.z * distance } };
+    total.damage += damage; hazardHits.set(hazardId, total);
+  };
   let first: { ray: HitscanRay; hit: HitscanTarget } | null = null;
   for (let pellet = 0; pellet < (definition.pellets ?? 1); pellet += 1) {
     const pelletSeed = pellet === 0 ? seed : seed ^ Math.imul(pellet, 0x85ebca6b);
     const pelletRay = spreadHitscanRay(ray, spread, pelletSeed);
     const hit = resolveHitscan(pelletRay, zombies, worldBoxes, definition.range, hazards);
     first ??= { ray: pelletRay, hit };
-    if (hit.kind === 'hazard') {
-      const { origin, direction } = pelletRay, total = hazardHits.get(hit.hazardId)
-        ?? { damage: 0, point: { x: origin.x + direction.x * hit.distance, y: origin.y + direction.y * hit.distance,
-          z: origin.z + direction.z * hit.distance } };
-      total.damage += definition.damage; hazardHits.set(hit.hazardId, total);
-    }
+    if (hit.kind === 'hazard') addHazardHit(hit.hazardId, hit.distance, pelletRay, definition.damage);
     const penetration = definition.penetration;
     const targets = hit.kind === 'zombie'
       ? resolveHitscanZombies(pelletRay, zombies, worldBoxes, definition.range, hazards).slice(0, penetration?.maxTargets ?? 1) : [];
@@ -546,6 +552,12 @@ export function firePlayerWeapon(
       if (target.hitZone === 'head') total.hitZone = 'head';
       hits.set(target.zombieId, total);
     });
+    if (hit.kind === 'zombie' && targets.length < (penetration?.maxTargets ?? 1)) {
+      const obstacle = nearestHazardHit(pelletRay, hazards, definition.range,
+        nearestWorldDistance(pelletRay, worldBoxes, definition.range));
+      if (obstacle) addHazardHit(obstacle.hazardId, obstacle.distance, pelletRay,
+        Math.round(definition.damage * (penetration?.damageRetention ?? 1) ** targets.length));
+    }
   }
   for (const [zombieId, hit] of [...hits].sort((a, b) => a[1].distance - b[1].distance || a[0].localeCompare(b[0]))) {
     const zombie = zombies.find((candidate) => candidate.id === zombieId && candidate.alive);
