@@ -13,7 +13,7 @@ import {
 import {
   BUNKER_NAVIGATION,
   greyboxCollisionBoxes,
-} from '../src/maps/bunker.ts';
+} from '../src/maps/bunkerLegacy.ts';
 
 const branchGraph: NavigationGraph = {
   nodes: [

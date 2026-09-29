@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { BARRIER_RULES, boardMask, createBarrier, createPlayerState, createPowerupState, createZombieEntry,
   createZombieState, collectPowerups, repairBarriers, restoreBarrier, updateZombieEntry,
   DEFAULT_POWERUP_CONFIG, type BarrierState } from '../src/core/index.ts';
-import { BUNKER_BARRIERS, BUNKER_MAP } from '../src/maps/bunker.ts';
+import { BUNKER_BARRIERS, BUNKER_MAP } from '../src/maps/bunkerLegacy.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { EYE_HEIGHT, SILL_TOP, plankHeights, plankPose, plankReach, turnUvs, windowSeed } from '../src/client/windowBoards.ts';
 
