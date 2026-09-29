@@ -1,5 +1,7 @@
 # Asylum
 
+The versioned source is [`src/maps/data/asylum.v1.json`](../src/maps/data/asylum.v1.json). The browser loads this file through `src/maps/asylum.ts`, and the Godot editor can import and export it.
+
 Asylum follows the layout of World at War's Verrückt: a two-storey sanatorium wrapped around an
 open courtyard. It is laid out from the fan floor plans and the original map's script and effect
 placements, so the proportions follow Verrückt's. It is not extracted from the original assets.
@@ -90,7 +92,7 @@ The treeline stands outside the boundary wall.
 
 Fuel barrels stand in the BAR room (a pair, so one sets off the other) and in the courtyard's north-west
 corner. An abandoned truck sits in the grounds, a few metres from where the German start's south
-windows' zombies appear. All of them explode when shot (`ASYLUM_HAZARDS`; the rules are in the README's
+windows' zombies appear. All of them explode when shot (see `gameplay.hazards` in the map document; the rules are in the README's
 Explosives section) and are clear of every zombie route. A shelf on the hallway's east wall sells
 Bouncing Betties for 1000 points.
 

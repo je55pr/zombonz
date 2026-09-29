@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import bunkerDocument from '../src/maps/data/bunker.v1.json';
+import asylumDocument from '../src/maps/data/asylum.v1.json';
 import { BUNKER_MAP } from '../src/maps/bunker.ts';
+import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { BUNKER_BARRIERS, BUNKER_COLLISION, BUNKER_DOORS, BUNKER_NAVIGATION,
   BUNKER_ZOMBIE_SPAWNS } from '../src/maps/bunkerLegacy.ts';
 import { loadMapDocument, toMapDocument, validateMapDocument } from '../src/maps/mapDocument.ts';
@@ -16,6 +18,24 @@ describe('versioned map document', () => {
     expect(BUNKER_MAP.barriers).toEqual(BUNKER_BARRIERS);
     expect(BUNKER_MAP.zombieSpawns).toEqual(BUNKER_ZOMBIE_SPAWNS);
     expect(BUNKER_MAP.doors).toEqual(BUNKER_DOORS);
+  });
+
+  it('loads the authored Asylum map with its routes, traps and presentation data', () => {
+    expect(loadMapDocument(asylumDocument)).toEqual(ASYLUM_MAP);
+    expect(toMapDocument(ASYLUM_MAP)).toEqual(asylumDocument);
+    expect(ASYLUM_MAP.barriers).toHaveLength(18);
+    expect(ASYLUM_MAP.traps).toHaveLength(2);
+    expect(ASYLUM_MAP.navigation.nodes.length).toBeGreaterThan(50);
+    expect(ASYLUM_MAP.scenery?.length).toBeGreaterThan(0);
+  });
+
+  it('validates Asylum trap switches and zones at their document paths', () => {
+    const document = structuredClone(asylumDocument);
+    document.gameplay.traps[0].switchPosition.x = Number.NaN;
+    document.gameplay.traps[1].zone.min.x = document.gameplay.traps[1].zone.max.x + 1;
+    const errors = validateMapDocument(document);
+    expect(errors).toContain('gameplay.traps[0].switchPosition: expected a finite {x, y, z} position');
+    expect(errors).toContain('gameplay.traps[1].zone: min cannot exceed max on any axis');
   });
 
   it('reports authorable paths for broken references, geometry and costs', () => {
