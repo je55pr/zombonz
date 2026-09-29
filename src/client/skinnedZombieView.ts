@@ -53,7 +53,6 @@ export class SkinnedZombieView {
   private deathTick?: number;
   private yaw?: number;
   private shown = 0;
-  private flashLeft = 0;
   private moving = false;
 
   constructor(asset: ZombieAsset, private readonly look: ZombieLook) {
@@ -135,11 +134,6 @@ export class SkinnedZombieView {
       if (crawling) this.poseCrawl(tick); else this.posture(tick);
     }
     this.syncLimbs(zombie.limbs);
-    if (this.flashLeft > 0) {
-      this.flashLeft -= 1;
-      const glow = this.flashLeft > 0 ? 0.55 * this.flashLeft / 5 : 0;
-      for (const material of this.materials) material.emissive.setRGB(glow, glow * 0.25, glow * 0.2);
-    }
     if (!zombie.alive) {
       this.deathTick ??= tick;
       // Keep a short death pose, then sink/remove; fallback for the variant without a death clip.
@@ -241,9 +235,6 @@ export class SkinnedZombieView {
       bone.add(cap); this.caps.push(cap);
     }
   }
-
-  /** A brief red-white flash of the whole body, for a hit that lands. */
-  flash(): void { this.flashLeft = 6; }
 
   /**
    * A copy of a limb as it is drawn right now, as a loose object at its own middle (in world space) for the gore system to

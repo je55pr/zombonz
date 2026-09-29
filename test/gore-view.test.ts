@@ -221,30 +221,46 @@ describe('what the gore director makes of events', () => {
     effects.burst = (...args) => { calls.bursts++; burst(...args); };
     effects.splat = (...args) => { calls.splats++; splat(...args); };
     effects.throwPiece = (...args) => { calls.pieces++; piece(...args); };
-    const flashes: string[] = [];
     const detachments: string[] = [];
     const views = new Map<`e:${number}`, SkinnedZombieView>();
     const world = { tick: 0, seed: 1, nextEntityNumber: 9, entities: {} as Record<string, unknown> };
     for (const id of ['e:2', 'e:3'] as const) {
       world.entities[id] = createZombieState(id, { x: 0, y: 0, z: -4 }, 1);
-      views.set(id, { flash: () => flashes.push(id),
+      views.set(id, {
         detach: (limb: string) => { detachments.push(limb); const group = new THREE.Group(); group.position.set(0, 1, -4); group.add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshBasicMaterial())); return group; },
       } as unknown as SkinnedZombieView);
     }
-    return { director: new GoreDirector(effects, views), calls, flashes, detachments, world: world as never, effects };
+    return { director: new GoreDirector(effects, views), calls, detachments, world: world as never, effects };
   }
   const dismembered = (lost: Array<'head' | 'armL' | 'armR' | 'legL' | 'legR'>, patch: Record<string, unknown> = {}): SimulationEvent => ({
     type: 'zombieDismembered', zombieId: 'e:2', playerId: 'e:1', lost, limbs: 0, part: 'armL', point: { x: 0, y: 1, z: -4 } as Vec3,
     direction: { x: 0, y: 0, z: -1 } as Vec3, source: 'bullet', lethal: false, crawler: false, gutted: false, ...patch,
   } as SimulationEvent);
 
-  it('sprays and flashes the body where a bullet lands, more for the head, and ignores a hit with no place', () => {
-    const { director, calls, flashes, world } = rig();
+  it('sprays where a bullet lands, more for the head, and ignores a hit with no place', () => {
+    const { director, calls, world } = rig();
     director.consume([{ type: 'weaponHit', playerId: 'e:1', weaponId: 'kar98k', zombieId: 'e:2', damage: 10, distance: 4, hitZone: 'body' }], world);
-    expect(calls.sprays).toBe(0); expect(flashes).toEqual([]);
+    expect(calls.sprays).toBe(0);
     director.consume([{ type: 'weaponHit', playerId: 'e:1', weaponId: 'kar98k', zombieId: 'e:2', damage: 10, distance: 4, hitZone: 'head',
       part: 'head', point: { x: 0, y: 1.5, z: -4 }, direction: { x: 0, y: 0, z: -1 } }], world);
-    expect(calls.sprays).toBe(2); expect(flashes).toEqual(['e:2']);
+    expect(calls.sprays).toBe(2);
+  });
+
+  it.each(ZOMBIE_ASSET_IDS)('%s: a hit leaves the zombie itself alone (no glow over its body, and its emissive map is kept)', id => {
+    const view = new SkinnedZombieView(assets[id], zombieLook({ id: 'e:2' }));
+    const zombie = createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, 'walk', ZOMBIE_ASSET_IDS.indexOf(id));
+    const materials = (view as unknown as { materials: THREE.MeshStandardMaterial[] }).materials;
+    // The walker's own material has a white emissive factor with a map (its eyes); the loader used in tests gives a bare one.
+    for (const material of materials) material.emissive.setRGB(1, 1, 1);
+    let tick = settle(view, zombie);
+    const describe = () => materials.map(material => [material.emissive.getHex(), material.emissiveIntensity, material.color.getHex(), !!material.emissiveMap]);
+    const before = describe();
+    const director = new GoreDirector(new GoreEffects(new THREE.Scene(), { ground: () => 0 }), new Map([[zombie.id, view]]));
+    const world = { tick: 0, seed: 1, nextEntityNumber: 9, entities: { [zombie.id]: zombie } } as never;
+    director.consume([{ type: 'weaponHit', playerId: 'e:1', weaponId: 'kar98k', zombieId: zombie.id, damage: 100, distance: 4, hitZone: 'body',
+      part: 'torso', point: { x: 0, y: 1, z: -0.3 }, direction: { x: 0, y: 0, z: -1 } }], world);
+    tick = settle(view, zombie, 12, tick);
+    expect(describe()).toEqual(before);
   });
 
   it('throws what came off, and a shot-off head and blast-torn zombie make a mess to match', () => {

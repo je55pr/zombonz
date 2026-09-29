@@ -8,7 +8,7 @@ import type { SkinnedZombieView } from './skinnedZombieView.ts';
 const MAX_DETACHED_PER_FRAME = 3;
 
 /**
- * Turns what the simulation says happened to zombies into what is seen: a spray where a bullet lands, a flash of the body,
+ * Turns what the simulation says happened to zombies into what is seen: a spray where a bullet lands,
  * a limb or a head flung away with blood after it, lumps and a spray from a zombie torn open, and a pool where one falls.
  * It only reads events; whether a limb is gone is the simulation's (and the view's, from `ZombieState.limbs`), so a late
  * arrival, or a co-op client, still sees the bodies as they are, just without the flying parts.
@@ -29,7 +29,6 @@ export class GoreDirector {
         // Out through the far side, and back toward the gun.
         this.effects.spray(event.point, direction, head ? 24 : 12, head ? 4.6 : 3.4, 0.32);
         this.effects.spray(event.point, { x: -direction.x, y: -direction.y + 0.2, z: -direction.z }, head ? 12 : 6, 2.2, 0.55);
-        this.views.get(event.zombieId)?.flash();
       } else if (event.type === 'zombieDismembered') {
         detached += this.tear(event, world, MAX_DETACHED_PER_FRAME - detached);
       } else if (event.type === 'zombieDied') {
