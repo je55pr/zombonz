@@ -157,7 +157,7 @@ The client draws all of this (`src/client/skinnedZombieView.ts`, `zombieRig.ts`,
 - The limb that came off is copied from the skeleton in the pose it was in (vertices skinned by hand from the bones) and
   thrown: along the shot, or away from the blast. It tumbles, lands, lies for eleven seconds and shrinks away. At most three
   are copied in a frame; the rest of a big blast still bleeds.
-- A bullet sprays blood forward from the hit and back toward the gun (more for the head) and flashes the body. A zombie torn
+- A bullet sprays blood forward from the hit and back toward the gun (more for the head). Nothing lights up the zombie itself: a glow added to the whole body turned a hit zombie into a flat pink silhouette. A zombie torn
   open by a blast throws lumps of flesh, a spray and a pool; every death leaves a pool on the floor.
 - All of it is pooled: 512 droplets, 56 lumps, 18 thrown limbs and 20 pools, oldest recycled first, and nothing is drawn or
   updated while none is alive (`GORE_BUDGET` in `goreEffects.ts`).
