@@ -5,7 +5,7 @@ import { HANDGUNS, VIEWMODEL_HIP_FOV, adsZoom, viewmodelFov } from './aim.ts';
 import { MIN_EYE_RELIEF, adsPose, eyeRelief, sightPoints, type AimPose, type SightPoints } from './weaponSights.ts';
 import { loadModel, WEAPON_ASSETS } from './runtimeAssets.ts';
 import { createGrenadeModel, createMineModel } from './explosiveModels.ts';
-import { WEAPON_DEFINITIONS, reloadTicksFor, weaponName } from '../core/weapon.ts';
+import { MELEE_RULES, WEAPON_DEFINITIONS, reloadTicksFor, weaponName } from '../core/weapon.ts';
 import { GRENADE_RULES } from '../core/grenade.ts';
 import type { PlayerState } from '../core/types.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
@@ -57,6 +57,49 @@ const FLASH_COLOURS: Readonly<Record<string, number>> = { irrlicht: 0x7dff9a, mo
 export type TossKind = 'grenade' | 'mine';
 /** How long each toss lasts, in seconds: the gun dips out of the way, the thing is thrown or set down, the gun comes back. */
 export const TOSS_SECONDS: Readonly<Record<TossKind, number>> = { grenade: 0.55, mine: 0.72 };
+
+/** The knife's real overall length: a Ka-Bar is 30 cm, drawn a touch larger so it reads on screen. */
+export const KNIFE_LENGTH = 0.32;
+
+/**
+ * The knife swing, `seconds` after `meleeSwung`: how far the gun has dipped out of the way (0 to 1) and where the knife
+ * in the hand is (view space: x right, y up, z forward is negative; rotations turn its tip up, left and roll its edge
+ * to the right), or null when it is not in view. The swing is a wind-up (the blade rises and cocks back), the strike,
+ * a follow-through across the view and a slow return. `MELEE_RULES.strikeTicks` is when the core lands the blow, and the
+ * strike pose here, the knife at full stretch in front of the player, is at that same moment.
+ */
+export const KNIFE_SWING_SECONDS = MELEE_RULES.cooldownTicks / 60;
+export const KNIFE_STRIKE_SECONDS = MELEE_RULES.strikeTicks / 60;
+export interface KnifePose { x: number; y: number; z: number; rx: number; ry: number; rz: number }
+const KNIFE_KEYS: ReadonlyArray<KnifePose & { t: number; ease: 'in' | 'out' | 'smooth' }> = [
+  // Just below and right of the frame.
+  { t: 0, x: 0.3, y: -0.22, z: -0.36, rx: 0.5, ry: 0.5, rz: 0.5, ease: 'smooth' },
+  // Cocked: raised beside the head, the tip pointing up and back.
+  { t: KNIFE_STRIKE_SECONDS * 0.5, x: 0.2, y: 0.03, z: -0.33, rx: 1.2, ry: -0.4, rz: -0.6, ease: 'in' },
+  // The strike: the blade thrown forward across the middle of the view, at full stretch.
+  { t: KNIFE_STRIKE_SECONDS, x: 0.06, y: -0.02, z: -0.42, rx: 0.12, ry: 0.7, rz: 0.45, ease: 'out' },
+  // Follow-through, down and to the left, then held for a moment.
+  { t: KNIFE_STRIKE_SECONDS + 0.09, x: -0.13, y: -0.1, z: -0.38, rx: -0.15, ry: 1.05, rz: 0.8, ease: 'smooth' },
+  { t: KNIFE_STRIKE_SECONDS + 0.15, x: -0.16, y: -0.12, z: -0.37, rx: -0.2, ry: 1.1, rz: 0.85, ease: 'smooth' },
+  // Back out of view to the lower right, as the gun comes back up.
+  { t: KNIFE_STRIKE_SECONDS + 0.28, x: 0.3, y: -0.22, z: -0.36, rx: 0.5, ry: 0.5, rz: 0.5, ease: 'smooth' },
+];
+
+export function knifeSwing(seconds: number): { dip: number; knife: KnifePose | null } {
+  if (seconds < 0 || seconds >= KNIFE_SWING_SECONDS) return { dip: 0, knife: null };
+  // The gun drops away quickly, stays down while the knife is out, and is back up before the swing's cooldown ends.
+  const dip = smooth(0, 0.08, seconds) * (1 - smooth(KNIFE_STRIKE_SECONDS + 0.08, KNIFE_STRIKE_SECONDS + 0.42, seconds));
+  const end = KNIFE_KEYS[KNIFE_KEYS.length - 1];
+  if (seconds >= end.t) return { dip, knife: null };
+  let index = 0;
+  while (KNIFE_KEYS[index + 1].t <= seconds) index++;
+  const from = KNIFE_KEYS[index], to = KNIFE_KEYS[index + 1];
+  const u = (seconds - from.t) / (to.t - from.t);
+  // A blade gathers speed into the strike and slows after it.
+  const eased = to.ease === 'in' ? u * u : to.ease === 'out' ? 1 - (1 - u) * (1 - u) : u * u * (3 - 2 * u);
+  return { dip, knife: { x: lerp(from.x, to.x, eased), y: lerp(from.y, to.y, eased), z: lerp(from.z, to.z, eased),
+    rx: lerp(from.rx, to.rx, eased), ry: lerp(from.ry, to.ry, eased), rz: lerp(from.rz, to.rz, eased) } };
+}
 
 const smooth = (from: number, to: number, t: number) => { const x = Math.max(0, Math.min(1, (t - from) / (to - from))); return x * x * (3 - 2 * x); };
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -114,7 +157,7 @@ export function prepareWeapon(source: THREE.Object3D, id: string): PreparedWeapo
     (isMagazine ? magazine : body).add(mesh);
   });
   const bounds = new THREE.Box3().setFromObject(root), size = bounds.getSize(new THREE.Vector3());
-  const length = VIEWMODEL_LENGTHS[id] ?? 1.05;
+  const length = VIEWMODEL_LENGTHS[id] ?? (id === 'knife' ? KNIFE_LENGTH : 1.05);
   const scale = length / size.z;
   const offset = new THREE.Vector3(-(bounds.min.x + bounds.max.x) / 2, -bounds.max.y, -bounds.max.z);
   for (const group of [body, magazine]) {
@@ -159,6 +202,24 @@ export function readyWeaponModel(id: string): PreparedWeapon | null {
   return asset ? readyWeapons.get(asset) ?? null : null;
 }
 
+let knifeModel: Promise<PreparedWeapon> | null = null;
+/** Parses and bakes the knife's viewmodel once per page (its GLB is downloaded with the guns). */
+export function prepareKnifeModel(): Promise<PreparedWeapon> {
+  knifeModel ??= loadModel('weapons/knife/model.glb').then(gltf => prepareWeapon(gltf.scene, 'knife'));
+  return knifeModel;
+}
+
+/** The knife until its model is ready: a plain blade and grip, held at the same place. */
+function placeholderKnife(): THREE.Group {
+  const group = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color: 0x9aa0a4, roughness: 0.4, metalness: 0.5 });
+  const grip = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.9 });
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.035, 0.19), steel); blade.position.set(0, 0, -0.165);
+  const handle = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, 0.12), grip); handle.position.set(0, 0, 0.0);
+  group.add(blade, handle);
+  return group;
+}
+
 function placeholderWeapon(id: string): PreparedWeapon {
   const root = new THREE.Group(), magazine = new THREE.Group(); root.add(magazine);
   const metal = new THREE.MeshStandardMaterial({ color: 0x444a48, roughness: 0.6, metalness: 0.5 });
@@ -191,6 +252,10 @@ export class WeaponView {
   private readonly aimTurn = new THREE.Quaternion();
   private tossTick = -100;
   private tossKind: TossKind = 'grenade';
+  /** The tick the last knife swing began. */
+  private meleeTick = -100;
+  /** The knife in the hand during a swing: one group, made once, with its model swapped in when it has loaded. */
+  private readonly knife = new THREE.Group();
   /** What is in the hand during a toss, built when first needed. */
   private held: Record<TossKind, THREE.Group | null> = { grenade: null, mine: null };
   notice: string | null = null;
@@ -200,6 +265,14 @@ export class WeaponView {
     this.scene.add(new THREE.HemisphereLight(0xdde8f4, 0x655747, 2.8));
     const light = new THREE.DirectionalLight(0xffe3ba, 3.5); light.position.set(-2, 3, 2); this.scene.add(light);
     this.scene.add(this.pose); this.pose.add(this.flash); this.flash.visible = false;
+    this.knife.name = 'held-knife'; this.knife.visible = false;
+    const stand = placeholderKnife(); this.knife.add(stand);
+    this.scene.add(this.knife);
+    prepareKnifeModel().then(model => {
+      // The grip's centre is the knife's pivot: the butt of the handle is behind it, the blade in front.
+      model.root.position.set(0, 0.017, 0.07);
+      this.knife.remove(stand); this.knife.add(model.root);
+    }).catch(error => console.warn('Unable to load the knife viewmodel', error));
   }
   private equip(id: string): void {
     this.id = id; this.firedTick = -100;
@@ -227,8 +300,10 @@ export class WeaponView {
     });
   }
   events(events: readonly SimulationEvent[], playerId: string, tick: number): void {
-    if (events.some(event => event.type === 'matchRestarted')) this.firedTick = -100;
+    if (events.some(event => event.type === 'matchRestarted')) { this.firedTick = -100; this.meleeTick = -100; this.tossTick = -100; }
     for (const event of events) {
+      // The knife takes the hand: a toss in progress is dropped rather than drawn over it.
+      if (event.type === 'meleeSwung' && event.playerId === playerId) { this.meleeTick = tick; this.tossTick = -100; }
       if (event.type === 'weaponFired' && event.playerId === playerId) this.firedTick = tick;
       if (event.type === 'grenadeThrown' && event.playerId === playerId) { this.tossTick = tick; this.tossKind = 'grenade'; }
       if (event.type === 'minePlaced' && event.playerId === playerId) { this.tossTick = tick; this.tossKind = 'mine'; }
@@ -253,7 +328,10 @@ export class WeaponView {
     const definition = WEAPON_DEFINITIONS[this.id];
     const progress = player.weapon.reloadTicksRemaining > 0 ? 1 - player.weapon.reloadTicksRemaining / reloadTicksFor(player, definition) : 0;
     const reload = Math.sin(progress * Math.PI);
-    const blend = 1 - Math.exp(-13 * Math.min(0.1, Math.max(0, deltaSeconds)));
+    // A knife swing in progress (a downed or dead player's is over): the gun dips away and the knife is drawn.
+    const stabbing = player.alive && !player.downed ? knifeSwing((tick - this.meleeTick) / 60) : { dip: 0, knife: null };
+    // Aiming is cancelled by the swing, and the view comes out of it fast so the knife is drawn through the hip lens.
+    const blend = 1 - Math.exp(-(stabbing.knife ? 40 : 13) * Math.min(0.1, Math.max(0, deltaSeconds)));
     this.aimBlend += ((player.aiming ? 1 : 0) - this.aimBlend) * blend;
     this.sprintBlend += ((player.sprinting ? 1 : 0) - this.sprintBlend) * blend;
     const moving = Math.min(1, Math.hypot(player.velocity.x, player.velocity.z) / 3);
@@ -272,13 +350,14 @@ export class WeaponView {
         (GRENADE_RULES.windupTicks - player.grenadeWindupTicks) / GRENADE_RULES.windupTicks * 0.29))
         : handToss(tossKind, this.tossKind === 'grenade' ? 0.3 + Math.max(0, (tick - this.tossTick) / 60)
           : Math.max(0, (tick - this.tossTick) / 60));
-    this.pose.position.set(ads.position.x + hip.x * away + bob + toss.dip * 0.08,
-      ads.position.y + hip.y * away - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob) - toss.dip * 0.32,
+    const dip = Math.max(toss.dip, stabbing.dip);
+    this.pose.position.set(ads.position.x + hip.x * away + bob + dip * 0.08,
+      ads.position.y + hip.y * away - this.sprintBlend * 0.16 - reload * 0.32 + Math.abs(bob) - dip * 0.32,
       // A longer eye relief moves the aimed gun forward; the hip pose stays where it was.
       ads.position.z + (hip.z + this.current.sights.relief - HIP_POSE_RELIEF) * away + kick * (0.045 - this.aimBlend * 0.025));
     this.pose.quaternion.setFromEuler(this.euler.set(
-      kick * (0.10 - this.aimBlend * 0.06) + reload * 0.35 - this.sprintBlend * 0.22 - toss.dip * 0.35,
-      0.12 * away, -reload * 0.45 + this.sprintBlend * 0.12 - toss.dip * 0.2))
+      kick * (0.10 - this.aimBlend * 0.06) + reload * 0.35 - this.sprintBlend * 0.22 - dip * 0.35,
+      0.12 * away, -reload * 0.45 + this.sprintBlend * 0.12 - dip * 0.2))
       .multiply(this.aimTurn.identity().slerp(ads.quaternion, this.aimBlend));
     for (const kind of ['grenade', 'mine'] as const) {
       const shown = kind === tossKind && toss.item !== null;
@@ -290,17 +369,26 @@ export class WeaponView {
         item.rotation.set(-0.3 + toss.item.spin * 0.6, 0.6 + toss.item.spin, 0.25 - toss.item.spin * 0.4);
       }
     }
+    this.knife.visible = stabbing.knife !== null;
+    if (stabbing.knife) {
+      this.knife.position.set(stabbing.knife.x, stabbing.knife.y, stabbing.knife.z);
+      this.knife.quaternion.setFromEuler(this.euler.set(stabbing.knife.rx, stabbing.knife.ry, stabbing.knife.rz, 'YXZ'));
+    }
     this.current.magazine.position.y = -reload * 0.18;
     this.flash.position.copy(this.current.muzzle); this.flash.position.z -= 0.04;
     this.flash.scale.set(0.025, 0.025, 0.065);
-    this.flash.visible = sinceShot < 0.055 && toss.dip < 0.5;
+    this.flash.visible = sinceShot < 0.055 && dip < 0.5;
   }
   /** Compiles the viewmodel's shaders and uploads its textures before the game is shown. */
   async warm(renderer: THREE.WebGLRenderer): Promise<void> {
     // The grenade and mine held during a toss are made now, so their shaders compile with the rest.
     for (const kind of ['grenade', 'mine'] as const) this.heldItem(kind).visible = true;
+    // The knife's model is awaited so it too is compiled and uploaded now, not on the first swing.
+    await prepareKnifeModel().catch(() => undefined);
+    this.knife.visible = true;
     await renderer.compileAsync(this.scene, this.camera);
     for (const kind of ['grenade', 'mine'] as const) this.heldItem(kind).visible = false;
+    this.knife.visible = false;
     this.scene.traverse(object => {
       const material = (object as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
       for (const texture of [material?.map, material?.normalMap, material?.roughnessMap, material?.aoMap, material?.emissiveMap]) {

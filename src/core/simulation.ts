@@ -47,7 +47,7 @@ import {
   type ZombieMeleeEvent,
 } from './zombie.ts';
 import {
-  beginReload, createWeaponState, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon,
+  beginMelee, beginReload, createWeaponState, firePlayerWeapon, rayFromPlayer, tickMelee, tickWeaponState, wantsToFire, switchWeapon,
   type WeaponEvent,
 } from './weapon.ts';
 import {
@@ -416,13 +416,13 @@ export class GameSimulation {
       if (frame.actions.switchWeapon?.pressed || frame.actions.melee?.pressed || frame.actions.reload?.pressed
         || frame.actions.cancelGrenade?.pressed || player.noclip) player.grenadeWindupTicks = 0;
       else if (frame.actions.throwGrenade?.pressed && player.grenadeWindupTicks === 0
-        && player.grenadeCharges > 0 && player.switchTicksRemaining === 0) {
+        && player.grenadeCharges > 0 && player.switchTicksRemaining === 0 && player.meleeCooldownTicks === 0) {
         player.grenadeWindupTicks = GRENADE_RULES.windupTicks;
       }
       if (player.grenadeWindupTicks > 0 && --player.grenadeWindupTicks === 0) {
         events.push(...throwGrenade(this.state.grenades, player));
       }
-      if (frame.actions.placeMine?.pressed) events.push(...placeMine(this.state.grenades, player, this.shotBlockers(), this.map.walkSurfaces));
+      if (frame.actions.placeMine?.pressed && player.meleeCooldownTicks === 0) events.push(...placeMine(this.state.grenades, player, this.shotBlockers(), this.map.walkSurfaces));
       // Holding use beside a downed teammate revives them, ahead of anything else in reach.
       const downedTeammate = frame.actions.interact?.held ? reviveTarget(player, this.players()) : null;
       if (downedTeammate) {
@@ -451,12 +451,11 @@ export class GameSimulation {
 
     for (const player of livingPlayers(world)) {
       const frame = playerFrames.get(player.id)!;
-      if (frame.actions.melee?.pressed && !player.downed) {
-        const meleeEvents = meleeAttack(player, this.zombies(), this.shotBlockers(),
-          this.state.powerups.instaKillTicksRemaining > 0);
-        events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig,
-          this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
-      }
+      // A swing already begun lands its blow this tick, when its count runs out; a new one starts after.
+      const blow = tickMelee(player, this.zombies(), this.shotBlockers(), this.state.powerups.instaKillTicksRemaining > 0);
+      const meleeEvents = [...blow, ...(frame.actions.melee?.pressed && !player.downed ? beginMelee(player) : [])];
+      events.push(...meleeEvents, ...awardCombatPoints(player, meleeEvents, this.economyConfig,
+        this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
       const fire = frame.actions.fire;
       if (player.grenadeWindupTicks > 0 || !wantsToFire(player, fire?.pressed ?? false, fire?.held ?? false)) continue;
       const weaponEvents = firePlayerWeapon(

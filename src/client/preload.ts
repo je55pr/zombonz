@@ -27,6 +27,7 @@ export async function gameAssetUrls(): Promise<string[]> {
   paths.push(`/assets/${TEAMMATE_MODEL}`);
   for (const zombie of ZOMBIE_ASSET_IDS) paths.push(...zombieAssetPaths(zombie).map(path => `/assets/${path}`));
   for (const asset of new Set(Object.values(WEAPON_ASSETS))) paths.push(`/assets/weapons/${asset}/model.glb`);
+  paths.push('/assets/weapons/knife/model.glb');
   for (const clip of AUDIO_CLIPS) paths.push(`/assets/audio/${clip}.mp3`);
   return [...new Set(paths.map(assetUrl))];
 }

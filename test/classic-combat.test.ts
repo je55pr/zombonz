@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { GameSimulation, addEntity, createInputFrame, createPlayerState, createZombieState,
   damagePlayer, tickPlayerRecovery, PLAYER_HEALTH, firePlayerWeapon,
-  meleeAttack, awardCombatPoints, awardRepairPoints, zombieHealthForRound, createWeaponState, resolveHitscan,
+  awardCombatPoints, awardRepairPoints, zombieHealthForRound, createWeaponState, resolveHitscan,
   WEAPON_DEFINITIONS, hitZoneMultiplier, hitZoneOf } from '../src/core/index.ts';
 import { chestRay, headRay } from './aim.ts';
+import { swing } from './melee.ts';
 
 const origin = { x: 0, y: 0, z: 0 };
 const wall = [{ min: { x: -2, y: 0, z: -0.7 }, max: { x: 2, y: 3, z: -0.5 } }];
@@ -88,18 +89,18 @@ describe('headshots and knife', () => {
     player.weapon.reloadTicksRemaining = 30;
     const near = createZombieState('e:2', { x: 0, y: 0, z: -1 }, 1);
     const far = createZombieState('e:3', { x: 0, y: 0, z: -1.4 }, 1);
-    const events = meleeAttack(player, [far, near], []);
+    const events = swing(player, [far, near]);
     awardCombatPoints(player, events);
     expect(near.alive).toBe(false); expect(far.alive).toBe(true);
     expect(player.points).toBe(630); expect(player.weapon.reloadTicksRemaining).toBe(0);
-    expect(meleeAttack(player, [far], [])).toEqual([]);
+    expect(swing(player, [far])).toEqual([]);
   });
   it('cannot knife through a wall, behind the player, upstairs or beyond reach', () => {
     const positions = [{ x: 0, y: 0, z: -1 }, { x: 0, y: 0, z: 1 },
       { x: 0, y: 3.4, z: -1 }, { x: 0, y: 0, z: -2 }];
     positions.forEach((position, i) => {
       const player = createPlayerState('e:1', origin), target = createZombieState('e:2', position, 1);
-      expect(meleeAttack(player, [target], i === 0 ? wall : [])).toEqual([{ type: 'meleeSwung', playerId: player.id }]);
+      expect(swing(player, [target], i === 0 ? wall : [])).toEqual([{ type: 'meleeSwung', playerId: player.id }]);
       expect(target.health).toBe(150);
     });
   });
@@ -118,9 +119,9 @@ describe('headshots and knife', () => {
     expect(shot).toContainEqual(expect.objectContaining({ type: 'weaponHit', damage: startingHealth }));
     const knifer = createPlayerState('e:3', origin);
     const close = createZombieState('e:4', { x: 0, y: 0, z: -1 }, 12);
-    const swing = meleeAttack(knifer, [close], [], true);
+    const blows = swing(knifer, [close], [], true);
     expect(close.alive).toBe(false);
-    expect(swing).toContainEqual(expect.objectContaining({ type: 'zombieDied', method: 'melee' }));
+    expect(blows).toContainEqual(expect.objectContaining({ type: 'zombieDied', method: 'melee' }));
   });
 });
 
