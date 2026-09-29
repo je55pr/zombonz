@@ -134,8 +134,14 @@ boarded windows, overhead beams,
 stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
 Dimensions and props are an approximation, not a one-to-one recreation of the original game.
 Zombies spawn outside and follow eight ground-level window approaches. They tear out
-the six boards one at a time, climb through the sill, then pursue players through
-open rooms and stairs. Hold E near a damaged window to rebuild one board per second.
+the six boards one at a time, in a random order (any board still up may go, and rebuilding
+fills a random gap; the match seed decides, so every player sees the same), climb through the
+sill, then pursue players through open rooms and stairs. The boards sit in two groups, three
+below the eye-line and three above, so the middle of a window is open to look and shoot through
+however many are up. Hold E within reach of a damaged window to rebuild one board per second;
+you do not need to look at it. Elsewhere an interaction needs you to face it within about 70
+degrees left or right (looking up or down doesn't matter), or to stand right beside it. Where
+several are in reach, the nearest and best-centred one is used.
 Repairs are free and award 10 points per board up to a per-round cap. Once a board is gone,
 a zombie at the window swipes any player within about 1.4 m of it on the inside,
 and it stops tearing while it swipes. Repair from further back to stay safe. Zombies can be shot outside, and only

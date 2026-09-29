@@ -5,11 +5,29 @@ import type {
   Vec3,
 } from './types.ts';
 
+/**
+ * Within this horizontal distance (metres) of an interactable's point the player counts as facing it, since
+ * standing right against something puts its point behind or beside them.
+ */
+export const CLOSE_RANGE = 0.8;
+/**
+ * How much looking away costs a candidate when choosing between several: this many metres of distance for a
+ * full turn away. A closer object wins unless another is much better centred.
+ */
+export const FACING_WEIGHT = 0.75;
+/** For `minFacingDot`: being in range is enough, wherever the player looks. (A dot is never below -1.) */
+export const ANY_FACING = -2;
+
 export interface InteractableOptions {
   interactionType: string;
   actionId: string;
   prompt: string;
   interactionRange?: number;
+  /**
+   * How squarely the player must face it, as the cosine of the widest angle from their heading, in the
+   * horizontal plane. `ANY_FACING` needs nothing: being in range is enough (barriers).
+   * Defaults to 0.35, about 70 degrees either side.
+   */
   minFacingDot?: number;
 }
 
@@ -36,12 +54,12 @@ export function createInteractableState(
   options: InteractableOptions,
 ): InteractableState {
   const interactionRange = options.interactionRange ?? 2.25;
-  const minFacingDot = options.minFacingDot ?? 0.55;
+  const minFacingDot = options.minFacingDot ?? 0.35;
   if (!Number.isFinite(interactionRange) || interactionRange <= 0) {
     throw new RangeError('Interaction range must be positive.');
   }
-  if (!Number.isFinite(minFacingDot) || minFacingDot < -1 || minFacingDot > 1) {
-    throw new RangeError('Minimum facing dot must be between -1 and 1.');
+  if (!Number.isFinite(minFacingDot) || minFacingDot < -2 || minFacingDot > 1) {
+    throw new RangeError('Minimum facing dot must be between -2 and 1.');
   }
   return {
     id,
@@ -57,14 +75,6 @@ export function createInteractableState(
   };
 }
 
-function playerForward(player: PlayerState): Vec3 {
-  const cosPitch = Math.cos(player.pitch);
-  return {
-    x: -Math.sin(player.yaw) * cosPitch,
-    y: Math.sin(player.pitch),
-    z: -Math.cos(player.yaw) * cosPitch,
-  };
-}
 function candidateFor(
   player: PlayerState,
   interactable: InteractableState,
@@ -75,10 +85,10 @@ function candidateFor(
   const dz = interactable.position.z - player.position.z;
   const distance = Math.hypot(dx, dy, dz);
   if (distance > interactable.interactionRange) return null;
-  const forward = playerForward(player);
-  const facingDot = distance <= 1e-9
-    ? 1
-    : (forward.x * dx + forward.y * dy + forward.z * dz) / distance;
+  // Facing is a matter of heading alone: an object at chest height is as ahead when you are close to it,
+  // or looking a little up or down, as it is from across the room.
+  const flat = Math.hypot(dx, dz);
+  const facingDot = flat <= CLOSE_RANGE ? 1 : (-Math.sin(player.yaw) * dx - Math.cos(player.yaw) * dz) / flat;
   if (facingDot < interactable.minFacingDot) return null;
   return {
     interactableId: interactable.id,
@@ -96,11 +106,12 @@ export function findInteractionCandidate(
   const candidates = interactables
     .map((interactable) => candidateFor(player, interactable))
     .filter((candidate): candidate is InteractionCandidate => candidate !== null);
+  // The nearest, best-centred one wins. The score moves smoothly as the player turns and walks, so the
+  // choice does not flicker between two objects; ties fall to the id.
+  const score = (candidate: InteractionCandidate) => candidate.distance + (1 - candidate.facingDot) * FACING_WEIGHT;
   candidates.sort((a, b) => {
-    const facingDelta = b.facingDot - a.facingDot;
-    if (Math.abs(facingDelta) > 1e-9) return facingDelta;
-    const distanceDelta = a.distance - b.distance;
-    if (Math.abs(distanceDelta) > 1e-9) return distanceDelta;
+    const delta = score(a) - score(b);
+    if (Math.abs(delta) > 1e-9) return delta;
     return a.interactableId.localeCompare(b.interactableId);
   });
   return candidates[0] ?? null;

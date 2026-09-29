@@ -88,7 +88,7 @@ export type PowerEvent = { type: 'powerActivated'; playerId: EntityId };
 
 export function createPowerSwitchInteractable(id: EntityId, definition: PowerSwitchDefinition): InteractableState {
   return createInteractableState(id, definition.position, {
-    interactionType: 'powerSwitch', actionId: 'power', prompt: 'E  Turn on the power', interactionRange: 2, minFacingDot: 0.4,
+    interactionType: 'powerSwitch', actionId: 'power', prompt: 'E  Turn on the power', interactionRange: 2, minFacingDot: 0.25,
   });
 }
 

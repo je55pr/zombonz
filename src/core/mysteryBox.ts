@@ -85,7 +85,7 @@ export function createMysteryBox(definition: MysteryBoxDefinition, id: EntityId)
       usesHere: 0, moves: 0, teddy: false },
     interactable: createInteractableState(id, definition.position, {
       interactionType: 'mysteryBox', actionId: `box:${definition.id}`,
-      prompt: `E  Mystery Box [${definition.cost}]`, interactionRange: 2.4, minFacingDot: 0.3,
+      prompt: `E  Mystery Box [${definition.cost}]`, interactionRange: 2.4, minFacingDot: 0.2,
     }),
   };
 }

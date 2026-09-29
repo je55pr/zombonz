@@ -1,4 +1,4 @@
-import type { BarrierState } from './barrier.ts';
+import { restoreBarrier, type BarrierState } from './barrier.ts';
 import type { CollisionBox } from './collision.ts';
 import { GRENADE_RULES } from './grenade.ts';
 import { SeededRng } from './rng.ts';
@@ -216,7 +216,7 @@ export function collectPowerups(
     if (drop.kind === 'carpenter') {
       let repaired = 0;
       for (const barrier of barriers) if (barrier.boards < barrier.maxBoards) {
-        barrier.boards = barrier.maxBoards; barrier.repairTicks = 0; barrier.repairerId = null;
+        restoreBarrier(barrier);
         repaired += 1;
       }
       events.push({ type: 'carpenterRepaired', dropId: drop.id, repaired });
