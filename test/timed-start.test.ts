@@ -1,59 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CodeError, buildSdp, candidateLines, decodeSession, encodeSession, parseSdp, type CompactSession } from '../src/network/codes.ts';
+import { CodeError, buildSdp, decodeSession, encodeSession, type CompactSession } from '../src/network/codes.ts';
 import { START_DELAY_MS, answerInvite, createInvite, timeUntilStart } from '../src/network/webrtc.ts';
 
 const MDNS = '0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8.local';
-const offer: CompactSession = {
+/** The host's session, as its browser would offer it. */
+const hostOffer: CompactSession = {
   ufrag: 'hostU', pwd: 'h'.repeat(22), fingerprint: new Uint8Array(32).fill(3), setup: 'actpass', mid: '0',
   candidates: [{ type: 'host', address: MDNS, port: 51000 }, { type: 'srflx', address: '203.0.113.9', port: 51000 }],
 };
-const answer: CompactSession = {
-  ufrag: 'joinU', pwd: 'j'.repeat(22), fingerprint: new Uint8Array(32).fill(9), setup: 'active', mid: '0',
+/** The joiner's own session: an offer too, since neither side has a remote end until the start time. */
+const joinerOffer: CompactSession = {
+  ufrag: 'joinU', pwd: 'j'.repeat(22), fingerprint: new Uint8Array(32).fill(9), setup: 'actpass', mid: '0',
   candidates: [{ type: 'host', address: MDNS.replace('0b', '1b'), port: 52000 }, { type: 'srflx', address: '198.51.100.7', port: 52000 }],
 };
 
 describe('the start time in a reply code', () => {
   it('goes into a reply code and comes back exactly', () => {
     for (const start of [1_790_000_000_123, 0, 1, 65_535, 2 ** 32 - 1, 2 ** 32, 2 ** 40 + 12345]) {
-      const back = decodeSession('reply', encodeSession('reply', { ...answer, start }));
+      const back = decodeSession('reply', encodeSession('reply', { ...joinerOffer, start }));
       expect(back.start, String(start)).toBe(start);
-      expect(back.candidates).toEqual(answer.candidates);
+      expect(back.candidates).toEqual(joinerOffer.candidates);
     }
   });
 
   it('is not in an invite, and a reply must have one', () => {
-    expect(decodeSession('invite', encodeSession('invite', offer)).start).toBeUndefined();
-    expect(() => encodeSession('reply', answer)).toThrow(/start time/);
-    expect(() => encodeSession('reply', { ...answer, start: -1 })).toThrow(CodeError);
-    expect(() => encodeSession('reply', { ...answer, start: 1.5 })).toThrow(CodeError);
+    expect(decodeSession('invite', encodeSession('invite', hostOffer)).start).toBeUndefined();
+    expect(() => encodeSession('reply', joinerOffer)).toThrow(/start time/);
+    expect(() => encodeSession('reply', { ...joinerOffer, start: -1 })).toThrow(CodeError);
+    expect(() => encodeSession('reply', { ...joinerOffer, start: 1.5 })).toThrow(CodeError);
   });
 
   it('makes replies from the version without one unusable, with a plain message', () => {
-    const code = encodeSession('reply', { ...answer, start: 1_790_000_000_000 });
+    const code = encodeSession('reply', { ...joinerOffer, start: 1_790_000_000_000 });
     expect(code.startsWith('ZBR2-')).toBe(true);
     expect(code.length).toBeLessThan(200);
     expect(() => decodeSession('reply', 'ZBR1-' + code.slice(5))).toThrow(/not a Zombonz code/);
-  });
-});
-
-describe('holding a session\'s addresses back', () => {
-  it('leaves the addresses out of the SDP, and does not say the list is complete, when asked to', () => {
-    const full = buildSdp(offer), held = buildSdp(offer, { candidates: false });
-    expect(full).toContain('a=candidate:1 1 udp');
-    expect(full).toContain('a=end-of-candidates');
-    expect(held).not.toContain('a=candidate');
-    expect(held).not.toContain('end-of-candidates');
-    // Trickle is announced, so a browser waits for addresses instead of finding none.
-    expect(held).toContain('a=ice-options:trickle');
-    expect(held).toContain('a=ice-ufrag:hostU');
-  });
-
-  it('gives the same candidate lines to addIceCandidate as the SDP has', () => {
-    const lines = candidateLines(offer);
-    expect(lines).toHaveLength(2);
-    expect(lines[1]).toMatch(/^candidate:2 1 udp \d+ 203\.0\.113\.9 51000 typ srflx$/);
-    expect(buildSdp(offer)).toContain(`a=${lines[0]}`);
-    expect(buildSdp(offer)).toContain(`a=${lines[1]}`);
   });
 });
 
@@ -84,60 +65,81 @@ describe('when to start', () => {
   });
 });
 
-/** Enough of a browser connection to see what is given to it and when. */
+/** Enough of a browser connection to see what is given to it and when. `ownOffer` is what its browser offers. */
 class FakeConnection extends EventTarget {
   static all: FakeConnection[] = [];
   iceGatheringState = 'complete'; iceConnectionState = 'new'; connectionState = 'new';
   localDescription: { type: string; sdp: string } | null = null;
-  remote: string[] = [];
-  added: Array<{ candidate: string }> = [];
+  remote: Array<{ type: string; sdp: string }> = [];
   closed = false;
-  constructor(private readonly sessions: { offer: CompactSession; answer: CompactSession }) { super(); FakeConnection.all.push(this); }
+  static failRemote = false;
+  constructor(private readonly ownOffer: CompactSession) { super(); FakeConnection.all.push(this); }
   createDataChannel() { return Object.assign(new EventTarget(), { readyState: 'connecting', binaryType: '' }); }
-  async createOffer() { return { type: 'offer', sdp: buildSdp(this.sessions.offer) }; }
-  async createAnswer() { return { type: 'answer', sdp: buildSdp(this.sessions.answer) }; }
+  async createOffer() { return { type: 'offer', sdp: buildSdp(this.ownOffer) }; }
   async setLocalDescription(description: { type: string; sdp: string }) { this.localDescription = description; }
-  async setRemoteDescription(description: { sdp: string }) { this.remote.push(description.sdp); }
-  async addIceCandidate(candidate: { candidate: string }) { this.added.push(candidate); }
+  async setRemoteDescription(description: { type: string; sdp: string }) {
+    if (FakeConnection.failRemote) throw new Error('Failed to parse SessionDescription');
+    this.remote.push(description);
+  }
   async getStats() { return new Map(); }
   close() { this.closed = true; }
 }
 
-describe('the joiner', () => {
-  beforeEach(() => {
-    FakeConnection.all = [];
-    vi.useFakeTimers({ now: 1_790_000_000_000 });
-    vi.stubGlobal('RTCPeerConnection', class extends FakeConnection { constructor() { super({ offer, answer }); } });
-  });
-  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+function stubBrowser(ownOffer: CompactSession): void {
+  FakeConnection.all = []; FakeConnection.failRemote = false;
+  vi.useFakeTimers({ now: 1_790_000_000_000 });
+  vi.stubGlobal('RTCPeerConnection', class extends FakeConnection { constructor() { super(ownOffer); } });
+}
+const restore = () => { vi.useRealTimers(); vi.unstubAllGlobals(); };
 
-  it('is given the host\'s addresses only at the start time, and none before it', async () => {
-    const join = await answerInvite(encodeSession('invite', offer));
+describe('the joiner', () => {
+  beforeEach(() => stubBrowser(joinerOffer));
+  afterEach(restore);
+
+  it('makes an offer of its own, and applies the host\'s invite only at the start time, as the answer to it', async () => {
+    const join = await answerInvite(encodeSession('invite', hostOffer));
     const [pc] = FakeConnection.all;
-    // Its own reply carries the start time, and it knows when that is.
+    // Its reply describes its own offer and names the start time, which it knows too.
+    expect(pc.localDescription?.type).toBe('offer');
     expect(join.startsAt).toBe(Date.now() + START_DELAY_MS);
-    expect(decodeSession('reply', join.reply).start).toBe(join.startsAt);
-    // The host's offer was given without addresses: nothing to try, so nothing to fail.
-    expect(pc.remote).toHaveLength(1);
-    expect(pc.remote[0]).not.toContain('a=candidate');
-    expect(pc.remote[0]).not.toContain('end-of-candidates');
+    const reply = decodeSession('reply', join.reply);
+    expect(reply.start).toBe(join.startsAt);
+    expect(reply.candidates).toEqual(joinerOffer.candidates);
+    expect(reply.ufrag).toBe('joinU');
+    // Until then it has no remote end: nothing to try, and so nothing to give up on.
     await vi.advanceTimersByTimeAsync(START_DELAY_MS - 1);
-    expect(pc.added).toEqual([]);
+    expect(pc.remote).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
-    // Then every one of the host's addresses, and an empty one to say there are no more.
-    expect(pc.added.map(added => added.candidate)).toEqual([...candidateLines(offer), '']);
+    expect(pc.remote).toHaveLength(1);
+    const [answer] = pc.remote;
+    expect(answer.type).toBe('answer');
+    // The host's own details, every address of its, and the joiner as the DTLS client.
+    expect(answer.sdp).toContain('a=ice-ufrag:hostU');
+    expect(answer.sdp).toContain('a=candidate:1 1 udp');
+    expect(answer.sdp).toContain('203.0.113.9 51000 typ srflx');
+    expect(answer.sdp).toContain('a=end-of-candidates');
+    expect(answer.sdp).toContain('a=setup:passive');
     join.cancel();
   });
 
   it('can start at once, for the connection test', async () => {
-    const join = await answerInvite(encodeSession('invite', offer), { startDelayMs: 0 });
+    const join = await answerInvite(encodeSession('invite', hostOffer), { startDelayMs: 0 });
     await vi.advanceTimersByTimeAsync(0);
-    expect(FakeConnection.all[0].added).toHaveLength(candidateLines(offer).length + 1);
+    expect(FakeConnection.all[0].remote).toHaveLength(1);
     join.cancel();
   });
 
+  it('says so straight away if the browser cannot use the host\'s invite', async () => {
+    const join = await answerInvite(encodeSession('invite', hostOffer), { startDelayMs: 1000 });
+    FakeConnection.failRemote = true;
+    const outcome = expect(join.connected).rejects.toThrow(/invite code could not be used/);
+    await vi.advanceTimersByTimeAsync(1000);
+    await outcome;
+    expect(FakeConnection.all[0].closed).toBe(true);
+  });
+
   it('gives up with a clear message twenty seconds after the start if the host never came, not five minutes later', async () => {
-    const join = await answerInvite(encodeSession('invite', offer));
+    const join = await answerInvite(encodeSession('invite', hostOffer));
     const outcome = expect(join.connected).rejects.toThrow(/host has to paste your reply and press Connect before your countdown ends/);
     await vi.advanceTimersByTimeAsync(START_DELAY_MS + 19_999);
     expect(FakeConnection.all[0].closed).toBe(false);
@@ -147,7 +149,7 @@ describe('the joiner', () => {
   });
 
   it('logs what it did, with no addresses in it', async () => {
-    const join = await answerInvite(encodeSession('invite', offer));
+    const join = await answerInvite(encodeSession('invite', hostOffer));
     await vi.advanceTimersByTimeAsync(START_DELAY_MS);
     const log = join.log();
     expect(log).toMatch(/reply made: host, srflx; clock behind by 0 ms; starting in 45 s/);
@@ -159,14 +161,10 @@ describe('the joiner', () => {
 });
 
 describe('the host', () => {
-  beforeEach(() => {
-    FakeConnection.all = [];
-    vi.useFakeTimers({ now: 1_790_000_000_000 });
-    vi.stubGlobal('RTCPeerConnection', class extends FakeConnection { constructor() { super({ offer, answer }); } });
-  });
-  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  beforeEach(() => stubBrowser(hostOffer));
+  afterEach(restore);
 
-  const reply = (secondsAhead: number) => encodeSession('reply', { ...answer, start: Date.now() + secondsAhead * 1000 });
+  const reply = (secondsAhead: number) => encodeSession('reply', { ...joinerOffer, start: Date.now() + secondsAhead * 1000 });
 
   it('waits for the start time before it tries anything, and says when that is', async () => {
     const invite = await createInvite();
@@ -179,9 +177,13 @@ describe('the host', () => {
     expect(pc.remote).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
     expect(pc.remote).toHaveLength(1);
-    // The reply's addresses go in with it, complete.
-    expect(pc.remote[0]).toContain('a=candidate:1 1 udp');
-    expect(pc.remote[0]).toContain('a=end-of-candidates');
+    // The joiner's own details and addresses go in as the answer, with the host as the DTLS server.
+    const [answer] = pc.remote;
+    expect(answer.type).toBe('answer');
+    expect(answer.sdp).toContain('a=ice-ufrag:joinU');
+    expect(answer.sdp).toContain('198.51.100.7 52000 typ srflx');
+    expect(answer.sdp).toContain('a=end-of-candidates');
+    expect(answer.sdp).toContain('a=setup:active');
     invite.cancel();
   });
 

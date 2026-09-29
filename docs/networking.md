@@ -67,20 +67,26 @@ ask both to run it.
 
 ## Why both sides start together
 
-A browser starts sending connection probes the moment it has both halves of the exchange, and gives up after about ten
-seconds. A home router drops what arrives from an address it has not sent anything to. In the old flow the friend's browser
-had both halves as soon as it made the reply code, so it probed for the whole time it took the reply to reach the host through
-a chat (a minute, say), sent everything into the host's router, and had given up by the time the host pressed **Connect**.
-Two browsers on one computer hid this, because the host's own machine answered the early probes. It was reproduced by putting an
-unreachable address in the invite, standing in for a router that drops them: a host that pasted within 10 seconds connected,
-and one that took 15 seconds or more never did.
+A browser starts sending connection probes the moment it has both halves of the exchange, and gives up after a few seconds
+(Chrome about ten, Firefox five when it has nothing to try). A home router drops what arrives from an address it has not sent
+anything to. In the first flow the friend's browser had both halves as soon as it made the reply code, so it probed for the
+whole time it took the reply to reach the host through a chat (a minute, say), sent everything into the host's router, and had
+given up by the time the host pressed **Connect**. Two browsers on one computer hid this, because the host's own machine
+answered the early probes. It was reproduced by putting an unreachable address in the invite, standing in for a router that
+drops them: a host that pasted within 10 seconds connected, and one that took 15 seconds or more never did.
 
-So the joiner names a start time in its reply code (45 seconds ahead, in the game server's clock: each side finds its offset
-from the `Date` header of the page's own server, good to about a second). The joiner gives its browser the host's invite
-without any addresses, so it has nothing to try, and nothing to give up on, and adds the addresses at the start time.
-The host reads the start time from the reply and waits for it before giving its browser the reply. Both start within about
-a second of each other. A reply read up to four seconds after its start time still starts at once; later than that it has
-expired. Code: `src/network/webrtc.ts` (`START_DELAY_MS`, `timeUntilStart`, `clockOffset`) and `src/network/codes.ts`.
+The next version held the host's addresses back from the joiner until a start time, so the joiner's browser had nothing to
+try. That worked in Chrome, but a real pair of logs showed Firefox declaring the connection failed five seconds after the reply
+was made: with a remote description and no addresses in it, it gives up after a five-second grace period.
+
+So now **neither side has a remote end until the start time**. Each makes an offer of its own (the invite is the host's, the
+reply is the joiner's), and neither browser has anything to try or give up on. The joiner names the start time in its reply code:
+45 seconds ahead, in the game server's clock (each side finds its offset from the `Date` header of the page's own server, good
+to about a second). The host reads it and waits. At that moment each side applies the other's offer as the answer to its own,
+with the host as the DTLS server and the joiner as the client (both browsers are then ICE controlling; the ICE role conflict
+is settled by the browsers). Both start within about a second of each other. A reply read up to four seconds after its start
+time still starts at once; later than that it has expired. Code: `src/network/webrtc.ts` (`START_DELAY_MS`, `timeUntilStart`,
+`clockOffset`) and `src/network/codes.ts`.
 
 ## Transport
 
