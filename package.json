@@ -8,9 +8,10 @@
     "build": "tsc --noEmit && vite build",
     "build:pages": "vite build --base=/zombonz/",
     "typecheck": "tsc --noEmit",
+    "validate:maps": "node scripts/validate-maps.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run typecheck && npm test && npm run build",
+    "check": "npm run typecheck && npm run validate:maps && npm test && npm run build",
     "benchmark": "node --experimental-strip-types scripts/benchmark.ts"
   },
   "dependencies": {

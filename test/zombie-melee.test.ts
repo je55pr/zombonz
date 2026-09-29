@@ -3,7 +3,7 @@ import {
   GameSimulation, ZOMBIE_MELEE, ZOMBIE_MOVEMENT, addEntity, createPlayerState, createZombieState, inMeleeReach, separateZombies,
   swingTiming, tickPlayerRecovery, tickZombieMelee, type CollisionBox, type EntityId, type SimulationEvent, type ZombieGait, type ZombieState,
 } from '../src/core/index.ts';
-import { BUNKER_BARRIERS, BUNKER_PLAYER_SPAWN, BUNKER_WALK_SURFACES, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
+import { BUNKER_BARRIERS, BUNKER_PLAYER_SPAWN, BUNKER_WALK_SURFACES, greyboxCollisionBoxes } from '../src/maps/bunkerLegacy.ts';
 
 const QUIET = { initialWaitTicks: 999999, intermissionTicks: 999999 };
 const facing = (from: { x: number; z: number }, to: { x: number; z: number }) => Math.atan2(to.x - from.x, to.z - from.z);

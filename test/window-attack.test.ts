@@ -4,7 +4,7 @@ import {
   createPlayerState, createZombieEntry, createZombieState, swingTiming, tickPlayerRecovery, tickWindowAttack,
   type SimulationEvent,
 } from '../src/core/index.ts';
-import { BUNKER_BARRIERS, BUNKER_WINDOW_BOARDS } from '../src/maps/bunker.ts';
+import { BUNKER_BARRIERS, BUNKER_WINDOW_BOARDS } from '../src/maps/bunkerLegacy.ts';
 
 const definition = BUNKER_BARRIERS[0];
 

@@ -5,7 +5,7 @@ import {
 } from '../src/core/index.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { BUNKER_BARRIERS, BUNKER_PLAYER_SPAWN, BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS,
-  BUNKER_DOORS, BUNKER_NAVIGATION, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
+  BUNKER_DOORS, BUNKER_NAVIGATION, greyboxCollisionBoxes } from '../src/maps/bunkerLegacy.ts';
 
 /** A point that buys something, at chest height like most of the map's. */
 function point(id: EntityId, x: number, y: number, z: number, options: { range?: number; facing?: number } = {}): InteractableState {

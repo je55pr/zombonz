@@ -4,7 +4,7 @@ import { BARRIER_RULES, GameSimulation, createInputFrame, createNavigationQuery,
   tickZombieMelee, firePlayerWeapon, zombieHeadCentre, type SimulationEvent } from '../src/core/index.ts';
 import { rayThrough } from './aim.ts';
 import { BUNKER_BARRIERS, BUNKER_DOORS, BUNKER_NAVIGATION, BUNKER_PLAYER_SPAWN, BUNKER_WINDOW_BOARDS,
-  BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
+  BUNKER_SHOT_BLOCKERS, BUNKER_WALK_SURFACES, BUNKER_ZOMBIE_SPAWNS, greyboxCollisionBoxes } from '../src/maps/bunkerLegacy.ts';
 
 const map = { collisionBoxes: greyboxCollisionBoxes(), walkSurfaces: BUNKER_WALK_SURFACES,
   shotBlockers: BUNKER_SHOT_BLOCKERS, zombieSpawns: BUNKER_ZOMBIE_SPAWNS,

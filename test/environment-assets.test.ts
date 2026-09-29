@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { readAssetGeometry, readAssetJson, assetExists, glbFiles, readGlbJson } from '../scripts/inspect-assets.mjs';
 import { BUNKER_PROPS, propCollisionBox } from '../src/maps/bunkerProps.ts';
-import { BUNKER_BARRIERS, BUNKER_STAIRS, BUNKER_PLAYER_SPAWN, greyboxCollisionBoxes } from '../src/maps/bunker.ts';
+import { BUNKER_BARRIERS, BUNKER_STAIRS, BUNKER_PLAYER_SPAWN, greyboxCollisionBoxes } from '../src/maps/bunkerLegacy.ts';
 import { hasClearNavigationLine } from '../src/core/navigation.ts';
 import { prepareProp } from '../src/client/environmentProps.ts';
 import { applyPbrMaps, environmentMaterial, bunkerMaterial, MATERIAL_IDS, projectWorldUvs } from '../src/client/environmentMaterials.ts';

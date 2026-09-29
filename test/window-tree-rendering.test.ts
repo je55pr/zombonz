@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { WindowBoards } from '../src/client/windowBoards.ts';
 import { deadTreeGeometry, scatterTreeSectors } from '../src/client/treeline.ts';
-import { BUNKER_MAP } from '../src/maps/bunker.ts';
+import { BUNKER_MAP } from '../src/maps/bunkerLegacy.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 
 describe('window and treeline batching', () => {
