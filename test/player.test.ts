@@ -18,6 +18,41 @@ function heldMove(action: 'moveForward' | 'moveRight' | 'sprint' | 'aim') {
 }
 
 describe('player movement', () => {
+  it('jumps from the floor, lands once, and does not double jump', () => {
+    const player = createPlayerState(id, { x: 0, y: 0, z: 0 });
+    const jump = createInputFrame(1);
+    jump.actions.jump = { held: true, pressed: true, released: false, value: 1 };
+    updatePlayerMovement(player, jump, 1 / 60, []);
+    expect(player.grounded).toBe(false);
+    expect(player.position.y).toBeGreaterThan(0);
+    const firstVelocity = player.velocity.y;
+    updatePlayerMovement(player, jump, 1 / 60, []);
+    expect(player.velocity.y).toBeLessThan(firstVelocity);
+    for (let i = 0; i < 70; i++) updatePlayerMovement(player, createInputFrame(i + 2), 1 / 60, []);
+    expect(player.grounded).toBe(true);
+    expect(player.position.y).toBe(0);
+  });
+
+  it('uses low collision heights and refuses to stand under a ceiling', () => {
+    const player = createPlayerState(id, { x: 0, y: 0, z: 0 });
+    const ceiling = [{ min: { x: -1, y: 1.3, z: -1 }, max: { x: 1, y: 2, z: 1 } }];
+    const crouch = createInputFrame(1);
+    crouch.actions.crouch = { held: true, pressed: true, released: false, value: 1 };
+    updatePlayerMovement(player, crouch, 1 / 60, ceiling);
+    expect(player.stance).toBe('crouch');
+    updatePlayerMovement(player, crouch, 1 / 60, ceiling);
+    expect(player.stance).toBe('crouch');
+    const prone = createInputFrame(2);
+    prone.actions.prone = { held: true, pressed: true, released: false, value: 1 };
+    updatePlayerMovement(player, prone, 1 / 60, ceiling);
+    expect(player.stance).toBe('prone');
+    updatePlayerMovement(player, crouch, 1 / 60, ceiling);
+    expect(player.stance).toBe('crouch');
+    player.position.x = 2;
+    updatePlayerMovement(player, crouch, 1 / 60, ceiling);
+    expect(player.stance).toBe('stand');
+  });
+
   it('accelerates forward relative to authoritative yaw', () => {
     const player = createPlayerState(id, { x: 0, y: 0, z: 0 });
     updatePlayerMovement(player, heldMove('moveForward'), 1 / 60, []);

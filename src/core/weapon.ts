@@ -3,7 +3,7 @@ import { hasPerk, PERK_RULES } from './perks.ts';
 import type { EntityId, PlayerState, Vec3, WeaponState, ZombieState } from './types.ts';
 import { SeededRng } from './rng.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
-import { PLAYER_MOVEMENT } from './player.ts';
+import { PLAYER_MOVEMENT, playerEyeHeight } from './player.ts';
 import { blastPlayers, blastZombies } from './blast.ts';
 import { blastHazards, damageHazard, type HazardEvent, type HazardTarget } from './hazard.ts';
 import { clearLine, rayAabbDistance } from './ray.ts';
@@ -616,7 +616,7 @@ export function meleeAttack(player: PlayerState, zombies: readonly ZombieState[]
   player.meleeCooldownTicks = MELEE_RULES.cooldownTicks;
   player.weapon.reloadTicksRemaining = 0;
   const events: WeaponEvent[] = [{ type: 'meleeSwung', playerId: player.id }];
-  const ray = rayFromPlayer(player, 1.3);
+  const ray = rayFromPlayer(player, playerEyeHeight(player));
   const candidates = zombies.filter(zombie => zombie.alive).map(zombie => {
     const chest = zombieChest(zombie);
     const offset = { x: chest.x - ray.origin.x, y: chest.y - ray.origin.y, z: chest.z - ray.origin.z };

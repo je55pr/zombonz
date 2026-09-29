@@ -55,6 +55,16 @@ describe('copy-paste codes', () => {
 });
 
 describe('protocol', () => {
+  it('sends stance controls and grenade cancellation to the host', () => {
+    const frame = createInputFrame(3);
+    frame.actions.jump = { held: true, pressed: true, released: false, value: 1 };
+    frame.actions.crouch = { held: false, pressed: true, released: true, value: 0 };
+    frame.actions.prone = { held: true, pressed: false, released: false, value: 1 };
+    frame.actions.cancelGrenade = { held: false, pressed: true, released: false, value: 0 };
+    const back = fromNetInput(toNetInput(frame, 3, 0, 0), { yaw: 0, pitch: 0 });
+    expect(back.actions).toEqual(frame.actions);
+  });
+
   it('carries buttons and the view, and never a remote cheat or restart', () => {
     const frame = createInputFrame(0);
     frame.actions.fire = { held: true, pressed: true, released: false, value: 1 };

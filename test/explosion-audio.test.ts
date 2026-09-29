@@ -51,6 +51,17 @@ describe('what explosions sound like, until the clips in docs/audio-wanted.md ex
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it('keeps ordinary reload completion quiet and racks shotguns', async () => {
+    const at = await startAudio();
+    at([{ type: 'weaponReloadCompleted', playerId: 'e:1', weaponId: 'starter-pistol',
+      loaded: 4, magazineAmmo: 8, reserveAmmo: 32 }]);
+    expect(heard()).toEqual([]);
+    played.length = 0;
+    at([{ type: 'weaponReloadCompleted', playerId: 'e:1', weaponId: 'trench-gun',
+      loaded: 1, magazineAmmo: 6, reserveAmmo: 24 }]);
+    expect(heard()).toEqual(['shotgun-rack']);
+  });
+
   it('gives a grenade a metal tick as it is thrown and a clink when it bounces, and the recorded bang as it goes off', async () => {
     const at = await startAudio();
     at([{ type: 'grenadeThrown', grenadeId: 'g:1', playerId: 'e:1' }]);

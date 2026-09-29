@@ -20,7 +20,7 @@ export class BrowserInput {
   private lookYaw = 0;
   private lookPitch = 0;
   private lookSensitivity: number;
-  private keyActions: ReadonlyMap<string, GameAction>;
+  private keyActions: ReadonlyMap<string, readonly GameAction[]>;
   private lastWheelSwitch = -Infinity;
 
   constructor(
@@ -44,8 +44,9 @@ export class BrowserInput {
     options.pointerElement.addEventListener('contextmenu', this.onContextMenu);
   }
 
-  /** Applies new key bindings; keys already held keep their old action until released. */
+  /** Applies new key bindings and clears any action held under the old mapping. */
   setBindings(bindings: KeyBindings): void {
+    this.clear();
     this.keyActions = actionsByKey(bindings);
   }
 
@@ -82,11 +83,11 @@ export class BrowserInput {
     this.lookPitch -= event.movementY * this.lookSensitivity;
   };
 
-  private actionForKey(code: string): GameAction | undefined {
-    return code === 'KeyP' && this.options.previewFireKey ? 'fire' : this.keyActions.get(code);
+  private actionsForKey(code: string): readonly GameAction[] {
+    return code === 'KeyP' && this.options.previewFireKey ? ['fire'] : this.keyActions.get(code) ?? [];
   }
-  private onKeyDown = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), true, event.repeat);
-  private onKeyUp = (event: KeyboardEvent) => this.set(this.actionForKey(event.code), false, false);
+  private onKeyDown = (event: KeyboardEvent) => { for (const action of this.actionsForKey(event.code)) this.set(action, true, event.repeat); };
+  private onKeyUp = (event: KeyboardEvent) => { for (const action of this.actionsForKey(event.code)) this.set(action, false, false); };
   private onMouseDown = (event: MouseEvent) => {
     if (document.pointerLockElement !== this.options.pointerElement) return;
     if (event.button === 0) this.set('fire', true, false);

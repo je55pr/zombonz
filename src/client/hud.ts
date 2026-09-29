@@ -187,7 +187,7 @@ export class CanvasHud {
   private readonly nukeFlash: NukeFlash;
 
   constructor(private readonly renderer: THREE.WebGLRenderer, private readonly mapName = 'Bunker',
-    private readonly bindings: KeyBindings = DEFAULT_KEY_BINDINGS) {
+    private bindings: KeyBindings = DEFAULT_KEY_BINDINGS) {
     if (typeof window !== 'undefined') window.addEventListener('keydown', this.onKeyDown);
     this.canvas.width = 1600;
     this.canvas.height = 900;
@@ -215,6 +215,7 @@ export class CanvasHud {
     // The first frames draw with fallback fonts; repaint once the bundled ones are ready.
     void loadUiFonts().then(() => { this.previous = null; });
   }
+  setBindings(bindings: KeyBindings): void { this.bindings = bindings; }
 
   /** Matches the canvas to the drawing buffer, so the HUD is drawn 1:1 with screen pixels, not stretched. */
   private fit(): boolean {

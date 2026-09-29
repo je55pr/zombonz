@@ -290,7 +290,9 @@ export class GameAudio {
         case 'playerDamaged': this.playClip('flesh-hit', MIX.hurt); break;
         case 'weaponReloadStarted': this.playClip(WEAPON_DEFINITIONS[event.weaponId]?.pellets ? 'shotgun-shell'
           : ['kar98k', 'springfield', 'mosin'].includes(event.weaponId) ? 'reload-round' : 'reload-mag', MIX.reload); break;
-        case 'weaponReloadCompleted': this.playClip(WEAPON_DEFINITIONS[event.weaponId]?.pellets ? 'shotgun-rack' : 'mechanical-click', MIX.reloadDone); break;
+        case 'weaponReloadCompleted':
+          if (WEAPON_DEFINITIONS[event.weaponId]?.pellets) this.playClip('shotgun-rack', MIX.reloadDone);
+          break;
         case 'pointsSpendRejected': this.playClip('buy-denied', MIX.reject); break;
         case 'mysteryBoxUsed': this.playClip('mechanical-button', MIX.box); break;
         case 'mysteryBoxClaimed': this.playClip('pickup', MIX.pickup); break;

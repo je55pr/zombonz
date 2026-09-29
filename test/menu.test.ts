@@ -116,7 +116,7 @@ describe('start menu', () => {
   it('adjusts settings with left/right and clicks, saving each change', () => {
     const state = createMenuState({ ...DEFAULT_SETTINGS });
     reduceMenu(state, { type: 'activate', index: 2 });
-    expect(menuItems(state).map(item => item.id)).toEqual(['sensitivity', 'fov', 'volume', 'back']);
+    expect(menuItems(state).map(item => item.id)).toEqual(['sensitivity', 'fov', 'volume', 'bindings', 'back']);
     reduceMenu(state, { type: 'down' });
     expect(reduceMenu(state, { type: 'right' })).toEqual({ type: 'saveSettings', settings: { ...DEFAULT_SETTINGS, fov: 68 } });
     reduceMenu(state, { type: 'left' }); reduceMenu(state, { type: 'left' });
@@ -126,8 +126,10 @@ describe('start menu', () => {
     state.settings.volume = 1;
     expect(reduceMenu(state, { type: 'activate', index: 2 })).toEqual({ type: 'saveSettings', settings: { ...state.settings, volume: 0 } });
     reduceMenu(state, { type: 'hover', index: 3 });
+    expect(reduceMenu(state, { type: 'activate', index: 3 })).toEqual({ type: 'openBindings' });
+    reduceMenu(state, { type: 'hover', index: 4 });
     expect(reduceMenu(state, { type: 'left' })).toBeNull(); // 'left' on the Back row changes nothing
-    reduceMenu(state, { type: 'activate', index: 3 });
+    reduceMenu(state, { type: 'activate', index: 4 });
     expect(state.screen).toBe('main');
   });
 });

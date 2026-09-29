@@ -1,5 +1,5 @@
 import type { CollisionBox, WalkSurface } from './collision.ts';
-import { moveWithCollision, sampleWalkHeight } from './collision.ts';
+import { moveWithCollision, sampleWalkHeight, walkSurfaceHeight } from './collision.ts';
 import type { InputFrame } from './input.ts';
 import type { EntityId, PlayerState, Vec3 } from './types.ts';
 import { GRENADE_RULES } from './grenade.ts';
@@ -14,6 +14,14 @@ export const PLAYER_MOVEMENT = {
   radius: 0.34,
   height: 1.78,
   eyeHeight: 1.62,
+  crouchHeight: 1.12,
+  crouchEyeHeight: 1.02,
+  proneHeight: 0.55,
+  proneEyeHeight: 0.43,
+  crouchMultiplier: 0.64,
+  proneMultiplier: 0.34,
+  jumpSpeed: 5.2,
+  gravity: 14,
   maxPitch: Math.PI * 0.47,
 } as const;
 
@@ -34,6 +42,9 @@ export function createPlayerState(id: EntityId, position: Vec3, startingPoints =
     yaw: 0,
     pitch: 0,
     sprinting: false,
+    stance: 'stand',
+    grounded: true,
+    grenadeWindupTicks: 0,
     sprintTicks: SPRINT_RULES.maxTicks,
     sprintRechargeDelayTicks: 0,
     aiming: false,
@@ -73,6 +84,33 @@ function held(frame: InputFrame, action: keyof InputFrame['actions']): number {
   return frame.actions[action]?.held ? 1 : 0;
 }
 
+export function playerHeight(player: PlayerState): number {
+  return player.stance === 'prone' ? PLAYER_MOVEMENT.proneHeight
+    : player.stance === 'crouch' ? PLAYER_MOVEMENT.crouchHeight : PLAYER_MOVEMENT.height;
+}
+
+export function playerEyeHeight(player: PlayerState): number {
+  return player.stance === 'prone' ? PLAYER_MOVEMENT.proneEyeHeight
+    : player.stance === 'crouch' ? PLAYER_MOVEMENT.crouchEyeHeight : PLAYER_MOVEMENT.eyeHeight;
+}
+
+function canOccupy(player: PlayerState, height: number, boxes: readonly CollisionBox[]): boolean {
+  return !boxes.some(box => player.position.x + PLAYER_MOVEMENT.radius > box.min.x
+    && player.position.x - PLAYER_MOVEMENT.radius < box.max.x
+    && player.position.z + PLAYER_MOVEMENT.radius > box.min.z
+    && player.position.z - PLAYER_MOVEMENT.radius < box.max.z
+    && player.position.y < box.max.y && player.position.y + height > box.min.y);
+}
+
+function floorBelow(x: number, z: number, feet: number, surfaces: readonly WalkSurface[]): number {
+  let floor = 0;
+  for (const surface of surfaces) {
+    const height = walkSurfaceHeight(surface, x, z);
+    if (height !== undefined && height <= feet + 0.45 && height > floor) floor = height;
+  }
+  return floor;
+}
+
 function tickSprintStamina(player: PlayerState): void {
   if (player.sprinting) {
     player.sprintTicks -= 1;
@@ -94,10 +132,11 @@ function exitNoclip(player: PlayerState, boxes: readonly CollisionBox[], surface
   const blocked = boxes.some(box => candidate.x + PLAYER_MOVEMENT.radius > box.min.x
     && candidate.x - PLAYER_MOVEMENT.radius < box.max.x
     && candidate.z + PLAYER_MOVEMENT.radius > box.min.z && candidate.z - PLAYER_MOVEMENT.radius < box.max.z
-    && candidate.y < box.max.y && candidate.y + PLAYER_MOVEMENT.height > box.min.y);
+    && candidate.y < box.max.y && candidate.y + playerHeight(player) > box.min.y);
   player.position = supported && !blocked ? candidate : { ...(player.noclipAnchor ?? candidate) };
   player.noclip = false; player.noclipAnchor = null;
   player.velocity = { x: 0, y: 0, z: 0 };
+  player.grounded = true;
 }
 
 export function updatePlayerMovement(
@@ -119,6 +158,19 @@ export function updatePlayerMovement(
       player.velocity = { x: 0, y: 0, z: 0 };
     }
   }
+  if (!player.noclip) {
+    let target = player.stance;
+    if (frame.actions.prone?.pressed) target = target === 'prone' ? 'crouch' : 'prone';
+    else if (frame.actions.crouch?.pressed) target = target === 'crouch' ? 'stand' : 'crouch';
+    if (frame.actions.jump?.pressed && player.grounded && target !== 'stand') target = 'stand';
+    const height = target === 'stand' ? PLAYER_MOVEMENT.height
+      : target === 'crouch' ? PLAYER_MOVEMENT.crouchHeight : PLAYER_MOVEMENT.proneHeight;
+    if (height <= playerHeight(player) || canOccupy(player, height, collisionBoxes)) player.stance = target;
+    if (frame.actions.jump?.pressed && player.grounded && player.stance === 'stand') {
+      player.velocity.y = PLAYER_MOVEMENT.jumpSpeed;
+      player.grounded = false;
+    }
+  }
   player.yaw += frame.look.yaw;
   player.pitch = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(
     PLAYER_MOVEMENT.maxPitch,
@@ -131,11 +183,11 @@ export function updatePlayerMovement(
     && player.weapon.reloadTicksRemaining === 0 && player.switchTicksRemaining === 0
     && player.meleeCooldownTicks === 0 && !frame.actions.reload?.pressed
     && !frame.actions.switchWeapon?.pressed && !frame.actions.melee?.pressed
-    && !frame.actions.throwGrenade?.pressed;
-  player.sprinting = !player.noclip && held(frame, 'sprint') > 0 && forwardInput > 0
+    && !frame.actions.throwGrenade?.pressed && player.grenadeWindupTicks === 0;
+  player.sprinting = !player.noclip && player.stance === 'stand' && held(frame, 'sprint') > 0 && forwardInput > 0
     && !player.aiming && !frame.actions.fire?.held && !frame.actions.fire?.pressed
     && !frame.actions.reload?.pressed && !frame.actions.switchWeapon?.pressed
-    && !frame.actions.melee?.pressed && !frame.actions.throwGrenade?.pressed
+    && !frame.actions.melee?.pressed && !frame.actions.throwGrenade?.pressed && player.grenadeWindupTicks === 0
     && player.weapon.reloadTicksRemaining === 0
     && player.switchTicksRemaining === 0 && player.meleeCooldownTicks === 0
     && player.sprintTicks >= (player.sprinting ? 1 : SPRINT_RULES.minStartTicks);
@@ -161,8 +213,9 @@ export function updatePlayerMovement(
 
   const sin = Math.sin(player.yaw);
   const cos = Math.cos(player.yaw);
-  const speed = PLAYER_MOVEMENT.maxSpeed * (player.sprinting
-    ? PLAYER_MOVEMENT.sprintMultiplier : player.aiming ? PLAYER_MOVEMENT.aimMultiplier : 1);
+  const speed = PLAYER_MOVEMENT.maxSpeed * (player.stance === 'prone' ? PLAYER_MOVEMENT.proneMultiplier
+    : player.stance === 'crouch' ? PLAYER_MOVEMENT.crouchMultiplier
+      : player.sprinting ? PLAYER_MOVEMENT.sprintMultiplier : player.aiming ? PLAYER_MOVEMENT.aimMultiplier : 1);
   const desiredX = (-sin * normalizedForward + cos * normalizedRight) * speed;
   const desiredZ = (-cos * normalizedForward - sin * normalizedRight) * speed;
   const moving = magnitude > 0;
@@ -179,10 +232,27 @@ export function updatePlayerMovement(
     player.position,
     requested,
     PLAYER_MOVEMENT.radius,
-    PLAYER_MOVEMENT.height,
+    playerHeight(player),
     collisionBoxes,
   );
-  next.y = sampleWalkHeight(next.x, next.z, player.position.y, walkSurfaces);
+  const floor = floorBelow(next.x, next.z, player.position.y, walkSurfaces);
+  if (player.grounded && floor >= player.position.y - 0.46) next.y = floor;
+  else {
+    player.grounded = false;
+    const previousTop = player.position.y + playerHeight(player);
+    player.velocity.y -= PLAYER_MOVEMENT.gravity * deltaSeconds;
+    next.y = player.position.y + player.velocity.y * deltaSeconds;
+    if (player.velocity.y > 0 && collisionBoxes.some(box => next.x + PLAYER_MOVEMENT.radius > box.min.x
+      && next.x - PLAYER_MOVEMENT.radius < box.max.x && next.z + PLAYER_MOVEMENT.radius > box.min.z
+      && next.z - PLAYER_MOVEMENT.radius < box.max.z && previousTop <= box.min.y
+      && next.y + playerHeight(player) > box.min.y)) {
+      next.y = Math.min(next.y, Math.min(...collisionBoxes.filter(box => next.x + PLAYER_MOVEMENT.radius > box.min.x
+        && next.x - PLAYER_MOVEMENT.radius < box.max.x && next.z + PLAYER_MOVEMENT.radius > box.min.z
+        && next.z - PLAYER_MOVEMENT.radius < box.max.z && previousTop <= box.min.y).map(box => box.min.y)) - playerHeight(player));
+      player.velocity.y = 0;
+    }
+    if (player.velocity.y <= 0 && next.y <= floor) { next.y = floor; player.velocity.y = 0; player.grounded = true; }
+  }
 
   if (Math.abs((next.x - player.position.x) - requested.x) > 1e-7) player.velocity.x = 0;
   if (Math.abs((next.z - player.position.z) - requested.z) > 1e-7) player.velocity.z = 0;
