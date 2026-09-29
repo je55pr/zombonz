@@ -59,6 +59,8 @@ It runs:
   on each channel, and reports how long the invite took to make and to connect. This catches a browser or extension that blocks
   WebRTC, and a slow invite (the invite waits up to four seconds for the addresses). It runs after the lookups, not with them,
   so its timing is the game's own.
+- **The clock**, against the game server's (see [The clock](#the-clock)): the connection's start time depends on it. If it could
+  not be checked the result is `MAYBE`.
 
 The first line of the text is the result: `GOOD`, `MAYBE` (only IPv6 was found, or IPv6 is the only way through, or the
 ports could not be compared) or `PROBLEM` (offline, WebRTC blocked, no public address found, or a symmetric NAT with no IPv6),
@@ -81,12 +83,27 @@ was made: with a remote description and no addresses in it, it gives up after a 
 
 So now **neither side has a remote end until the start time**. Each makes an offer of its own (the invite is the host's, the
 reply is the joiner's), and neither browser has anything to try or give up on. The joiner names the start time in its reply code:
-45 seconds ahead, in the game server's clock (each side finds its offset from the `Date` header of the page's own server, good
-to about a second). The host reads it and waits. At that moment each side applies the other's offer as the answer to its own,
+45 seconds ahead, in the game server's clock (see below). The host reads it and waits. At that moment each side applies the other's offer as the answer to its own,
 with the host as the DTLS server and the joiner as the client (both browsers are then ICE controlling; the ICE role conflict
 is settled by the browsers). Both start within about a second of each other. A reply read up to four seconds after its start
 time still starts at once; later than that it has expired. Code: `src/network/webrtc.ts` (`START_DELAY_MS`, `timeUntilStart`,
-`clockOffset`) and `src/network/codes.ts`.
+`clockMeasurement`) and `src/network/codes.ts`.
+
+### The clock
+
+Two computers' clocks can differ by seconds or minutes, so each measures its own against the game server's. It sends eight
+requests, one after another, for pages that do not exist (`HEAD __clock_…`, which a cache never serves, so the `Date` header is the
+server's now), and each answer says the server's clock read some whole second at a moment between the request being sent and the
+answer arriving. That bounds the offset to a range, and every request narrows it: the result is good to about a hundred
+milliseconds (`estimateClock`), and a request that stalls for seconds only adds a wide range of its own, never a wrong one. It is
+measured in the background when the lobby opens, and once per page.
+
+The first version added the `Age` header to `Date`. On GitHub Pages a cached answer already has an up-to-date `Date`, so that put
+each computer about 160 seconds out (the age of the cached page), and by different amounts, because the two measured at different
+moments: the two starts were four seconds apart, which is nearly all of Firefox's five-second window. `Age` is not used now.
+
+Both players' logs (Copy log) give the start as a server time (`start set for 23:52:15.5 server time`, `starting at 23:52:15.5 server
+time`), so the two can be laid side by side to see how far apart the starts were.
 
 ## Transport
 

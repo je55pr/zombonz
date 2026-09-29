@@ -1,6 +1,6 @@
 import { decodeSession } from './codes.ts';
 import type { PeerLink } from './link.ts';
-import { ICE_SERVERS, answerInvite, createInvite } from './webrtc.ts';
+import { ICE_SERVERS, answerInvite, clockMeasurement, createInvite, type ClockReading } from './webrtc.ts';
 
 /**
  * "Test my connection": finds out, in the player's own browser, whether this network is likely to let them join or host
@@ -96,6 +96,8 @@ export interface ConnectionReport {
   connection?: string;
   stun: StunAnswer[];
   addresses: Addresses;
+  /** How this computer's clock compares with the game server's, which the connection's start time depends on; null if it could not be checked. */
+  clock: ClockReading | null;
   self: SelfTest;
   durationMs: number;
 }
@@ -104,7 +106,7 @@ export type Level = 'good' | 'warn' | 'bad';
 export interface Verdict { level: Level; headline: string; detail: string }
 
 /** What to tell the player: one line, and a sentence or two on why. */
-export function judge(report: Pick<ConnectionReport, 'online' | 'stun' | 'addresses' | 'self'>): Verdict {
+export function judge(report: Pick<ConnectionReport, 'online' | 'stun' | 'addresses' | 'self' | 'clock'>): Verdict {
   const { addresses, self } = report;
   if (!report.online) return { level: 'bad', headline: 'You look to be offline.',
     detail: 'The browser says there is no network connection. Check the connection and run the test again.' };
@@ -122,6 +124,8 @@ export function judge(report: Pick<ConnectionReport, 'online' | 'stun' | 'addres
     detail: 'No public IPv4 address came back. If the other player has no IPv6, you will not be able to connect.' };
   if (addresses.mapping === 'unknown') return { level: 'warn', headline: 'Found your address, but could not tell how your router handles it.',
     detail: 'Fewer than two of the address servers answered, so the ports could not be compared. It may well work; see which servers did not answer below.' };
+  if (!report.clock) return { level: 'warn', headline: 'This network looks fine, but this computer’s clock could not be checked.',
+    detail: 'Both players start connecting at the same moment, found by comparing each computer’s clock with the game server’s, and that comparison failed here. If the two computers’ clocks differ by more than a few seconds, connecting can fail.' };
   return { level: 'good', headline: 'This network looks fine for direct connections.',
     detail: 'If a connection still fails, the other player’s network is the likely cause: ask them to run this test too and send you the result.' };
 }
@@ -167,6 +171,7 @@ export function formatReport(report: ConnectionReport): string {
     `Public IPv6: ${addresses.publicV6 ? 'found' : 'not found'}`,
     `Local addresses: ${addresses.localHidden ? 'hidden by the browser (.local names)' : addresses.localShown ? `${addresses.localShown} shown` : 'none found'}`,
     `Relay (TURN): ${addresses.relay ? `${addresses.relay} found` : 'none (this version has no relay server)'}`,
+    `Clock: ${report.clock ? `${Math.abs(Math.round(report.clock.offset))} ms ${report.clock.offset >= 0 ? 'behind' : 'ahead of'} the game server (within ${Math.round(report.clock.uncertainty)})` : 'could not be checked against the game server'}`,
     '',
     'Connection to itself, with the game\'s own codes',
     self.ok
@@ -185,6 +190,8 @@ export interface TestEnvironment {
   createConnection(configuration: RTCConfiguration): RTCPeerConnection;
   createInvite: typeof createInvite;
   answerInvite: typeof answerInvite;
+  /** This computer's clock against the game server's. */
+  clock(): Promise<ClockReading | null>;
   now(): number;
   userAgent: string;
   online: boolean;
@@ -295,7 +302,7 @@ export function browserEnvironment(build: string, protocol: number): TestEnviron
       if (typeof RTCPeerConnection === 'undefined') throw new Error('This browser has no WebRTC.');
       return new RTCPeerConnection(configuration);
     },
-    createInvite, answerInvite,
+    createInvite, answerInvite, clock: clockMeasurement,
     now: () => performance.now(),
     userAgent: navigator.userAgent,
     online: navigator.onLine,
@@ -308,9 +315,10 @@ export function browserEnvironment(build: string, protocol: number): TestEnviron
 export async function runConnectionTest(env: TestEnvironment, progress: (step: string) => void = () => {}): Promise<ConnectionReport> {
   const start = env.now();
   progress('Looking up your public address…');
-  const [stun, candidates] = await Promise.all([
+  const [stun, candidates, clock] = await Promise.all([
     Promise.all(TEST_STUN_URLS.map(url => probeStun(env, url))),
     gatherAll(env),
+    env.clock().catch(() => null),
   ]);
   // After those, not alongside: the invite waits for its own addresses, and would be timing everyone else's traffic too.
   progress('Connecting to yourself with the game’s own codes…');
@@ -319,6 +327,6 @@ export async function runConnectionTest(env: TestEnvironment, progress: (step: s
     build: env.build, protocol: env.protocol, browser: describeBrowser(env.userAgent), at: new Date().toISOString(),
     online: env.online, connection: env.connection, stun,
     addresses: summariseAddresses(candidates, stun.filter(answer => answer.ok).length),
-    self, durationMs: Math.round(env.now() - start),
+    clock, self, durationMs: Math.round(env.now() - start),
   };
 }
