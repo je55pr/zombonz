@@ -6,7 +6,7 @@ export const MAP_FORMAT_VERSION = 1;
 export const GAMEPLAY_FIELDS = [
   'collisionBoxes', 'shotBlockers', 'walkSurfaces', 'navigation', 'playerSpawn',
   'windowBoards', 'barriers', 'zombieSpawns', 'doors', 'wallWeapons',
-  'mysteryBoxes', 'powerSwitch', 'perkMachines', 'traps', 'hazards', 'equipment',
+  'mysteryBoxes', 'powerSwitch', 'perkMachines', 'traps', 'hazards', 'equipment', 'zombieLooks',
 ] as const satisfies readonly (keyof GameMap)[];
 export const PRESENTATION_FIELDS = [
   'greybox', 'scenery', 'prisms', 'windows', 'doorStyles', 'wallWeaponFacing',
@@ -133,6 +133,10 @@ export function validateMapDocument(value: unknown): string[] {
     ids(gameplay[field] as unknown[], `gameplay.${field}`);
   }
   if (gameplay.powerSwitch !== undefined && record(gameplay.powerSwitch)) vec(gameplay.powerSwitch.position, 'gameplay.powerSwitch.position');
+  // How likely each zombie look is on this map (index = the look); a look with no weight never spawns.
+  if (gameplay.zombieLooks !== undefined) array(gameplay.zombieLooks, 'gameplay.zombieLooks').forEach((weight, i) => {
+    if (!finite(weight) || weight < 0) error(`gameplay.zombieLooks[${i}]`, 'expected a nonnegative finite weight');
+  });
 
   for (const field of ['greybox', 'prisms', 'windows', 'rails', 'props', 'decals', 'labels', 'lights', 'rubble'] as const)
     array(presentation[field], `presentation.${field}`);

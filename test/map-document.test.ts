@@ -29,6 +29,14 @@ describe('versioned map document', () => {
     expect(errors).toContain('gameplay.collisionBoxes[0]: min cannot exceed max on any axis');
   });
 
+  it('carries how likely each zombie look is, and rejects a weight that makes no sense', () => {
+    expect(BUNKER_MAP.zombieLooks).toEqual([3, 1]);
+    expect(bunkerDocument.gameplay.zombieLooks).toEqual([3, 1]);
+    const document = structuredClone(bunkerDocument);
+    document.gameplay.zombieLooks = [3, -1];
+    expect(validateMapDocument(document)).toContain('gameplay.zombieLooks[1]: expected a nonnegative finite weight');
+  });
+
   it('rejects unsupported versions and duplicate navigation IDs', () => {
     const document = structuredClone(bunkerDocument);
     Object.assign(document, { version: 2 });

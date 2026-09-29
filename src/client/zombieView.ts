@@ -40,9 +40,7 @@ export function createZombieView(): ZombieView {
     root.position.set(position.x, position.y, position.z);
     const phase = zombie.entry?.phase;
     const moving = Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0.05;
-    if (barrier && (phase === 'breaking' || phase === 'vaulting')) {
-      root.rotation.y = Math.atan2(-barrier.outward.x, -barrier.outward.z);
-    } else if (moving) root.rotation.y = Math.atan2(zombie.velocity.x, zombie.velocity.z);
+    root.rotation.y = zombie.yaw;
     const walk = Math.sin(tick * 0.12 + Number(zombie.id.slice(2)));
     body.scale.y = phase === 'vaulting' ? 0.85 : 1;
     for (let i = 0; i < 2; i++) {

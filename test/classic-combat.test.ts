@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { GameSimulation, addEntity, createInputFrame, createPlayerState, createZombieState,
-  damagePlayer, tickPlayerRecovery, PLAYER_HEALTH, firePlayerWeapon, rayFromPlayer,
+  damagePlayer, tickPlayerRecovery, PLAYER_HEALTH, firePlayerWeapon,
   meleeAttack, awardCombatPoints, awardRepairPoints, zombieHealthForRound, createWeaponState, resolveHitscan,
-  ZOMBIE_HIT_ZONES, WEAPON_DEFINITIONS, hitZoneMultiplier } from '../src/core/index.ts';
+  WEAPON_DEFINITIONS, hitZoneMultiplier, hitZoneOf } from '../src/core/index.ts';
+import { chestRay, headRay } from './aim.ts';
 
 const origin = { x: 0, y: 0, z: 0 };
 const wall = [{ min: { x: -2, y: 0, z: -0.7 }, max: { x: 2, y: 3, z: -0.5 } }];
@@ -28,7 +29,7 @@ describe('classic survival health', () => {
     expect(player.health).toBe(0); expect(player.downed).not.toBeNull();
   });
   it('ramps zombie health through round nine then scales exponentially', () => {
-    expect([1, 2, 3, 9, 10, 11].map(zombieHealthForRound)).toEqual([150, 250, 350, 950, 1045, 1150]);
+    expect([1, 2, 3, 9, 10, 11].map(zombieHealthForRound)).toEqual([150, 250, 350, 950, 1045, 1149]);
     expect(createZombieState('e:2', origin, 10).health).toBe(1045);
     expect(zombieHealthForRound(10000)).toBe(1_000_000_000);
   });
@@ -37,36 +38,48 @@ describe('classic survival health', () => {
 describe('headshots and knife', () => {
   it('classifies body and head impacts and rewards headshot kills once', () => {
     const player = createPlayerState('e:1', origin);
+    player.aiming = true;
     const target = createZombieState('e:2', { x: 0, y: 0, z: -4 }, 1);
-    const events = firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
-    expect(events).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'head', damage: 150 }));
-    awardCombatPoints(player, events);
-    expect(player.points).toBe(600);
+    // One pistol headshot (twice the body damage) leaves a round-1 zombie standing; the second kills it.
+    const first = firePlayerWeapon(player, headRay(player, target), [target], []);
+    expect(first).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'head', part: 'head', damage: 100 }));
+    expect(target.alive).toBe(true);
+    player.weapon.cooldownTicks = 0;
+    const events = firePlayerWeapon(player, headRay(player, target), [target], []);
+    expect(events).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'head', damage: 50 }));
+    awardCombatPoints(player, [...first, ...events]);
+    expect(player.points).toBe(610);
     expect(target.alive).toBe(false);
-    expect(firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], [])).toEqual([]);
+    expect(firePlayerWeapon(player, headRay(player, target), [target], [])).toEqual([]);
     const body = createZombieState('e:3', { x: 0, y: 0, z: -4 }, 1);
     player.weapon.cooldownTicks = 0;
-    const bodyEvents = firePlayerWeapon(player, { origin: { x: 0, y: 1, z: 0 }, direction: { x: 0, y: 0, z: -1 } }, [body], []);
+    const bodyEvents = firePlayerWeapon(player, chestRay(player, body), [body], []);
     expect(body.health).toBe(100);
-    expect(bodyEvents).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'body' }));
+    expect(bodyEvents).toContainEqual(expect.objectContaining({ type: 'weaponHit', hitZone: 'body', part: 'torso' }));
   });
-  it('reads hit zones from data and falls back to the body', () => {
-    expect(ZOMBIE_HIT_ZONES.map(zone => zone.id)).toEqual(['head']);
+  it('classifies impacts by the part of the body they strike: skull, torso and limbs', () => {
+    expect(hitZoneOf('head')).toBe('head');
+    for (const part of ['torso', 'armL', 'armR', 'legL', 'legR'] as const) expect(hitZoneOf(part)).toBe('body');
     const zombie = createZombieState('e:2', { x: 0, y: 0, z: -4 }, 1);
-    const at = (y: number) => resolveHitscan({ origin: { x: 0, y, z: 0 }, direction: { x: 0, y: 0, z: -1 } },
-      [zombie], [], 60);
-    expect(at(1.5)).toMatchObject({ kind: 'zombie', hitZone: 'head' });
-    expect(at(0.3)).toMatchObject({ kind: 'zombie', hitZone: 'body' });
+    const shot = (x: number, y: number) => resolveHitscan({ origin: { x, y, z: 0 }, direction: { x: 0, y: 0, z: -1 } }, [zombie], [], 60);
+    expect(shot(0.02, 1.49)).toMatchObject({ kind: 'zombie', hitZone: 'head', part: 'head' });
+    expect(shot(0, 1.0)).toMatchObject({ kind: 'zombie', hitZone: 'body', part: 'torso' });
+    expect(shot(0.2, 0.3)).toMatchObject({ kind: 'zombie', hitZone: 'body', part: 'legL' });
+    expect(shot(-0.2, 0.3)).toMatchObject({ kind: 'zombie', hitZone: 'body', part: 'legR' });
+    // Air above the skull, beside it and beside the shoulders is not a hit: the old box covered all of it.
+    expect(shot(0.02, 1.72).kind).toBe('none');
+    expect(shot(0.32, 1.49).kind).toBe('none');
+    expect(shot(0.55, 1.2).kind).toBe('none');
   });
   it('uses per-weapon headshot multipliers: the Kar98k one-shots through round 3 only', () => {
-    expect(hitZoneMultiplier(WEAPON_DEFINITIONS['starter-pistol'], 'head')).toBe(3);
+    expect(hitZoneMultiplier(WEAPON_DEFINITIONS['starter-pistol'], 'head')).toBe(2);
     expect(hitZoneMultiplier(WEAPON_DEFINITIONS.kar98k, 'head')).toBe(4);
     expect(hitZoneMultiplier(WEAPON_DEFINITIONS.kar98k, 'body')).toBe(1);
     for (const [round, dies] of [[3, true], [4, false]] as const) {
       const player = createPlayerState('e:1', origin);
-      player.weapon = createWeaponState('kar98k');
+      player.weapon = createWeaponState('kar98k'); player.aiming = true;
       const target = createZombieState('e:2', { x: 0, y: 0, z: -4 }, round);
-      firePlayerWeapon(player, rayFromPlayer(player, 1.62), [target], []);
+      firePlayerWeapon(player, headRay(player, target), [target], []);
       expect(target.alive).toBe(!dies);
     }
   });
@@ -97,9 +110,10 @@ describe('headshots and knife', () => {
   });
   it('lets Insta-Kill finish tough zombies with either a bullet or a knife', () => {
     const shooter = createPlayerState('e:1', origin);
+    shooter.aiming = true;
     const target = createZombieState('e:2', { x: 0, y: 0, z: -4 }, 12);
     const startingHealth = target.health;
-    const shot = firePlayerWeapon(shooter, rayFromPlayer(shooter, 1.62), [target], [], true);
+    const shot = firePlayerWeapon(shooter, chestRay(shooter, target), [target], [], true);
     expect(target.alive).toBe(false);
     expect(shot).toContainEqual(expect.objectContaining({ type: 'weaponHit', damage: startingHealth }));
     const knifer = createPlayerState('e:3', origin);

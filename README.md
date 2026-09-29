@@ -146,8 +146,8 @@ you do not need to look at it. Elsewhere an interaction needs you to face it wit
 degrees left or right (looking up or down doesn't matter), or to stand right beside it. Where
 several are in reach, the nearest and best-centred one is used.
 Repairs are free and award 10 points per board up to a per-round cap. Once a board is gone,
-a zombie at the window swipes any player within about 1.4 m of it on the inside,
-and it stops tearing while it swipes. Repair from further back to stay safe. Zombies can be shot outside, and only
+a zombie at the window swipes a player standing within an arm's length of the opening on the inside (about a metre),
+and it stops tearing while it swings. Repair from further back to stay safe. Zombies can be shot outside, and only
 one zombie crosses a given window at a time. Upstairs entries begin spawning from round four,
 when their interior landing can reach a player; the ground window behind the north-east stair remains scenery.
 Rounds follow the classic WaW/BO1 curves: solo rounds hold 6, 8, 13, 18 and 24 zombies,
@@ -155,7 +155,12 @@ then grow faster from round 10, with more per extra co-op player and at most 24 
 Rounds are ten seconds apart. Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
 sprint gait when it spawns: round 1 is all walkers, runners join from round 2, sprinters from
 round 5, and from round 9 everything sprints. Sprinters nearly match a walking player.
-Zombie health rises with each round. Headshots deal triple damage (quadruple with the Kar98k, which one-shots through round 3), knife swings
+Zombie health rises with each round. Headshots deal double damage (quadruple with the Kar98k, which one-shots through round 3;
+the starting pistol takes two on round 1), and only where the head is drawn: a zombie is ten capsules that follow what it is doing
+(see [docs/combat.md](docs/combat.md); `?hitboxes=1` draws them). Hip-fire wanders, a lot at range and on the move, so aim for
+anything far off. A zombie winds up before it hits and its blows land one at a time, so two arriving together do not down you at once.
+Strong hits, and every explosion, can take a zombie's limbs off (never the pistol's or the knife's): a head goes with the shot that
+kills, and a zombie that loses a leg and lives crawls after you, slower and from a shorter reach. Knife swings
 hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
 and temporary damage tint. Original synthesized audio gives simple gun, melee,
@@ -220,7 +225,10 @@ compressed locomotion pose (the pack has no dedicated vault animation). Corpses
 disappear after four seconds, with at most eight animated corpses retained.
 Identical vertices and constant animation tracks are removed in memory; all instances
 share model geometry/textures, with independent skeletons. Source GLBs stay untouched.
-Add `?zombie=pxltiger` to try the alternate rig; it has more draw calls and no death clip.
+Zombies are drawn with one of two models, chosen when each spawns by its map's proportions (the Bunker's dead are mostly
+Peter_D's soldiers, the Asylum's mostly pxltiger's bare-chested patients), and differ again in colouring, build, tempo and
+bearing. `?zombie=peter_d` or `?zombie=pxltiger` makes every zombie one of them (the alternate rig has no death clip, and a
+few more draw calls). More models and animations are wanted: see [docs/zombie-art-wanted.md](docs/zombie-art-wanted.md).
 
 Every gun has a real first-person model (29 licensed CC BY models; see the F2 credits).
 Recoil, muzzle flash and a basic reload pose

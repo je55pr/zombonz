@@ -4,6 +4,7 @@ import { assetExists, readAssetGeometry } from '../scripts/inspect-assets.mjs';
 import { cloneZombieModel, inPlaceClip, WEAPON_ASSETS, type ZombieAsset } from '../src/client/runtimeAssets.ts';
 import { prepareWeapon, VIEWMODEL_LENGTHS, WeaponView } from '../src/client/weaponView.ts';
 import { SkinnedZombieView, zombieAnimation } from '../src/client/skinnedZombieView.ts';
+import { zombieLook } from '../src/client/zombieLooks.ts';
 import { createPlayerState, createZombieState, createWeaponState, WEAPON_DEFINITIONS } from '../src/core/index.ts';
 import { BrowserInput } from '../src/client/input.ts';
 
@@ -93,10 +94,10 @@ describe('runtime GLB integration', () => {
     const zombie = createZombieState('e:2', { x: 1, y: 0, z: 1 }, 1);
     expect(zombieAnimation(zombie)).toBe('idle');
     zombie.velocity.x = 1; expect(zombieAnimation(zombie)).toBe('walk');
-    zombie.attackCooldownTicks = 60; expect(zombieAnimation(zombie)).toBe('attack');
+    zombie.attackTicks = 5; expect(zombieAnimation(zombie)).toBe('attack');
     zombie.alive = false; expect(zombieAnimation(zombie)).toBe('death');
     const model = new THREE.Group(); model.add(new THREE.Mesh(new THREE.BoxGeometry()));
-    const view = new SkinnedZombieView({ model, clips: {} }, 0);
+    const view = new SkinnedZombieView({ model, clips: {} }, zombieLook(zombie));
     view.update(zombie, 10); expect(view.expired(200)).toBe(false); expect(view.expired(251)).toBe(true);
     expect(zombie.position).toEqual({ x: 1, y: 0, z: 1 }); view.dispose();
   });

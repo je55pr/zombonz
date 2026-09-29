@@ -12608,6 +12608,10 @@
         "cost": 1000,
         "refillCost": 500
       }
+    ],
+    "zombieLooks": [
+      3,
+      1
     ]
   },
   "presentation": {

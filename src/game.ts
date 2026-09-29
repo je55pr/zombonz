@@ -17,13 +17,17 @@ import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import { HudFeedback } from './client/feedback.ts';
 import { GameAudio } from './client/audio.ts';
 import { decodeAudioClips } from './client/audioClips.ts';
-import { loadModel, loadZombieAsset, type ZombieAsset, type ZombieAssetId } from './client/runtimeAssets.ts';
+import { ZOMBIE_ASSET_IDS, loadModel, loadZombieAsset, zombieAssetFor, type ZombieAsset } from './client/runtimeAssets.ts';
+import { zombieLook } from './client/zombieLooks.ts';
 import { SkinnedZombieView } from './client/skinnedZombieView.ts';
 import { WeaponView, prepareWeaponModel } from './client/weaponView.ts';
 import { PowerupView } from './client/powerupView.ts';
 import { GrenadeView } from './client/grenadeView.ts';
 import { BlastEffects, groundFromSurfaces } from './client/blastEffects.ts';
 import { HazardView } from './client/hazardView.ts';
+import { HitboxView } from './client/hitboxView.ts';
+import { GoreEffects } from './client/goreEffects.ts';
+import { GoreDirector } from './client/goreDirector.ts';
 import { MineView } from './client/mineView.ts';
 import { createGrenadeModel, createMineModel } from './client/explosiveModels.ts';
 import { readEnvironmentManifest, loadEnvironmentMaterials } from './client/environmentMaterials.ts';
@@ -69,8 +73,7 @@ export type NetPlay =
  * zombie rig and the starting pistol into the loaders' page-wide caches, so startGame finds them ready.
  * Failures are left for the game to report; it already falls back to placeholders.
  */
-export async function prepareGameAssets(onProgress: (done: number, total: number) => void,
-  zombie: ZombieAssetId = 'peter_d'): Promise<void> {
+export async function prepareGameAssets(onProgress: (done: number, total: number) => void): Promise<void> {
   // Warm every map's assets: the map is chosen after this, on the Solo screen.
   const allMaps = Object.values(MAPS);
   const manifest = await readEnvironmentManifest().catch(() => null);
@@ -81,7 +84,7 @@ export async function prepareGameAssets(onProgress: (done: number, total: number
       .map(asset => () => loadModel(`props/${asset}/model.glb`)),
     () => loadModel(VENDING_MODEL),
     () => loadModel(TEAMMATE_MODEL),
-    () => loadZombieAsset(zombie),
+    ...ZOMBIE_ASSET_IDS.map(id => () => loadZombieAsset(id)),
     () => prepareWeaponModel('starter-pistol'),
     // Model-derived chalk outlines need the weapon assets ready before the map appears.
     ...[...new Set(allMaps.flatMap(map => map.wallWeapons.map(wall => wall.weaponId)))].map(id => () => prepareWeaponModel(id)),
@@ -204,7 +207,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const lobbyPlayers = net ? net.role === 'host' ? net.players : net.start.players : [];
   const simulation = net ? createMatch(map, lobbyPlayers.length, net.role === 'host' ? net.seed : net.start.seed) : new GameSimulation({
     seed: soloSeed(preview !== null),
-    map: { ...simulationMap(map), zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns },
+    map: { ...simulationMap(map), zombieSpawns: preview && previewName === 'barrier' ? [map.zombieSpawns[0]] : map.zombieSpawns,
+      // The map says how many of each look; `?zombie=peter_d` or `?zombie=pxltiger` makes every zombie one of them.
+      zombieLooks: ({ peter_d: [1, 0], pxltiger: [0, 1] } as Record<string, number[]>)[new URLSearchParams(location.search).get('zombie') ?? ''] ?? map.zombieLooks },
     // `&teammate=idle|run|down` adds a teammate three metres ahead, to inspect their figure.
     playerSpawns: [preview?.position ?? map.playerSpawn, ...(previewTeammate && preview ? [{
       x: preview.position.x - Math.sin(preview.yaw) * 3, y: preview.position.y, z: preview.position.z - Math.cos(preview.yaw) * 3 }] : [])],
@@ -284,17 +289,19 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
 
   const zombieViews = new Map<EntityId, ZombieView>();
   const zombieBatch = new ActorBatch(scene);
+  // `?hitboxes=1` draws the capsules shots are tested against over every zombie.
+  const hitboxView = new URLSearchParams(location.search).get('hitboxes') === '1' ? new HitboxView(scene) : null;
   const previousPositions = new Map<EntityId, Vec3>();
   const skinnedViews = new Map<EntityId, SkinnedZombieView>();
-  let zombieAsset: ZombieAsset | undefined;
+  // Every zombie model there is: which one a zombie is drawn with is its look (`ZombieState.variant`), chosen when it spawned.
+  const zombieAssets = new Map<string, ZombieAsset>();
   let zombieAssetNotice: string | null = 'Loading zombie model…';
-  const zombieVariant = new URLSearchParams(location.search).get('zombie') === 'pxltiger' ? 'pxltiger' : 'peter_d';
-  const zombieReady = loadZombieAsset(zombieVariant).then(asset => {
-    zombieAsset = asset; zombieAssetNotice = null;
+  const zombieReady = Promise.all(ZOMBIE_ASSET_IDS.map(id => loadZombieAsset(id).then(asset => { zombieAssets.set(id, asset); }).catch(error => {
+    console.warn(`Unable to load zombie asset ${id}`, error);
+  }))).then(() => {
+    if (zombieAssets.size === 0) { zombieAssetNotice = 'Zombie asset failed to load; using low-poly fallback'; return; }
+    zombieAssetNotice = null;
     zombieViews.clear(); zombieBatch.update([]);
-  }).catch(error => {
-    zombieAssetNotice = 'Zombie asset failed to load; using low-poly fallback';
-    console.warn('Unable to load zombie asset', error);
   });
   const weaponView = new WeaponView();
   const powerupView = new PowerupView(scene);
@@ -303,13 +310,16 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const blastEffects = new BlastEffects(scene, { ground: groundFromSurfaces(map.walkSurfaces), lights: lightPool });
   const hazardView = new HazardView(scene, map.hazards ?? [], blastEffects);
   const mineView = new MineView(scene);
+  // Blood, flesh and thrown limbs, and what turns the simulation's events into them.
+  const goreEffects = new GoreEffects(scene, { ground: groundFromSurfaces(map.walkSurfaces) });
+  const goreDirector = new GoreDirector(goreEffects, skinnedViews);
   const grenadeView = new GrenadeView(scene, blastEffects);
 
   function zombies(): ZombieState[] {
     return simulation.zombies();
   }
   function syncZombieViews(alpha: number, tick: number, previous: ReadonlyMap<EntityId, Vec3>): void {
-    if (zombieAsset) {
+    if (zombieAssets.size > 0) {
       for (const [id, view] of skinnedViews) if (!simulation.state.world.entities[id]) {
         view.dispose(); skinnedViews.delete(id);
       }
@@ -318,7 +328,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
         let view = skinnedViews.get(entity.id);
         if (!view) {
           if (!entity.alive) continue;
-          view = new SkinnedZombieView(zombieAsset, Number(entity.id.slice(2)) * 0.37);
+          // A look whose model has not loaded is drawn with one that has.
+          const asset = zombieAssets.get(zombieAssetFor(entity.variant)) ?? zombieAssets.values().next().value!;
+          view = new SkinnedZombieView(asset, zombieLook(entity, map.id));
           skinnedViews.set(entity.id, view); scene.add(view.root);
         }
         view.update(entity, tick, simulation.state.barriers.find(barrier => barrier.id === entity.entry?.barrierId),
@@ -382,7 +394,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     collision: () => simulation.collisionBoxes(), walkSurfaces: map.walkSurfaces, shotBlockers: map.shotBlockers,
   });
   // Development builds expose the running match for inspection from the browser console.
-  if (import.meta.env.DEV) Object.assign(window, { zombonz: { simulation, playerId, net, effects: blastEffects, weaponView, camera } });
+  if (import.meta.env.DEV) Object.assign(window, { zombonz: { simulation, playerId, net, effects: blastEffects, weaponView, camera, frame, renderer, scene, skinnedViews, present, gore: goreEffects } });
   /** The host holds the first wave until every player has loaded. */
   let hostRunning = net?.role !== 'host';
   if (net) {
@@ -434,9 +446,10 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     feedback.consume(events, playerId, simulation.state.world.tick);
     hud.events(events as SimulationEvent[], playerId);
     audio.consume(events as SimulationEvent[], playerId, simulation.state.world);
+    goreDirector.consume(events, simulation.state.world);
   }
   function resetMatchViews(): void {
-    hazardView.reset(); mineView.clear(); blastEffects.clear();
+    hazardView.reset(); mineView.clear(); blastEffects.clear(); goreEffects.clear();
     previousPositions.clear();
     for (const view of skinnedViews.values()) view.dispose();
     skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
@@ -506,12 +519,14 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
     if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
     syncZombieViews(remote.alpha, remote.tick, remote.previous);
+    hitboxView?.update(simulation.zombies());
     syncPlayerViews(remote.alpha, remote.tick, remote.previous);
     powerupView.update(simulation.state.powerups.drops, remote.tick);
     grenadeView.update(simulation.state.grenades.active, remote.tick, interval / 1000);
     mineView.update(simulation.state.grenades.mines, nowSeconds);
     hazardView.update(simulation.state.hazards);
     blastEffects.update(interval / 1000, camera);
+    goreEffects.update(interval / 1000, camera, renderer.domElement.height);
     // A blast near enough shakes the view, dying away over a second or so.
     const shake = blastEffects.shake();
     camera.rotation.x += shake.x; camera.rotation.y += shake.y; camera.rotation.z += shake.z;
@@ -654,7 +669,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       if (net?.role === 'host') net.host.close();
       if (net?.role === 'client') net.client.leave();
       for (const view of playerViews.values()) view.dispose();
-      pause.dispose(); input.dispose(); audio.dispose(); hud.dispose(); blastEffects.clear();
+      pause.dispose(); input.dispose(); audio.dispose(); hud.dispose(); blastEffects.clear(); goreEffects.dispose();
       performanceOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose();
       for (const view of skinnedViews.values()) view.dispose();
       skinnedViews.clear(); zombieViews.clear();

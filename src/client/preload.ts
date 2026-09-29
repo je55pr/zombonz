@@ -3,12 +3,12 @@ import { assetUrl, MATERIAL_IDS, readEnvironmentManifest } from './environmentMa
 import { TREELINE_ASSETS } from './treeline.ts';
 import { VENDING_MODEL, VENDING_PAINTS } from './mapDetails.ts';
 import { TEAMMATE_MODEL } from './playerView.ts';
-import { WEAPON_ASSETS, zombieAssetPaths, type ZombieAssetId } from './runtimeAssets.ts';
+import { WEAPON_ASSETS, ZOMBIE_ASSET_IDS, zombieAssetPaths } from './runtimeAssets.ts';
 import { storeAsset } from './assetStore.ts';
 import { AUDIO_CLIPS } from './audioClips.ts';
 
 /** Every file the solo game fetches, for every map: environment maps, props, the zombie rig, all weapon models and every sound. */
-export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<string[]> {
+export async function gameAssetUrls(): Promise<string[]> {
   const manifest = await readEnvironmentManifest();
   const paths = ['/assets/environment/manifest.json'];
   for (const id of MATERIAL_IDS) {
@@ -25,7 +25,7 @@ export async function gameAssetUrls(zombie: ZombieAssetId = 'peter_d'): Promise<
   if (manifest.sky) paths.push(manifest.sky.image);
   if (Object.values(MAPS).some(map => map.perkMachines?.length)) paths.push(`/assets/${VENDING_MODEL}`, ...Object.values(VENDING_PAINTS));
   paths.push(`/assets/${TEAMMATE_MODEL}`);
-  paths.push(...zombieAssetPaths(zombie).map(path => `/assets/${path}`));
+  for (const zombie of ZOMBIE_ASSET_IDS) paths.push(...zombieAssetPaths(zombie).map(path => `/assets/${path}`));
   for (const asset of new Set(Object.values(WEAPON_ASSETS))) paths.push(`/assets/weapons/${asset}/model.glb`);
   for (const clip of AUDIO_CLIPS) paths.push(`/assets/audio/${clip}.mp3`);
   return [...new Set(paths.map(assetUrl))];

@@ -4,9 +4,11 @@ import type { EntityId, PlayerState, Vec3, WeaponState, ZombieState } from './ty
 import { SeededRng } from './rng.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
 import { PLAYER_MOVEMENT } from './player.ts';
-import { blastPlayers, blastZombies, chestOf } from './blast.ts';
+import { blastPlayers, blastZombies } from './blast.ts';
 import { blastHazards, damageHazard, type HazardEvent, type HazardTarget } from './hazard.ts';
 import { clearLine, rayAabbDistance } from './ray.ts';
+import { rayZombieBody, zombieChest, type BodyPart } from './zombieBody.ts';
+import { dismember, type GoreEvent } from './gore.ts';
 export { rayAabbDistance } from './ray.ts';
 
 export interface WeaponDefinition {
@@ -20,8 +22,9 @@ export interface WeaponDefinition {
   magazineSize: number;
   startingReserveAmmo: number;
   reloadTicks: number;
+  /** Half-angle of the cone shots land in when fired from the hip, standing still, before the cone widens with movement and bloom. */
   hipSpreadRadians: number;
-  /** Aiming scales hip spread by this (default 0.1); shotguns tighten far less. */
+  /** Aiming scales the spread by this (default DEFAULT_AIM_SPREAD); shotguns tighten far less. */
   aimSpreadMultiplier?: number;
   /** Rays per shot; shotgun pellets each deal `damage`, totalled per zombie. */
   pellets?: number;
@@ -33,138 +36,142 @@ export interface WeaponDefinition {
   chain?: { targets: number; radius: number; falloff: number };
   /** Damage multipliers per hit zone; missing zones use DEFAULT_HIT_ZONE_MULTIPLIERS. */
   hitZoneMultipliers?: Partial<Record<HitZoneId, number>>;
+  /** False for a gun that never takes limbs off (WaW: every pistol but the .357); default true. */
+  gibs?: boolean;
 }
 
 export type HitZoneId = 'head' | 'body';
 
-export interface HitZone {
-  id: HitZoneId;
-  /** Lowest impact height that counts, as a fraction of the zombie's current height. */
-  minHeightFraction: number;
-}
-
-/** Checked top-down; an impact below every zone falls back to FALLBACK_HIT_ZONE. */
-export const ZOMBIE_HIT_ZONES: readonly HitZone[] = [{ id: 'head', minHeightFraction: 1.42 / 1.72 }];
-export const FALLBACK_HIT_ZONE: HitZoneId = 'body';
-export const DEFAULT_HIT_ZONE_MULTIPLIERS: Readonly<Record<HitZoneId, number>> = { head: 3, body: 1 };
+/** A hit on the head is a headshot; a hit on anything else (torso, arms, legs) is a body shot. */
+export function hitZoneOf(part: BodyPart): HitZoneId { return part === 'head' ? 'head' : 'body'; }
+/**
+ * A headshot is worth twice a body shot unless the gun says otherwise. The pistol's 50 damage kills a round-1
+ * zombie (150 health) in three body shots, as in the Nazi Zombies wiki, and so in two headshots rather than one;
+ * bolt-action rifles and shotguns override this below. Zombie mode's own multipliers are not in the scripts we can
+ * read (multiplayer's is 1.4 for pistols, SMGs and rifles), so this is a balance choice: see docs/combat.md.
+ */
+export const DEFAULT_HIT_ZONE_MULTIPLIERS: Readonly<Record<HitZoneId, number>> = { head: 2, body: 1 };
 
 export function hitZoneMultiplier(definition: WeaponDefinition, zone: HitZoneId): number {
   return definition.hitZoneMultipliers?.[zone] ?? DEFAULT_HIT_ZONE_MULTIPLIERS[zone];
 }
 
+// Hip spread is the largest single cause of missed shots at range: a hip-fired pistol is about 2.6 degrees (0.9 m at
+// 20 m, so a distant head is a matter of luck), sub-machine guns 3 to 4, rifles 2.5 to 3, machine guns 4 to 5, and
+// aiming tightens each to a tenth or so. Shotguns keep their pellet cone.
 // Stats are WaW-inspired approximations tuned to this game's 60 Hz ticks. Penetration tiers follow
 // the small/medium/large penetrateType fields in the WaW/BO1 weapon files; counts and retention are
 // explicit balance choices because those files do not specify a zombie body count or loss per body.
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   'starter-pistol': {
-    id: 'starter-pistol', name: 'M1911', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
-    magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90, hipSpreadRadians: 0.008,
+    id: 'starter-pistol', name: 'M1911', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi', gibs: false,
+    magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90, hipSpreadRadians: 0.045,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   kar98k: {
     id: 'kar98k', name: 'Kar98k', damage: 100, range: 80, fireIntervalTicks: 45, trigger: 'semi',
-    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120, hipSpreadRadians: 0.015,
+    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 120, hipSpreadRadians: 0.05, aimSpreadMultiplier: 0.05,
     // WaW: one headshot kills through round 3 (350 health) but not round 4 (450).
     hitZoneMultipliers: { head: 4 }, penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   springfield: {
     id: 'springfield', name: 'Springfield', damage: 100, range: 80, fireIntervalTicks: 50, trigger: 'semi',
-    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 135, hipSpreadRadians: 0.015,
+    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 135, hipSpreadRadians: 0.05, aimSpreadMultiplier: 0.05,
     hitZoneMultipliers: { head: 4 }, penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   mosin: {
     id: 'mosin', name: 'Mosin-Nagant', damage: 110, range: 80, fireIntervalTicks: 55, trigger: 'semi',
-    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 140, hipSpreadRadians: 0.015,
+    magazineSize: 5, startingReserveAmmo: 50, reloadTicks: 140, hipSpreadRadians: 0.05, aimSpreadMultiplier: 0.05,
     hitZoneMultipliers: { head: 4 }, penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   'm1-garand': {
     id: 'm1-garand', name: 'M1 Garand', damage: 105, range: 80, fireIntervalTicks: 9, trigger: 'semi',
-    magazineSize: 8, startingReserveAmmo: 128, reloadTicks: 150, hipSpreadRadians: 0.014,
+    magazineSize: 8, startingReserveAmmo: 128, reloadTicks: 150, hipSpreadRadians: 0.04,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   thompson: {
     id: 'thompson', name: 'Thompson', damage: 65, range: 60, fireIntervalTicks: 6, trigger: 'auto',
-    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120, hipSpreadRadians: 0.03,
+    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 120, hipSpreadRadians: 0.06,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   mp40: {
     id: 'mp40', name: 'MP40', damage: 75, range: 65, fireIntervalTicks: 8, trigger: 'auto',
-    magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138, hipSpreadRadians: 0.027,
+    magazineSize: 32, startingReserveAmmo: 192, reloadTicks: 138, hipSpreadRadians: 0.055,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   ppsh41: {
     id: 'ppsh41', name: 'PPSh-41', damage: 70, range: 60, fireIntervalTicks: 4, trigger: 'auto',
-    magazineSize: 71, startingReserveAmmo: 284, reloadTicks: 210, hipSpreadRadians: 0.035,
+    magazineSize: 71, startingReserveAmmo: 284, reloadTicks: 210, hipSpreadRadians: 0.07,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   'm1-carbine': {
     id: 'm1-carbine', name: 'M1A1 Carbine', damage: 120, range: 70, fireIntervalTicks: 8, trigger: 'semi',
-    magazineSize: 15, startingReserveAmmo: 120, reloadTicks: 150, hipSpreadRadians: 0.016,
+    magazineSize: 15, startingReserveAmmo: 120, reloadTicks: 150, hipSpreadRadians: 0.04,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   m14: {
     id: 'm14', name: 'M14', damage: 105, range: 80, fireIntervalTicks: 8, trigger: 'semi',
-    magazineSize: 8, startingReserveAmmo: 96, reloadTicks: 150, hipSpreadRadians: 0.014,
+    magazineSize: 8, startingReserveAmmo: 96, reloadTicks: 150, hipSpreadRadians: 0.04,
     penetration: { maxTargets: 4, damageRetention: 0.85 },
   },
   fal: {
     id: 'fal', name: 'FN FAL', damage: 130, range: 80, fireIntervalTicks: 7, trigger: 'semi',
-    magazineSize: 20, startingReserveAmmo: 180, reloadTicks: 165, hipSpreadRadians: 0.016,
+    magazineSize: 20, startingReserveAmmo: 180, reloadTicks: 165, hipSpreadRadians: 0.04,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   stg44: {
     id: 'stg44', name: 'STG-44', damage: 100, range: 70, fireIntervalTicks: 7, trigger: 'auto',
-    magazineSize: 30, startingReserveAmmo: 180, reloadTicks: 150, hipSpreadRadians: 0.03,
+    magazineSize: 30, startingReserveAmmo: 180, reloadTicks: 150, hipSpreadRadians: 0.05,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   fg42: {
     id: 'fg42', name: 'FG42', damage: 110, range: 75, fireIntervalTicks: 5, trigger: 'auto',
-    magazineSize: 20, startingReserveAmmo: 240, reloadTicks: 180, hipSpreadRadians: 0.035,
+    magazineSize: 20, startingReserveAmmo: 240, reloadTicks: 180, hipSpreadRadians: 0.06,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   commando: {
     id: 'commando', name: 'Commando', damage: 100, range: 70, fireIntervalTicks: 5, trigger: 'auto',
-    magazineSize: 30, startingReserveAmmo: 270, reloadTicks: 150, hipSpreadRadians: 0.028,
+    magazineSize: 30, startingReserveAmmo: 270, reloadTicks: 150, hipSpreadRadians: 0.05,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   ak74u: {
     id: 'ak74u', name: 'AK-74u', damage: 100, range: 60, fireIntervalTicks: 5, trigger: 'auto',
-    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 150, hipSpreadRadians: 0.03,
+    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 150, hipSpreadRadians: 0.06,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   mp5k: {
     id: 'mp5k', name: 'MP5K', damage: 80, range: 55, fireIntervalTicks: 4, trigger: 'auto',
-    magazineSize: 30, startingReserveAmmo: 120, reloadTicks: 150, hipSpreadRadians: 0.03,
+    magazineSize: 30, startingReserveAmmo: 120, reloadTicks: 150, hipSpreadRadians: 0.06,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   skorpion: {
     id: 'skorpion', name: 'Skorpion', damage: 60, range: 50, fireIntervalTicks: 4, trigger: 'auto',
-    magazineSize: 20, startingReserveAmmo: 200, reloadTicks: 120, hipSpreadRadians: 0.035,
+    magazineSize: 20, startingReserveAmmo: 200, reloadTicks: 120, hipSpreadRadians: 0.07,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   'magnum-357': {
     id: 'magnum-357', name: '.357 Magnum', damage: 240, range: 60, fireIntervalTicks: 18, trigger: 'semi',
-    magazineSize: 6, startingReserveAmmo: 48, reloadTicks: 180, hipSpreadRadians: 0.012,
+    magazineSize: 6, startingReserveAmmo: 48, reloadTicks: 180, hipSpreadRadians: 0.04,
     penetration: { maxTargets: 4, damageRetention: 0.85 },
   },
   python: {
     id: 'python', name: 'Python', damage: 200, range: 60, fireIntervalTicks: 18, trigger: 'semi',
-    magazineSize: 6, startingReserveAmmo: 84, reloadTicks: 180, hipSpreadRadians: 0.012,
+    magazineSize: 6, startingReserveAmmo: 84, reloadTicks: 180, hipSpreadRadians: 0.04,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   rpk: {
     id: 'rpk', name: 'RPK', damage: 110, range: 80, fireIntervalTicks: 5, trigger: 'auto',
-    magazineSize: 100, startingReserveAmmo: 400, reloadTicks: 330, hipSpreadRadians: 0.045,
+    magazineSize: 100, startingReserveAmmo: 400, reloadTicks: 330, hipSpreadRadians: 0.075,
     penetration: { maxTargets: 4, damageRetention: 0.8 },
   },
   bar: {
     id: 'bar', name: 'BAR', damage: 125, range: 80, fireIntervalTicks: 10, trigger: 'auto',
-    magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150, hipSpreadRadians: 0.035,
+    magazineSize: 20, startingReserveAmmo: 140, reloadTicks: 150, hipSpreadRadians: 0.065,
     penetration: { maxTargets: 3, damageRetention: 0.8 },
   },
   mg42: {
     id: 'mg42', name: 'MG42', damage: 120, range: 90, fireIntervalTicks: 3, trigger: 'auto',
-    magazineSize: 125, startingReserveAmmo: 500, reloadTicks: 360, hipSpreadRadians: 0.045,
+    magazineSize: 125, startingReserveAmmo: 500, reloadTicks: 360, hipSpreadRadians: 0.08,
     penetration: { maxTargets: 4, damageRetention: 0.8 },
   },
   'double-barrel': {
@@ -189,18 +196,18 @@ export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   },
   rpg7: {
     id: 'rpg7', name: 'RPG-7', damage: 1500, range: 90, fireIntervalTicks: 30, trigger: 'semi',
-    magazineSize: 1, startingReserveAmmo: 4, reloadTicks: 150, hipSpreadRadians: 0.01,
+    magazineSize: 1, startingReserveAmmo: 4, reloadTicks: 150, hipSpreadRadians: 0.02,
     explosive: { radius: 4, damage: 2500, selfDamage: 75 },
   },
   // Original wonder weapons in the Ray Gun / Wunderwaffe roles; rare box rewards only.
   irrlicht: {
     id: 'irrlicht', name: 'Irrlicht', damage: 1000, range: 70, fireIntervalTicks: 20, trigger: 'semi',
-    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 180, hipSpreadRadians: 0.01,
+    magazineSize: 20, startingReserveAmmo: 160, reloadTicks: 180, hipSpreadRadians: 0.025,
     explosive: { radius: 2.2, damage: 350, selfDamage: 35 },
   },
   molniya: {
     id: 'molniya', name: 'Molniya', damage: 1200, range: 50, fireIntervalTicks: 40, trigger: 'semi',
-    magazineSize: 6, startingReserveAmmo: 42, reloadTicks: 200, hipSpreadRadians: 0.005,
+    magazineSize: 6, startingReserveAmmo: 42, reloadTicks: 200, hipSpreadRadians: 0.02,
     chain: { targets: 5, radius: 4, falloff: 0.15 },
   },
 };
@@ -254,7 +261,7 @@ export interface HitscanRay {
 
 export type HitscanTarget =
   | { kind: 'world'; distance: number }
-  | { kind: 'zombie'; distance: number; zombieId: EntityId; hitZone: HitZoneId }
+  | { kind: 'zombie'; distance: number; zombieId: EntityId; hitZone: HitZoneId; part: BodyPart; point: Vec3 }
   | { kind: 'hazard'; distance: number; hazardId: string }
   | { kind: 'none'; distance: number };
 
@@ -263,14 +270,17 @@ export type WeaponEvent =
   | { type: 'weaponFired'; playerId: EntityId; weaponId: string }
   | { type: 'weaponReloadStarted'; playerId: EntityId; weaponId: string; reloadTicks: number }
   | { type: 'weaponReloadCompleted'; playerId: EntityId; weaponId: string; loaded: number; magazineAmmo: number; reserveAmmo: number }
-  | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number; hitZone?: HitZoneId }
+  /** `part`, `point` (where the shot struck) and `direction` (which way it was going) say where and how, for the client's blood. */
+  | { type: 'weaponHit'; playerId: EntityId; weaponId: string; zombieId: EntityId; damage: number; distance: number; hitZone?: HitZoneId;
+    part?: BodyPart; point?: Vec3; direction?: Vec3 }
   | { type: 'meleeSwung'; playerId: EntityId }
   | { type: 'meleeHit'; playerId: EntityId; zombieId: EntityId; damage: number }
   | { type: 'grenadeHit'; playerId: EntityId; zombieId: EntityId; damage: number }
   | { type: 'weaponExploded'; playerId: EntityId; weaponId: string; position: Vec3; radius: number }
   | { type: 'weaponChained'; playerId: EntityId; weaponId: string; points: Vec3[] }
   | { type: 'zombieDamaged'; zombieId: EntityId; playerId: EntityId; damage: number; health: number }
-  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: HitZoneId | 'melee' }
+  | { type: 'zombieDied'; zombieId: EntityId; playerId: EntityId; method?: HitZoneId | 'melee' | 'fall' }
+  | GoreEvent
   | HazardEvent;
 
 function normalize(direction: Vec3): Vec3 {
@@ -290,12 +300,16 @@ export function rayFromPlayer(player: PlayerState, eyeHeight: number): HitscanRa
   };
 }
 
-/** Seeded angular variation keeps gameplay repeatable while making ADS useful. */
+/**
+ * Seeded angular variation keeps gameplay repeatable while making ADS useful. Shots land evenly over a disc of
+ * half-angle `radians` (the circle the crosshair draws), not a square, so no shot strays farther than the spread.
+ */
 export function spreadHitscanRay(ray: HitscanRay, radians: number, seed: number): HitscanRay {
   if (radians <= 0) return ray;
   const rng = new SeededRng(seed);
-  const yaw = Math.atan2(-ray.direction.x, -ray.direction.z) + (rng.next() * 2 - 1) * radians;
-  const pitch = Math.asin(Math.max(-1, Math.min(1, ray.direction.y))) + (rng.next() * 2 - 1) * radians;
+  const angle = rng.next() * Math.PI * 2, reach = Math.sqrt(rng.next()) * radians;
+  const yaw = Math.atan2(-ray.direction.x, -ray.direction.z) + Math.cos(angle) * reach;
+  const pitch = Math.asin(Math.max(-1, Math.min(1, ray.direction.y))) + Math.sin(angle) * reach;
   const cosPitch = Math.cos(pitch);
   return { origin: ray.origin, direction: normalize({
     x: -Math.sin(yaw) * cosPitch, y: Math.sin(pitch), z: -Math.cos(yaw) * cosPitch,
@@ -327,17 +341,6 @@ function nearestHazardHit(ray: HitscanRay, hazards: readonly HazardTarget[], ran
     }
   }
   return best;
-}
-
-function zombieHitDistance(ray: HitscanRay, zombie: ZombieState, maxDistance: number): number | null {
-  const radius = 0.32;
-  const height = zombie.entry?.phase === 'vaulting' ? 1.72 * 0.85 : 1.72;
-  return rayAabbDistance(
-    ray,
-    { x: zombie.position.x - radius, y: zombie.position.y, z: zombie.position.z - radius },
-    { x: zombie.position.x + radius, y: zombie.position.y + height, z: zombie.position.z + radius },
-    maxDistance,
-  );
 }
 
 /**
@@ -373,13 +376,10 @@ export function resolveHitscanZombies(
   const hits: Array<Extract<HitscanTarget, { kind: 'zombie' }>> = [];
   for (const zombie of zombies) {
     if (!zombie.alive) continue;
-    const distance = zombieHitDistance(ray, zombie, range);
-    if (distance === null || (worldDistance !== null && distance >= worldDistance)
-      || (hazardDistance !== null && distance >= hazardDistance)) continue;
-    const height = 1.72 * (zombie.entry?.phase === 'vaulting' ? 0.85 : 1);
-    const impactY = ray.origin.y + ray.direction.y * distance - zombie.position.y;
-    const zone = ZOMBIE_HIT_ZONES.find(zone => impactY >= zone.minHeightFraction * height);
-    hits.push({ kind: 'zombie', zombieId: zombie.id, distance, hitZone: zone?.id ?? FALLBACK_HIT_ZONE });
+    const hit = rayZombieBody(ray.origin, ray.direction, zombie, range);
+    if (hit === null || (worldDistance !== null && hit.distance >= worldDistance)
+      || (hazardDistance !== null && hit.distance >= hazardDistance)) continue;
+    hits.push({ kind: 'zombie', zombieId: zombie.id, distance: hit.distance, hitZone: hitZoneOf(hit.part), part: hit.part, point: hit.point });
   }
   return hits.sort((a, b) => a.distance - b.distance || a.zombieId.localeCompare(b.zombieId));
 }
@@ -413,7 +413,13 @@ function completeReload(player: PlayerState): WeaponEvent[] {
  * WaW-style dynamic spread: hip fire opens up while moving (most while sprinting) and blooms with each
  * shot, settling back over about half a second. Aiming scales the whole cone by the gun's aim multiplier.
  */
-export const SPREAD_RULES = { movingExtra: 0.8, sprintExtra: 1.6, bloomPerShot: 0.3, maxBloom: 1.2, bloomDecayPerTick: 0.03 } as const;
+export const SPREAD_RULES = {
+  movingExtra: 1, sprintExtra: 2, bloomPerShot: 0.3, maxBloom: 1.2, bloomDecayPerTick: 0.03,
+  /** The widest a cone ever gets, whatever the gun and however it is fired (11 degrees). */
+  maxCone: 0.2,
+} as const;
+/** Aiming down the sights leaves this much of a gun's spread unless it says otherwise. */
+export const DEFAULT_AIM_SPREAD = 0.12;
 
 /** The spread cone (radians) the player's next shot will use; the HUD crosshair draws the same value. */
 export function currentSpread(player: PlayerState): number {
@@ -421,8 +427,8 @@ export function currentSpread(player: PlayerState): number {
   if (!definition) return 0;
   const pace = Math.min(1, Math.hypot(player.velocity.x, player.velocity.z) / PLAYER_MOVEMENT.maxSpeed);
   const movement = player.sprinting ? SPREAD_RULES.sprintExtra : SPREAD_RULES.movingExtra * pace;
-  return definition.hipSpreadRadians * (1 + movement + player.spreadBloom)
-    * (player.aiming ? definition.aimSpreadMultiplier ?? 0.1 : 1);
+  return Math.min(SPREAD_RULES.maxCone, definition.hipSpreadRadians * (1 + movement + player.spreadBloom)
+    * (player.aiming ? definition.aimSpreadMultiplier ?? DEFAULT_AIM_SPREAD : 1));
 }
 
 export function tickWeaponState(player: PlayerState): WeaponEvent[] {
@@ -448,12 +454,11 @@ export function wantsToFire(player: PlayerState, pressed: boolean, held: boolean
   return definition.trigger === 'semi' ? pressed : held || pressed;
 }
 
-const chest = chestOf;
-
 function damageZombie(events: Array<WeaponEvent | DamageEvent>, player: PlayerState, weaponId: string,
-  zombie: ZombieState, damage: number, distance: number, instaKill: boolean): void {
+  zombie: ZombieState, damage: number, distance: number, instaKill: boolean, blast?: { centre: Vec3; scale: number }): void {
   const applied = Math.min(zombie.health, instaKill ? zombie.health : Math.round(damage));
   if (applied <= 0) return;
+  const healthBefore = zombie.health;
   zombie.health -= applied;
   events.push({ type: 'weaponHit', playerId: player.id, weaponId, zombieId: zombie.id, damage: applied, distance, hitZone: 'body' },
     { type: 'zombieDamaged', zombieId: zombie.id, playerId: player.id, damage: applied, health: zombie.health });
@@ -461,6 +466,9 @@ function damageZombie(events: Array<WeaponEvent | DamageEvent>, player: PlayerSt
     zombie.alive = false; zombie.velocity = { x: 0, y: 0, z: 0 };
     events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: 'body' });
   }
+  // A blast (a rocket's burst) takes limbs as any blast does; chained lightning does not.
+  if (blast) events.push(...dismember(zombie, { source: 'explosion', credit: player.id, damage: applied, healthBefore, point: blast.centre,
+    scale: blast.scale, gibs: true }));
 }
 
 /**
@@ -473,7 +481,7 @@ function explodeAt(events: Array<WeaponEvent | DamageEvent>, player: PlayerState
   const blast = definition.explosive!;
   events.push({ type: 'weaponExploded', playerId: player.id, weaponId: definition.id, position: { ...impact }, radius: blast.radius });
   for (const { target: zombie, distance, scale } of blastZombies(impact, blast.radius, zombies, boxes)) {
-    damageZombie(events, player, definition.id, zombie, blast.damage * scale, distance, instaKill);
+    damageZombie(events, player, definition.id, zombie, blast.damage * scale, distance, instaKill, { centre: impact, scale });
   }
   for (const { scale } of blastPlayers(impact, blast.radius, [player], boxes)) {
     events.push(...damagePlayer(player, Math.round(blast.selfDamage * scale)));
@@ -487,12 +495,12 @@ function chainFrom(events: Array<WeaponEvent | DamageEvent>, player: PlayerState
   origin: Vec3, first: ZombieState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[], instaKill: boolean): void {
   const chain = definition.chain!;
   const struck = new Set<EntityId>([first.id]);
-  const points = [{ ...origin }, chest(first.position)];
+  const points = [{ ...origin }, zombieChest(first)];
   let from = first, damage = definition.damage * (1 - chain.falloff);
   for (let jump = 1; jump < chain.targets; jump += 1) {
-    const here = chest(from.position);
+    const here = zombieChest(from);
     const next = zombies.filter(zombie => zombie.alive && !struck.has(zombie.id)).map(zombie => {
-      const target = chest(zombie.position);
+      const target = zombieChest(zombie);
       return { zombie, target, distance: Math.hypot(target.x - here.x, target.y - here.y, target.z - here.z) };
     }).filter(candidate => candidate.distance <= chain.radius && clearLine(here, candidate.target, boxes))
       .sort((a, b) => a.distance - b.distance || a.zombie.id.localeCompare(b.zombie.id))[0];
@@ -525,7 +533,7 @@ export function firePlayerWeapon(
   const spread = currentSpread(player);
   player.spreadBloom = Math.min(SPREAD_RULES.maxBloom, player.spreadBloom + SPREAD_RULES.bloomPerShot);
   // Pellets resolve against the pre-shot state, then each zombie takes one combined hit.
-  const hits = new Map<EntityId, { damage: number; distance: number; hitZone: HitZoneId }>();
+  const hits = new Map<EntityId, { damage: number; distance: number; hitZone: HitZoneId; part: BodyPart; point: Vec3; direction: Vec3 }>();
   const hazardHits = new Map<string, { damage: number; point: Vec3 }>();
   const addHazardHit = (hazardId: string, distance: number, shotRay: HitscanRay, damage: number) => {
     const { origin, direction } = shotRay;
@@ -545,11 +553,13 @@ export function firePlayerWeapon(
     const targets = hit.kind === 'zombie'
       ? resolveHitscanZombies(pelletRay, zombies, worldBoxes, definition.range, hazards).slice(0, penetration?.maxTargets ?? 1) : [];
     targets.forEach((target, index) => {
-      const total = hits.get(target.zombieId) ?? { damage: 0, distance: target.distance, hitZone: target.hitZone };
+      const total = hits.get(target.zombieId) ?? { damage: 0, distance: target.distance, hitZone: target.hitZone,
+        part: target.part, point: target.point, direction: pelletRay.direction };
       total.damage += definition.damage * hitZoneMultiplier(definition, target.hitZone)
         * (penetration?.damageRetention ?? 1) ** index;
-      total.distance = Math.min(total.distance, target.distance);
-      if (target.hitZone === 'head') total.hitZone = 'head';
+      // The hit that is reported is the nearest pellet's, or a headshot's if any pellet struck the head.
+      if (target.distance < total.distance) Object.assign(total, { distance: target.distance, point: target.point, part: target.part });
+      if (target.hitZone === 'head' && total.hitZone !== 'head') Object.assign(total, { hitZone: 'head', part: 'head', point: target.point });
       hits.set(target.zombieId, total);
     });
     if (hit.kind === 'zombie' && targets.length < (penetration?.maxTargets ?? 1)) {
@@ -563,10 +573,12 @@ export function firePlayerWeapon(
     const zombie = zombies.find((candidate) => candidate.id === zombieId && candidate.alive);
     if (!zombie) continue;
     const applied = Math.min(zombie.health, instaKill ? zombie.health : Math.round(hit.damage));
+    const healthBefore = zombie.health;
     zombie.health -= applied;
     events.push({
       type: 'weaponHit', playerId: player.id, weaponId: definition.id,
       zombieId: zombie.id, damage: applied, distance: hit.distance, hitZone: hit.hitZone,
+      part: hit.part, point: hit.point, direction: hit.direction,
     });
     events.push({ type: 'zombieDamaged', zombieId: zombie.id, playerId: player.id, damage: applied, health: zombie.health });
     if (zombie.health === 0) {
@@ -574,6 +586,8 @@ export function firePlayerWeapon(
       zombie.velocity = { x: 0, y: 0, z: 0 };
       events.push({ type: 'zombieDied', zombieId: zombie.id, playerId: player.id, method: hit.hitZone });
     }
+    events.push(...dismember(zombie, { source: 'bullet', credit: player.id, damage: applied, healthBefore, part: hit.part, point: hit.point,
+      direction: hit.direction, gibs: definition.gibs !== false && !definition.chain }));
   }
   for (const [hazardId, hit] of hazardHits) {
     const target = hazards.find(candidate => candidate.state.id === hazardId);
@@ -604,8 +618,8 @@ export function meleeAttack(player: PlayerState, zombies: readonly ZombieState[]
   const events: WeaponEvent[] = [{ type: 'meleeSwung', playerId: player.id }];
   const ray = rayFromPlayer(player, 1.3);
   const candidates = zombies.filter(zombie => zombie.alive).map(zombie => {
-    const offset = { x: zombie.position.x - ray.origin.x, y: zombie.position.y + 1.1 - ray.origin.y,
-      z: zombie.position.z - ray.origin.z };
+    const chest = zombieChest(zombie);
+    const offset = { x: chest.x - ray.origin.x, y: chest.y - ray.origin.y, z: chest.z - ray.origin.z };
     const distance = Math.hypot(offset.x, offset.y, offset.z);
     const direction = distance > 0 ? normalize(offset) : ray.direction;
     const facing = direction.x * ray.direction.x + direction.y * ray.direction.y + direction.z * ray.direction.z;

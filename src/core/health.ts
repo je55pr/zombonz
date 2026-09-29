@@ -17,6 +17,7 @@ export function maxPlayerHealth(player: PlayerState): number {
 }
 
 export function tickPlayerRecovery(player: PlayerState): DamageEvent[] {
+  if (player.hurtGraceTicks > 0) player.hurtGraceTicks -= 1;
   if (!player.alive || player.downed) return [];
   if (player.recoveryDelayTicks > 0) { player.recoveryDelayTicks -= 1; return []; }
   const maximum = maxPlayerHealth(player);

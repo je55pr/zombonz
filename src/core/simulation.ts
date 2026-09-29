@@ -41,10 +41,10 @@ import {
 import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
 import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
-import { SeededRng } from './rng.ts';
+import { SeededRng, mix32 } from './rng.ts';
 import {
-  createZombieState, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound,
-  type ZombieAttackEvent,
+  createZombieState, separateZombies, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
+  type ZombieMeleeEvent,
 } from './zombie.ts';
 import {
   beginReload, createWeaponState, firePlayerWeapon, meleeAttack, rayFromPlayer, tickWeaponState, wantsToFire, switchWeapon,
@@ -73,6 +73,8 @@ export interface SimulationMap {
   hazards?: readonly HazardDefinition[];
   /** Equipment (Bouncing Betties) sold from the wall. */
   equipment?: readonly EquipmentBuyDefinition[];
+  /** How likely each look (see `ZombieState.variant`) is for a new zombie; a map with none has only the first. */
+  zombieLooks?: readonly number[];
 }
 
 export interface SimulationState {
@@ -113,7 +115,7 @@ export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
 
-export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieAttackEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
+export type SimulationEvent = RoundEvent | ZombieSpawnedEvent | ZombieMeleeEvent | DamageEvent | WeaponEvent | EconomyEvent | InteractionEvent | DoorEvent | WallWeaponEvent | MysteryBoxEvent | BarrierEvent | PowerupEvent | GrenadeEvent | MatchRestartedEvent
   | PowerEvent | PerkEvent | TrapEvent | DownEvent | HazardEvent | EquipmentEvent;
 export type PlayerInputFrames = Readonly<Partial<Record<EntityId, InputFrame>>>;
 
@@ -280,6 +282,26 @@ export class GameSimulation {
   /** The hazards that can be shot or hurt right now. */
   hazardTargets() { return hazardTargets(this.map.hazards ?? [], this.state.hazards); }
 
+  /**
+   * A zombie that loses its legs on its way up a wall cannot hold on (a crawler drags itself along, and never climbs): it
+   * falls, dead, and the player who shot them off is credited with it. Returns those deaths, to be scored like any kill.
+   */
+  private dropCrawlingClimbers(events: readonly SimulationEvent[]): SimulationEvent[] {
+    const deaths: SimulationEvent[] = [];
+    for (const event of events) {
+      if (event.type !== 'zombieDismembered' || !event.crawler) continue;
+      const zombie = this.state.world.entities[event.zombieId];
+      if (zombie?.kind !== 'zombie' || !zombie.alive || zombie.entry?.phase !== 'approach') continue;
+      const barrier = this.state.barriers.find(candidate => candidate.id === zombie.entry!.barrierId);
+      const path = barrier?.approachPath ?? [];
+      if (!path.some((point, index) => index > 0 && Math.abs(point.y - path[index - 1].y) > 0.05)) continue;
+      zombie.health = 0; zombie.alive = false; zombie.velocity = { x: 0, y: 0, z: 0 };
+      zombie.position = { ...zombie.position, y: Math.min(...path.map(point => point.y)) };
+      deaths.push({ type: 'zombieDied', zombieId: zombie.id, playerId: event.playerId, method: 'fall' });
+    }
+    return deaths;
+  }
+
   /** Every player entity, dead or alive. */
   players(): PlayerState[] {
     return this.playerIds.map(id => this.getPlayer(id)).filter((player): player is PlayerState => !!player);
@@ -436,6 +458,7 @@ export class GameSimulation {
         world.seed ^ world.tick,
         this.hazardTargets(),
       );
+      weaponEvents.push(...this.dropCrawlingClimbers(weaponEvents) as typeof weaponEvents);
       events.push(...weaponEvents);
       events.push(...awardCombatPoints(player, weaponEvents, this.economyConfig,
         this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
@@ -453,6 +476,7 @@ export class GameSimulation {
         walls, instaKill, targets));
       if (burning) blastEvents.push(...tickHazards(this.map.hazards ?? [], this.state.hazards,
         { zombies: this.zombies(), players: livingPlayers(world), boxes: walls, instaKill }));
+      blastEvents.push(...this.dropCrawlingClimbers(blastEvents));
       events.push(...blastEvents);
       const blastCombat = blastEvents.filter((event): event is WeaponEvent =>
         event.type === 'grenadeHit' || event.type === 'zombieDamaged' || event.type === 'zombieDied');
@@ -505,8 +529,18 @@ export class GameSimulation {
         const source = availableSpawns[request.spawnIndex];
         const round = this.state.round.round;
         const gait = zombieGaitForRound(round, new SeededRng(world.seed ^ Math.imul(Number(id.slice(2)), 0x85ebca6b)));
-        const zombie = createZombieState(id, request.position, round, gait);
-        if (source.spawn.barrierId) zombie.entry = createZombieEntry(source.spawn.barrierId, this.state.spawnDirector.spawned - 1);
+        const variant = zombieLookFor(this.map.zombieLooks, new SeededRng(mix32(world.seed ^ Math.imul(Number(id.slice(2)), 0x9e3779b1))));
+        const zombie = createZombieState(id, request.position, round, gait, variant);
+        if (source.spawn.barrierId) {
+          const barrier = this.state.barriers.find(barrier => barrier.id === source.spawn.barrierId)!;
+          zombie.entry = createZombieEntry(barrier.id, this.state.spawnDirector.spawned - 1);
+          // It comes out of the dark already looking at its window.
+          const next = barrier.approachPath[1] ?? barrier.position;
+          zombie.yaw = Math.atan2(next.x - request.position.x, next.z - request.position.z);
+        } else {
+          const nearest = livingPlayers(world)[0];
+          if (nearest) zombie.yaw = Math.atan2(nearest.position.x - request.position.x, nearest.position.z - request.position.z);
+        }
         addEntity(world, zombie);
         events.push({
           type: 'zombieSpawned', zombieId: id, round: this.state.round.round,
@@ -536,6 +570,7 @@ export class GameSimulation {
       );
       events.push(...tickZombieMelee(zombie, players, this.collisionBoxes()));
     }
+    separateZombies(zombies, players, this.collisionBoxes(), this.map.walkSurfaces);
     if (this.state.traps.length) {
       events.push(...tickTraps(this.state.traps, this.zombies(), livingPlayers(world), world.tick));
       syncTrapInteractables(this.state.traps, this.interactables(), this.state.power.on);

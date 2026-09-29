@@ -26,3 +26,6 @@ export * from './equipment.ts';
 export * from './perks.ts';
 export * from './traps.ts';
 export * from './downs.ts';
+export * from './zombieBody.ts';
+export * from './zombieMelee.ts';
+export * from './gore.ts';

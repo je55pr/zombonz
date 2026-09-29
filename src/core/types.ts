@@ -39,6 +39,8 @@ export interface PlayerState extends EntityBase {
   health: number;
   recoveryDelayTicks: number;
   meleeCooldownTicks: number;
+  /** After a zombie's blow lands, ticks during which no other zombie's can (see ZOMBIE_MELEE.hurtGraceTicks). */
+  hurtGraceTicks: number;
   grenadeCharges: number;
   /** Bouncing Betties carried (see MINE_RULES). */
   mineCharges: number;
@@ -75,6 +77,16 @@ export interface ZombieState extends EntityBase {
   targetId: EntityId | null;
   entry: ZombieEntryState | null;
   deadTicks: number;
+  /** Which way it faces, in radians, as the renderer turns a model (0 faces +z). */
+  yaw: number;
+  /** Its look, chosen when it spawned: which model it is drawn with, and so where its body is (see zombieBody.ts). */
+  variant: number;
+  /** Limbs it has lost, as bits of LIMB; a zombie with a leg gone is a crawler. */
+  limbs: number;
+  /** Ticks into the current melee swing, or 0 when it is not swinging. */
+  attackTicks: number;
+  /** Which of its model's swings the current one is. */
+  attackStyle: number;
 }
 export interface InteractableState extends EntityBase {
   kind: 'interactable';

@@ -1,6 +1,7 @@
 import { moveWithCollision, type CollisionBox } from './collision.ts';
 import { ANY_FACING, createInteractableState } from './interaction.ts';
-import { SeededRng } from './rng.ts';
+import { SeededRng, hashString as idHash, mix32 } from './rng.ts';
+import { faceToward, zombieSpeed } from './zombieBody.ts';
 import type { EntityId, InteractableState, Vec3, ZombieState } from './types.ts';
 
 /** `climbSpeed` (m/s) is how fast a zombie climbs a wall on its way in, such as onto a roof below an upstairs window. */
@@ -56,19 +57,6 @@ export function boardMask(barrier: Pick<BarrierState, 'boards' | 'mask' | 'maxBo
 export function restoreBarrier(barrier: BarrierState): void {
   barrier.boards = barrier.maxBoards; barrier.mask = fullBoardMask(barrier.maxBoards);
   barrier.repairTicks = 0; barrier.repairerId = null;
-}
-
-/** Scrambles every bit, so seeds that differ only slightly still pick differently. */
-function mix32(value: number): number {
-  let h = value >>> 0;
-  h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16;
-  return h >>> 0;
-}
-
-function idHash(id: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < id.length; i++) hash = Math.imul(hash ^ id.charCodeAt(i), 0x01000193);
-  return hash >>> 0;
 }
 
 /**
@@ -129,7 +117,7 @@ function moveToward(zombie: ZombieState, point: Vec3, dt: number, boxes: readonl
   const dx = point.x - zombie.position.x, dz = point.z - zombie.position.z;
   const distance = Math.hypot(dx, dz);
   if (distance < 0.025) { stop(zombie); return true; }
-  const step = Math.min(distance, zombie.moveSpeed * dt);
+  const step = Math.min(distance, zombieSpeed(zombie) * dt);
   const delta = { x: dx / distance * step, y: 0, z: dz / distance * step };
   const next = moveWithCollision(zombie.position, delta, 0.32, 1.72, boxes);
   zombie.velocity = { x: (next.x - zombie.position.x) / dt, y: 0, z: (next.z - zombie.position.z) / dt };
@@ -168,6 +156,7 @@ export function updateZombieEntry(zombie: ZombieState, barrier: BarrierState,
       z: waypoint.z - barrier.outward.x * entry.lane };
     // Any difference in height is a climb, which ends exactly at the waypoint's height.
     const arrived = point.y !== zombie.position.y ? climbToward(zombie, point, dt) : moveToward(zombie, point, dt, boxes);
+    if (Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0.05) faceToward(zombie, Math.atan2(zombie.velocity.x, zombie.velocity.z), dt);
     if (arrived) {
       entry.waypointIndex += 1;
       if (entry.waypointIndex >= barrier.approachPath.length) {
@@ -176,6 +165,8 @@ export function updateZombieEntry(zombie: ZombieState, barrier: BarrierState,
     }
     return [];
   }
+  // Tearing boards and crossing the sill, a zombie faces into the room.
+  faceToward(zombie, Math.atan2(-barrier.outward.x, -barrier.outward.z), dt);
   if (entry.phase === 'breaking') {
     stop(zombie);
     entry.phaseTicks += 1;

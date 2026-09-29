@@ -40,6 +40,8 @@ function runSmokeScenario() {
   const fireTicks = new Set([2, 14, 26]);
   runHeadlessTicks(simulation, 40, (tick) => {
     const frame = createInputFrame(tick);
+    // Down the sights: a hip-fired pistol wanders too far at this range to make the kill repeatable by luck.
+    frame.actions.aim = { held: true, pressed: false, released: false, value: 1 };
     if (fireTicks.has(tick)) {
       frame.actions.fire = {
         held: true,
@@ -68,7 +70,7 @@ describe('deterministic smoke scenario', () => {
       weapon: { magazineAmmo: 5, reserveAmmo: 32 },
     });
     expect(state.round.phase).toBe('intermission');
-    // Includes movement stance, sprint stamina, earned-points and power-up drop tracking, survival timers/reward tracking, zombie gait and walk speed, spread bloom, spawn cadence, an aimed body-shot kill, and (empty) power, perk, trap, hazard, mine, last-stand and departed-player state.
-    expect(fnv1a(JSON.stringify(state))).toBe('3c23d441');
+    // Includes movement stance, sprint stamina, earned-points and power-up drop tracking, survival timers/reward tracking, zombie gait, walk speed, facing, look, lost limbs and swing, spread bloom, spawn cadence, an aimed body-shot kill, and (empty) power, perk, trap, hazard, mine, last-stand and departed-player state.
+    expect(fnv1a(JSON.stringify(state))).toBe('6067a809');
   });
 });

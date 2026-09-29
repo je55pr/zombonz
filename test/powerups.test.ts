@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { collectPowerups, createBarrier, createPlayerState, createPowerupState, createWeaponState,
   createZombieState, tickPowerupLifetime, tryDropPowerup, GameSimulation, createInputFrame,
   addEntity, damagePlayer, DEFAULT_POWERUP_CONFIG, startPowerupRound, updatePowerupThreshold,
-  type PowerupConfig } from '../src/core/index.ts';
+  zombieHeadCentre, type PowerupConfig } from '../src/core/index.ts';
+import { aimedFire } from './aim.ts';
 
 const forced: PowerupConfig = { ...DEFAULT_POWERUP_CONFIG, randomDropPercent: 100, kinds: ['maxAmmo'] };
 
@@ -68,9 +69,9 @@ describe('timed power-ups', () => {
       roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 } });
     const player = sim.getPlayer(sim.playerIds[0])!;
     player.weapon = createWeaponState('kar98k'); player.weapon.reserveAmmo = 2;
-    addEntity(sim.state.world, createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1));
-    const fire = createInputFrame(0);
-    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    const target = createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1);
+    addEntity(sim.state.world, target);
+    const fire = aimedFire(player, zombieHeadCentre(target));
     expect(sim.tick({ [player.id]: fire }).map(event => event.type)).toContain('powerupSpawned');
     expect(sim.state.powerups.drops).toHaveLength(1);
     player.position.z = -2.5;
@@ -101,9 +102,9 @@ describe('timed power-ups', () => {
     const player = sim.getPlayer(sim.playerIds[0])!;
     player.weapon = createWeaponState('kar98k');
     sim.state.powerups.doublePointsTicksRemaining = 2;
-    addEntity(sim.state.world, createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1));
-    const fire = createInputFrame(0);
-    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    const first = createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1);
+    addEntity(sim.state.world, first);
+    const fire = aimedFire(player, zombieHeadCentre(first));
     sim.tick({ [player.id]: fire });
     expect(player.points).toBe(700); // Headshot kill: (10 hit + 90 bonus) × 2.
     player.weapon.cooldownTicks = 0;
@@ -132,8 +133,7 @@ describe('timed power-ups', () => {
     sim.state.powerups.instaKillTicksRemaining = 2;
     const first = createZombieState('e:99', { x: 0, y: 0, z: -3 }, 12);
     addEntity(sim.state.world, first);
-    const fire = createInputFrame(0);
-    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
+    const fire = aimedFire(player, zombieHeadCentre(first));
     sim.tick({ [player.id]: fire });
     expect(first.alive).toBe(false);
     player.weapon.cooldownTicks = 0;
@@ -142,7 +142,7 @@ describe('timed power-ups', () => {
     addEntity(sim.state.world, second);
     sim.tick({ [player.id]: fire });
     expect(second.alive).toBe(true);
-    expect(second.health).toBe(secondHealth - 150);
+    expect(second.health).toBe(secondHealth - 100);
   });
 
   it('detonates a Nuke before zombie attacks and awards a flat team bonus', () => {
@@ -221,10 +221,9 @@ describe('classic power-up drop rules', () => {
     player.points = 0;
     player.pointsEarned = 2505;
     player.weapon = createWeaponState('kar98k');
-    addEntity(sim.state.world, createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1));
-    const fire = createInputFrame(0);
-    fire.actions.fire = { held: true, pressed: true, released: false, value: 1 };
-    const events = sim.tick({ [player.id]: fire });
+    const target = createZombieState('e:99', { x: 0, y: 0, z: -3 }, 1);
+    addEntity(sim.state.world, target);
+    const events = sim.tick({ [player.id]: aimedFire(player, zombieHeadCentre(target)) });
     expect(player.pointsEarned).toBeGreaterThan(2500);
     expect(events.map(event => event.type)).toContain('powerupSpawned');
   });
