@@ -1,4 +1,4 @@
-import { CodeError, buildSdp, candidateLines, decodeSession, encodeSession, parseSdp } from './codes.ts';
+import { CodeError, buildSdp, decodeSession, encodeSession, parseSdp } from './codes.ts';
 import { Listeners, type PeerLink } from './link.ts';
 import type { DeliveryClass, TransportPayload } from './transport.ts';
 
@@ -12,8 +12,10 @@ const GATHER_TIMEOUT_MS = 4000;
 /**
  * Both sides must start connecting at about the same moment. A browser sends its first probes as soon as it has both halves of
  * the exchange, and its router drops what comes back until the other side has sent something too, so whoever starts first sends
- * into a wall, and gives up after roughly ten seconds. Pasting a code into a chat takes a person longer than that. So the joiner
- * names a start time in its reply, holds the host's addresses back until then, and the host waits for it too.
+ * into a wall, and gives up after a few seconds (Chrome about ten, Firefox five). Pasting a code into a chat takes a person longer
+ * than that. So each side makes an offer of its own and does not apply the other's until a start time, which the joiner names in
+ * its reply. Neither has a remote end before then, so neither browser has anything to try, or to give up on.
+ * (Giving the joiner the host's offer early but withholding its addresses does not work: Firefox fails after five seconds of that.)
  */
 export const START_DELAY_MS = 45000;
 /** A host this late still starts at once: the joiner has only been trying for a moment. */
@@ -203,7 +205,8 @@ export async function createInvite(): Promise<PendingInvite> {
       const opened = linkWhenOpen(pc, channels, timeoutMs, HOST_FAILURE);
       opened.catch(() => {}); // Reported through the returned promise.
       try {
-        await pc.setRemoteDescription({ type: 'answer', sdp: buildSdp(session) });
+        // The joiner's session is an offer of its own, used here as the answer to ours: the host is the DTLS server, the joiner the client.
+        await pc.setRemoteDescription({ type: 'answer', sdp: buildSdp({ ...session, setup: 'active' }) });
       } catch {
         pc.close();
         throw new CodeError('That reply code could not be used. Ask your friend to send it again.');
@@ -217,31 +220,31 @@ export async function createInvite(): Promise<PendingInvite> {
 
 export async function answerInvite(inviteCode: string, options: { timeoutMs?: number; startDelayMs?: number } = {}): Promise<PendingJoin> {
   const { timeoutMs = CONNECT_TIMEOUT_MS, startDelayMs = START_DELAY_MS } = options;
-  const session = decodeSession('invite', inviteCode);
+  const host = decodeSession('invite', inviteCode);
   const log = new ConnectionLog();
   const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   watch(pc, log);
   const channels = openChannels(pc);
-  try {
-    // The host's addresses are held back, so this browser has nothing to try (and nothing to give up on) until the start time.
-    await pc.setRemoteDescription({ type: 'offer', sdp: buildSdp(session, { candidates: false }) });
-  } catch {
-    pc.close();
-    throw new CodeError('That invite code could not be used. Ask the host for a new one.');
-  }
-  await pc.setLocalDescription(await pc.createAnswer());
+  // An offer of its own, like the host's: with no remote end yet the browser has nothing to try, so nothing to give up on.
+  await pc.setLocalDescription(await pc.createOffer());
   await gatherCandidates(pc);
+  const own = parseSdp(pc.localDescription!.sdp);
   const offset = await clockOffset();
   const startsAt = Date.now() + startDelayMs;
-  const reply = encodeSession('reply', { ...parseSdp(pc.localDescription!.sdp), start: Math.round(startsAt + offset) });
-  log.add(`reply made: ${parseSdp(pc.localDescription!.sdp).candidates.map(candidate => candidate.type).join(', ')}; clock ${offset >= 0 ? 'behind' : 'ahead'} by ${Math.abs(Math.round(offset))} ms; starting in ${(startDelayMs / 1000).toFixed(0)} s`);
-  const release = setTimeout(() => {
-    log.add('starting');
-    for (const line of candidateLines(session)) pc.addIceCandidate({ candidate: line, sdpMid: session.mid, sdpMLineIndex: 0 }).catch(() => {});
-    // An empty candidate says there are no more.
-    pc.addIceCandidate({ candidate: '', sdpMid: session.mid, sdpMLineIndex: 0 }).catch(() => {});
-  }, startDelayMs);
-  const connected = linkWhenOpen(pc, channels, startDelayMs + timeoutMs, JOIN_FAILURE);
+  const reply = encodeSession('reply', { ...own, start: Math.round(startsAt + offset) });
+  log.add(`reply made: ${own.candidates.map(candidate => candidate.type).join(', ')}; clock ${offset >= 0 ? 'behind' : 'ahead'} by ${Math.abs(Math.round(offset))} ms; starting in ${(startDelayMs / 1000).toFixed(0)} s`);
+  let unusable: (error: Error) => void = () => {};
+  const rejected = new Promise<never>((_, reject) => { unusable = reject; });
+  const connected = Promise.race([linkWhenOpen(pc, channels, startDelayMs + timeoutMs, JOIN_FAILURE), rejected]);
   connected.catch(() => {}); // Reported through the returned promise.
-  return { reply, startsAt, connected, log: () => log.text(), cancel: () => { clearTimeout(release); pc.close(); } };
+  const timer = setTimeout(() => {
+    log.add('starting');
+    // The host's invite is used here as the answer to our offer: the host is the DTLS server, this side the client.
+    pc.setRemoteDescription({ type: 'answer', sdp: buildSdp({ ...host, setup: 'passive' }) }).catch(() => {
+      log.add('the invite could not be used');
+      pc.close();
+      unusable(new CodeError('That invite code could not be used. Ask the host for a new one.'));
+    });
+  }, startDelayMs);
+  return { reply, startsAt, connected, log: () => log.text(), cancel: () => { clearTimeout(timer); pc.close(); } };
 }

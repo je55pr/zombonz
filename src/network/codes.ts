@@ -4,10 +4,11 @@
  * fingerprint, the media id, the setup role and the candidate addresses. Those pack into about 90
  * bytes, and the far side rebuilds a minimal SDP from them.
  *
- * A reply code also carries the moment both sides start connecting (`start`): the joiner picks it, and the host waits for it
- * before it begins. Connecting has to begin at both ends at about the same time, because each end's router drops what the
- * other sends until it has sent something of its own, and a browser gives up after roughly ten seconds. Pasting a code takes
- * a human much longer than that.
+ * Both codes describe a connection that has not met its other end: each side makes an offer, and neither applies what the other
+ * sent until the moment both sides start connecting. That moment is in the reply code (`start`): the joiner picks it, and the
+ * host waits for it too. Connecting has to begin at both ends at about the same time, because each end's router drops what the
+ * other sends until it has sent something of its own, and a browser gives up after a few seconds (Firefox after five, if it has
+ * nothing to try). Pasting a code takes a human much longer than that.
  */
 export type CodeKind = 'invite' | 'reply';
 export type CandidateType = 'host' | 'srflx' | 'prflx' | 'relay';
@@ -59,20 +60,8 @@ export function parseSdp(sdp: string): CompactSession {
   return { ufrag, pwd, fingerprint: new Uint8Array(bytes), setup, mid, candidates };
 }
 
-/** The session's candidates as the lines a browser's `addIceCandidate` takes (no `a=`). */
-export function candidateLines(session: CompactSession): string[] {
-  return session.candidates.map((candidate, index) => {
-    const priority = TYPE_PREFERENCE[candidate.type] * 2 ** 24 + (65535 - index) * 2 ** 8 + 255;
-    return `candidate:${index + 1} 1 udp ${priority} ${candidate.address} ${candidate.port} typ ${candidate.type}`;
-  });
-}
-
-/**
- * The minimal SDP a browser accepts for one data-channel section. With `candidates: false` it names no addresses and does not say
- * the list is complete, so the browser has nothing to try and waits (it is not failing) until `addIceCandidate` supplies them.
- */
-export function buildSdp(session: CompactSession, options: { candidates?: boolean } = {}): string {
-  const withCandidates = options.candidates !== false;
+/** The minimal SDP a browser accepts for one data-channel section. */
+export function buildSdp(session: CompactSession): string {
   const hex = [...session.fingerprint].map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(':');
   const lines = [
     'v=0', 'o=- 4611731400430051336 2 IN IP4 127.0.0.1', 's=-', 't=0 0',
@@ -81,7 +70,11 @@ export function buildSdp(session: CompactSession, options: { candidates?: boolea
     `a=ice-ufrag:${session.ufrag}`, `a=ice-pwd:${session.pwd}`, 'a=ice-options:trickle',
     `a=fingerprint:sha-256 ${hex}`, `a=setup:${session.setup}`, `a=mid:${session.mid}`,
     'a=sctp-port:5000', 'a=max-message-size:262144',
-    ...(withCandidates ? [...candidateLines(session).map(line => `a=${line}`), 'a=end-of-candidates'] : []),
+    ...session.candidates.map((candidate, index) => {
+      const priority = TYPE_PREFERENCE[candidate.type] * 2 ** 24 + (65535 - index) * 2 ** 8 + 255;
+      return `a=candidate:${index + 1} 1 udp ${priority} ${candidate.address} ${candidate.port} typ ${candidate.type}`;
+    }),
+    'a=end-of-candidates',
   ];
   return `${lines.join('\r\n')}\r\n`;
 }
