@@ -53,6 +53,14 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
   that is mid-swing is not counted as stalled (it is busy, not stuck); one swinging on the spot holds its ground while one
   swinging on the move is jostled like any other; and separation now runs as up to four passes (stopping as soon as nothing
   is more than 5 mm off), because a queue pressing on a zombie that holds its ground could not be settled in one.
+- **The blow has a window** (`ZOMBIE_MELEE.hitWindow`, `advanceSwing`). The blow was a single-tick check at contact, so a
+  player in reach the tick before and out of it on the tick, or arriving a tick late, was missed however close it looked. It now
+  lands at contact on whoever is in reach then, and also on whoever was in reach in the 4 ticks before and has stepped out, and
+  whoever comes into reach in the 8 ticks after. A standing player is hit on the same tick as before; a dodge has to be made a
+  little sooner (4 ticks, about 70 ms). Each swing is still one blow (`ZombieState.blow`, host-only).
+  What it does not do is reach further: running past a zombie at arm's length is hit 100% of the time at 1.2 m or closer and
+  0% at 1.4 m or further, with the window or without it (`ZOMBIE_MELEE.reach.strikeRange` is 1.3 m), and a player who
+  is passing is already met by the early swing. If blows that look close still miss, that distance is the number to look at.
 - **Zombies read where you are going** (`willConnect` in `tickZombieMelee`, `ZOMBIE_MELEE.anticipation`). A zombie also
   starts its swing when the player, at the speed and heading they have now, and it, still coming, will be within strike range
   as the blow lands, so it begins about 3 m out for a player running at it and the blow arrives with them. It looks at most
@@ -126,6 +134,7 @@ begins, dodges it (and the zombie swings at nothing).
 | `ZOMBIE_GIVE` | 0.3 | How much a free zombie yields to a shoulder; 0 makes every zombie a wall. |
 | `WEDGE_DEPTH` | 0.05 m | How deep in the bodies round them a player is before they are stopped where they were. |
 | `ZOMBIE_MELEE.anticipation` | 2 m | How far ahead a zombie reads (the two's travel while it winds up): it never starts a swing from further out than reach plus this, about 3.3 m. Raise it and it swings from further out and catches more feints. |
+| `ZOMBIE_MELEE.hitWindow` | 4 before, 8 after (ticks) | How long the blow is live around contact: raise either and more near-misses land; both 0 is the old one-tick check. |
 | `ARRIVED` | touching plus 4 cm | How near a zombie gets before it stops closing on its target. |
 | rest of `ZOMBIE_MELEE` (`zombieMelee.ts`) | unchanged | Wind-ups, recoveries, reach, arcs and the hurt grace: how long a player in contact survives. |
 
