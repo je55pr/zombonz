@@ -118,6 +118,7 @@ describe.each(Object.values(MAPS) as GameMap[])('$name’s Bouncing Betties', ma
       expect(sim.interactionCandidate(player.id)?.prompt, buy.id).toContain(`[${buy.cost}]`);
       const bought = press(sim, 'interact');
       expect(bought.map(event => event.type), buy.id).toContain('equipmentPurchased');
+      expect(player.bouncingBettyOwned).toBe(true);
       expect(player.mineCharges).toBe(EQUIPMENT_ITEMS['bouncing-betty'].perPurchase);
       expect(player.points).toBe(200);
       // A full pair is not sold to again.

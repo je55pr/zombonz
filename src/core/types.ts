@@ -50,6 +50,8 @@ export interface PlayerState extends EntityBase {
   grenadeCharges: number;
   /** Bouncing Betties carried (see MINE_RULES). */
   mineCharges: number;
+  /** Whether this player has purchased Bouncing Betties this match, even if none are currently carried. */
+  bouncingBettyOwned: boolean;
   repairRewardRound: number;
   repairPointsEarned: number;
   points: number;
