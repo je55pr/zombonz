@@ -53,13 +53,15 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
   that is mid-swing is not counted as stalled (it is busy, not stuck); one swinging on the spot holds its ground while one
   swinging on the move is jostled like any other; and separation now runs as up to four passes (stopping as soon as nothing
   is more than 5 mm off), because a queue pressing on a zombie that holds its ground could not be settled in one.
-- **The blow has a window** (`ZOMBIE_MELEE.hitWindow`, `advanceSwing`). The blow was a single-tick check at contact, so a
-  player in reach the tick before and out of it on the tick, or arriving a tick late, was missed however close it looked. It now
-  lands at contact on whoever is in reach then, and also on whoever was in reach in the 4 ticks before and has stepped out, and
-  whoever comes into reach in the 8 ticks after. A standing player is hit on the same tick as before; a dodge has to be made a
-  little sooner (4 ticks, about 70 ms). Each swing is still one blow (`ZombieState.blow`, host-only).
+- **The blow is a swipe, live from contact to the end of the swing** (`advanceSwing`). The blow was a single-tick check at
+  contact, so a player in reach the tick before and out of it on the tick, or arriving a tick late, was missed however close it
+  looked. It is now live from the end of the wind-up, when the arm comes down, to the end of the swing, which is about half the
+  animation (51 to 68%: the wind-up is 22 to 54 ticks and what follows 35 to 65), and lands once on whoever is in reach at any
+  point in it. A standing player is hit on the same tick as before; a player who has left before contact is missed; one who comes
+  into reach later in the swipe is hit. (The first version was 4 ticks either side of contact with a lead-in; the whole swipe
+  replaced it.) `ZombieState.struck` is whether the swing's blow has landed (host-only).
   What it does not do is reach further: with the reach then at 1.3 m, running past a zombie at arm's length was hit 100% of
-  the time at 1.2 m or closer and 0% at 1.4 m or further, with the window or without it, because a player who is passing is
+  the time at 1.2 m or closer and 0% at 1.4 m or further, with a short window or none, because a player who is passing is
   already met by the early swing. (The reach was raised afterwards, below.)
 - **Reach 1.5 m, grace 0.3 s, a wider swarm** (tuned after the window). `ZOMBIE_MELEE.reach.strikeRange` is 1.5 m (a crawler's 1.3), so
   running past a zombie at arm's length is now hit at up to 1.4 m and missed from 1.5 m. A landed blow gives the player 18 ticks
@@ -142,7 +144,7 @@ begins, dodges it (and the zombie swings at nothing).
 | `ZOMBIE_MELEE.reach.strikeRange` | 1.5 m (crawler 1.3) | How far a blow lands from. Raise it and more near-misses connect and more of a crowd reaches over its front row. |
 | `ZOMBIE_MELEE.hurtGraceTicks` | 18 (0.3 s) | How long a player is safe from every other zombie after a blow: lower it and a crowd's blows come faster. |
 | `ZOMBIE_SPACING` | 0.72 m | How far apart zombies keep their middles: a bigger number makes a wider, looser swarm. |
-| `ZOMBIE_MELEE.hitWindow` | 4 before, 8 after (ticks) | How long the blow is live around contact: raise either and more near-misses land; both 0 is the old one-tick check. |
+| `ZOMBIE_MELEE.swing` (wind-up and recovery ticks by gait) | walk 42 + 54, run 30 + 42, sprint 22 + 34 (each plus up to 12 and 10 of a zombie's own tempo) | The blow is live from the end of the wind-up to the end of the recovery, so the recovery is how long it is live: lengthen it and the swipe (and the time before the zombie can swing again) gets longer. |
 | `ARRIVED` | touching plus 4 cm | How near a zombie gets before it stops closing on its target. |
 | rest of `ZOMBIE_MELEE` (`zombieMelee.ts`) | unchanged | Wind-ups, recoveries, reach, arcs and the hurt grace: how long a player in contact survives. |
 

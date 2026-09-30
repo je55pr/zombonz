@@ -102,11 +102,12 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
   their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
   zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). The blow is aimed where the player is when it lands,
   so a player who steps back out of reach in the wind-up is missed.
-- **The blow has a window, not one tick** (issue #210). It lands at contact, the tick the arm comes down (the wind-up's end), on
-  whoever is in reach then; but also on someone who was in reach during the 4 ticks before it and has stepped out by contact, and
-  on someone who comes into reach up to 8 ticks after it, as the arm follows through: twelve ticks, a fifth of a second. A player
-  standing in reach is hit on exactly the contact tick as before; one who steps out has to be out of reach a little sooner to
-  dodge. It is still one blow a swing (whoever it lands on), and a blow that arrives in another zombie's grace still waits.
+- **The blow is a swipe, not one tick** (issue #210). It is live from contact, the tick the arm comes down at the end of the
+  wind-up, to the end of the swing: about half the animation, a little more (51 to 68%, depending on the gait and the zombie's own tempo, from 35 to 65
+  ticks). Whoever is in reach at any point in that stretch is hit, the moment they are in it, once: a swing is one blow, whoever
+  it lands on. A player standing in reach is hit on exactly the contact tick; one who steps out before contact is missed, one who
+  comes into reach later in the swipe is not. A blow that finds the player in another zombie's grace lands when the grace ends,
+  if they are still in reach and the swing is not over (the arm does not stop and wait).
 - **A zombie keeps coming while it swings, and reads where the player is going** (issue #210). A swing is a lunge on the move,
   not a halt: the zombie closes on the player through the wind-up and the recovery, and stops only when it touches them (it
   never pushes them along). It also starts a swing when the player, at the speed and heading they have now, and it, still
