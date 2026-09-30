@@ -276,10 +276,11 @@ round with 24 zombies encodes to under 16 KB.
 
 Development builds expose `window.zombonz` (`{ simulation, playerId, net }`) for inspection.
 
+For browser-level regression coverage, `npm run test:e2e` starts the local room server plus Vite, opens two isolated Chromium contexts, connects them through the actual signalling/WebRTC path, starts a two-player match and verifies client movement reaches the host and reconciles back. Failures retain a trace, screenshot and JSON page/network log.
+
 ## Not yet
 
 - Room-code signalling is done (see [server-setup.md](server-setup.md)); game discovery or a public lobby list would be separate future work.
 - A TURN relay for networks that block direct connections (#46).
 - A reconnect UI for the copy-paste fallback; room-code games can already reclaim a reserved slot after a drop.
-- An automated two-browser test (#44).
 - A fuller in-game diagnostics overlay (#45); for now there is a ping readout, and the connection test above.

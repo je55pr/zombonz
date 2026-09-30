@@ -196,8 +196,17 @@ async function downloadGame(view: MenuView): Promise<void> {
   }
 }
 
+const query = new URLSearchParams(location.search);
+// Development-only browser integration harness. It skips all rendering/assets and exercises the real room + WebRTC + netcode path.
+if (import.meta.env.DEV && query.get('e2e') === 'multiplayer') {
+  void import('./e2e/multiplayerHarness.ts').then(module => module.bootMultiplayerHarness())
+    .catch(error => {
+      console.error('Multiplayer E2E harness failed', error);
+      document.body.dataset.e2ePhase = 'failed';
+      document.body.dataset.e2eLog = error instanceof Error ? error.stack ?? error.message : String(error);
+    });
 // Development inspection URLs (?preview=...) skip the menu and open the map directly.
-if (import.meta.env.DEV && new URLSearchParams(location.search).has('preview')) {
+} else if (import.meta.env.DEV && query.has('preview')) {
   void import('./game.ts').then(module => {
     gameCanvas.hidden = false;
     const previewSession = module.startGame(gameCanvas, loadSettings());
