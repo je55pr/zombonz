@@ -49,7 +49,31 @@ git pull
 npm run server:deploy
 ```
 
-Everyone playing together must be on the same version, and needs to reload the page after a deploy (hard refresh, Ctrl+Shift+R, if it still looks old). The build ID is shown in **Multiplayer**, then **Test my connection**, and on the credits screen (F2); it is the git commit, so two players can compare.
+You can have this happen on every push to `dev` instead: see [the next section](#5-deploy-automatically-from-github-optional). Everyone playing together must be on the same version, and needs to reload the page after a deploy (hard refresh, Ctrl+Shift+R, if it still looks old). The build ID is shown in **Multiplayer**, then **Test my connection**, and on the credits screen (F2); it is the git commit, so two players can compare.
+
+## 5. Deploy automatically from GitHub (optional)
+
+[`.github/workflows/server.yml`](../.github/workflows/server.yml) deploys the server on every push to `dev`, once the typecheck and tests pass. It is switched off until you give it what it needs, so a fork without a Cloudflare account just skips it.
+
+1. **Make an API token.** In the Cloudflare dashboard, open your profile, **API Tokens**, **Create Token**, and use the **Edit Cloudflare Workers** template. Restrict it to your own account (Cloudflare recommends this), and copy the token when it is shown.
+2. **Give the repository the token, your account ID and the switch.** The token is a secret, so paste it at the prompt rather than putting it in a command:
+
+   ```bash
+   gh secret set CLOUDFLARE_API_TOKEN
+   gh secret set CLOUDFLARE_ACCOUNT_ID
+   gh variable set DEPLOY_SERVER --body true
+   ```
+
+   `npx wrangler whoami` prints your account ID (it is also in the dashboard). The same three can be added in GitHub under **Settings**, **Secrets and variables**, **Actions**.
+3. **Push to `dev`,** or run **Deploy game server** from the repository's **Actions** tab. Open the run to watch it; when it finishes, the build ID shown in **Test my connection** is the commit you pushed.
+
+Things to know:
+
+- **Every push to `dev` goes live.** If you would rather have a step in between, change `branches: [dev]` in the workflow to a branch you merge into when you want a release.
+- **Rolling back:** re-run the workflow from the Actions tab on an earlier commit, or run `npx wrangler rollback`, or use **Deployments** in the dashboard.
+- **Nothing about your address is involved.** A custom domain added in the dashboard stays attached, and the token only needs to edit Workers.
+- **The token is the only thing that can publish as you.** It lives in GitHub's secrets, never in the repository; if it leaks, delete it in the dashboard and make another.
+- **Players in a game keep the version they loaded** until they reload; anyone who joins from a different version is told it does not match.
 
 ## What it costs, and the limits
 
