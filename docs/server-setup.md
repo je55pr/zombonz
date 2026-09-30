@@ -81,12 +81,12 @@ On Cloudflare's free plan, as Cloudflare's documentation says (read on 2026-09-3
 
 - **The game's files are free and unlimited.** Requests for static assets do not use the daily allowance. The game is about 250 files, the biggest 7.5 MB; the limits are 20,000 files and 25 MiB each.
 - **Rooms use the Worker:** 100,000 requests a day. A whole session of four players is a few dozen messages, so this is a lot of games. WebSocket messages into a room count 1 for every 20.
-- **Rooms are Durable Objects**, which have their own daily allowance (13,000 GB-seconds of running time a day, which at the 128 MB Cloudflare bills for is about 28 hours of one room being open; rooms stay open for seconds to minutes).
+- **Rooms are Durable Objects**, which have their own daily allowance (13,000 GB-seconds of running time a day, which at the 128 MB Cloudflare bills for is about 28 hours of one room being open). Joining players use signalling for only a few seconds; the host keeps its room connection open for the match so a dropped player can reconnect.
 - **Going over** makes room requests fail until midnight UTC; the game's files keep loading, and the room lobby's **Use connection codes instead** still works, because that does not need the server.
 
 ## Privacy and abuse
 
-- **A room code is a name, not a secret.** Anyone with your address and a code can ask to join it, and there are about 28 million codes. A room holds four connections and closes after 30 minutes.
+- **A room code is a name, not a secret.** Anyone with your address and a code can ask to join it, and there are about 28 million codes. A room holds four connections, closes when its host leaves, and has a 12-hour safety cap if the host never closes it.
 - **What the server sees:** room codes and the messages that set connections up, which necessarily contain the players' network addresses. The server code keeps none of it (it lives in memory until the room ends and nothing is logged); Cloudflare's own request logging applies as it does to any site on Cloudflare.
 - **Limits per connection** (in `server/roomLogic.ts`): messages up to 16 KB, at most 80 in 10 seconds, or the connection is closed. For more protection, Cloudflare's rate-limiting rules in the dashboard can sit in front of `/signal/*`.
 - **The server accepts connections from any address**, so a copy of the game hosted elsewhere can use it (see the next section). If you want it to serve only your own address, add a check of the `Origin` header in `server/worker.ts`.

@@ -5,7 +5,7 @@ import type { MapId } from '../maps/catalog.ts';
 import type { WorldSnapshot } from './snapshot.ts';
 
 /** Bumped whenever messages or snapshots change shape; mismatched builds refuse to connect. */
-export const PROTOCOL_VERSION = 10;
+export const PROTOCOL_VERSION = 11;
 export const MAX_PLAYERS = 4;
 /** The host sends a snapshot every third tick: 20 a second. */
 export const SNAPSHOT_INTERVAL_TICKS = 3;
@@ -20,13 +20,13 @@ export interface LobbyPlayer { slot: number; name: string }
 export interface NetInput { s: number; h: number; p: number; r: number; y: number; x: number }
 
 export type ClientMessage =
-  | { t: 'hello'; v: number; name: string }
+  | { t: 'hello'; v: number; name: string; resume?: string }
   /** Loaded and ready to play; the host holds the first wave until everyone is. */
   | { t: 'ready' }
   | { t: 'input'; f: NetInput[] };
 
 export type HostMessage =
-  | { t: 'welcome'; slot: number }
+  | { t: 'welcome'; slot: number; resume: string }
   | { t: 'reject'; reason: string }
   | { t: 'lobby'; map: MapId; players: LobbyPlayer[] }
   | { t: 'start'; map: MapId; seed: number; players: LobbyPlayer[] }
@@ -34,6 +34,7 @@ export type HostMessage =
   | { t: 'snap'; ep: number; ack: number; s: WorldSnapshot }
   | { t: 'ev'; ep: number; k: number; e: SimulationEvent[] }
   | { t: 'left'; slot: number; name: string }
+  | { t: 'returned'; slot: number; name: string }
   | { t: 'end'; reason: string };
 
 /** Button order for the input bitmasks. Only append: reordering changes the protocol. */
@@ -118,7 +119,8 @@ export function readClientMessage(payload: Uint8Array): ClientMessage | null {
   if (!message) return null;
   if (message.t === 'hello') {
     return isInt(message.v) && typeof message.name === 'string'
-      ? { t: 'hello', v: message.v, name: message.name } : null;
+      && (message.resume === undefined || typeof message.resume === 'string')
+      ? { t: 'hello', v: message.v, name: message.name, ...(message.resume ? { resume: message.resume } : {}) } : null;
   }
   if (message.t === 'ready') return { t: 'ready' };
   if (message.t === 'input' && Array.isArray(message.f) && message.f.length <= 16) {

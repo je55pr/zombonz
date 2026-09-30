@@ -9,11 +9,25 @@ import { SignalError, normaliseRoomCode } from '../network/signaling.ts';
 import type { LobbyCallbacks } from './lobby.ts';
 
 const NAME_KEY = 'zombonz.playerName';
+const LAST_ROOM_KEY = 'zombonz.lastRoom';
+const RESUME_PREFIX = 'zombonz.resume.';
 function savedName(): string {
   try { return localStorage.getItem(NAME_KEY) ?? ''; } catch { return ''; }
 }
 function saveName(name: string): void {
   try { localStorage.setItem(NAME_KEY, name); } catch { /* storage unavailable */ }
+}
+function savedRoom(): string {
+  try { return sessionStorage.getItem(LAST_ROOM_KEY) ?? ''; } catch { return ''; }
+}
+function saveRoom(room: string): void {
+  try { sessionStorage.setItem(LAST_ROOM_KEY, room); } catch { /* storage unavailable */ }
+}
+function savedResume(room: string): string | null {
+  try { return sessionStorage.getItem(`${RESUME_PREFIX}${room}`); } catch { return null; }
+}
+function saveResume(room: string, token: string): void {
+  try { sessionStorage.setItem(`${RESUME_PREFIX}${room}`, token); } catch { /* storage unavailable */ }
 }
 const escape = (text: string) => text.replace(/[&<>"']/g, char => `&#${char.charCodeAt(0)};`);
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Try again.';
@@ -83,11 +97,15 @@ export class RoomLobbyView {
       this.transport = new LinkHostTransport();
       this.host = new NetHost(this.transport, cleanName(name.value, 'Player 1'), mode.map);
       this.host.changed.add(() => this.renderPlayers());
-      this.host.notices.add(notice => this.status(`${notice.name} ${notice.kind === 'joined' ? 'joined.' : 'left.'}`));
+      this.host.notices.add(notice => this.status(`${notice.name} ${notice.kind === 'left' ? 'left.' : notice.kind === 'returned' ? 'rejoined.' : 'joined.'}`));
       this.renderPlayers();
       void this.openRoom();
       name.focus();
-    } else this.find<HTMLInputElement>('[data-code]').focus();
+    } else {
+      const code = this.find<HTMLInputElement>('[data-code]');
+      code.value = savedRoom();
+      code.focus();
+    }
   }
 
   private find<T extends HTMLElement>(selector: string): T { return this.element.querySelector<T>(selector)!; }
@@ -112,7 +130,7 @@ export class RoomLobbyView {
     try {
       const room = await hostRoom({
         // Connections are told apart by `serial`, not by the number the room gave: that is used again once its player has left the room.
-        onPeer: (link, _id, serial) => { if (this.done) link.close(); else this.transport?.addPeer(`peer-${serial}`, link); },
+        onPeer: (link, _id, serial) => { this.transport?.addPeer(`peer-${serial}`, link); },
         onPeerFailed: (_id, reason) => { if (!this.done) this.status(`A player could not connect. ${reason}`, true); },
         onServerLost: () => { if (!this.done) this.status('Lost the connection to the game server. Players already here can still play, but nobody new can join.', true); },
       });
@@ -143,7 +161,8 @@ export class RoomLobbyView {
         if (!code) { this.status('That is not a room code. It is 5 letters and numbers, like K7QX2.', true); return; }
         const button = this.find<HTMLButtonElement>('[data-action="join"]');
         button.disabled = true; input.disabled = true;
-        this.status('Joining…');
+        saveRoom(code);
+        this.status(savedResume(code) ? 'Reconnecting…' : 'Joining…');
         this.join?.cancel();
         let join: RoomJoin;
         try { join = await joinRoom(code); } catch (error) {
@@ -158,9 +177,10 @@ export class RoomLobbyView {
         join.connected.then(link => {
           if (this.done || this.join !== join) { link.close(); return; }
           const name = cleanName(this.find<HTMLInputElement>('[data-name]').value, 'Player');
-          const client = new NetClient(linkClientTransport(link), name);
+          const client = new NetClient(linkClientTransport(link), name, { resumeToken: savedResume(code) });
           this.client = client;
           client.changed.add(() => {
+            if (client.resumeToken) saveResume(code, client.resumeToken);
             if (client.phase === 'lobby') {
               this.find<HTMLElement>('[data-players-title]').hidden = false;
               this.find<HTMLElement>('[data-players]').hidden = false;
@@ -183,7 +203,10 @@ export class RoomLobbyView {
         const seed = crypto.getRandomValues(new Uint32Array(1))[0];
         const players = this.host.start(seed);
         const host = this.host;
-        this.finish();
+        // Keep the signalling room alive during the match so a dropped room-code player can reconnect to their reserved slot.
+        const room = this.room;
+        if (room) { host.addCleanup(() => room.close()); this.room = null; }
+        this.finish(false);
         this.callbacks.hostStarted(host, players, seed, (this.mode as { map: MapId }).map);
         break;
       }
@@ -214,9 +237,9 @@ ${(this.room?.log() ?? this.join?.log()) ?? ''}`;
   }
 
   /** Hands the session on to the game, keeping the players' connections open. */
-  private finish(): void {
+  private finish(closeRoom = true): void {
     this.done = true;
-    this.room?.close();
+    if (closeRoom) this.room?.close();
     this.element.remove();
   }
   private back(): void {
