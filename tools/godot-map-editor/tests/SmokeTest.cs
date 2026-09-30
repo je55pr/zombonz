@@ -22,6 +22,7 @@ public partial class SmokeTest : Node
         var coldModel = assets.Model("wooden-table", rebuild: true).Instantiate<Node3D>();
         try { Require(MapPreviewAssets.Bounds(coldModel).Size.Length() > 0, "Cold model import has no renderable meshes"); }
         finally { coldModel.Free(); }
+        CheckSharedTypeScriptValidation();
         foreach (var id in new[] { "bunker", "asylum" })
         {
             // Exercise cached native resources after the previous map's managed wrappers are collected.
@@ -36,6 +37,21 @@ public partial class SmokeTest : Node
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException(message);
+    }
+
+    private static void CheckSharedTypeScriptValidation()
+    {
+        var document = MapDocument.Read(ZombonzMapPlugin.SourcePath("../../src/maps/data/bunker.v1.json"));
+        var spawns = (JsonArray)document["gameplay"]!["zombieSpawns"]!;
+        var first = (JsonObject)spawns[0]!;
+        var duplicate = (JsonObject)spawns[1]!;
+        duplicate["x"] = first["x"]!.DeepClone();
+        duplicate["y"] = first["y"]!.DeepClone();
+        duplicate["z"] = first["z"]!.DeepClone();
+        Require(MapDocument.Validate(document).Count == 0, "C# preflight unexpectedly owns the semantic spawn rule");
+        var result = ZombonzMapPlugin.ValidateWithTypeScript(document);
+        Require(!result.Ok && result.Message.Contains("duplicate spawn within"),
+            "Godot did not surface the shared TypeScript semantic validator: " + result.Message);
     }
 
     private static void CheckMap(string id)
@@ -202,7 +218,8 @@ public partial class SmokeTest : Node
         try
         {
             ZombonzMapItem Find(string type) => MapPreview.ItemsIn(root).First(item => item.GameplayType == type);
-            var move = new Vector3(2, 0, 3);
+            // Keep the synthetic edit small enough to remain a valid playable map while still proving linked transforms export.
+            var move = new Vector3(0.15f, 0, 0.15f);
             var door = Find("doors"); var blocker = door.GetChildren().OfType<ZombonzMapItem>().Single();
             var oldBlocker = MapGameplay.MapTransform(blocker).Origin;
             door.Position += move; door.DoorLabel = "TEST"; door.Cost = 750; door.RequiresPower = true;
@@ -227,11 +244,19 @@ public partial class SmokeTest : Node
             var window = MapDocument.Items((JsonObject)candidate["presentation"]!, "windows").First(item => MapDocument.Text(item?["id"]) == barrier.ObjectId);
             Require(MapDocument.Vector(window).IsEqualApprox(barrier.Position), "Window presentation did not follow barrier");
             Require(MapDocument.Items((JsonObject)candidate["gameplay"]!, "zombieSpawns").All(item => MapDocument.Text(item?["barrierId"]) != oldBarrierId), "Barrier rename left invalid spawn references");
+            // WalkItems writes each spawn marker's BarrierId back into JSON. Mirror the editor's post-export
+            // synchronisation before a second synthetic walk so the renamed reference stays current.
+            foreach (var spawnItem in MapPreview.ItemsIn(root).Where(item => item.GameplayType == "zombieSpawns"))
+                spawnItem.BarrierId = MapDocument.Text(MapDocument.AtPath(candidate, spawnItem.DataPath)?["barrierId"]);
             Require(MapDocument.Vector(candidate["presentation"]!["boxCenter"]).IsEqualApprox(MapDocument.Vector(original["presentation"]!["boxCenter"]) + move), "Mystery box did not follow purchase point");
             if (candidate["gameplay"]!["mysteryBoxes"]![0]!["locations"] is JsonArray locations)
                 Require(MapDocument.Vector(locations[0]!["position"]).IsEqualApprox(mystery.Position), "Initial box location retained its old purchase point");
             foreach (var body in mystery.GetChildren().OfType<ZombonzMapItem>().Where(item => item.Kind == "box"))
                 Require(MapDocument.Vector(MapDocument.AtPath(candidate, body.DataPath)?["center"]).IsEqualApprox(MapDocument.Vector(MapDocument.AtPath(original, body.DataPath)?["center"]) + move), "Fixed mystery box body did not follow its lid");
+            // Moving the fixed box body through dense nav links is correctly rejected by the semantic validator.
+            // The transform behavior was proved above; restore it before testing a valid export of the other edits.
+            mystery.Position -= move;
+            MapDocument.WalkItems(candidate, root);
             CheckExport(id + "-gameplay", original, candidate, MapDocument.CollectChanges(original, candidate));
 
             // All add choices together exercise optional arrays, linked child paths, and presentation additions.
@@ -240,6 +265,12 @@ public partial class SmokeTest : Node
             try
             {
                 foreach (var kind in MapScene.NewObjectKinds) MapScene.AddNew(newRoot, added, kind);
+                var newCollision = MapPreview.ItemsIn(newRoot).First(item => item.Kind == "new" && item.DataPath.Contains("/collisionBoxes"));
+                newCollision.Position += new Vector3(100, 0, 100); // a placeholder at player spawn would deliberately block navigation
+                var newNavigation = MapPreview.ItemsIn(newRoot).First(item => item.Kind == "new" && item.GameplayType == "routePoint");
+                var navigationNodes = (JsonArray)added["gameplay"]!["navigation"]!["nodes"]!;
+                var navigationAnchor = (JsonObject)navigationNodes[0]!;
+                newNavigation.Position = MapDocument.Vector(navigationAnchor["position"]);
                 var second = MapScene.AddNew(newRoot, added, "Barrel");
                 Require(second.ObjectId == "new-barrel-2", "Repeated additions did not get unique IDs");
                 var newBarrier = MapPreview.ItemsIn(newRoot).First(item => item.Kind == "new" && item.GameplayType == "barriers");
@@ -252,6 +283,10 @@ public partial class SmokeTest : Node
                 newBarrier.Position += move; newBarrier.Rotation = new Vector3(0, Mathf.Pi / 2, 0);
                 var pending = new List<MapDocument.Addition>();
                 MapDocument.WalkItems(added, newRoot, pending);
+                var authoredNavigation = ((JsonArray)added["gameplay"]!["navigation"]!["nodes"]!).OfType<JsonObject>()
+                    .First(node => MapDocument.Text(node["id"]) == newNavigation.ObjectId);
+                authoredNavigation["neighbors"] = new JsonArray(MapDocument.Text(navigationAnchor["id"]));
+                ((JsonArray)navigationAnchor["neighbors"]!).Add(newNavigation.ObjectId);
                 CheckExport(id + "-add-gameplay", original, added, MapDocument.CollectChanges(original, added));
                 foreach (var entry in pending) { entry.Item.DataPath = entry.Path; entry.Item.Kind = entry.Kind; }
                 var once = added.DeepClone(); MapDocument.WalkItems(added, newRoot);

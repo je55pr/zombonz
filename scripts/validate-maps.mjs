@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
 const files = process.argv.slice(2);
 if (!files.length) files.push('src/maps/data/bunker.v1.json', 'src/maps/data/asylum.v1.json');
-const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom' });
+const vite = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: 'custom' });
 let failed = false;
 try {
   const { validateMapDocument } = await vite.ssrLoadModule('/src/maps/mapDocument.ts');

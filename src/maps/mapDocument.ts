@@ -1,3 +1,7 @@
+import { hasClearNavigationLine, hasWalkableConnection } from '../core/navigation.ts';
+import { ZOMBIE_MOVEMENT } from '../core/zombie.ts';
+import type { CollisionBox, WalkSurface } from '../core/collision.ts';
+import type { Vec3 } from '../core/types.ts';
 import type { GameMap } from './gameMap.ts';
 
 /** Versioned, renderer-independent source file used by the browser and the Godot editor. */
@@ -28,6 +32,13 @@ const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 const nonempty = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+const asVec = (value: unknown): Vec3 | null => record(value) && finite(value.x) && finite(value.y) && finite(value.z)
+  ? { x: value.x, y: value.y, z: value.z } : null;
+const distanceSquared = (a: Vec3, b: Vec3): number => {
+  const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z;
+  return dx * dx + dy * dy + dz * dz;
+};
+const DUPLICATE_SPAWN_DISTANCE = 0.05;
 
 /** Paths in diagnostics match the JSON source, so an author can find the bad value. */
 export function validateMapDocument(value: unknown): string[] {
@@ -103,26 +114,93 @@ export function validateMapDocument(value: unknown): string[] {
         error(`gameplay.navigation.nodes[${i}].neighbors[${j}]`, `unknown node "${String(neighbor)}"`);
     });
   });
+
+  const navigationEntries = nodes.flatMap((node, index) => {
+    if (!record(node) || !nonempty(node.id)) return [];
+    const position = asVec(node.position);
+    if (!position || !Array.isArray(node.neighbors)
+      || !node.neighbors.every(neighbor => nonempty(neighbor) && nodeIds.has(neighbor))) return [];
+    return [{ index, id: node.id, position, neighbors: node.neighbors as string[] }];
+  });
+  const playerSpawn = asVec(gameplay.playerSpawn);
+  if (playerSpawn && navigationEntries.length === nodes.length && nodeIds.size === nodes.length && navigationEntries.length > 0) {
+    const byId = new Map(navigationEntries.map(node => [node.id, node]));
+    const geometryValid = !errors.some(message => message.startsWith('gameplay.collisionBoxes')
+      || message.startsWith('gameplay.walkSurfaces'));
+    const collision = gameplay.collisionBoxes as CollisionBox[];
+    const surfaces = gameplay.walkSurfaces as WalkSurface[];
+    const links = new Map<string, string[]>();
+    for (const node of navigationEntries) {
+      const usable: string[] = [];
+      node.neighbors.forEach((neighborId, neighborIndex) => {
+        const neighbor = byId.get(neighborId)!;
+        if (geometryValid) {
+          const clear = hasClearNavigationLine(node.position, neighbor.position, collision,
+            ZOMBIE_MOVEMENT.radius, ZOMBIE_MOVEMENT.height);
+          const walkable = clear && hasWalkableConnection(node.position, neighbor.position, surfaces);
+          if (!clear) error(`gameplay.navigation.nodes[${node.index}].neighbors[${neighborIndex}]`,
+            `link "${node.id}" -> "${neighborId}" crosses fixed collision`);
+          else if (!walkable) error(`gameplay.navigation.nodes[${node.index}].neighbors[${neighborIndex}]`,
+            `link "${node.id}" -> "${neighborId}" leaves the authored walk surfaces`);
+          if (walkable) usable.push(neighborId);
+        } else usable.push(neighborId);
+      });
+      links.set(node.id, usable);
+    }
+
+    const root = navigationEntries.reduce((best, node) =>
+      distanceSquared(node.position, playerSpawn) < distanceSquared(best.position, playerSpawn) ? node : best);
+    const reached = new Set<string>([root.id]), queue = [root.id];
+    for (let i = 0; i < queue.length; i++) for (const neighbor of links.get(queue[i]) ?? []) {
+      if (!reached.has(neighbor)) { reached.add(neighbor); queue.push(neighbor); }
+    }
+    const unreachable = navigationEntries.filter(node => !reached.has(node.id));
+    if (unreachable.length) {
+      const first = unreachable[0];
+      error(`gameplay.navigation.nodes[${first.index}]`,
+        `node "${first.id}" is unreachable from the player-spawn navigation component (${unreachable.length} disconnected node${unreachable.length === 1 ? '' : 's'})`);
+    }
+  }
   const barriers = array(gameplay.barriers, 'gameplay.barriers');
   const barrierIds = ids(barriers, 'gameplay.barriers');
   barriers.forEach((barrier, i) => {
     if (!record(barrier)) return;
     vec(barrier.position, `gameplay.barriers[${i}].position`);
+    vec(barrier.outward, `gameplay.barriers[${i}].outward`);
     vec(barrier.insidePoint, `gameplay.barriers[${i}].insidePoint`);
     if (!finite(barrier.width) || barrier.width <= 0) error(`gameplay.barriers[${i}].width`, 'expected a positive width');
     if (!Number.isInteger(barrier.maxBoards) || (barrier.maxBoards as number) < 0 || (barrier.maxBoards as number) > 30)
       error(`gameplay.barriers[${i}].maxBoards`, 'expected an integer from 0 to 30');
-    array(barrier.approachPath, `gameplay.barriers[${i}].approachPath`).forEach((point, j) =>
-      vec(point, `gameplay.barriers[${i}].approachPath[${j}]`));
+    const approach = array(barrier.approachPath, `gameplay.barriers[${i}].approachPath`);
+    if (approach.length < 2) error(`gameplay.barriers[${i}].approachPath`, 'expected at least two exterior route points');
+    approach.forEach((point, j) => vec(point, `gameplay.barriers[${i}].approachPath[${j}]`));
   });
-  array(gameplay.zombieSpawns, 'gameplay.zombieSpawns').forEach((spawn, i) => {
+  const zombieSpawns = array(gameplay.zombieSpawns, 'gameplay.zombieSpawns');
+  zombieSpawns.forEach((spawn, i) => {
     vec(spawn, `gameplay.zombieSpawns[${i}]`);
     if (record(spawn) && spawn.barrierId !== undefined && !barrierIds.has(String(spawn.barrierId)))
       error(`gameplay.zombieSpawns[${i}].barrierId`, `unknown barrier "${String(spawn.barrierId)}"`);
   });
+  const spawnPositions = zombieSpawns.flatMap((spawn, index) => {
+    const position = asVec(spawn);
+    return position ? [{ index, position }] : [];
+  });
+  const duplicateDistanceSquared = DUPLICATE_SPAWN_DISTANCE * DUPLICATE_SPAWN_DISTANCE;
+  for (let later = 0; later < spawnPositions.length; later++) {
+    for (let earlier = 0; earlier < later; earlier++) {
+      if (distanceSquared(spawnPositions[later].position, spawnPositions[earlier].position) <= duplicateDistanceSquared) {
+        error(`gameplay.zombieSpawns[${spawnPositions[later].index}]`,
+          `duplicate spawn within ${DUPLICATE_SPAWN_DISTANCE.toFixed(2)} m of gameplay.zombieSpawns[${spawnPositions[earlier].index}]`);
+        break;
+      }
+    }
+  }
+
+  const gameplayIds = new Map<string, Set<string>>();
   for (const field of ['doors', 'wallWeapons', 'mysteryBoxes', 'perkMachines', 'traps', 'hazards', 'equipment', 'packAPunch'] as const) {
     if (gameplay[field] === undefined && !['doors', 'wallWeapons', 'mysteryBoxes'].includes(field)) continue;
-    array(gameplay[field], `gameplay.${field}`).forEach((item, i) => {
+    const items = array(gameplay[field], `gameplay.${field}`);
+    items.forEach((item, i) => {
       if (!record(item)) return;
       if (field === 'traps') {
         vec(item.switchPosition, `gameplay.traps[${i}].switchPosition`);
@@ -136,7 +214,7 @@ export function validateMapDocument(value: unknown): string[] {
         if (item[cost] !== undefined && (!finite(item[cost]) || item[cost] < 0))
           error(`gameplay.${field}[${i}].${cost}`, 'expected a nonnegative finite cost');
     });
-    ids(gameplay[field] as unknown[], `gameplay.${field}`);
+    gameplayIds.set(field, ids(items, `gameplay.${field}`));
   }
   if (gameplay.powerSwitch !== undefined && record(gameplay.powerSwitch)) vec(gameplay.powerSwitch.position, 'gameplay.powerSwitch.position');
   // How likely each zombie look is on this map (index = the look); a look with no weight never spawns.
@@ -146,6 +224,33 @@ export function validateMapDocument(value: unknown): string[] {
 
   for (const field of ['greybox', 'prisms', 'windows', 'rails', 'props', 'decals', 'labels', 'lights', 'rubble'] as const)
     array(presentation[field], `presentation.${field}`);
+
+  const linkedPresentation = [
+    ['doorStyles', 'doors'],
+    ['wallWeaponFacing', 'wallWeapons'],
+    ['perkMachineFacing', 'perkMachines'],
+    ['equipmentFacing', 'equipment'],
+  ] as const;
+  for (const [field, target] of linkedPresentation) {
+    const table = presentation[field];
+    if (table === undefined) {
+      if (field === 'doorStyles' || field === 'wallWeaponFacing') error(`presentation.${field}`, 'expected an object');
+      continue;
+    }
+    if (!record(table)) { error(`presentation.${field}`, 'expected an object'); continue; }
+    const targetIds = gameplayIds.get(target) ?? new Set<string>();
+    for (const [id, setting] of Object.entries(table)) {
+      if (!targetIds.has(id)) error(`presentation.${field}.${id}`, `unknown gameplay.${target} ID "${id}"`);
+      if (field === 'doorStyles') {
+        if (!record(setting)) { error(`presentation.doorStyles.${id}`, 'expected a door style object'); continue; }
+        if (setting.kind !== 'planks' && setting.kind !== 'debris')
+          error(`presentation.doorStyles.${id}.kind`, 'expected "planks" or "debris"');
+        if (!finite(setting.yaw)) error(`presentation.doorStyles.${id}.yaw`, 'expected a finite angle');
+        if (!finite(setting.width) || setting.width <= 0)
+          error(`presentation.doorStyles.${id}.width`, 'expected a positive finite width');
+      } else if (!finite(setting)) error(`presentation.${field}.${id}`, 'expected a finite angle');
+    }
+  }
   for (const field of ['greybox', 'scenery'] as const) {
     if (field === 'scenery' && presentation.scenery === undefined) continue;
     array(presentation[field], `presentation.${field}`).forEach((item, i) => {

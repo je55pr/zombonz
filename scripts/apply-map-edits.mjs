@@ -25,7 +25,7 @@ for (const { path, value } of edits) {
   if (Array.isArray(parent) && key === parent.length) parent.push(value);
   else parent[key] = value;
 }
-const vite = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)), server: { middlewareMode: true }, appType: 'custom' });
+const vite = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)), server: { middlewareMode: true, hmr: false }, appType: 'custom' });
 try {
   const { validateMapDocument } = await vite.ssrLoadModule('/src/maps/mapDocument.ts');
   const errors = validateMapDocument(original);
