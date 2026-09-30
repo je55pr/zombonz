@@ -217,7 +217,7 @@ export function gaitMix(round: number, samples = 4000): Record<ZombieGait, numbe
 /** Group sizes the report crosses. */
 const CROWD_SIZES = [1, 2, 3, 6, 12] as const;
 /** How near the player gets before turning away, in the run-up rows. */
-const TURN_DISTANCES = [0.7, 1.5, 2.5] as const;
+const TURN_DISTANCES = [0.7, 2.5, 4] as const;
 
 /** The measurements as text, for the console. */
 export function formatDifficulty(): string {

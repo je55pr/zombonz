@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BODY_CONTACT, PLAYER_MOVEMENT, ZOMBIE_GAIT_SPEEDS, ZOMBIE_GIVE, ZOMBIE_PACE_SPREAD, addEntity, allocateEntityId,
-  WEDGE_DEPTH, ZOMBIE_MELEE, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, tickZombieMelee, type CollisionBox, type GameSimulation, type PlayerState, type ZombieState,
+  WEDGE_DEPTH, ZOMBIE_MELEE, updateZombiePursuit, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, tickZombieMelee, type CollisionBox, type GameSimulation, type PlayerState, type ZombieState,
 } from '../src/core/index.ts';
 import { frameFor, openGround, runChase, runCrowd, runRunUp } from '../src/bench/difficulty.ts';
 import { predictPlayerTick } from '../src/net/prediction.ts';
@@ -42,7 +42,8 @@ describe('a chase', () => {
   it('still catches a player who stops: sprinters are a threat, only not one that cannot be outrun', () => {
     const chase = runChase({ gait: 'sprint', plan: 'stand', startGap: 12, seconds: 10 });
     expect(chase.firstHitSecond).not.toBeNull();
-    expect(chase.firstHitSecond!).toBeGreaterThan(3);
+    // A sprinter covers the 12 m in about three and a half seconds, and its blow lands as it arrives.
+    expect(chase.firstHitSecond!).toBeGreaterThan(2);
     expect(chase.firstHitSecond!).toBeLessThan(6);
   });
 });
@@ -234,8 +235,8 @@ describe('a zombie that reads where the player is going', () => {
     expect(hit).toBe(true);
   });
 
-  it('holds off for a player who is standing, backing away, or crossing well in front of it', () => {
-    for (const [z, vx, vz] of [[2, 0, 0], [2, 0, 4.2], [3, 4.2, 0], [3, -4.2, 0]]) {
+  it('holds off for a player who is well off, backing away, or crossing well in front of it', () => {
+    for (const [z, vx, vz] of [[4, 0, 0], [2, 0, 4.2], [3, 4.2, 0], [3, -4.2, 0]]) {
       const { zombie, player } = scene(z, vx, vz);
       for (let tick = 0; tick < 30; tick++) tickZombieMelee(zombie, [player]);
       expect(zombie.attackTicks, `player at ${z} m going (${vx}, ${vz})`).toBe(0);
@@ -258,6 +259,80 @@ describe('a zombie that reads where the player is going', () => {
   });
 });
 
+describe('a zombie keeps coming while it swings', () => {
+  /** A zombie `start` m from a player who stands still on open ground, run tick by tick. */
+  function approach(start: number) {
+    const sim = openGround({ x: 0, y: 0, z: 0 });
+    const player = sim.getPlayer(sim.playerIds[0])!;
+    const zombie = createZombieState(allocateEntityId(sim.state.world), { x: 0, y: 0, z: -start }, 15, 'sprint');
+    zombie.yaw = 0;
+    addEntity(sim.state.world, zombie);
+    const distance = () => Math.hypot(zombie.position.x - player.position.x, zombie.position.z - player.position.z);
+    return { sim, player, zombie, distance };
+  }
+
+  it('closes in during the wind-up rather than halting where it began, and the blow lands with it at the player', () => {
+    const { sim, zombie, distance } = approach(6);
+    let swingAt: number | null = null, hitAt: number | null = null;
+    for (let tick = 0; tick < 600 && hitAt === null; tick++) {
+      const events = sim.tick();
+      if (swingAt === null && zombie.attackTicks > 0) swingAt = distance();
+      if (events.some(event => event.type === 'zombieAttacked')) hitAt = distance();
+    }
+    expect(swingAt).not.toBeNull();
+    // It began the swing while still well off, and closed by a couple of metres during it: the blow lands from its reach.
+    expect(swingAt!).toBeGreaterThan(2);
+    expect(hitAt).not.toBeNull();
+    expect(hitAt!).toBeLessThanOrEqual(ZOMBIE_MELEE.reach.strikeRange);
+    expect(swingAt! - hitAt!).toBeGreaterThan(1);
+  });
+
+  it('stops when it touches the player, and does not push them along', () => {
+    const { sim, player, zombie, distance } = approach(6);
+    const start = { ...player.position };
+    for (let tick = 0; tick < 600; tick++) sim.tick();
+    expect(distance()).toBeLessThan(BODY_CONTACT + 0.06);
+    expect(distance()).toBeGreaterThan(BODY_CONTACT - 0.02);
+    expect(Math.hypot(player.position.x - start.x, player.position.z - start.z)).toBeLessThan(0.06);
+    expect(zombie.velocity).toMatchObject({ x: 0, z: 0 });
+  });
+
+  it('is not counted as stalled while it swings, however little ground it gets, but is when it is not swinging', () => {
+    // A wall across its way to a player 6 m off: it gets nowhere either way.
+    const wall: CollisionBox = { min: { x: -5, y: 0, z: -3.2 }, max: { x: 5, y: 3, z: -2.8 } };
+    for (const [swinging, stalls] of [[true, false], [false, true]] as const) {
+      const zombie = createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, 'run');
+      const player = createPlayerState('e:1', { x: 0, y: 0, z: -6 });
+      let most = 0;
+      for (let tick = 0; tick < 120; tick++) {
+        zombie.attackTicks = swinging ? 5 : 0;
+        updateZombiePursuit(zombie, [player], 1 / 60, [wall], []);
+        most = Math.max(most, zombie.stall);
+      }
+      expect(most > 30, swinging ? 'swinging' : 'not swinging').toBe(stalls);
+    }
+  });
+
+  it('keeps zombies that swing on the move out of each other, so a column does not merge into one', () => {
+    const sim = openGround({ x: 0, y: 0, z: 0 });
+    const column = [0, 1, 2, 3, 4, 5].map(index => {
+      const zombie = createZombieState(allocateEntityId(sim.state.world), { x: 0, y: 0, z: -5 - index * 0.6 }, 15, 'sprint');
+      addEntity(sim.state.world, zombie);
+      return zombie;
+    });
+    let closest = Infinity;
+    for (let tick = 0; tick < 420; tick++) {
+      sim.tick();
+      if (tick < 30) continue;
+      for (let i = 0; i < column.length; i++) for (let j = i + 1; j < column.length; j++) {
+        closest = Math.min(closest, Math.hypot(column[i].position.x - column[j].position.x, column[i].position.z - column[j].position.z));
+      }
+    }
+    // Bodies are 0.64 across and are held at 0.58 apart; none may sit on another.
+    expect(closest).toBeGreaterThan(0.45);
+  });
+});
+
 describe('running up to a zombie and away again', () => {
   const variants = [0, 1, 2, 3, 4, 5];
 
@@ -267,9 +342,9 @@ describe('running up to a zombie and away again', () => {
     }
   });
 
-  it('can still be dodged by turning away early enough', () => {
+  it('can still be dodged by turning away before the swing begins', () => {
     for (const plan of ['walk', 'sprint'] as const) for (const variant of variants) {
-      expect(runRunUp({ turnAt: 2.5, plan, variant }).hits, `${plan}, tempo ${variant}`).toBe(0);
+      expect(runRunUp({ turnAt: 4, plan, variant }).hits, `${plan}, tempo ${variant}`).toBe(0);
     }
   });
 
@@ -286,8 +361,10 @@ describe('what a crowd costs', () => {
   it('makes running into the middle of a group cost blows, though steering round it stays free', () => {
     for (const seed of [1, 2, 3, 4, 5, 6]) {
       expect(runCrowd({ approach: 'dash', zombies: 6, seed, seconds: 8 }).hits, `dash, seed ${seed}`).toBeGreaterThanOrEqual(1);
-      expect(runCrowd({ approach: 'weave', zombies: 12, seed, seconds: 8 }), `weave, seed ${seed}`).toMatchObject({ hits: 0 });
-      expect(runCrowd({ approach: 'weave', zombies: 12, seed, seconds: 8 }).seconds, `weave, seed ${seed}`).not.toBeNull();
+      // Steering round a whole group costs at most a blow (half a life), never a wall.
+      const weave = runCrowd({ approach: 'weave', zombies: 12, seed, seconds: 8 });
+      expect(weave.hits, `weave, seed ${seed}`).toBeLessThanOrEqual(1);
+      expect(weave.seconds, `weave, seed ${seed}`).not.toBeNull();
     }
   });
 

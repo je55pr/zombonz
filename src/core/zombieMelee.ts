@@ -33,12 +33,13 @@ export const ZOMBIE_MELEE = {
   reach: { startRange: 1.1, strikeRange: 1.3 },
   crawlerReach: { startRange: 0.9, strikeRange: 1.1 },
   /**
-   * A zombie also starts its swing early, when the player, going at the speed and heading they have now, will be in
-   * strike range as the blow lands (issue #210): otherwise a player who runs up to a zombie and turns away is out of
-   * reach before the wind-up ends, and no blow ever connects. It reads only a player moving at `minSpeed` m/s or more,
-   * and looks no further ahead than `maxLeadMetres` of their travel, so a fast player still outruns a slow wind-up.
+   * A zombie also starts its swing early, when the player, going at the speed and heading they have now, and the zombie,
+   * still coming, will be within strike range as the blow lands (issue #210): otherwise a player who runs up to a zombie
+   * and turns away is out of reach before the wind-up ends, and no blow ever connects. It looks no further ahead than
+   * `maxLeadMetres` of the two's travel, so it never starts from further out than that and a fast player still outruns
+   * a slow wind-up.
    */
-  anticipation: { minSpeed: 0.5, maxLeadMetres: 2 },
+  anticipation: { maxLeadMetres: 2 },
   /** Highest a target may be above or below the zombie's feet: a swing does not reach another floor. */
   maxHeightDelta: 0.9,
   /** Widest angle (radians) between where the zombie faces and where its target is, to start a swing and to land one. */

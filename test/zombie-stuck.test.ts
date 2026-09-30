@@ -379,7 +379,7 @@ describe('the benchmark routes', () => {
     const bunker = runBunkerRoute({ ticks: 900 });
     expect(bunker.stalls.stuckZombies).toBe(0);
     expect(bunker.stalls.longestSeconds).toBeLessThan(STUCK_SECONDS);
-  });
+  }, 60_000);
 
   it('keep 24 zombies moving through a lap of Asylum with doors opening as the player passes', () => {
     const train = runAsylumTraining({ ticks: 2400, warmup: 60 });

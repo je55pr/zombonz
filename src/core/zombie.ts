@@ -163,8 +163,9 @@ export function updateZombiePursuit(
   freeFromWalls(zombie, height, collisionBoxes, solids);
   const targetDx = target.position.x - zombie.position.x;
   const targetDz = target.position.z - zombie.position.z;
-  // A zombie swinging, or close enough to start, stands its ground and turns to face its target.
-  if (zombie.attackTicks > 0 || inMeleeReach(zombie, target, collisionBoxes, meleeReach(zombie).startRange)) {
+  // A zombie that has got to its target (touching) stands and turns to face it. Until then it keeps coming, swinging or
+  // not: a swing is a lunge on the move, not a halt short of them.
+  if (inMeleeReach(zombie, target, collisionBoxes, ARRIVED)) {
     zombie.velocity.x = 0;
     zombie.velocity.z = 0;
     trackZombieProgress(zombie, false);
@@ -216,8 +217,9 @@ export function updateZombiePursuit(
   }
   next.y = sampleWalkHeight(next.x, next.z, zombie.position.y, walkSurfaces);
   zombie.position = next;
-  // Sliding along a wall, shuffling in a corner or dithering between two waypoints is moving but not getting anywhere.
-  trackZombieProgress(zombie, planarDistance > 0);
+  // Sliding along a wall, shuffling in a corner or dithering between two waypoints is moving but not getting anywhere
+  // (a zombie mid-swing is not trying to get anywhere, it is busy).
+  trackZombieProgress(zombie, planarDistance > 0 && zombie.attackTicks === 0);
 }
 
 /**
@@ -355,17 +357,18 @@ export function tickZombieMelee(
 }
 
 /**
- * Whether a blow begun now would land: the player, carrying on as they are, is in strike range and in front of the zombie
- * when the wind-up ends (looking ahead at most `ZOMBIE_MELEE.anticipation` metres of their travel). The zombie stands its ground
- * to swing, so this is all it has to go on; a player who stops short, turns off or backs away in the wind-up is missed.
+ * Whether a blow begun now would land: the player, carrying on as they are, and the zombie, carrying on toward them, are
+ * within strike range and the zombie is facing them when the wind-up ends (looking ahead at most
+ * `ZOMBIE_MELEE.anticipation` metres of their travel between them). It is all the zombie has to go on; a player who stops short,
+ * turns off or backs away in the wind-up is missed.
  */
 function willConnect(zombie: ZombieState, player: PlayerState, boxes: readonly CollisionBox[], strikeRange: number): boolean {
-  const { minSpeed, maxLeadMetres } = ZOMBIE_MELEE.anticipation;
-  const speed = Math.hypot(player.velocity.x, player.velocity.z);
-  if (speed < minSpeed || !facesWithin(zombie, player, ZOMBIE_MELEE.startArc)) return false;
-  const lead = Math.min(swingTiming(zombie).windupTicks / 60, maxLeadMetres / speed);
+  if (!facesWithin(zombie, player, ZOMBIE_MELEE.startArc)) return false;
+  const closing = Math.hypot(player.velocity.x, player.velocity.z) + zombieSpeed(zombie);
+  const lead = Math.min(swingTiming(zombie).windupTicks / 60, closing > 0 ? ZOMBIE_MELEE.anticipation.maxLeadMetres / closing : Infinity);
   const ahead = { ...player, position: { x: player.position.x + player.velocity.x * lead, y: player.position.y, z: player.position.z + player.velocity.z * lead } };
-  return inMeleeReach(zombie, ahead, boxes, strikeRange) && facesWithin(zombie, ahead, ZOMBIE_MELEE.strikeArc);
+  // The zombie keeps coming while it swings, so it will be that much nearer too.
+  return inMeleeReach(zombie, ahead, boxes, strikeRange + zombieSpeed(zombie) * lead) && facesWithin(zombie, ahead, ZOMBIE_MELEE.strikeArc);
 }
 
 /**
@@ -407,6 +410,8 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
 
 /** How far apart a player's middle and a zombie's are when their bodies touch. */
 export const BODY_CONTACT = PLAYER_MOVEMENT.radius + ZOMBIE_MOVEMENT.radius;
+/** A zombie this near its target has got to them and stops closing (a step from touching). */
+const ARRIVED = BODY_CONTACT + 0.04;
 
 /**
  * The share of a squeeze that a zombie free to move (not mid-swing, not coming through a window) gives way by, so a
@@ -492,51 +497,62 @@ export function separateZombies(zombies: readonly ZombieState[], players: readon
     zombie.position = next;
     return along;
   };
-  // Free to be moved: on the ground, out in the open, and not in the middle of a swing.
-  const free = (zombie: ZombieState) => !zombie.entry && zombie.attackTicks === 0;
+  // Free to be moved: out in the open, and not swinging on the spot (one swinging on the move can be jostled like any other).
+  const free = (zombie: ZombieState) => !zombie.entry && !(zombie.attackTicks > 0 && zombie.velocity.x === 0 && zombie.velocity.z === 0);
   /** Pairs pressed against each other, to find who is queued behind a fight (see `holdBehindFighters`). */
   let touching: Array<[number, number]> | null = null;
-  for (let i = 0; i < zombies.length; i++) {
-    const a = zombies[i];
-    if (!a.alive) continue;
-    for (let j = i + 1; j < zombies.length; j++) {
-      const b = zombies[j];
-      if (!b.alive || Math.abs(a.position.y - b.position.y) > 1) continue;
-      work.separationPairs++;
-      let dx = a.position.x - b.position.x, dz = a.position.z - b.position.z, distance = Math.hypot(dx, dz);
-      if (distance < gap + TOUCH_SLACK) (touching ??= []).push([i, j]);
-      if (distance >= gap) continue;
-      work.separationShoves++;
-      if (distance < 1e-4) { const angle = (mix32(hashString(a.id) ^ hashString(b.id)) / 0x1_0000_0000) * Math.PI * 2; dx = Math.cos(angle); dz = Math.sin(angle); distance = 1; }
-      const overlap = gap - Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z), ux = dx / distance, uz = dz / distance;
-      const aFree = free(a), bFree = free(b);
-      if (aFree && bFree) {
-        // A zombie against a wall cannot give way, so the other gives way for it rather than staying in its body.
-        const gaveA = shove(a, ux * overlap / 2, uz * overlap / 2), owedB = overlap - gaveA;
-        const gaveB = shove(b, -ux * owedB, -uz * owedB), rest = owedB - gaveB;
-        if (rest > 1e-6) shove(a, ux * rest, uz * rest);
-      } else if (aFree) shove(a, ux * overlap, uz * overlap);
-      else if (bFree) shove(b, -ux * overlap, -uz * overlap);
+  // A few passes, each settling every pair and then every zombie against its player: one is not enough for a queue pressing
+  // on a zombie that holds its ground (each pair's push is undone by the next pair down the line), and stops early once
+  // nothing is more than a few millimetres off.
+  for (let pass = 0; pass < SEPARATION_PASSES; pass++) {
+    let unsettled = false;
+    for (let i = 0; i < zombies.length; i++) {
+      const a = zombies[i];
+      if (!a.alive) continue;
+      for (let j = i + 1; j < zombies.length; j++) {
+        const b = zombies[j];
+        if (!b.alive || Math.abs(a.position.y - b.position.y) > 1) continue;
+        work.separationPairs++;
+        let dx = a.position.x - b.position.x, dz = a.position.z - b.position.z, distance = Math.hypot(dx, dz);
+        if (pass === 0 && distance < gap + TOUCH_SLACK) (touching ??= []).push([i, j]);
+        if (distance >= gap) continue;
+        work.separationShoves++;
+        if (distance < 1e-4) { const angle = (mix32(hashString(a.id) ^ hashString(b.id)) / 0x1_0000_0000) * Math.PI * 2; dx = Math.cos(angle); dz = Math.sin(angle); distance = 1; }
+        const overlap = gap - Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z), ux = dx / distance, uz = dz / distance;
+        if (overlap > SETTLED) unsettled = true;
+        const aFree = free(a), bFree = free(b);
+        if (aFree && bFree) {
+          // A zombie against a wall cannot give way, so the other gives way for it rather than staying in its body.
+          const gaveA = shove(a, ux * overlap / 2, uz * overlap / 2), owedB = overlap - gaveA;
+          const gaveB = shove(b, -ux * owedB, -uz * owedB), rest = owedB - gaveB;
+          if (rest > 1e-6) shove(a, ux * rest, uz * rest);
+        } else if (aFree) shove(a, ux * overlap, uz * overlap);
+        else if (bFree) shove(b, -ux * overlap, -uz * overlap);
+      }
     }
-  }
-  for (const zombie of zombies) {
-    if (!zombie.alive || zombie.entry) continue;
-    for (const player of players) {
-      if (!player.alive || Math.abs(player.position.y - zombie.position.y) > 1) continue;
-      // A swinging zombie holds its ground against a player who is stopped by it (blockPlayerByZombies); a downed player
-      // is not, so a zombie over one is still pushed off.
-      if (zombie.attackTicks > 0 && !player.downed) continue;
-      const dx = zombie.position.x - player.position.x, dz = zombie.position.z - player.position.z, distance = Math.hypot(dx, dz);
-      if (distance >= playerGap) continue;
-      const push = playerGap - distance, ux = distance > 1e-4 ? dx / distance : Math.sin(zombie.yaw), uz = distance > 1e-4 ? dz / distance : Math.cos(zombie.yaw);
-      shove(zombie, ux * push, uz * push);
+    for (const zombie of zombies) {
+      if (!zombie.alive || zombie.entry) continue;
+      for (const player of players) {
+        if (!player.alive || Math.abs(player.position.y - zombie.position.y) > 1) continue;
+        // A swinging zombie holds its ground against a player who is stopped by it (blockPlayerByZombies); a downed player
+        // is not, so a zombie over one is still pushed off.
+        if (zombie.attackTicks > 0 && !player.downed) continue;
+        const dx = zombie.position.x - player.position.x, dz = zombie.position.z - player.position.z, distance = Math.hypot(dx, dz);
+        if (distance >= playerGap) continue;
+        const push = playerGap - distance, ux = distance > 1e-4 ? dx / distance : Math.sin(zombie.yaw), uz = distance > 1e-4 ? dz / distance : Math.cos(zombie.yaw);
+        if (push > SETTLED) unsettled = true;
+        shove(zombie, ux * push, uz * push);
+      }
     }
+    if (!unsettled) break;
   }
   if (touching) holdBehindFighters(zombies, players, touching);
 }
 
 /** How much nearer than touching two bodies must be to count as pressed together. */
 const TOUCH_SLACK = 0.1;
+/** Passes of separation a tick, at most, and the overlap (metres) under which a pass finds nothing left to settle. */
+const SEPARATION_PASSES = 4, SETTLED = 0.005;
 
 /**
  * A zombie queued behind others that are fighting (swinging, or against a player) is held up by them, not stuck on the
