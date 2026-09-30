@@ -5,7 +5,10 @@ import type { EntityId, InteractableState, PlayerState, Vec3 } from './types.ts'
 
 /** Equipment bought from a wall (as opposed to a gun): what it is called and how many come with a purchase. */
 export const EQUIPMENT_ITEMS = {
-  'bouncing-betty': { name: 'Bouncing Betty', perPurchase: MINE_RULES.perPurchase, maximum: MINE_RULES.maximum },
+  'bouncing-betty': {
+    name: 'Bouncing Betty', perPurchase: MINE_RULES.perPurchase, maximum: MINE_RULES.maximum,
+    chargeField: 'mineCharges', ownedField: 'bouncingBettyOwned',
+  },
 } as const;
 export type EquipmentItem = keyof typeof EQUIPMENT_ITEMS;
 
@@ -36,7 +39,24 @@ export function equipmentName(item: EquipmentItem): string { return EQUIPMENT_IT
 
 /** How many of an item the player carries. */
 export function equipmentCharges(player: PlayerState, item: EquipmentItem): number {
-  return item === 'bouncing-betty' ? player.mineCharges : 0;
+  return player[EQUIPMENT_ITEMS[item].chargeField];
+}
+
+/** Set carried equipment without ever exceeding that item's configured capacity. */
+export function setEquipmentCharges(player: PlayerState, item: EquipmentItem, charges: number): void {
+  const definition = EQUIPMENT_ITEMS[item];
+  player[definition.chargeField] = Math.max(0, Math.min(definition.maximum, charges));
+}
+
+export function equipmentOwned(player: PlayerState, item: EquipmentItem): boolean {
+  return player[EQUIPMENT_ITEMS[item].ownedField];
+}
+
+/** Max Ammo refills purchased equipment only; grenades are handled separately because everyone starts with them. */
+export function refillEquipment(player: PlayerState): void {
+  for (const item of Object.keys(EQUIPMENT_ITEMS) as EquipmentItem[]) {
+    if (equipmentOwned(player, item)) setEquipmentCharges(player, item, EQUIPMENT_ITEMS[item].maximum);
+  }
 }
 
 export function createEquipmentInteractable(id: EntityId, definition: EquipmentBuyDefinition): InteractableState {
@@ -64,7 +84,8 @@ export function handleEquipmentInteraction(player: PlayerState, interaction: Int
   if (held >= maximum) return [{ type: 'equipmentFull', playerId: player.id, buyId: buy.id, item: buy.item }];
   const spend = spendPoints(player, held > 0 ? buy.refillCost : buy.cost, `equipment:${buy.id}`);
   if (spend.type === 'pointsSpendRejected') return [spend];
-  if (buy.item === 'bouncing-betty') player.mineCharges = Math.min(maximum, held + EQUIPMENT_ITEMS[buy.item].perPurchase);
+  player[EQUIPMENT_ITEMS[buy.item].ownedField] = true;
+  setEquipmentCharges(player, buy.item, held + EQUIPMENT_ITEMS[buy.item].perPurchase);
   return [spend, { type: 'equipmentPurchased', playerId: player.id, buyId: buy.id, item: buy.item,
     charges: equipmentCharges(player, buy.item) }];
 }

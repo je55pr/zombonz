@@ -39,15 +39,18 @@ describe('timed power-ups', () => {
     tryDropPowerup(state, zombie, [], 42, 1, forced);
     const collector = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     collector.weapon.magazineAmmo = 2; collector.weapon.reserveAmmo = 1;
+    collector.mineCharges = 0; collector.bouncingBettyOwned = true;
     collector.holsteredWeapon = createWeaponState('bar'); collector.holsteredWeapon.reserveAmmo = 3;
     const teammate = createPlayerState('e:2', { x: 10, y: 0, z: 0 });
-    teammate.weapon.reserveAmmo = 0;
+    teammate.weapon.reserveAmmo = 0; teammate.mineCharges = 1; teammate.bouncingBettyOwned = true;
     expect(collectPowerups(state, [teammate, collector], [], forced)).toEqual([
       { type: 'powerupCollected', dropId: 'p:1', kind: 'maxAmmo', playerId: 'e:1' },
     ]);
-    expect(collector.weapon).toMatchObject({ magazineAmmo: 2, reserveAmmo: 32 });
+    expect(collector.weapon).toMatchObject({ magazineAmmo: 2, reserveAmmo: 80 });
     expect(collector.holsteredWeapon.reserveAmmo).toBe(140);
-    expect(teammate.weapon.reserveAmmo).toBe(32);
+    expect(teammate.weapon.reserveAmmo).toBe(80);
+    expect(collector.mineCharges).toBe(2);
+    expect(teammate.mineCharges).toBe(2);
     expect(state.drops).toEqual([]);
   });
 
@@ -228,13 +231,24 @@ describe('classic power-up drop rules', () => {
     expect(events.map(event => event.type)).toContain('powerupSpawned');
   });
 
-  it('Max Ammo also refills grenades', () => {
+  it('Max Ammo gives default grenades without granting unpurchased equipment', () => {
     const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
     tryDropPowerup(state, zombie, [], 42, 1, forced);
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     player.grenadeCharges = 0;
     collectPowerups(state, [player], [], forced);
     expect(player.grenadeCharges).toBe(4);
+    expect(player.mineCharges).toBe(0);
+    expect(player.bouncingBettyOwned).toBe(false);
+  });
+
+  it('Max Ammo refills purchased Betties even after both have been used', () => {
+    const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
+    tryDropPowerup(state, zombie, [], 42, 1, forced);
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.bouncingBettyOwned = true; player.mineCharges = 0;
+    collectPowerups(state, [player], [], forced);
+    expect(player.mineCharges).toBe(2);
   });
 });
 

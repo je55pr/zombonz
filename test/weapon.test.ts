@@ -34,10 +34,12 @@ describe('hitscan weapons', () => {
     expect(wantsToFire(player, false, true)).toBe(true);
     expect(wantsToFire(player, false, false)).toBe(false);
   });
-  it('uses data-driven starter weapon stats', () => {
+  it('uses data-driven starter weapon stats with separate starting and maximum reserve', () => {
     expect(WEAPON_DEFINITIONS['starter-pistol']).toMatchObject({
       damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi',
+      magazineSize: 8, startingReserveAmmo: 32, maxReserveAmmo: 80,
     });
+    expect(createWeaponState('starter-pistol')).toMatchObject({ magazineAmmo: 8, reserveAmmo: 32 });
   });
 
   it('makes ADS ten times steadier than hip-fire with repeatable shot spread', () => {

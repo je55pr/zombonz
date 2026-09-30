@@ -1,10 +1,10 @@
 import { restoreBarrier, type BarrierState } from './barrier.ts';
 import type { CollisionBox } from './collision.ts';
+import { refillEquipment } from './equipment.ts';
 import { GRENADE_RULES } from './grenade.ts';
 import { SeededRng } from './rng.ts';
 import type { EntityId, PlayerState, Vec3, ZombieState } from './types.ts';
-import { weaponDefinition } from './weapon.ts';
-import { rayAabbDistance } from './weapon.ts';
+import { rayAabbDistance, weaponDefinition, weaponReserveCapacity } from './weapon.ts';
 
 export type PowerupKind = 'maxAmmo' | 'doublePoints' | 'instaKill' | 'nuke' | 'carpenter';
 
@@ -179,10 +179,11 @@ function unobstructed(player: PlayerState, drop: PowerupDrop, boxes: readonly Co
 
 function refillAmmo(player: PlayerState): void {
   player.grenadeCharges = GRENADE_RULES.maximum;
+  refillEquipment(player);
   for (const weapon of [player.weapon, player.holsteredWeapon]) {
     if (!weapon) continue;
     const definition = weaponDefinition(weapon.weaponId);
-    if (definition) weapon.reserveAmmo = Math.max(weapon.reserveAmmo, definition.startingReserveAmmo);
+    if (definition) weapon.reserveAmmo = weaponReserveCapacity(definition);
   }
 }
 
