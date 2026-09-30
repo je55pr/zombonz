@@ -8,7 +8,7 @@ profiler overlay and the benchmark scenarios.
 
 `npm run benchmark` builds a repeatable stress run and times the simulation tick by tick. The main one, **train**, is the
 worst case a player can make on purpose: 24 zombies (two thirds runners, a third sprinters) chase a player who walks a full
-lap of Asylum at 3.7 m/s (a hair faster than a sprinter's 3.6): out of the German start, up its stair, through the upstairs
+lap of Asylum at 3.3 m/s (a hair faster than a sprinter's 3.24): out of the German start, up its stair, through the upstairs
 rooms and the power room, down the American stair, through the hallway and back, with each door opening as the player
 reaches it. Ticks are 60 a second, so one has 16.7 ms.
 

@@ -66,7 +66,7 @@ describe('zombie gaits', () => {
     expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeGreaterThan(PLAYER_MOVEMENT.maxSpeed * 0.8);
     expect(fastest).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * PLAYER_MOVEMENT.sprintMultiplier * 0.7);
     // Round-one walkers are a slow shamble and runners a jog: a walking player leaves both behind.
-    expect(ZOMBIE_GAIT_SPEEDS.walk).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.2);
+    expect(ZOMBIE_GAIT_SPEEDS.walk).toBeLessThanOrEqual(PLAYER_MOVEMENT.maxSpeed * 0.2);
     expect(ZOMBIE_GAIT_SPEEDS.run).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.6);
   });
 

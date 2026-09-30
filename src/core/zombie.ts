@@ -36,13 +36,14 @@ export type ZombieMeleeEvent = ZombieAttackEvent | ZombieSwingEvent;
 
 /**
  * Walkers shamble at their walk cycle's own ground pace (about 0.75 m/s), so feet don't slide and an
- * early round is as slow as WaW's. Runners jog at about half the player's 4.2 m/s walk (their run cycle
- * covers about 1.84 m/s and plays slightly faster). Sprinters run at 3.6, six sevenths of the player's walk: at
- * 4.1 (issue #210) they matched a walking player, so once sprint stamina ran out a late-round horde stayed on top of
+ * early round is as slow as WaW's. Runners jog at a little over half the player's 4 m/s walk (their run cycle
+ * covers about 1.84 m/s and plays slightly faster). Sprinters run at 3.24, so that the fastest zombie a horde can hold
+ * (a sprinter at the most its own pace may be over, 8%) is 3.5, seven eighths of the player's walk: at 4.1 against a 4.2
+ * walk (issue #210) they matched a walking player, so once sprint stamina ran out a late-round horde stayed on top of
  * them for good. Now walking away always opens a gap, slowly; sprinting opens a big one; a corner or a dead end still
  * costs the player what it should. See docs/zombie-difficulty.md.
  */
-export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 0.8, run: 2.2, sprint: 3.6 };
+export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 0.8, run: 2.2, sprint: 3.24 };
 
 /**
  * Each zombie's own pace is its gait's speed within this fraction either way (fixed by its id, so it is the same on every

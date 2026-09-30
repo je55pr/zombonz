@@ -7,7 +7,8 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
 ## What was wrong
 
 1. **Late rounds were glued to a walking player.** From round 10 every zombie rolls as a sprinter, and a sprinter ran at
-   4.1 m/s against the player's 4.2 walk. The player's own sprint (6.3 m/s) lasts about four seconds; when it ran out a
+   4.1 m/s against the player's 4.2 walk (the original numbers; the player now walks at 4.0 and sprints at 6.0). The
+   player's own sprint lasts about four seconds; when it ran out a
    sprinter was at 98% of their walking pace, so any turn or corner let the horde close and nothing ever opened a gap again.
 2. **A crowd cost nothing to run through.** The player had no collision with zombies at all: `separateZombies` pushed each
    zombie out of a ring round the player instead, so the player shouldered through a group at full speed. A swing needs a
@@ -19,12 +20,13 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
 
 ## What changed
 
-- **Sprinters are 3.6 m/s, not 4.1** (six sevenths of the player's walk). Walking away from any zombie now opens a gap;
+- **Sprinters are 3.24 m/s, not 4.1**, and the player walks at 4.0 (was 4.2) and sprints at 6.0 (was 6.3). The fastest zombie
+  a horde can hold is 3.5, seven eighths of the player's walk. Walking away from any zombie now opens a gap;
   sprinting opens a large one; a player who stops, or who is cornered, is still caught in seconds. Walkers (0.8) and
   runners (2.2) are as they were.
 - **Every zombie has its own pace**, its gait's speed within 8% either way, fixed by its id (`zombiePaceFactor`). A horde of
   sprinters therefore strings out into a line behind a player walking away instead of arriving as one blob: the slowest
-  sprinter is 3.3 m/s and the fastest 3.9, still under a walking player. The client plays each zombie's run cycle at its own
+  sprinter is 3.0 m/s and the fastest 3.5, still under a walking player. The client plays each zombie's run cycle at its own
   pace so feet stay planted.
 - **Zombies are solid to the player** (`blockPlayerByZombies`). After the player moves each tick they are put back on the
   edge of any body they have run into (bodies touch at 0.66 m, the player's radius and a zombie's), so they slide round a
@@ -65,13 +67,13 @@ after a blow.
 
 ## The numbers
 
-Speeds, in m/s: the player walks 4.2 and sprints 6.3 for four seconds (then a pause, and a recharge). Zombies:
+Speeds, in m/s: the player walks 4.0 and sprints 6.0 for four seconds (then a pause, and a recharge). Zombies:
 
 | Gait | Speed | With each zombie's own pace |
 | --- | --- | --- |
 | walk | 0.8 | 0.74 to 0.86 |
 | run | 2.2 | 2.02 to 2.38 |
-| sprint | 3.6 (was 4.1) | 3.31 to 3.89 |
+| sprint | 3.24 (was 4.1) | 2.98 to 3.50 |
 
 The mix by round is WaW's: round 1 all walkers, runners from round 2, walkers gone by round 6 where the first sprinters
 appear (12%), 57% sprinters in round 8, and all sprinters from round 10.
@@ -79,10 +81,10 @@ appear (12%), 57% sprinters in round 8, and all sprinters from round 10.
 **A chase** (`runChase`): a sprinter three metres behind a player on open ground, the gap in metres after 1, 5, 10 and 20 s.
 Nobody was hit in any of these.
 
-| Player | Before | After |
+| Player | Before (original game) | After |
 | --- | --- | --- |
-| walking | 2.7, 3.1, 3.6, 4.6 | 3.0, 4.5, 6.3, 10.0 |
-| sprinting whenever stamina allows | 4.4, 11.1, 15.8, 25.2 | 4.6, 12.5, 18.5, 30.6 |
+| walking | 2.7, 3.1, 3.6, 4.6 | 3.2, 5.4, 8.2, 13.7 |
+| sprinting whenever stamina allows | 4.4, 11.1, 15.8, 25.2 | 4.8, 13.1, 19.8, 33.3 |
 
 **A crowd** (`runCrowd`): a group of running zombies coming the other way, six layouts each, the player sprinting. Blows
 taken (with the player unkillable, so a run that is stopped keeps taking them) and how many of the six got through:
@@ -90,11 +92,11 @@ taken (with the player unkillable, so a run that is stopped keeps taking them) a
 | Zombies in the group | 1 | 2 | 3 | 6 | 12 |
 | --- | --- | --- | --- | --- | --- |
 | straight through, before | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 |
-| straight through, after | 0.0 / 6 | 1.0 / 6 | 14.0 / 0 | 14.0 / 0 | 14.0 / 0 |
+| straight through, after | 1.0 / 6 | 1.0 / 6 | 14.0 / 0 | 14.0 / 0 | 14.0 / 0 |
 | steering round, before | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 |
-| steering round, after | 0.0 / 6 | 0.0 / 6 | 0.7 / 6 | 1.0 / 6 | 1.0 / 6 |
+| steering round, after | 0.0 / 6 | 0.0 / 6 | 1.0 / 6 | 1.0 / 6 | 1.0 / 6 |
 
-Read as: one or two zombies can be run past (two cost a blow); three side by side (bodies 1.1 m apart, so no gap a player
+Read as: one or two zombies can be run past (they cost a blow); three side by side (bodies 1.1 m apart, so no gap a player
 fits) are a wall, and running into one is a dead stop under blows (14 in eight seconds; in a real game two put the player
 down). The way round stays open, but a player who steers close round a whole group now takes a blow, at most one, where
 before it was free. That is the shape asked for: running through a crowd is no longer free, and a player with good movement still
@@ -106,9 +108,9 @@ shown and runs the other way; blows taken per run (mean of six tempos), and how 
 | Player turns at | 0.7 m (touching) | 2.5 m | 4 m |
 | --- | --- | --- | --- |
 | walking, before | 0.0, swing at 1.2 m | 0.0, 1.1 m | 0.0, no swing |
-| walking, after | 1.3, swing at 3.3 m | 1.0, 3.3 m | 0.0, 3.3 m |
+| walking, after | 1.0, swing at 3.4 m | 0.2, 3.4 m | 0.0, 3.4 m |
 | sprinting, before | 0.0, swing at 1.2 m | 0.0, 1.1 m | 0.0, no swing |
-| sprinting, after | 1.0, swing at 3.4 m | 1.0, 3.4 m | 0.0, 3.4 m |
+| sprinting, after | 1.0, swing at 3.4 m | 1.0, 3.4 m | 0.0, 3.3 m |
 
 So running right up is punished (a blow, which is half a life; a walker gets a second as it follows), and a player who turns
 after the swing has begun is caught too, because the zombie is committed and still closing. Turning away at 4 m, before it
@@ -118,7 +120,8 @@ begins, dodges it (and the zombie swings at nothing).
 
 | Constant | Now | What it does |
 | --- | --- | --- |
-| `ZOMBIE_GAIT_SPEEDS.sprint` | 3.6 | How near a late-round zombie runs to a walking player (86%). Raise it and walking away opens a gap more slowly. |
+| `ZOMBIE_GAIT_SPEEDS.sprint` | 3.24 | How near a late-round zombie runs to a walking player (81%; the fastest, at +8% pace, is 3.5 or 87%). Raise it and walking away opens a gap more slowly. |
+| `PLAYER_MOVEMENT.maxSpeed` | 4.0 | The player's walk (sprint is 1.5 times it). |
 | `ZOMBIE_PACE_SPREAD` | 0.08 | How strung out a horde gets; 0 makes every zombie of a gait identical. |
 | `ZOMBIE_GIVE` | 0.3 | How much a free zombie yields to a shoulder; 0 makes every zombie a wall. |
 | `WEDGE_DEPTH` | 0.05 m | How deep in the bodies round them a player is before they are stopped where they were. |
@@ -135,7 +138,7 @@ beside it).
 ## Not covered
 
 - Only measured against scripted players on open ground. How it plays in Asylum's corridors and doorways, where a crowd
-  cannot be steered round, is for hands-on play, as is whether 3.6 m/s and a 30% give feel right.
+  cannot be steered round, is for hands-on play, as is whether 3.24 m/s and a 30% give feel right.
 - Co-op with a real second player: a client predicts against zombies a moment old, so a shove can be corrected by a few
   centimetres. Not tried over a real connection.
 - The stuck-zombie recovery and the wall-aware navigation from issues #191 and #186 are unchanged apart from the queue rule

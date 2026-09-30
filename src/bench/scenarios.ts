@@ -162,7 +162,7 @@ export interface TrainingOptions {
   ticks?: number;
   /** Ticks to leave out of the timings while everything warms up (default 60). */
   warmup?: number;
-  /** The player's pace in metres per second (default 3.7, a hair faster than a sprinter's 3.6, so the horde stays on their heels). */
+  /** The player's pace in metres per second (default 3.3, a hair faster than a sprinter's 3.24, so the horde stays on their heels). */
   pace?: number;
 }
 
@@ -175,7 +175,7 @@ const UNLOCK_RANGE = 3.5;
  * zombies run and a third sprint, and they begin in the open a few metres behind.
  */
 export function runAsylumTraining(options: TrainingOptions = {}): BenchmarkResult {
-  const map = ASYLUM_MAP, count = options.zombies ?? 24, pace = (options.pace ?? 3.7) / 60;
+  const map = ASYLUM_MAP, count = options.zombies ?? 24, pace = (options.pace ?? 3.3) / 60;
   const route = routeThrough(map, ASYLUM_TRAIN_LAP);
   const sim = new GameSimulation({ seed: 1, map: { ...simulationMap(map), zombieSpawns: [] }, playerSpawns: [map.playerSpawn],
     roundConfig: { initialWaitTicks: 2147483647, intermissionTicks: 2147483647 } });

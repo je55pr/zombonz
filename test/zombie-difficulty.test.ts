@@ -14,6 +14,8 @@ import { predictPlayerTick } from '../src/net/prediction.ts';
 
 /** The fastest zombie a horde can hold: the sprinter's speed, and the most its own pace may be over it. */
 const FASTEST = ZOMBIE_GAIT_SPEEDS.sprint * (1 + ZOMBIE_PACE_SPREAD);
+/** How fast the player walks. */
+const WALK = PLAYER_MOVEMENT.maxSpeed;
 
 /** A zombie that stays where it is placed, on open ground. */
 function stationary(sim: GameSimulation, x: number, z: number): ZombieState {
@@ -220,10 +222,10 @@ describe('a zombie that reads where the player is going', () => {
   }
 
   it('starts its swing before a player running at it is in reach, so the blow lands as they arrive', () => {
-    const { zombie, player } = scene(5, 0, -4.2);
+    const { zombie, player } = scene(5, 0, -WALK);
     let beganAt: number | null = null, hit = false;
     for (let tick = 0; tick < 240 && !hit; tick++) {
-      player.position.z = Math.max(BODY_CONTACT, player.position.z - 4.2 / 60);
+      player.position.z = Math.max(BODY_CONTACT, player.position.z - WALK / 60);
       const events = tickZombieMelee(zombie, [player]);
       if (beganAt === null && zombie.attackTicks > 0) beganAt = player.position.z;
       hit = events.some(event => event.type === 'zombieAttacked');
@@ -236,7 +238,7 @@ describe('a zombie that reads where the player is going', () => {
   });
 
   it('holds off for a player who is well off, backing away, or crossing well in front of it', () => {
-    for (const [z, vx, vz] of [[4, 0, 0], [2, 0, 4.2], [3, 4.2, 0], [3, -4.2, 0]]) {
+    for (const [z, vx, vz] of [[4, 0, 0], [2, 0, WALK], [3, WALK, 0], [3, -WALK, 0]]) {
       const { zombie, player } = scene(z, vx, vz);
       for (let tick = 0; tick < 30; tick++) tickZombieMelee(zombie, [player]);
       expect(zombie.attackTicks, `player at ${z} m going (${vx}, ${vz})`).toBe(0);
@@ -245,11 +247,11 @@ describe('a zombie that reads where the player is going', () => {
 
   it('misses a player who stops short, or turns away, once the swing has begun', () => {
     for (const away of [false, true]) {
-      const { zombie, player } = scene(5, 0, -4.2);
+      const { zombie, player } = scene(5, 0, -WALK);
       let hit = false, swung = false;
       for (let tick = 0; tick < 240; tick++) {
-        if (!swung) player.position.z -= 4.2 / 60;
-        else { player.velocity = { x: 0, y: 0, z: away ? 4.2 : 0 }; if (away) player.position.z += 4.2 / 60; }
+        if (!swung) player.position.z -= WALK / 60;
+        else { player.velocity = { x: 0, y: 0, z: away ? WALK : 0 }; if (away) player.position.z += WALK / 60; }
         if (tickZombieMelee(zombie, [player]).some(event => event.type === 'zombieAttacked')) hit = true;
         if (zombie.attackTicks > 0) swung = true;
       }
