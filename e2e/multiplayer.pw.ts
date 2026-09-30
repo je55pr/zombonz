@@ -94,3 +94,62 @@ test('real room WebRTC starts two players and replicates movement', async ({ bro
     await close(contexts);
   }
 });
+
+test('room client refresh reclaims the same running match slot', async ({ browser }, testInfo) => {
+  const hostContext = await browser.newContext();
+  const clientContext = await browser.newContext();
+  const contexts = [hostContext, clientContext];
+  const host = await hostContext.newPage();
+  const client = await clientContext.newPage();
+  const logs: string[] = [];
+  capturePageLog(host, 'host', logs);
+  capturePageLog(client, 'client', logs);
+
+  try {
+    await host.goto('/?e2e=multiplayer&role=host');
+    await expect.poll(async () => (await snapshot(host))?.phase).toBe('room-open');
+    const room = (await snapshot(host))?.room;
+    expect(room).toMatch(/^[A-Z2-9]{5}$/);
+
+    await client.goto(`/?e2e=multiplayer&role=client&room=${room}`);
+    await expect.poll(async () => (await snapshot(host))?.players).toBe(2);
+    await host.evaluate(() => {
+      (window as typeof window & { zombonzE2E?: { start(): void } }).zombonzE2E?.start();
+    });
+    await expect.poll(async () => (await snapshot(client))?.phase).toBe('game');
+
+    const before = await snapshot(client);
+    expect(before?.slot).toBe(1);
+    expect(before?.playerId).toBeTruthy();
+    const slot = before!.slot;
+    const playerId = before!.playerId!;
+    const hostTicks = (await snapshot(host))!.ticks;
+
+    await client.reload();
+    await expect.poll(async () => (await snapshot(host))?.ticks ?? 0).toBeGreaterThan(hostTicks + 5);
+    await expect.poll(async () => (await snapshot(client))?.phase, { timeout: 15_000 }).toBe('game');
+
+    const returned = await snapshot(client);
+    expect(returned?.slot).toBe(slot);
+    expect(returned?.playerId).toBe(playerId);
+    await expect.poll(async () => (await snapshot(host))?.players).toBe(2);
+    await expect.poll(async () => {
+      const hostPosition = (await snapshot(host))?.positions[playerId];
+      const clientPosition = (await snapshot(client))?.positions[playerId];
+      if (!hostPosition || !clientPosition) return Infinity;
+      return Math.hypot(hostPosition.x - clientPosition.x, hostPosition.z - clientPosition.z);
+    }).toBeLessThan(0.5);
+
+    const position = (await snapshot(host))!.positions[playerId];
+    await client.evaluate(() => {
+      (window as typeof window & { zombonzE2E?: { setMoving(value: boolean): void } }).zombonzE2E?.setMoving(true);
+    });
+    await expect.poll(async () => {
+      const current = (await snapshot(host))?.positions[playerId];
+      return current ? Math.hypot(current.x - position.x, current.z - position.z) : 0;
+    }, { timeout: 10_000 }).toBeGreaterThan(0.75);
+  } finally {
+    await attachDiagnostics(testInfo, host, client, logs);
+    await close(contexts);
+  }
+});

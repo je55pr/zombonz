@@ -121,6 +121,9 @@ The first line of the text is the result: `GOOD`, `MAYBE` or `PROBLEM`, with a s
 configured TURN service actually produced a relay candidate. Incomplete TURN deployment settings are called out as configuration trouble,
 while direct-connectivity failures remain labelled as network trouble. Both players' networks matter, so ask both to run the test.
 
+For repeatable same-LAN, normal-NAT, restrictive-NAT/TURN, refresh and disconnect checks, use the
+[NAT and connectivity test matrix](connectivity-test-matrix.md). It states the expected route, what CI proves, and which rows require real networks.
+
 ## Why both sides start together
 
 A browser starts sending connection probes the moment it has both halves of the exchange, and gives up after a few seconds

@@ -77,12 +77,18 @@ describe('the verdict', () => {
     expect(judge(report({ addresses: network({ publicV4: 3, mapping: 'differs' }) })).level).toBe('warn');
   });
 
-  it('recognises a working TURN relay when direct NAT traversal is restrictive', () => {
-    const verdict = judge(report({
+  it('recognises a working TURN relay when direct NAT traversal is restrictive or STUN is blocked', () => {
+    const symmetric = judge(report({
       turn: { configured: true, problem: null },
       addresses: network({ publicV4: 3, publicV6: false, relay: 1, mapping: 'differs' }),
     }));
-    expect(verdict).toMatchObject({ level: 'good', headline: expect.stringMatching(/relay fallback is available/i) });
+    expect(symmetric).toMatchObject({ level: 'good', headline: expect.stringMatching(/relay fallback is available/i) });
+
+    const blockedDirect = judge(report({
+      turn: { configured: true, problem: null },
+      addresses: network({ publicV4: 0, publicV6: false, relay: 1, mapping: 'none' }),
+    }));
+    expect(blockedDirect).toMatchObject({ level: 'good', headline: expect.stringMatching(/relay fallback is available/i) });
   });
 
   it('warns when TURN deployment settings are incomplete or a configured relay does not answer', () => {

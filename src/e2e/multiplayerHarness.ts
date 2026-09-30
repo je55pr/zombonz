@@ -33,6 +33,13 @@ declare global {
 }
 
 const TICK_MS = 1000 / 60;
+const RESUME_PREFIX = 'zombonz.e2e.resume.';
+const savedResume = (room: string): string | null => {
+  try { return sessionStorage.getItem(`${RESUME_PREFIX}${room}`); } catch { return null; }
+};
+const saveResume = (room: string, token: string): void => {
+  try { sessionStorage.setItem(`${RESUME_PREFIX}${room}`, token); } catch { /* storage unavailable */ }
+};
 const logLines: string[] = [];
 const note = (text: string) => {
   const line = `${new Date().toISOString()} ${text}`;
@@ -117,9 +124,14 @@ async function bootClient(room: string): Promise<HarnessApi> {
   const link = await join.connected;
   phase = 'webrtc-open';
   note('WebRTC link to host connected');
-  const client = new NetClient(linkClientTransport(link), 'Browser Client');
+  const resumeToken = savedResume(room);
+  const client = new NetClient(linkClientTransport(link), 'Browser Client', { resumeToken });
+  if (resumeToken) note('requesting reserved match slot');
+  const rememberResume = () => { if (client.resumeToken) saveResume(room, client.resumeToken); };
+  client.changed.add(rememberResume);
 
   client.started.add(start => {
+    rememberResume();
     simulation = createMatch(ASYLUM_MAP, start.players.length, start.seed, {
       roundConfig: { initialWaitTicks: 999999, intermissionTicks: 1 },
     });
