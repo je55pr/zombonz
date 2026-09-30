@@ -34,7 +34,10 @@ if (action === 'check') {
   const version = run(godot, ['--version']);
   if (!/^4\.7\.\d+\.stable\.mono\./.test(version)) throw new Error(`Use Godot 4.7 .NET (tested with 4.7.2); found ${version}. Set GODOT to its executable path.`);
   // Give the .NET editor time to finish initialization before shutting down its tool scripts.
-  run(godot, ['--headless', '--editor', '--path', project, '--quit-after', '10'], true);
+  env.ZOMBONZ_EDITOR_SMOKE_TEST = '1';
+  const editorOutput = run(godot, ['--headless', '--editor', '--path', project, '--quit-after', '10'], true);
+  delete env.ZOMBONZ_EDITOR_SMOKE_TEST;
+  if (!editorOutput.includes('C# map editor (editor):')) throw new Error('The editor plugin did not run its import checks.');
   run(godot, ['--headless', '--path', project, 'res://tests/SmokeTest.tscn'], true);
 } else {
   console.log('Open tools/godot-map-editor/project.godot in Godot 4.7 .NET. The C# plugin has been built.');

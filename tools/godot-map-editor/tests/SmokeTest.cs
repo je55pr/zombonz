@@ -7,11 +7,25 @@ public partial class SmokeTest : Node
     {
         try
         {
-            foreach (var id in new[] { "bunker", "asylum" }) CheckMap(id);
-            GD.Print("C# map editor: both maps load textured models and PBR surfaces, preserve previews after reopening, preserve untouched JSON, edit, add objects, and export through the browser validator.");
+            RunChecks();
             GetTree().Quit();
         }
         catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }
+    }
+
+    public static void RunChecks()
+    {
+        var propsDirectory = ZombonzMapPlugin.SourcePath("../../public/assets/props");
+        var sourceFiles = System.IO.Directory.GetFiles(propsDirectory, "*", SearchOption.AllDirectories).Order().ToArray();
+        // Force a real GLB import even when previous runtime checks already populated the cache.
+        var assets = new MapPreviewAssets();
+        var coldModel = assets.Model("wooden-table", rebuild: true).Instantiate<Node3D>();
+        try { Require(MapPreviewAssets.Bounds(coldModel).Size.Length() > 0, "Cold model import has no renderable meshes"); }
+        finally { coldModel.Free(); }
+        foreach (var id in new[] { "bunker", "asylum" }) CheckMap(id);
+        Require(sourceFiles.SequenceEqual(System.IO.Directory.GetFiles(propsDirectory, "*", SearchOption.AllDirectories).Order()),
+            "Preview import extracted new files into the browser's source assets");
+        GD.Print("C# map editor (" + (Engine.IsEditorHint() ? "editor" : "runtime") + "): both maps load textured models and PBR surfaces, preserve previews after reopening, preserve untouched JSON, edit, add objects, and export through the browser validator.");
     }
 
     private static void Require(bool condition, string message)
