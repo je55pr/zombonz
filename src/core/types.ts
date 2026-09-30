@@ -93,6 +93,11 @@ export interface ZombieState extends EntityBase {
   attackTicks: number;
   /** Which of its model's swings the current one is. */
   attackStyle: number;
+  /** Ticks in a row it has meant to move and stayed within a step or two of where it was (see `trackZombieProgress`). */
+  stall: number;
+  /** Where that stay began. Only the host uses these two, so they are left out of snapshots. */
+  anchorX: number;
+  anchorZ: number;
 }
 export interface InteractableState extends EntityBase {
   kind: 'interactable';

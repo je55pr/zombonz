@@ -1,3 +1,4 @@
+import { work } from './profiling.ts';
 import type { Vec3 } from './types.ts';
 
 export interface CollisionBox {
@@ -9,6 +10,14 @@ function overlapsVertical(feetY: number, height: number, box: CollisionBox): boo
   return feetY < box.max.y && feetY + height > box.min.y;
 }
 
+/**
+ * How far into a wall's margin a body may be, in metres, and still count as touching it rather than inside it.
+ * `moveWithCollision` stops a body exactly on the edge of a wall's margin (the wall grown by the body's radius), so a
+ * body pressed against a wall sits on that edge to the last bit; a line test that took the edge for the inside of the
+ * wall found no way out of it in any direction.
+ */
+export const CONTACT = 1e-4;
+
 export function moveWithCollision(
   position: Vec3,
   delta: Vec3,
@@ -19,6 +28,7 @@ export function moveWithCollision(
   let x = position.x;
   let z = position.z;
   const y = position.y;
+  work.moves++; work.moveBoxTests += 2 * boxes.length;
 
   let targetX = x + delta.x;
   for (const box of boxes) {
@@ -47,6 +57,75 @@ export function moveWithCollision(
   z = targetZ;
 
   return { x, y: y + delta.y, z };
+}
+
+/**
+ * Whether a body `radius` wide and `height` tall, walking the straight line from `start` to `end`, runs into `box`:
+ * whether the line enters the box grown by the radius on every side, at a height where the body would touch it.
+ */
+export function segmentHitsExpandedBox(
+  start: Vec3,
+  end: Vec3,
+  box: CollisionBox,
+  radius: number,
+  height: number,
+): boolean {
+  work.navigationBoxTests++;
+  // A line along the edge of the margin, or leaving it, does not enter it: only a line that goes inside does.
+  const insetX = Math.min(CONTACT, (box.max.x - box.min.x + 2 * radius) / 4);
+  const insetZ = Math.min(CONTACT, (box.max.z - box.min.z + 2 * radius) / 4);
+  const minX = box.min.x - radius + insetX;
+  const maxX = box.max.x + radius - insetX;
+  const minZ = box.min.z - radius + insetZ;
+  const maxZ = box.max.z + radius - insetZ;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dz = end.z - start.z;
+  const minY = box.min.y - height + 1e-6;
+  const maxY = box.max.y - 1e-6;
+  let near = 0;
+  let far = 1;
+  // Avoid allocating four temporary arrays for every box/line test.
+  for (let axis = 0; axis < 3; axis++) {
+    const origin = axis === 0 ? start.x : axis === 1 ? start.y : start.z;
+    const delta = axis === 0 ? dx : axis === 1 ? dy : dz;
+    const min = axis === 0 ? minX : axis === 1 ? minY : minZ;
+    const max = axis === 0 ? maxX : axis === 1 ? maxY : maxZ;
+    if (Math.abs(delta) < 1e-9) {
+      if (origin < min || origin > max) return false;
+      continue;
+    }
+    let t1 = (min - origin) / delta;
+    let t2 = (max - origin) / delta;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    near = Math.max(near, t1);
+    far = Math.min(far, t2);
+    if (near > far) return false;
+  }
+  return far >= 0 && near <= 1;
+}
+
+/**
+ * Where a body `radius` wide and `height` tall that has ended up inside a wall's margin (a wall grown by the radius:
+ * pushed in by a crowd, or the box has just been put down on it) should stand instead: the nearest edge of the margin,
+ * a shortest push along one axis, which never carries it through the wall. Null when it is not inside any.
+ */
+export function pushOutOfBoxes(position: Vec3, radius: number, height: number, boxes: readonly CollisionBox[]): Vec3 | null {
+  let x = position.x, z = position.z, moved = false;
+  // Freeing it from one wall can put it into the next (a corner), so go round a few times.
+  for (let pass = 0; pass < 4; pass++) {
+    let pushed = false;
+    for (const box of boxes) {
+      if (!overlapsVertical(position.y, height, box)) continue;
+      const minX = box.min.x - radius, maxX = box.max.x + radius, minZ = box.min.z - radius, maxZ = box.max.z + radius;
+      if (x <= minX + CONTACT || x >= maxX - CONTACT || z <= minZ + CONTACT || z >= maxZ - CONTACT) continue;
+      const west = x - minX, east = maxX - x, north = z - minZ, south = maxZ - z, least = Math.min(west, east, north, south);
+      if (least === west) x = minX; else if (least === east) x = maxX; else if (least === north) z = minZ; else z = maxZ;
+      pushed = moved = true;
+    }
+    if (!pushed) break;
+  }
+  return moved ? { x, y: position.y, z } : null;
 }
 
 export interface WalkSurface {

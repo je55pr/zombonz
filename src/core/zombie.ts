@@ -1,9 +1,11 @@
+import { work } from './profiling.ts';
 import type { BarrierState } from './barrier.ts';
 import type { CollisionBox, WalkSurface } from './collision.ts';
-import { moveWithCollision, sampleWalkHeight } from './collision.ts';
+import { moveWithCollision, pushOutOfBoxes, sampleWalkHeight } from './collision.ts';
+import type { CollisionIndex } from './collisionIndex.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
 import { mix32, hashString } from './rng.ts';
-import { hasClearNavigationLine, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
+import { hasClearNavigationLine, hasWalkableConnection, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { SeededRng } from './rng.ts';
 import { CRAWLER, LEGS_MASK, faceToward, zombieSpeed } from './zombieBody.ts';
 import { ZOMBIE_MELEE, swingTiming } from './zombieMelee.ts';
@@ -84,6 +86,9 @@ export function createZombieState(id: EntityId, position: Vec3, round: number, g
     limbs: 0,
     attackTicks: 0,
     attackStyle: 0,
+    stall: 0,
+    anchorX: position.x,
+    anchorZ: position.z,
     alive: true,
   };
 }
@@ -129,19 +134,25 @@ export function updateZombiePursuit(
   walkSurfaces: readonly WalkSurface[] = [],
   navigationGraph?: NavigationGraph,
   navigationQuery?: NavigationQuery,
+  /** The same walls as `collisionBoxes`, indexed: moves then look only at the walls around the zombie. */
+  solids?: CollisionIndex,
 ): void {
   if (!zombie.alive) return;
   const target = chooseZombieTarget(zombie, players);
   if (!target) {
     zombie.velocity = { x: 0, y: 0, z: 0 };
+    trackZombieProgress(zombie, false);
     return;
   }
+  const height = zombie.limbs & LEGS_MASK ? CRAWLER.height : ZOMBIE_MOVEMENT.height;
+  freeFromWalls(zombie, height, collisionBoxes, solids);
   const targetDx = target.position.x - zombie.position.x;
   const targetDz = target.position.z - zombie.position.z;
   // A zombie swinging, or close enough to start, stands its ground and turns to face its target.
   if (zombie.attackTicks > 0 || inMeleeReach(zombie, target, collisionBoxes, meleeReach(zombie).startRange)) {
     zombie.velocity.x = 0;
     zombie.velocity.z = 0;
+    trackZombieProgress(zombie, false);
     faceToward(zombie, Math.atan2(targetDx, targetDz), deltaSeconds);
     return;
   }
@@ -162,16 +173,93 @@ export function updateZombiePursuit(
   zombie.velocity.x = velocityX;
   zombie.velocity.z = velocityZ;
   if (planarDistance > 0) faceToward(zombie, Math.atan2(dx, dz), deltaSeconds);
-  const requested = { x: velocityX * deltaSeconds, y: 0, z: velocityZ * deltaSeconds };
-  const next = moveWithCollision(
-    zombie.position,
-    requested,
-    ZOMBIE_MOVEMENT.radius,
-    zombie.limbs & LEGS_MASK ? CRAWLER.height : ZOMBIE_MOVEMENT.height,
-    collisionBoxes,
-  );
+  // Stood still for seconds with a way to go: get to somewhere it can walk from.
+  if (zombie.stall >= STALL.relocateTicks) {
+    const spot = freeSpotNear(zombie, waypoint, collisionBoxes, walkSurfaces, height);
+    zombie.stall = spot ? 0 : STALL.relocateTicks - STALL.retryTicks;
+    if (spot) { zombie.position = spot; work.stuckRecoveries++; return; }
+  }
+  const step = (vx: number, vz: number): Vec3 => {
+    const delta = { x: vx * deltaSeconds, y: 0, z: vz * deltaSeconds };
+    return solids ? solids.move(zombie.position, delta, ZOMBIE_MOVEMENT.radius, height)
+      : moveWithCollision(zombie.position, delta, ZOMBIE_MOVEMENT.radius, height, collisionBoxes);
+  };
+  /** How much nearer the waypoint a step would put the zombie. */
+  const closes = (to: Vec3) => planarDistance - Math.hypot(waypoint.x - to.x, waypoint.z - to.z);
+  let next = step(velocityX, velocityZ);
+  // Pressed against a wall or a corner it gets little of its step: try other headings and take the one that gets it
+  // furthest on (the way along the wall to the door, not away from it), else, when none does, the side that is its own,
+  // so that a crowd spreads.
+  if (planarDistance > 0 && closes(next) < speed * deltaSeconds * STALL.blocked) {
+    const first = mix32(hashString(zombie.id)) & 1 ? 1 : -1;
+    let best = closes(next);
+    for (const turn of SLIDE_TURNS) for (const side of [first, -first]) {
+      const angle = turn * side, cos = Math.cos(angle), sin = Math.sin(angle);
+      const candidate = step(velocityX * cos - velocityZ * sin, velocityX * sin + velocityZ * cos);
+      if (closes(candidate) > best + 1e-9) { next = candidate; best = closes(candidate); }
+    }
+  }
   next.y = sampleWalkHeight(next.x, next.z, zombie.position.y, walkSurfaces);
   zombie.position = next;
+  // Sliding along a wall, shuffling in a corner or dithering between two waypoints is moving but not getting anywhere.
+  trackZombieProgress(zombie, planarDistance > 0);
+}
+
+/**
+ * How a zombie that cannot get anywhere is recognised and helped. It is stalled while it means to move and stays within
+ * `radius` metres of where it was; after `relocateTicks` of that it is put somewhere free close by (never across a wall),
+ * and it tries again `retryTicks` later if there was nowhere. Closing on its waypoint by `blocked` or less of its step,
+ * it tries the headings in `SLIDE_TURNS`, to either side, and takes whichever closes on it most.
+ */
+export const STALL = { radius: 0.2, relocateTicks: 180, retryTicks: 60, blocked: 0.2 } as const;
+/** Turns off a blocked heading, in radians: a slide, along the wall, and back the way it came round. */
+const SLIDE_TURNS = [Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4] as const;
+
+/** Frees a zombie from the margin of a wall it has been pushed into, to the nearest edge of it. */
+function freeFromWalls(zombie: ZombieState, height: number, boxes: readonly CollisionBox[], solids?: CollisionIndex): void {
+  const near = solids ? solids.near(zombie.position.x, zombie.position.z, ZOMBIE_MOVEMENT.radius + 1e-6) : boxes;
+  const out = pushOutOfBoxes(zombie.position, ZOMBIE_MOVEMENT.radius, height, near);
+  if (!out) return;
+  zombie.position = { x: out.x, y: zombie.position.y, z: out.z };
+  work.stuckRecoveries++;
+}
+
+/**
+ * Counts a tick against a zombie that meant to move (`wanting`: it had somewhere to go and was not swinging) and is still
+ * within `STALL.radius` of where it stood when the count began. Once it has left that circle, or has no wish to move, the
+ * count starts again from where it is. Measuring the distance from a fixed spot, not each tick's step, is what catches a
+ * zombie that shuffles or dithers in place, which moves every tick and gets nowhere.
+ */
+export function trackZombieProgress(zombie: ZombieState, wanting: boolean): void {
+  if (wanting && Math.hypot(zombie.position.x - zombie.anchorX, zombie.position.z - zombie.anchorZ) < STALL.radius) {
+    zombie.stall += 1;
+  } else {
+    zombie.stall = 0;
+    zombie.anchorX = zombie.position.x;
+    zombie.anchorZ = zombie.position.z;
+  }
+}
+
+/**
+ * Somewhere close to a stalled zombie that it can stand and walk from: clear of every wall's margin, on the same floor,
+ * and reached from where it is by a line with no wall across it (so it is never put through one), nearest the way it was
+ * heading. Null when there is nowhere (a zombie walled in stays walled in).
+ */
+export function freeSpotNear(zombie: ZombieState, toward: Vec3, boxes: readonly CollisionBox[],
+  surfaces: readonly WalkSurface[], height: number): Vec3 | null {
+  const from = zombie.position, first = (mix32(hashString(zombie.id)) & 7) * (Math.PI / 4);
+  let best: Vec3 | null = null, bestDistance = Infinity;
+  for (const ring of [0.5, 1, 1.5, 2]) for (let k = 0; k < 8; k++) {
+    const angle = first + k * (Math.PI / 4);
+    const x = from.x + Math.sin(angle) * ring, z = from.z + Math.cos(angle) * ring;
+    const y = sampleWalkHeight(x, z, from.y, surfaces);
+    const spot = { x, y, z };
+    if (Math.abs(y - from.y) > 0.2 || pushOutOfBoxes(spot, ZOMBIE_MOVEMENT.radius, height, boxes)
+      || !hasClearNavigationLine(from, spot, boxes, 0, height) || !hasWalkableConnection(from, spot, surfaces)) continue;
+    const distance = Math.hypot(toward.x - x, toward.z - z);
+    if (distance < bestDistance) { best = spot; bestDistance = distance; }
+  }
+  return best;
 }
 
 /** How far a zombie reaches, from where it starts a swing and from where a blow still lands: a crawler has the shorter arms of one that drags itself. */
@@ -293,12 +381,17 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
  * that has walked into a player is pushed back out. Walls still hold. Call once a tick, after the zombies have moved.
  */
 export function separateZombies(zombies: readonly ZombieState[], players: readonly PlayerState[],
-  boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[]): void {
+  boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[], solids?: CollisionIndex): void {
   const gap = ZOMBIE_MOVEMENT.radius * 2 * 0.9, playerGap = ZOMBIE_MOVEMENT.radius + 0.3;
-  const shove = (zombie: ZombieState, dx: number, dz: number) => {
-    const next = moveWithCollision(zombie.position, { x: dx, y: 0, z: dz }, ZOMBIE_MOVEMENT.radius, ZOMBIE_MOVEMENT.height, boxes);
+  /** Pushes a zombie, walls permitting, and says how far along the push it got. */
+  const shove = (zombie: ZombieState, dx: number, dz: number): number => {
+    const delta = { x: dx, y: 0, z: dz };
+    const next = solids ? solids.move(zombie.position, delta, ZOMBIE_MOVEMENT.radius, ZOMBIE_MOVEMENT.height)
+      : moveWithCollision(zombie.position, delta, ZOMBIE_MOVEMENT.radius, ZOMBIE_MOVEMENT.height, boxes);
     next.y = sampleWalkHeight(next.x, next.z, zombie.position.y, surfaces);
+    const along = ((next.x - zombie.position.x) * dx + (next.z - zombie.position.z) * dz) / (Math.hypot(dx, dz) || 1);
     zombie.position = next;
+    return along;
   };
   // Free to be moved: on the ground, out in the open, and not in the middle of a swing.
   const free = (zombie: ZombieState) => !zombie.entry && zombie.attackTicks === 0;
@@ -308,13 +401,19 @@ export function separateZombies(zombies: readonly ZombieState[], players: readon
     for (let j = i + 1; j < zombies.length; j++) {
       const b = zombies[j];
       if (!b.alive || Math.abs(a.position.y - b.position.y) > 1) continue;
+      work.separationPairs++;
       let dx = a.position.x - b.position.x, dz = a.position.z - b.position.z, distance = Math.hypot(dx, dz);
       if (distance >= gap) continue;
+      work.separationShoves++;
       if (distance < 1e-4) { const angle = (mix32(hashString(a.id) ^ hashString(b.id)) / 0x1_0000_0000) * Math.PI * 2; dx = Math.cos(angle); dz = Math.sin(angle); distance = 1; }
       const overlap = gap - Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z), ux = dx / distance, uz = dz / distance;
       const aFree = free(a), bFree = free(b);
-      if (aFree && bFree) { shove(a, ux * overlap / 2, uz * overlap / 2); shove(b, -ux * overlap / 2, -uz * overlap / 2); }
-      else if (aFree) shove(a, ux * overlap, uz * overlap);
+      if (aFree && bFree) {
+        // A zombie against a wall cannot give way, so the other gives way for it rather than staying in its body.
+        const gaveA = shove(a, ux * overlap / 2, uz * overlap / 2), owedB = overlap - gaveA;
+        const gaveB = shove(b, -ux * owedB, -uz * owedB), rest = owedB - gaveB;
+        if (rest > 1e-6) shove(a, ux * rest, uz * rest);
+      } else if (aFree) shove(a, ux * overlap, uz * overlap);
       else if (bFree) shove(b, -ux * overlap, -uz * overlap);
     }
   }
