@@ -97,12 +97,46 @@ On Cloudflare's free plan, as Cloudflare's documentation says (read on 2026-09-3
 
 The GitHub Pages copy of the game, or any other, can use your server instead of the code-swapping fallback. Build it with `VITE_SIGNAL_URL` set to your address, such as `https://play.example.com` (no path, no trailing slash). For GitHub Pages, add a repository variable of that name (**Settings**, then **Secrets and variables**, then **Actions**, then **Variables**); the Pages workflow passes it to the build if it exists.
 
+## Optional STUN and TURN configuration
+
+The browser uses the ICE settings in `src/network/ice.ts`. With nothing configured it keeps the existing defaults: two Google STUN
+URLs and no TURN relay. You can override STUN or add TURN without changing source code:
+
+```text
+VITE_STUN_URLS=stun:stun.example.com:3478,stun:stun2.example.com:3478
+VITE_TURN_URLS=turn:relay.example.com:3478?transport=udp,turns:relay.example.com:5349?transport=tcp
+VITE_TURN_USERNAME=temporary-user
+VITE_TURN_CREDENTIAL=temporary-password
+```
+
+For local development, put those values in `.env.local`. Local `.env*` files are ignored by Git; `.env.example` contains safe
+placeholders. If `VITE_TURN_URLS` is set, both username and credential are required. An incomplete TURN configuration is ignored for
+connections and is called out by **Test my connection** instead of silently behaving like a working relay.
+
+For the GitHub Pages and automatic Cloudflare builds, the workflows already accept the same settings. URLs are ordinary repository
+variables; the username and credential are repository secrets so they are not committed or printed in the workflow:
+
+```bash
+gh variable set VITE_STUN_URLS --body "stun:stun.example.com:3478,stun:stun2.example.com:3478"
+gh variable set VITE_TURN_URLS --body "turn:relay.example.com:3478?transport=udp,turns:relay.example.com:5349?transport=tcp"
+gh secret set TURN_USERNAME
+gh secret set TURN_CREDENTIAL
+```
+
+**Browser credential warning:** a Vite build is static client code. GitHub Secrets keep the values out of this repository and build logs,
+but the browser must ultimately receive TURN credentials, so a determined player can inspect them in the shipped app. Use credentials meant
+for client use, ideally short-lived or tightly restricted by the TURN provider. Do **not** put a TURN administration/shared-secret key in
+`VITE_TURN_CREDENTIAL`.
+
+After deploying, open **Multiplayer → Test my connection**. A working configured relay reports `Relay (TURN): … relay candidate found`.
+A configured service that cannot be reached reports that no relay candidate was obtained, separately from the STUN/NAT diagnosis.
+
 ## If something goes wrong
 
 - **The game shows the copy-and-paste lobby, not the room lobby.** It could not reach the server: open `<address>/signal/health` in a browser and check it shows the JSON above. If you set `VITE_SIGNAL_URL`, check it is right and starts with `https://`.
 - **"Could not reach the game server" when joining.** WebSockets may be blocked on that network. In the browser's developer console, `new WebSocket('wss://<your address>/signal/echo').onmessage = event => console.log(event.data)` prints `{"t":"echo","ok":true}` where they work. **Use connection codes instead** gets around it.
 - **"No game with that code."** The host has to stay on the Host Game screen, and codes never contain 0, 1, I, L or O, so a typo is caught.
-- **Both players reach the room but never connect to each other.** That is the players' networks not allowing a direct connection, not the server. **Test my connection** on both shows why (a "symmetric NAT" or blocked UDP is the usual cause); there is no relay server yet (see [networking.md](networking.md)). **Copy log** in the lobby gives a timeline to send along.
+- **Both players reach the room but never connect to each other.** Run **Test my connection** on both. If TURN is not configured, a symmetric NAT or blocked direct WebRTC can prevent the connection; configure a relay as above. If TURN is configured, the report says whether a relay candidate was actually obtained. **Copy log** in the lobby gives a timeline to send along.
 - **The automatic deploy fails at "Check the Cloudflare secrets are set".** The secret it names is empty or missing. `gh secret set` hides what you paste, so an empty paste is easy to miss: set it again in GitHub's web page instead (**Settings**, **Secrets and variables**, **Actions**, the secret, **Update**), where you can see the box fill, then re-run the failed run from the Actions tab.
 - **The automatic deploy fails later with an error from Cloudflare** (authentication, or permission). The token is probably for another account, has expired, or was not made from the **Edit Cloudflare Workers** template: make a new one and set the secret again.
 - **`wrangler` says you are not logged in.** Run `npx wrangler login` again.

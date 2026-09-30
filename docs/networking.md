@@ -1,14 +1,15 @@
 # Online co-op
 
 Up to four players share a match. One player's browser hosts it and runs the only real simulation.
-The others join over direct browser-to-browser connections (WebRTC). What sets a connection up depends on the copy of the game:
+The others join over WebRTC, directly when possible and through an optional TURN relay when a deployment configures one. What sets a connection up depends on the copy of the game:
 
 - **With a game server** ([`server/`](../server), set up as in [server-setup.md](server-setup.md)), players are introduced through
   a **room**: the host gets a five-character code, and everyone else types it. Nothing is pasted and nothing has to be timed.
 - **Without one** (the copy on GitHub Pages, say), players swap short copy-paste codes instead.
 
-The server only introduces browsers to each other: it passes along the few kilobytes it takes to set a connection up, and no game
-traffic. Once two browsers are connected the server is not involved.
+The room server only introduces browsers to each other: it passes along the few kilobytes it takes to set a connection up, and no game
+traffic. Once two browsers are connected the room server is not involved. A separately configured TURN service can relay game traffic only
+when the browsers cannot establish a direct path.
 
 ## Playing with a room
 
@@ -88,25 +89,27 @@ just a few parts of it:
 The far side rebuilds a minimal SDP from them. Each side waits for ICE gathering to finish (or four
 seconds) before showing its code, so one code carries every address.
 
-Public STUN servers tell each browser its internet-facing address. There is no TURN relay yet, so
-networks that block direct connections (some office, school and mobile networks) cannot connect.
+ICE server configuration is built in `src/network/ice.ts`. By default the game uses two public Google STUN addresses; deployments can override
+those with `VITE_STUN_URLS`. A deployment can also supply `VITE_TURN_URLS`, `VITE_TURN_USERNAME` and `VITE_TURN_CREDENTIAL`. When TURN is
+configured, the browser keeps trying direct candidates normally and can fall back to a relay candidate on restrictive networks.
 
 ## Testing a connection
 
 **Multiplayer → Test my connection** (and the **Test connection** button in the lobby) checks whether this network is likely
 to let a player join or host, and writes the answer as plain text with one button to copy it. A friend who can't connect runs
-it and sends the text back. It takes a second or two, uses only public STUN servers (the game's two from Google and one from
-Cloudflare) and leaves every IP address out of the text. The code is in `src/network/diagnostics.ts` (the checks and the
-wording) and `src/client/connectionTest.ts` (the dialog).
+it and sends the text back. It takes a few seconds, uses the deployment's configured ICE servers plus an extra Cloudflare STUN lookup for
+comparison, and leaves every IP address and every TURN credential out of the text. The code is in `src/network/diagnostics.ts` (the checks
+and the wording) and `src/client/connectionTest.ts` (the dialog).
 
 It runs:
 
 - **A lookup of the public address, per server.** Each STUN server is asked on its own, so a report says which ones answered
   and how fast, and which failed and with what error.
-- **A comparison of ports.** All the servers are asked from one socket. A router that keeps one public port whichever server
+- **A comparison of ports.** All the STUN servers are asked from one socket. A router that keeps one public port whichever server
   is asked ("same") lets a direct connection be made. One that gives a new port to each destination (a "symmetric NAT",
-  common on mobile data, hotspots and some broadband) usually blocks it; that is the case a relay would fix. Fewer than two
-  answering servers is reported as "could not compare".
+  common on mobile data, hotspots and some broadband) usually blocks it. Fewer than two answering servers is reported as "could not compare".
+- **TURN availability.** The same gathering includes the configured TURN service. If it yields a `relay` candidate, the report says relay
+  fallback is available; if TURN is configured but yields none, that is reported separately from a direct-connectivity problem.
 - **A connection to itself with the game's own codes.** It makes an invite, answers it, connects the two and sends a message
   on each channel, and reports how long the invite took to make and to connect. This catches a browser or extension that blocks
   WebRTC, and a slow invite (the invite waits up to four seconds for the addresses). It runs after the lookups, not with them,
@@ -114,10 +117,9 @@ It runs:
 - **The clock**, against the game server's (see [The clock](#the-clock)): the connection's start time depends on it. If it could
   not be checked the result is `MAYBE`.
 
-The first line of the text is the result: `GOOD`, `MAYBE` (only IPv6 was found, or IPv6 is the only way through, or the
-ports could not be compared) or `PROBLEM` (offline, WebRTC blocked, no public address found, or a symmetric NAT with no IPv6),
-with a sentence on why. Both players' networks matter: a good result on one side and a problem on the other still fails, so
-ask both to run it.
+The first line of the text is the result: `GOOD`, `MAYBE` or `PROBLEM`, with a sentence on why. A restrictive NAT can still be `GOOD` when a
+configured TURN service actually produced a relay candidate. Incomplete TURN deployment settings are called out as configuration trouble,
+while direct-connectivity failures remain labelled as network trouble. Both players' networks matter, so ask both to run the test.
 
 ## Why both sides start together
 
@@ -287,5 +289,4 @@ For browser-level regression coverage, `npm run test:e2e` starts the local room 
 ## Not yet
 
 - Room-code signalling is done (see [server-setup.md](server-setup.md)); game discovery or a public lobby list would be separate future work.
-- A TURN relay for networks that block direct connections (#46).
 - A reconnect UI for the copy-paste fallback; room-code games can already reclaim a reserved slot after a drop.

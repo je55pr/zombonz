@@ -1,6 +1,7 @@
 import { decodeSession } from './codes.ts';
+import { ICE_CONFIG_PROBLEM, ICE_SERVERS, STUN_URLS, TURN_CONFIGURED } from './ice.ts';
 import type { PeerLink } from './link.ts';
-import { ICE_SERVERS, answerInvite, clockMeasurement, createInvite, type ClockReading } from './webrtc.ts';
+import { answerInvite, clockMeasurement, createInvite, type ClockReading } from './webrtc.ts';
 
 /**
  * "Test my connection": finds out, in the player's own browser, whether this network is likely to let them join or host
@@ -10,11 +11,11 @@ import { ICE_SERVERS, answerInvite, clockMeasurement, createInvite, type ClockRe
  * codes. The report leaves out every IP address.
  */
 
-/** The STUN servers the game itself uses, then one more from another company, to compare against. */
-export const TEST_STUN_URLS: readonly string[] = [
-  ...ICE_SERVERS.flatMap(server => Array.isArray(server.urls) ? server.urls : [server.urls]),
+/** The configured STUN servers, then one more from another company, to compare NAT mappings against. */
+export const TEST_STUN_URLS: readonly string[] = [...new Set([
+  ...STUN_URLS,
   'stun:stun.cloudflare.com:3478',
-];
+])];
 const PROBE_LIMIT_MS = 5000;
 const SELF_TEST_LIMIT_MS = 12000;
 
@@ -65,7 +66,8 @@ export function summariseAddresses(candidates: readonly ParsedCandidate[], serve
     publicV6: udp.some(c => c.type === 'srflx' && c.address.includes(':')),
     localHidden: hosts.some(c => c.address.endsWith('.local')),
     localShown: hosts.filter(c => !c.address.endsWith('.local')).length,
-    relay: udp.filter(c => c.type === 'relay').length,
+    // TURN-over-TCP/TLS candidates still count even though NAT mapping itself is diagnosed from UDP candidates.
+    relay: candidates.filter(c => c.type === 'relay').length,
     mapping,
   };
 }
@@ -95,6 +97,7 @@ export interface ConnectionReport {
   /** The kind of connection ("wifi", "cellular") where the browser says; only some Android browsers do. */
   connection?: string;
   stun: StunAnswer[];
+  turn: { configured: boolean; problem: string | null };
   addresses: Addresses;
   /** How this computer's clock compares with the game server's, which the connection's start time depends on; null if it could not be checked. */
   clock: ClockReading | null;
@@ -106,24 +109,32 @@ export type Level = 'good' | 'warn' | 'bad';
 export interface Verdict { level: Level; headline: string; detail: string }
 
 /** What to tell the player: one line, and a sentence or two on why. */
-export function judge(report: Pick<ConnectionReport, 'online' | 'stun' | 'addresses' | 'self' | 'clock'>): Verdict {
-  const { addresses, self } = report;
+export function judge(report: Pick<ConnectionReport, 'online' | 'stun' | 'turn' | 'addresses' | 'self' | 'clock'>): Verdict {
+  const { addresses, self, turn } = report;
   if (!report.online) return { level: 'bad', headline: 'You look to be offline.',
     detail: 'The browser says there is no network connection. Check the connection and run the test again.' };
   if (!self.ok) return { level: 'bad', headline: 'This browser could not make a test connection to itself.',
     detail: `Something is blocking WebRTC, the browser feature games use to connect (a browser setting, a privacy extension or a firewall). ${self.problem ?? ''}`.trim() };
+  if (turn.problem) return { level: 'warn', headline: 'Direct networking was tested, but TURN fallback is misconfigured.',
+    detail: `${turn.problem} Direct connections may still work, but this build cannot fall back to a relay until that deployment setting is fixed.` };
+  const relayReady = turn.configured && addresses.relay > 0;
+  if (relayReady && (addresses.mapping === 'differs' || addresses.mapping === 'none')) return {
+    level: 'good', headline: 'Direct connections may fail, but TURN relay fallback is available.',
+    detail: 'This network looks restrictive for peer-to-peer traffic, but the browser successfully gathered a relay candidate from the configured TURN service.' };
   if (addresses.mapping === 'none' && !addresses.publicV6) return { level: 'bad',
     headline: 'Could not find a public address: the address lookup is being blocked.',
-    detail: 'This network or a firewall seems to block the UDP traffic that games use, which is common at work, at school and on some VPNs. Direct connections to other networks will almost certainly fail. Try another network or turn a VPN off.' };
+    detail: `This network or a firewall seems to block the UDP traffic that games use, which is common at work, at school and on some VPNs. Direct connections will almost certainly fail. ${turn.configured ? 'TURN is configured, but this test did not obtain a relay candidate.' : 'This build has no TURN relay configured.'}` };
   if (addresses.mapping === 'differs') return addresses.publicV6
     ? { level: 'warn', headline: 'Direct connections will probably fail, except with someone who also has IPv6.',
-      detail: 'Your router gives a different public port to every destination (a "symmetric NAT", common on mobile data, hotspots and some broadband). That usually blocks direct connections to players on other networks. IPv6 was found, so it can work with a player who has IPv6 too. The game has no relay server yet, which is the fix.' }
+      detail: `Your router gives a different public port to every destination (a "symmetric NAT", common on mobile data, hotspots and some broadband). That usually blocks direct connections to players on other networks. IPv6 was found, so it can work with a player who has IPv6 too. ${turn.configured ? 'TURN is configured, but this test did not obtain a relay candidate.' : 'This build has no TURN relay configured.'}` }
     : { level: 'bad', headline: 'Direct connections to other networks will probably fail.',
-      detail: 'Your router gives a different public port to every destination (a "symmetric NAT", common on mobile data, hotspots and some broadband). That usually blocks direct connections to players on other networks. The game has no relay server yet, which is the fix.' };
+      detail: `Your router gives a different public port to every destination (a "symmetric NAT", common on mobile data, hotspots and some broadband). That usually blocks direct connections to players on other networks. ${turn.configured ? 'TURN is configured, but this test did not obtain a relay candidate.' : 'This build has no TURN relay configured.'}` };
   if (addresses.mapping === 'none') return { level: 'warn', headline: 'Only IPv6 was found: it works only with someone who also has IPv6.',
     detail: 'No public IPv4 address came back. If the other player has no IPv6, you will not be able to connect.' };
   if (addresses.mapping === 'unknown') return { level: 'warn', headline: 'Found your address, but could not tell how your router handles it.',
     detail: 'Fewer than two of the address servers answered, so the ports could not be compared. It may well work; see which servers did not answer below.' };
+  if (turn.configured && addresses.relay === 0) return { level: 'warn', headline: 'Direct networking looks usable, but TURN fallback did not answer.',
+    detail: 'This connection can probably work directly, but the configured TURN service produced no relay candidate. Restrictive networks will still fail until the relay configuration or service is fixed.' };
   if (!report.clock) return { level: 'warn', headline: 'This network looks fine, but this computer’s clock could not be checked.',
     detail: 'Both players start connecting at the same moment, found by comparing each computer’s clock with the game server’s, and that comparison failed here. If the two computers’ clocks differ by more than a few seconds, connecting can fail.' };
   return { level: 'good', headline: 'This network looks fine for direct connections.',
@@ -170,7 +181,9 @@ export function formatReport(report: ConnectionReport): string {
     `Public IPv4: ${mapping}`,
     `Public IPv6: ${addresses.publicV6 ? 'found' : 'not found'}`,
     `Local addresses: ${addresses.localHidden ? 'hidden by the browser (.local names)' : addresses.localShown ? `${addresses.localShown} shown` : 'none found'}`,
-    `Relay (TURN): ${addresses.relay ? `${addresses.relay} found` : 'none (this version has no relay server)'}`,
+    `Relay (TURN): ${report.turn.problem ? `MISCONFIGURED (${report.turn.problem})` : report.turn.configured
+      ? addresses.relay ? `${addresses.relay} relay candidate${addresses.relay === 1 ? '' : 's'} found` : 'configured, but no relay candidate found'
+      : 'not configured'}`,
     `Clock: ${report.clock ? `${Math.abs(Math.round(report.clock.offset))} ms ${report.clock.offset >= 0 ? 'behind' : 'ahead of'} the game server (within ${Math.round(report.clock.uncertainty)})` : 'could not be checked against the game server'}`,
     '',
     'Connection to itself, with the game\'s own codes',
@@ -236,7 +249,9 @@ async function probeStun(env: TestEnvironment, url: string): Promise<StunAnswer>
 async function gatherAll(env: TestEnvironment): Promise<ParsedCandidate[]> {
   const found: ParsedCandidate[] = [];
   let pc: RTCPeerConnection;
-  try { pc = env.createConnection({ iceServers: [{ urls: [...TEST_STUN_URLS] }] }); pc.createDataChannel('gather'); } catch { return found; }
+  const extraStun = TEST_STUN_URLS.filter(url => !STUN_URLS.includes(url));
+  const iceServers: RTCIceServer[] = [...ICE_SERVERS, ...(extraStun.length ? [{ urls: extraStun }] : [])];
+  try { pc = env.createConnection({ iceServers }); pc.createDataChannel('gather'); } catch { return found; }
   const done = new Promise<void>(resolve => {
     const timer = setTimeout(resolve, PROBE_LIMIT_MS);
     pc.addEventListener('icecandidate', event => { const candidate = parseCandidate(event.candidate?.candidate); if (candidate) found.push(candidate); });
@@ -326,6 +341,7 @@ export async function runConnectionTest(env: TestEnvironment, progress: (step: s
   return {
     build: env.build, protocol: env.protocol, browser: describeBrowser(env.userAgent), at: new Date().toISOString(),
     online: env.online, connection: env.connection, stun,
+    turn: { configured: TURN_CONFIGURED, problem: ICE_CONFIG_PROBLEM },
     addresses: summariseAddresses(candidates, stun.filter(answer => answer.ok).length),
     clock, self, durationMs: Math.round(env.now() - start),
   };

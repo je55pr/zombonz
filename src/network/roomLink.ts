@@ -1,7 +1,8 @@
 import { CodeError } from './codes.ts';
 import type { PeerLink } from './link.ts';
 import { SignalError, newRoomCode, openSignal, type Signal, type SignalOptions } from './signaling.ts';
-import { CONNECT_TIMEOUT_MS, ConnectionLog, ICE_SERVERS, linkWhenOpen, openChannels, watch } from './webrtc.ts';
+import { ICE_SERVERS, connectivityFailure } from './ice.ts';
+import { CONNECT_TIMEOUT_MS, ConnectionLog, linkWhenOpen, openChannels, watch } from './webrtc.ts';
 
 /**
  * Browser-to-browser links set up through a room on the game server (see signaling.ts): the host makes a room and shows its code,
@@ -10,7 +11,7 @@ import { CONNECT_TIMEOUT_MS, ConnectionLog, ICE_SERVERS, linkWhenOpen, openChann
  * Once a link is open the server is not involved any more.
  */
 
-const FAILURE = 'Could not connect directly. One of the networks may be blocking direct connections.';
+const FAILURE = connectivityFailure('room');
 /**
  * A player keeps its room connection open this long after its own end comes up. Its browser can be ready a moment before the host's, and the
  * last of the host's addresses may still be on their way, so the room is left only once nothing more is needed from it.

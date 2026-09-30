@@ -47,8 +47,8 @@ describe('what the candidates say about a network', () => {
     expect(summariseAddresses([candidate('srflx', '203.0.113.9', 9, 'tcp')], 3).mapping).toBe('none');
   });
 
-  it('notices local addresses the browser shows, and relay addresses', () => {
-    expect(summariseAddresses([candidate('host', '192.168.1.20'), candidate('relay', '198.51.100.4', 3478)], 0))
+  it('notices local addresses the browser shows, and relay addresses even over TCP/TLS', () => {
+    expect(summariseAddresses([candidate('host', '192.168.1.20'), candidate('relay', '198.51.100.4', 3478, 'tcp')], 0))
       .toMatchObject({ localHidden: false, localShown: 1, relay: 1 });
   });
 });
@@ -60,7 +60,7 @@ const network = (overrides: Partial<ReturnType<typeof summariseAddresses>> = {})
 });
 const report = (overrides: Partial<ConnectionReport> = {}): ConnectionReport => ({
   build: 'abc1234', protocol: 8, browser: 'Chrome 141 on Windows', at: '2026-09-29T21:30:12.000Z', online: true, stun: stun(),
-  addresses: network(), clock: { offset: 466, uncertainty: 110, samples: 8 }, self: goodSelf, durationMs: 4200, ...overrides,
+  turn: { configured: false, problem: null }, addresses: network(), clock: { offset: 466, uncertainty: 110, samples: 8 }, self: goodSelf, durationMs: 4200, ...overrides,
 });
 
 describe('the verdict', () => {
@@ -75,6 +75,24 @@ describe('the verdict', () => {
     expect(noV6.detail).toContain('symmetric NAT');
     expect(noV6.detail).toContain('relay');
     expect(judge(report({ addresses: network({ publicV4: 3, mapping: 'differs' }) })).level).toBe('warn');
+  });
+
+  it('recognises a working TURN relay when direct NAT traversal is restrictive', () => {
+    const verdict = judge(report({
+      turn: { configured: true, problem: null },
+      addresses: network({ publicV4: 3, publicV6: false, relay: 1, mapping: 'differs' }),
+    }));
+    expect(verdict).toMatchObject({ level: 'good', headline: expect.stringMatching(/relay fallback is available/i) });
+  });
+
+  it('warns when TURN deployment settings are incomplete or a configured relay does not answer', () => {
+    const incomplete = judge(report({ turn: { configured: false, problem: 'TURN URLs are configured, but credentials are missing.' } }));
+    expect(incomplete.level).toBe('warn');
+    expect(incomplete.detail).toContain('credentials are missing');
+
+    const unreachable = judge(report({ turn: { configured: true, problem: null } }));
+    expect(unreachable.level).toBe('warn');
+    expect(unreachable.headline).toMatch(/TURN fallback did not answer/);
   });
 
   it('is a problem when no server could be reached', () => {
@@ -113,7 +131,7 @@ describe('the text a friend sends back', () => {
     expect(text).toContain('stun.l.google.com:19302 - answered in 40 ms (IPv4 and IPv6)');
     expect(text).toContain('Public IPv4: same public port for every server');
     expect(text).toContain('Public IPv6: found');
-    expect(text).toContain('Relay (TURN): none');
+    expect(text).toContain('Relay (TURN): not configured');
     expect(text).toContain('Clock: 466 ms behind the game server (within 110)');
     expect(formatReport(report({ clock: { offset: -1200, uncertainty: 130, samples: 8 } }))).toContain('Clock: 1200 ms ahead of the game server (within 130)');
     expect(formatReport(report({ clock: null }))).toContain('Clock: could not be checked against the game server');
@@ -121,6 +139,12 @@ describe('the text a friend sends back', () => {
     expect(text).not.toMatch(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
     expect(text).not.toMatch(/[0-9a-f]{1,4}(:[0-9a-f]{1,4}){3,}/i);
     expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}/i);
+  });
+
+  it('reports configured TURN relay candidates without printing credentials', () => {
+    const text = formatReport(report({ turn: { configured: true, problem: null }, addresses: network({ relay: 2 }) }));
+    expect(text).toContain('Relay (TURN): 2 relay candidates found');
+    expect(text).not.toContain('secret-password');
   });
 
   it('marks what failed in capitals, so it stands out in a chat', () => {

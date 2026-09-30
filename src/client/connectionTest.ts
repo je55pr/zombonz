@@ -27,7 +27,7 @@ export class ConnectionTestView {
       </div>
       <p class="lobby-status" data-status role="status"></p>
       <p class="lobby-hint">Can't connect to a friend? Run this on both computers and send the results to each other. It takes a few seconds,
-        uses only public address-lookup servers (Google's and Cloudflare's) and leaves your IP address out of the results.</p>
+        uses the game's configured connection servers plus public address lookups, and leaves your IP address out of the results.</p>
     </div>`;
     parent.append(this.element);
     this.element.addEventListener('click', event => {
