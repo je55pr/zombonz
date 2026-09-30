@@ -348,8 +348,24 @@ export function tickZombieMelee(
   const target = players.find((player) => player.id === zombie.targetId && player.alive && !player.downed)
     ?? chooseZombieTarget(zombie, players);
   const { startRange, strikeRange } = meleeReach(zombie);
-  return advanceSwing(zombie, players, target, (player, phase) => inMeleeReach(zombie, player, collisionBoxes,
-    phase === 'start' ? startRange : strikeRange) && facesWithin(zombie, player, phase === 'start' ? ZOMBIE_MELEE.startArc : ZOMBIE_MELEE.strikeArc));
+  const inReach = (player: PlayerState, range: number, arc: number) => inMeleeReach(zombie, player, collisionBoxes, range) && facesWithin(zombie, player, arc);
+  return advanceSwing(zombie, players, target, (player, phase) => phase === 'strike'
+    ? inReach(player, strikeRange, ZOMBIE_MELEE.strikeArc)
+    : inReach(player, startRange, ZOMBIE_MELEE.startArc) || willConnect(zombie, player, collisionBoxes, strikeRange));
+}
+
+/**
+ * Whether a blow begun now would land: the player, carrying on as they are, is in strike range and in front of the zombie
+ * when the wind-up ends (looking ahead at most `ZOMBIE_MELEE.anticipation` metres of their travel). The zombie stands its ground
+ * to swing, so this is all it has to go on; a player who stops short, turns off or backs away in the wind-up is missed.
+ */
+function willConnect(zombie: ZombieState, player: PlayerState, boxes: readonly CollisionBox[], strikeRange: number): boolean {
+  const { minSpeed, maxLeadMetres } = ZOMBIE_MELEE.anticipation;
+  const speed = Math.hypot(player.velocity.x, player.velocity.z);
+  if (speed < minSpeed || !facesWithin(zombie, player, ZOMBIE_MELEE.startArc)) return false;
+  const lead = Math.min(swingTiming(zombie).windupTicks / 60, maxLeadMetres / speed);
+  const ahead = { ...player, position: { x: player.position.x + player.velocity.x * lead, y: player.position.y, z: player.position.z + player.velocity.z * lead } };
+  return inMeleeReach(zombie, ahead, boxes, strikeRange) && facesWithin(zombie, ahead, ZOMBIE_MELEE.strikeArc);
 }
 
 /**

@@ -148,6 +148,48 @@ export function runCrowd(options: CrowdOptions): CrowdResult {
   return { hits, seconds: reached, closest, overlapSeconds: overlapping / 60 };
 }
 
+// ---- run up to a zombie and away again ----------------------------------------------------------------------------
+
+export interface RunUpOptions {
+  gait?: ZombieGait;
+  /** How near the player gets before they turn and run: a body is 0.66 across, so under that they are touching it. */
+  turnAt: number;
+  plan?: SprintPlan;
+  /** Entity ids to use up first, so that each run has a zombie with its own tempo. */
+  variant?: number;
+}
+
+export interface RunUpResult {
+  /** Blows that landed, from the start of the run until the player was seconds clear. */
+  hits: number;
+  /** How far the zombie was from the player's middle when it began its first swing, or null if it never swung. */
+  swingBeganAt: number | null;
+}
+
+/**
+ * The way zombies are trained: the player runs at one that is coming for them, turns at `turnAt` metres and runs away
+ * again. Does it swing early enough for the blow to land as they arrive, or do they get in and out untouched?
+ */
+export function runRunUp(options: RunUpOptions): RunUpResult {
+  const sim = openGround({ x: 0, y: 0, z: 0 });
+  const player = sim.getPlayer(sim.playerIds[0])!;
+  for (let i = 0; i < (options.variant ?? 0); i++) allocateEntityId(sim.state.world);
+  const zombie = createZombieState(allocateEntityId(sim.state.world), { x: 0, y: 0, z: -7 }, 15, options.gait ?? 'sprint');
+  addEntity(sim.state.world, zombie);
+  const actions: GameAction[] = (options.plan ?? 'walk') === 'sprint' ? ['moveForward', 'sprint'] : ['moveForward'];
+  let hits = 0, swingBeganAt: number | null = null, turned = -1;
+  for (let tick = 0; tick < 12 * 60; tick++) {
+    const distance = Math.hypot(zombie.position.x - player.position.x, zombie.position.z - player.position.z);
+    const turn = turned < 0 && distance <= options.turnAt;
+    if (turn) turned = tick;
+    const events = sim.tick({ [player.id]: frameFor(tick, actions, turn ? Math.PI : 0) });
+    hits += events.filter(event => event.type === 'zombieAttacked').length;
+    if (swingBeganAt === null && events.some(event => event.type === 'zombieSwung')) swingBeganAt = distance;
+    if (turned >= 0 && tick - turned > 5 * 60) break;
+  }
+  return { hits, swingBeganAt };
+}
+
 /** The way a player steering round zombies would face: for the goal, bent away from every zombie within 2.5 m. */
 function weave(player: PlayerState, crowd: readonly ZombieState[], goal: { x: number; z: number }): number {
   let hx = goal.x - player.position.x, hz = goal.z - player.position.z;
@@ -174,6 +216,8 @@ export function gaitMix(round: number, samples = 4000): Record<ZombieGait, numbe
 
 /** Group sizes the report crosses. */
 const CROWD_SIZES = [1, 2, 3, 6, 12] as const;
+/** How near the player gets before turning away, in the run-up rows. */
+const TURN_DISTANCES = [0.7, 1.5, 2.5] as const;
 
 /** The measurements as text, for the console. */
 export function formatDifficulty(): string {
@@ -201,6 +245,18 @@ export function formatDifficulty(): string {
       return `${hits.toFixed(1)}/${results.filter(result => result.seconds !== null).length}`.padStart(8);
     });
     lines.push(`  ${approach === 'dash' ? 'straight through' : 'steering round '}:      ${cells.join('')}`);
+  }
+  lines.push('', 'Running up to a sprinter and away again: blows taken per run (mean of 6 tempos) / how far off it began its swing, m');
+  lines.push(`  the player turns at:   ${TURN_DISTANCES.map(metres => `${metres} m`.padStart(12)).join('')}`);
+  for (const plan of ['walk', 'sprint'] as const) {
+    const cells = TURN_DISTANCES.map(turnAt => {
+      const results = [0, 1, 2, 3, 4, 5].map(variant => runRunUp({ turnAt, plan, variant }));
+      const hits = results.reduce((sum, result) => sum + result.hits, 0) / results.length;
+      const began = results.flatMap(result => result.swingBeganAt === null ? [] : [result.swingBeganAt]);
+      const at = began.length ? (began.reduce((sum, value) => sum + value, 0) / began.length).toFixed(1) : '-';
+      return `${hits.toFixed(1)} / ${at}`.padStart(12);
+    });
+    lines.push(`  ${plan === 'walk' ? 'walking' : 'sprinting'}:            ${cells.join('')}`);
   }
   return lines.join('\n');
 }

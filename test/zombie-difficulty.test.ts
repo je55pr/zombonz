@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   BODY_CONTACT, PLAYER_MOVEMENT, ZOMBIE_GAIT_SPEEDS, ZOMBIE_GIVE, ZOMBIE_PACE_SPREAD, addEntity, allocateEntityId,
-  WEDGE_DEPTH, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, type CollisionBox, type GameSimulation, type PlayerState, type ZombieState,
+  WEDGE_DEPTH, ZOMBIE_MELEE, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, tickZombieMelee, type CollisionBox, type GameSimulation, type PlayerState, type ZombieState,
 } from '../src/core/index.ts';
-import { frameFor, openGround, runChase, runCrowd } from '../src/bench/difficulty.ts';
+import { frameFor, openGround, runChase, runCrowd, runRunUp } from '../src/bench/difficulty.ts';
 import { predictPlayerTick } from '../src/net/prediction.ts';
 
 /**
@@ -205,6 +205,80 @@ describe('a queue behind a fight', () => {
     const line = [zombie('e:2', -6), zombie('e:3', -6.58), zombie('e:4', -7.16)];
     separateZombies(line, [player], [], []);
     for (const body of line) expect(body.stall, body.id).toBe(179);
+  });
+});
+
+describe('a zombie that reads where the player is going', () => {
+  /** A zombie at the origin facing +z, and a player at (0, z) moving with (vx, vz). */
+  function scene(z: number, vx = 0, vz = 0, x = 0) {
+    const zombie = createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, 'run');
+    zombie.yaw = 0;
+    const player = createPlayerState('e:1', { x, y: 0, z });
+    player.velocity = { x: vx, y: 0, z: vz };
+    return { zombie, player };
+  }
+
+  it('starts its swing before a player running at it is in reach, so the blow lands as they arrive', () => {
+    const { zombie, player } = scene(5, 0, -4.2);
+    let beganAt: number | null = null, hit = false;
+    for (let tick = 0; tick < 240 && !hit; tick++) {
+      player.position.z = Math.max(BODY_CONTACT, player.position.z - 4.2 / 60);
+      const events = tickZombieMelee(zombie, [player]);
+      if (beganAt === null && zombie.attackTicks > 0) beganAt = player.position.z;
+      hit = events.some(event => event.type === 'zombieAttacked');
+    }
+    expect(beganAt).not.toBeNull();
+    // Well before the 1.1 m a swing used to need, and not so far off that it is guessing.
+    expect(beganAt!).toBeGreaterThan(ZOMBIE_MELEE.reach.startRange + 1);
+    expect(beganAt!).toBeLessThan(ZOMBIE_MELEE.reach.strikeRange + ZOMBIE_MELEE.anticipation.maxLeadMetres + 0.3);
+    expect(hit).toBe(true);
+  });
+
+  it('holds off for a player who is standing, backing away, or crossing well in front of it', () => {
+    for (const [z, vx, vz] of [[2, 0, 0], [2, 0, 4.2], [3, 4.2, 0], [3, -4.2, 0]]) {
+      const { zombie, player } = scene(z, vx, vz);
+      for (let tick = 0; tick < 30; tick++) tickZombieMelee(zombie, [player]);
+      expect(zombie.attackTicks, `player at ${z} m going (${vx}, ${vz})`).toBe(0);
+    }
+  });
+
+  it('misses a player who stops short, or turns away, once the swing has begun', () => {
+    for (const away of [false, true]) {
+      const { zombie, player } = scene(5, 0, -4.2);
+      let hit = false, swung = false;
+      for (let tick = 0; tick < 240; tick++) {
+        if (!swung) player.position.z -= 4.2 / 60;
+        else { player.velocity = { x: 0, y: 0, z: away ? 4.2 : 0 }; if (away) player.position.z += 4.2 / 60; }
+        if (tickZombieMelee(zombie, [player]).some(event => event.type === 'zombieAttacked')) hit = true;
+        if (zombie.attackTicks > 0) swung = true;
+      }
+      expect(swung).toBe(true);
+      expect(hit, away ? 'turned away' : 'stopped short').toBe(false);
+    }
+  });
+});
+
+describe('running up to a zombie and away again', () => {
+  const variants = [0, 1, 2, 3, 4, 5];
+
+  it('connects when the player gets right up to it, at a walk or a sprint', () => {
+    for (const plan of ['walk', 'sprint'] as const) for (const variant of variants) {
+      expect(runRunUp({ turnAt: 0.7, plan, variant }).hits, `${plan}, tempo ${variant}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('can still be dodged by turning away early enough', () => {
+    for (const plan of ['walk', 'sprint'] as const) for (const variant of variants) {
+      expect(runRunUp({ turnAt: 2.5, plan, variant }).hits, `${plan}, tempo ${variant}`).toBe(0);
+    }
+  });
+
+  it('begins the swing well before the player is in reach', () => {
+    for (const variant of variants) {
+      const { swingBeganAt } = runRunUp({ turnAt: 0.7, variant });
+      expect(swingBeganAt).not.toBeNull();
+      expect(swingBeganAt!).toBeGreaterThan(2);
+    }
   });
 });
 
