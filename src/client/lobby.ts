@@ -12,6 +12,8 @@ export interface LobbyCallbacks {
   back(): void;
   /** Opens "Test my connection" over the lobby. */
   testConnection(): void;
+  /** Asks for the copy-and-paste lobby in place of the room lobby (the room lobby's way out when a network will not reach the game server). */
+  useCodes?(): void;
 }
 
 const NAME_KEY = 'zombonz.playerName';

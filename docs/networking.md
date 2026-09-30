@@ -1,10 +1,62 @@
 # Online co-op
 
 Up to four players share a match. One player's browser hosts it and runs the only real simulation.
-The others join over direct browser-to-browser connections (WebRTC), set up by swapping short
-copy-paste codes. There is no game server.
+The others join over direct browser-to-browser connections (WebRTC). What sets a connection up depends on the copy of the game:
 
-## Playing
+- **With a game server** ([`server/`](../server), set up as in [server-setup.md](server-setup.md)), players are introduced through
+  a **room**: the host gets a five-character code, and everyone else types it. Nothing is pasted and nothing has to be timed.
+- **Without one** (the copy on GitHub Pages, say), players swap short copy-paste codes instead.
+
+The server only introduces browsers to each other: it passes along the few kilobytes it takes to set a connection up, and no game
+traffic. Once two browsers are connected the server is not involved.
+
+## Playing with a room
+
+1. The host chooses **Multiplayer → Host Game** and a map. The screen shows a room code, such as `K7QX2`, with a **Copy code** button.
+2. Everyone else chooses **Multiplayer → Join Game**, types the code (any case; spaces and dashes are ignored) and presses **Join**.
+   Each is connected to the host within a second or so and appears in the host's lobby.
+3. The host presses **Start game**.
+
+A wrong code says there is no game with that code; a full room says so. **Use connection codes instead** (at the bottom of the room
+lobby) switches to the copy-paste lobby, for a network that will not talk to the game server. **Test connection** and **Copy log** are
+there too, as in the code lobby.
+
+## How rooms work
+
+Each room is a Durable Object on Cloudflare, named by its code. A connection into a room is a WebSocket to `/signal/CODE`
+(`?role=host` to make the room, otherwise to join it). Everyone in a room has a number: the host is 0, players are 1 to 3.
+The rules are in `server/roomLogic.ts`, which uses no Cloudflare types and is tested on its own; `server/room.ts` wires it to a
+Durable Object and `server/worker.ts` routes requests.
+
+| From | Message | Meaning |
+| --- | --- | --- |
+| server | `hello { role, room, id }` | You are in the room, as number `id`. |
+| server | `peer-joined { id }` / `peer-left { id }` | To the host: a player came or went. |
+| server | `host-left` | To players: the host went; the room is over. |
+| server | `signal { from, data }` | Something from another person in the room. |
+| server | `error { reason }` | Refused: `no-room`, `full`, `room-in-use`, `bad-message`, `too-large`, `too-fast` or `expired`; then closed. |
+| client | `signal { to, data }` | Pass `data` to number `to`. Players can only write to the host, and the host to a player. |
+
+For each player who joins, the host's browser makes a WebRTC offer and sends it in a `signal`; the player answers; and each passes the
+other every network address it finds as it finds it (trickle ICE), so both ends start at once. When the connection is open the player leaves
+the room (after a couple of seconds' grace, in case the host's end is a moment behind). `src/network/roomLink.ts` does this;
+`src/network/signaling.ts` is the WebSocket client.
+
+Limits, to keep a room from being a problem for the server: four connections; messages up to 16 KB; at most 80 messages in 10 seconds
+per connection (a real connection sends a few dozen in its first second); and a room closes after 30 minutes. Room codes are names, not
+secrets: anyone with the code and the address can ask to join, so a room is only as private as its code. The server accepts connections
+from any address, so a copy of the game hosted elsewhere can use it (see `VITE_SIGNAL_URL` below).
+
+`GET /signal/health` says the server is there (the game asks before choosing a lobby) and `GET /signal/echo` is a WebSocket that says hello and
+closes, which is a way to check WebSockets get through a network.
+
+### Where the game looks for the server
+
+The address the game was loaded from, unless the build was given `VITE_SIGNAL_URL` (an `https://` address), which lets a copy of the game
+hosted somewhere else, such as GitHub Pages, use a game server elsewhere. The GitHub Pages workflow passes a repository variable of that name,
+if there is one, so a fork can set it under Settings, Secrets and variables, Actions, Variables.
+
+## Playing with connection codes
 
 1. The host chooses **Multiplayer → Host Game** and a map, then **Invite a player**. This makes an
    invite code (`ZBI1-…`, about 180 characters) to send to one friend over chat or text.
@@ -202,7 +254,7 @@ Development builds expose `window.zombonz` (`{ simulation, playerId, net }`) for
 
 ## Not yet
 
-- A room-code server, so codes can be short and nobody has to paste anything or watch a countdown (#39, #40).
+- Room-code servers are done (see [server-setup.md](server-setup.md)); what is left of #39 and #40 is a lobby list, and a way to find a game without a code.
 - A TURN relay for networks that block direct connections (#46).
 - Reconnecting after a drop.
 - An automated two-browser test (#44).

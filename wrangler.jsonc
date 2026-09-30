@@ -1,0 +1,16 @@
+{
+  // The game server: serves the built game (run `npm run build` first) and runs the rooms players are introduced in.
+  // See docs/server-setup.md. The address it is served at is set in your own Cloudflare account, not here.
+  "name": "zombonz",
+  "main": "server/worker.ts",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Only room traffic runs the worker; the game's files are served straight from Cloudflare's network.
+    "run_worker_first": ["/signal/*"]
+  },
+  "durable_objects": { "bindings": [{ "name": "ROOMS", "class_name": "Room" }] },
+  // The free plan needs SQLite-backed Durable Objects.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+}

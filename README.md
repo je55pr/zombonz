@@ -51,7 +51,9 @@ Run `npm run check` for TypeScript validation, automated tests and a production 
 
 The game opens on a start menu: **Solo**, **Multiplayer** and **Settings** (mouse or arrow keys,
 Enter to choose, Esc to go back). Multiplayer hosts or joins online co-op for up to four players:
-players connect by swapping short codes over chat or text ([how it works](docs/networking.md)); **Test my connection**
+the host gets a five-letter room code and everyone else types it in (this needs the small game server in [`server/`](server), which
+[docs/server-setup.md](docs/server-setup.md) shows how to run for free on Cloudflare; a copy of the game without one falls back to swapping
+short codes over chat or text) ([how it works](docs/networking.md)). **Test my connection**
 there (and in the lobby) checks whether a network will allow it and gives a text report to send to a friend. Settings
 holds mouse sensitivity, field of view and volume, saved in this browser. While the menu is open it
 downloads the game code and every model and texture the game uses (about 88 MB), with a progress
