@@ -108,9 +108,11 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
 - **Blows come one at a time.** A landed blow gives the player 30 ticks (0.5 s) of grace against every other zombie; a
   blow that arrives in the grace waits, its arm out, until it has passed. So a crowd's blows are spaced, and someone hit
   once can step away, shoot or knife before the second.
-- **Zombies do not stand inside each other or the player.** Each tick, pairs closer than their bodies (0.58 m) are pushed
-  apart (all of it for the one free to move, when the other is mid-swing or coming through a window), zombies that have
-  walked into a player are pushed back out, and the walls still hold. A crowd spreads round its target.
+- **Zombies do not stand inside each other or the player, and the player cannot walk through them.** Each tick, pairs closer
+  than their bodies (0.58 m) are pushed apart (all of it for the one free to move, when the other is mid-swing or coming
+  through a window), and the walls still hold. A crowd spreads round its target. A player is stopped by a zombie's body
+  (0.66 m from its middle) and slides round it; a swinging zombie holds its ground, a free one gives way a little. Zombies
+  queued behind a fight are not taken for stuck. See [zombie difficulty](zombie-difficulty.md) (issue #210).
 
 The damage per blow is unchanged at 50, so two blows still down a 100-health player (250 with Juggernog takes five), as in
 WaW; only when they land has changed. Ticks (at 60 a second) from a zombie's first swing until the player goes down, with

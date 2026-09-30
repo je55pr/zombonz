@@ -177,7 +177,8 @@ Rounds follow the classic WaW/BO1 curves: solo rounds hold 6, 8, 13, 18 and 24 z
 then grow faster from round 10, with more per extra co-op player and at most 24 alive at once.
 Rounds are ten seconds apart. Spawns start two seconds apart and speed up 5% each round. Each zombie rolls a walk, run or
 sprint gait when it spawns: round 1 is all walkers, runners join from round 2, sprinters from
-round 5, and from round 9 everything sprints. Sprinters nearly match a walking player.
+round 6, and from round 10 everything sprints. A sprinter runs a little slower than a walking player, so walking away
+always opens a gap (see [zombie difficulty](docs/zombie-difficulty.md)), but zombies are solid: run into a group of them and you stop.
 Zombie health rises with each round. Headshots deal double damage (quadruple with the Kar98k, which one-shots through round 3;
 the starting pistol takes two on round 1), and only where the head is drawn: a zombie is ten capsules that follow what it is doing
 (see [docs/combat.md](docs/combat.md); `?hitboxes=1` draws them). Hip-fire wanders, a lot at range and on the move, so aim for
@@ -289,7 +290,8 @@ god mode for repeatable performance checks. Add `&round=N` to any preview URL to
 round N, for example `/?preview=start&round=9` to face a round of sprinters. `npm run benchmark` runs headless
 stress scenarios (24 zombies trained round Asylum's power side, a spawn wave, the Bunker) and reports tick time as
 mean/p95/p99/max with a per-stage breakdown and exact work counts; it does not measure GPU time or FPS (see
-[simulation performance](docs/simulation-performance.md)).
+[simulation performance](docs/simulation-performance.md)). `npm run difficulty` prints how the game feels by the numbers:
+the gap a chase opens and what running through a crowd costs (see [zombie difficulty](docs/zombie-difficulty.md)).
 `/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
 That preview places a Max Ammo pickup in front of the player and guarantees another when the target dies. Add
 `&powerup=doublePoints`, `&powerup=instaKill`, `&powerup=nuke` or `&powerup=carpenter` to inspect the other pickup models.
