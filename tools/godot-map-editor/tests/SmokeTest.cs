@@ -86,10 +86,12 @@ public partial class SmokeTest : Node
                     MapScene.AddNew(testRoot, candidate, kind);
                     var additions = new List<MapDocument.Addition>();
                     MapDocument.WalkItems(candidate, testRoot, additions);
-                    Require(additions.Count == 1 && MapDocument.CollectChanges(original, candidate).Count == 1, "Could not add " + kind);
+                    Require(additions.Count >= 1 && MapDocument.CollectChanges(original, candidate).Count >= 1
+                        && MapDocument.Validate(candidate).Count == 0, "Could not add " + kind);
                 }
                 finally { testRoot.Free(); }
             }
+            CheckGameplayEdits(id, (JsonObject)original, source);
         }
         finally { root.Free(); }
     }
@@ -103,6 +105,7 @@ public partial class SmokeTest : Node
     private static void CheckPreview(ZombonzMapRoot root, JsonObject document)
     {
         Require(MapPreview.Refresh(root, document).Count == 0, "A map preview asset could not load");
+        CheckGameplayPreview(root);
         foreach (var item in MapPreview.ItemsIn(root).Where(item => item.Kind == "prop"))
         {
             var art = item.GetNode<Node3D>("Art");
@@ -139,10 +142,11 @@ public partial class SmokeTest : Node
             try
             {
                 Require(Meshes(restored).Count() == Meshes(root).Count(), "Reopened map lost models");
+                CheckGameplayPreview(restored);
                 Require(Meshes(restored).Count(mesh => mesh.MaterialOverride is OrmMaterial3D { OrmTexture: not null })
                     == Meshes(root).Count(mesh => mesh.MaterialOverride is OrmMaterial3D { OrmTexture: not null }), "Reopened map lost PBR textures");
                 var roundtrip = (JsonObject)document.DeepClone(); MapDocument.WalkItems(roundtrip, restored);
-                Require(JsonNode.DeepEquals(roundtrip, document), "Preview nodes changed exported JSON after reopening");
+                Require(JsonNode.DeepEquals(roundtrip, document), "Preview nodes changed exported JSON after reopening: " + MapDocument.CollectChanges(document, roundtrip).ToJsonString());
             }
             finally { restored.Free(); }
         }
@@ -153,6 +157,102 @@ public partial class SmokeTest : Node
         Require(MapPreview.Refresh(root, document).Count == 1 && prop.GetNode("Art") == oldArt, "Missing asset did not preserve an editable preview");
         prop.Asset = asset;
         Require(MapPreview.Refresh(root, document).Count == 0, "Preview did not recover after restoring the asset");
+    }
+
+    private static void CheckGameplayPreview(ZombonzMapRoot root)
+    {
+        var items = MapPreview.ItemsIn(root).ToArray();
+        foreach (var item in items.Where(item => item.GameplayType == "hazards"))
+        {
+            var bounds = MapPreviewAssets.Bounds(item.GetNode<Node3D>("Art"));
+            var size = GameplayPreview.Hazard(item.HazardKind).Size;
+            Require(bounds.Size.X <= size.X + 0.001 && bounds.Size.Y <= size.Y + 0.001 && bounds.Size.Z <= size.Z + 0.001,
+                "Hazard model does not match runtime dimensions: " + item.ObjectId);
+        }
+        foreach (var gun in items.Where(item => item.GameplayType == "wallWeapons"))
+        {
+            Require(!gun.GetNode<Node3D>("Art/WallDisplay/PurchasedGun").Visible, "Unpurchased wall gun model is visible");
+            foreach (var layer in new[] { "ChalkOutline", "ChalkInset" })
+                Require(Meshes(gun.GetNode("Art/WallDisplay/" + layer)).All(mesh => mesh.MaterialOverride is BaseMaterial3D
+                    { ShadingMode: BaseMaterial3D.ShadingModeEnum.Unshaded }), "Chalk materials were lost when saving");
+        }
+        foreach (var perk in items.Where(item => item.GameplayType == "perkMachines"))
+            Require(Meshes(perk).Any(mesh => Enumerable.Range(0, mesh.Mesh.GetSurfaceCount())
+                .Any(index => mesh.GetSurfaceOverrideMaterial(index) is BaseMaterial3D { AlbedoTexture: not null })),
+                "Perk paint was lost when saving");
+        Require(items.Any(item => item.GameplayType == "playerSpawn" && item.HasNode("Art/SpawnBody")), "Missing human-sized player spawn guide");
+        root.ShowPurchasedWallGuns = true; root.ShowSpawns = false; root.ShowRoutes = true; root.ShowCollision = true;
+        MapPreview.ApplyVisibility(root);
+        Require(items.Where(item => item.GameplayType == "wallWeapons").All(item => item.GetNode<Node3D>("Art/WallDisplay/PurchasedGun").Visible), "Purchased preview toggle failed");
+        Require(items.Where(item => item.GameplayType is "playerSpawn" or "zombieSpawns").All(item => !item.Visible), "Spawn preview toggle failed");
+        Require(items.Where(item => item.GameplayType is "routePoint" or "collision").All(item => item.Visible), "Linked guide toggle failed");
+        root.ShowPurchasedWallGuns = false; root.ShowSpawns = true; root.ShowRoutes = false; root.ShowCollision = false;
+        MapPreview.ApplyVisibility(root);
+    }
+
+    private static void CheckGameplayEdits(string id, JsonObject original, string source)
+    {
+        var candidate = (JsonObject)original.DeepClone();
+        var root = MapScene.Build(candidate, source, previewAssets: false);
+        try
+        {
+            ZombonzMapItem Find(string type) => MapPreview.ItemsIn(root).First(item => item.GameplayType == type);
+            var move = new Vector3(2, 0, 3);
+            var door = Find("doors"); var blocker = door.GetChildren().OfType<ZombonzMapItem>().Single();
+            var oldBlocker = MapGameplay.MapTransform(blocker).Origin;
+            door.Position += move; door.DoorLabel = "TEST"; door.Cost = 750;
+            var barrier = Find("barriers");
+            var inside = barrier.GetChildren().OfType<ZombonzMapItem>().First(item => item.DataPath.EndsWith("/insidePoint"));
+            var oldInside = MapGameplay.MapTransform(inside).Origin;
+            var oldRoute = MapGameplay.MapTransform(barrier.GetChildren().OfType<ZombonzMapItem>().First(item => item.DataPath.Contains("/approachPath/"))).Origin;
+            var oldBarrierId = barrier.ObjectId;
+            barrier.Position += move; barrier.Width += 0.2f; barrier.ObjectId = "edited-barrier";
+            var gun = Find("wallWeapons"); gun.Rotation += new Vector3(0, Mathf.Pi / 2, 0); gun.WeaponId = "mp40";
+            var barrel = Find("hazards"); barrel.HazardKind = "jeep"; barrel.Rotation += new Vector3(0, 0.5f, 0);
+            var mystery = Find("mysteryBoxes"); mystery.Position += move;
+            var pap = Find("packAPunch"); pap.Rotation += new Vector3(0, Mathf.Pi / 2, 0);
+            MapGameplay.Prepare(root, candidate); // Refresh/migration must not detach linked children or reset edits.
+            Require(MapGameplay.MapTransform(blocker).Origin.IsEqualApprox(oldBlocker + move), "Door blocker did not follow its door");
+            Require(MapGameplay.MapTransform(inside).Origin.IsEqualApprox(oldInside + move), "Barrier inside point did not follow its anchor");
+            MapDocument.WalkItems(candidate, root);
+            Require(MapDocument.Vector(MapDocument.AtPath(candidate, inside.DataPath)).IsEqualApprox(oldInside + move), "Nested point export used local coordinates");
+            Require(MapDocument.Vector(candidate["gameplay"]!["barriers"]![0]!["approachPath"]![0]).IsEqualApprox(oldRoute + move), "Approach route did not follow barrier");
+            var window = MapDocument.Items((JsonObject)candidate["presentation"]!, "windows").First(item => MapDocument.Text(item?["id"]) == barrier.ObjectId);
+            Require(MapDocument.Vector(window).IsEqualApprox(barrier.Position), "Window presentation did not follow barrier");
+            Require(MapDocument.Items((JsonObject)candidate["gameplay"]!, "zombieSpawns").All(item => MapDocument.Text(item?["barrierId"]) != oldBarrierId), "Barrier rename left invalid spawn references");
+            Require(MapDocument.Vector(candidate["presentation"]!["boxCenter"]).IsEqualApprox(MapDocument.Vector(original["presentation"]!["boxCenter"]) + move), "Mystery box did not follow purchase point");
+            if (candidate["gameplay"]!["mysteryBoxes"]![0]!["locations"] is JsonArray locations)
+                Require(MapDocument.Vector(locations[0]!["position"]).IsEqualApprox(mystery.Position), "Initial box location retained its old purchase point");
+            foreach (var body in mystery.GetChildren().OfType<ZombonzMapItem>().Where(item => item.Kind == "box"))
+                Require(MapDocument.Vector(MapDocument.AtPath(candidate, body.DataPath)?["center"]).IsEqualApprox(MapDocument.Vector(MapDocument.AtPath(original, body.DataPath)?["center"]) + move), "Fixed mystery box body did not follow its lid");
+            CheckExport(id + "-gameplay", original, candidate, MapDocument.CollectChanges(original, candidate));
+
+            // All add choices together exercise optional arrays, linked child paths, and presentation additions.
+            var added = (JsonObject)original.DeepClone();
+            var newRoot = MapScene.Build(added, source, previewAssets: false);
+            try
+            {
+                foreach (var kind in MapScene.NewObjectKinds) MapScene.AddNew(newRoot, added, kind);
+                var second = MapScene.AddNew(newRoot, added, "Barrel");
+                Require(second.ObjectId == "new-barrel-2", "Repeated additions did not get unique IDs");
+                var newBarrier = MapPreview.ItemsIn(newRoot).First(item => item.Kind == "new" && item.GameplayType == "barriers");
+                var secondBarrier = MapScene.AddNew(newRoot, added, "Barrier");
+                MapScene.AddNew(newRoot, added, "Door");
+                Require(newBarrier.GetChildren().OfType<ZombonzMapItem>().Count() == 3 && secondBarrier.GetChildren().OfType<ZombonzMapItem>().Count() == 3,
+                    "Repeated barriers shared or stole route points");
+                Require(MapPreview.ItemsIn(newRoot).Where(item => item.Kind == "new" && item.GameplayType == "doors")
+                    .All(item => item.GetChildren().OfType<ZombonzMapItem>().Count() == 1), "Repeated doors shared blockers");
+                newBarrier.Position += move; newBarrier.Rotation = new Vector3(0, Mathf.Pi / 2, 0);
+                var pending = new List<MapDocument.Addition>();
+                MapDocument.WalkItems(added, newRoot, pending);
+                CheckExport(id + "-add-gameplay", original, added, MapDocument.CollectChanges(original, added));
+                foreach (var entry in pending) { entry.Item.DataPath = entry.Path; entry.Item.Kind = entry.Kind; }
+                var once = added.DeepClone(); MapDocument.WalkItems(added, newRoot);
+                Require(JsonNode.DeepEquals(once, added), "Second export changed or duplicated new gameplay objects");
+            }
+            finally { newRoot.Free(); }
+        }
+        finally { root.Free(); }
     }
 
     private static void CheckExport(string id, JsonNode original, JsonNode expected, JsonArray changes)

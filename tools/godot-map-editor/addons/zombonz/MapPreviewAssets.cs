@@ -38,18 +38,27 @@ public sealed class MapPreviewAssets
     {
         var result = ResourceSaver.Save(resource, path, ResourceSaver.SaverFlags.Compress);
         if (result != Error.Ok) throw new IOException("Could not cache preview: " + result);
-        return ResourceLoader.Load<T>(path, cacheMode: ResourceLoader.CacheMode.Ignore)
+        return LoadCached<T>(path, true)
             ?? throw new IOException("Could not read cached preview: " + path);
     }
 
-    public PackedScene Model(string asset, bool rebuild = false)
+    private static T LoadCached<T>(string path, bool fresh = false) where T : Resource
     {
-        if (!rebuild && _models.TryGetValue(asset, out var loaded)) return loaded;
+        // The cache is ignored by the filesystem scanner; register its UIDs explicitly.
+        var uid = ResourceLoader.GetResourceUid(path);
+        if (uid != ResourceUid.InvalidId && !ResourceUid.HasId(uid)) ResourceUid.AddId(uid, path);
+        return ResourceLoader.Load<T>(path, cacheMode: fresh ? ResourceLoader.CacheMode.Ignore : ResourceLoader.CacheMode.Reuse);
+    }
+
+    public PackedScene Model(string asset, bool rebuild = false, string category = "props")
+    {
+        var key = category + "/" + asset;
+        if (!rebuild && _models.TryGetValue(key, out var loaded)) return loaded;
         PackedScene? cached;
-        var source = PublicPath("/assets/props/" + asset + "/model.glb");
+        var source = PublicPath("/assets/" + category + "/" + asset + "/model.glb");
         // v1 editor caches contain ImporterMeshInstance3D nodes, which do not render.
         var path = CachePath(source, ".scn", "v2");
-        if (!rebuild && System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) cached = ResourceLoader.Load<PackedScene>(path);
+        if (!rebuild && System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) cached = LoadCached<PackedScene>(path);
         else
         {
             using var importer = new GltfDocument();
@@ -75,15 +84,15 @@ public sealed class MapPreviewAssets
             }
             finally { GltfDocument.UnregisterGltfDocumentExtension(converter); }
         }
-        return _models[asset] = cached ?? throw new IOException("Invalid model cache: " + asset);
+        return _models[key] = cached ?? throw new IOException("Invalid model cache: " + asset);
     }
 
-    private Texture2D Texture(string asset)
+    public Texture2D Texture(string asset)
     {
         if (_textures.TryGetValue(asset, out var cached)) return cached;
         var source = PublicPath(asset);
         var path = CachePath(source, ".res");
-        if (System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) cached = ResourceLoader.Load<Texture2D>(path);
+        if (System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) cached = LoadCached<Texture2D>(path);
         else
         {
             using var image = Image.LoadFromFile(source) ?? throw new IOException("Could not decode texture: " + asset);
@@ -92,6 +101,40 @@ public sealed class MapPreviewAssets
             cached = Save(ImageTexture.CreateFromImage(image), path);
         }
         return _textures[asset] = cached ?? throw new IOException("Invalid texture cache: " + asset);
+    }
+
+    public PackedScene Variant(string asset, string category, string recipe, Func<Node3D> create)
+    {
+        var source = PublicPath("/assets/" + category + "/" + asset + "/model.glb");
+        var path = CachePath(source, ".scn", recipe);
+        if (System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) return LoadCached<PackedScene>(path);
+        var root = create();
+        try
+        {
+            void Own(Node node)
+            {
+                node.SceneFilePath = "";
+                if (node != root) node.Owner = root;
+                foreach (var child in node.GetChildren()) Own(child);
+            }
+            Own(root);
+            using var packed = new PackedScene();
+            if (packed.Pack(root) != Error.Ok) throw new IOException("Could not pack preview variant: " + asset);
+            return Save(packed, path);
+        }
+        finally { root.Free(); }
+    }
+
+    public Node3D PerkModel(string perk, Action<Node3D, Texture2D> paint)
+    {
+        var texturePath = "/assets/props/vending-machine/paint-" + perk + ".webp";
+        var texture = Texture(texturePath);
+        var textureHash = Convert.ToHexString(SHA256.HashData(System.IO.File.ReadAllBytes(PublicPath(texturePath)))).ToLowerInvariant();
+        return Variant("vending-machine", "props", "perk-v2-" + textureHash, () =>
+        {
+            var model = Model("vending-machine").Instantiate<Node3D>();
+            paint(model, texture); return model;
+        }).Instantiate<Node3D>();
     }
 
     public OrmMaterial3D Material(string look)
@@ -116,7 +159,7 @@ public sealed class MapPreviewAssets
         var alphaHash = Convert.ToHexString(SHA256.HashData(System.IO.File.ReadAllBytes(alphaPath))).ToLowerInvariant();
         var path = CachePath(colorPath, "-" + alphaHash + "-decal.res");
         Texture2D texture;
-        if (System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) texture = ResourceLoader.Load<Texture2D>(path);
+        if (System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) texture = LoadCached<Texture2D>(path);
         else
         {
             using var color = Image.LoadFromFile(colorPath);

@@ -32,15 +32,15 @@ public static class MapDocument
         return value;
     }
 
-    private static void SetNumber(JsonObject target, string key, double value, bool angle = false)
+    internal static void SetNumber(JsonObject target, string key, double value, bool angle = false, bool exact = false)
     {
         var difference = Number(target[key]) - value;
         if (angle) difference = Math.IEEERemainder(difference, Math.Tau);
         if (!target.ContainsKey(key) || Math.Abs(difference) > 0.0001)
-            target[key] = Math.Round(value, 4, MidpointRounding.AwayFromZero);
+            target[key] = exact ? value : Math.Round(value, 4, MidpointRounding.AwayFromZero);
     }
 
-    private static void SetPosition(JsonObject target, Vector3 position)
+    internal static void SetPosition(JsonObject target, Vector3 position)
     {
         SetNumber(target, "x", position.X);
         SetNumber(target, "y", position.Y);
@@ -55,30 +55,36 @@ public static class MapDocument
     public static void ApplyItem(JsonObject document, ZombonzMapItem item)
     {
         if (AtPath(document, item.DataPath) is not JsonObject target) return;
+        var transform = MapGameplay.MapTransform(item);
         var size = item.Scale.Abs() * item.BaseSize;
         if (item.Kind == "box")
         {
             if (target["center"] is JsonObject center && target["size"] is JsonObject boxSize)
             {
-                SetPosition(center, item.Position);
+                SetPosition(center, transform.Origin);
+                if (item.GetParent() is ZombonzMapItem { GameplayType: "mysteryBoxes" })
+                    size = (transform * new Aabb(-item.BaseSize / 2, item.BaseSize)).Size;
                 SetPosition(boxSize, size);
                 if (target.ContainsKey("rotationX") || Math.Abs(item.Rotation.X) > 0.0001) SetNumber(target, "rotationX", item.Rotation.X, true);
                 if (target.ContainsKey("rotationZ") || Math.Abs(item.Rotation.Z) > 0.0001) SetNumber(target, "rotationZ", item.Rotation.Z, true);
             }
             else if (target["min"] is JsonObject min && target["max"] is JsonObject max)
             {
-                SetPosition(min, item.Position - size / 2);
-                SetPosition(max, item.Position + size / 2);
+                var bounds = transform * new Aabb(-item.BaseSize / 2, item.BaseSize);
+                SetPosition(min, bounds.Position);
+                SetPosition(max, bounds.End);
             }
             return;
         }
-        SetPosition(target, item.Position);
+        SetPosition(target, transform.Origin);
         if (item.DataPath.StartsWith("gameplay/zombieSpawns/") && item.BarrierId.Length > 0)
             target["barrierId"] = item.BarrierId;
         var slash = item.DataPath.LastIndexOf('/');
         if (slash < 0 || item.Kind == "marker" || AtPath(document, item.DataPath[..slash]) is not JsonObject parent) return;
+        var originalId = Text(parent["id"]);
         SetField(parent, "id", JsonValue.Create(item.ObjectId)!, item.ObjectId.Length > 0);
-        if (parent.ContainsKey("yaw")) SetNumber(parent, "yaw", item.Rotation.Y, true);
+        if (parent.ContainsKey("yaw")) SetNumber(parent, "yaw", item.GameplayType == "packAPunch" ? MapGameplay.QuarterYaw(item.Rotation.Y) : item.Rotation.Y,
+            true, item.GameplayType == "packAPunch");
         if (item.Kind == "prop" && parent["size"] is JsonObject propSize) SetPosition(propSize, size);
         SetField(parent, "cost", JsonValue.Create(item.Cost)!, item.Cost >= 0);
         SetField(parent, "weaponId", JsonValue.Create(item.WeaponId)!, item.WeaponId.Length > 0);
@@ -87,6 +93,16 @@ public static class MapDocument
         SetField(parent, "maxBoards", JsonValue.Create(item.MaxBoards)!);
         SetField(parent, "requiresPower", JsonValue.Create(item.RequiresPower)!);
         SetField(parent, "asset", JsonValue.Create(item.Asset)!, item.Asset.Length > 0);
+        if (item.GameplayType == "hazards") parent["kind"] = item.HazardKind;
+        if (item.GameplayType == "perkMachines") parent["perk"] = item.PerkId;
+        if (item.GameplayType == "doors" && item.DoorAppearance != Text(document["presentation"]?["doorStyles"]?[originalId]?["kind"], "planks"))
+            parent["kind"] = item.DoorAppearance == "debris" ? "debris" : "door";
+        if (item.GameplayType == "barriers")
+        {
+            SetNumber(parent, "width", item.Width);
+            if (parent["outward"] is JsonObject outward) SetPosition(outward, new Basis(Vector3.Up, item.Rotation.Y) * item.Outward);
+        }
+        if (item.GameplayType.Length > 0) MapGameplay.WritePresentation(document, item, originalId);
     }
 
     private static void AppendNew(JsonObject document, ZombonzMapItem item, List<Addition> pending)
@@ -95,6 +111,7 @@ public static class MapDocument
         if (parts.Length < 3 || document[parts[1]] is not JsonObject section) return;
         var field = parts[2];
         var target = (field == "navigation" ? section["navigation"]?["nodes"] : section[field]) as JsonArray;
+        if (target is null && field is ("perkMachines" or "packAPunch" or "equipment" or "hazards")) section[field] = target = new JsonArray();
         if (target is null) return;
         var position = Point(item.Position);
         var size = item.Scale.Abs() * item.BaseSize;
@@ -114,27 +131,63 @@ public static class MapDocument
                     ["max"] = Point(item.Position + new Vector3(0.5f, 2.4f, 0.15f)) } },
             "wallWeapons" => new() { ["id"] = item.ObjectId, ["position"] = position, ["weaponId"] = item.WeaponId.Length > 0 ? item.WeaponId : "kar98k",
                 ["weaponCost"] = item.WeaponCost, ["ammoCost"] = item.AmmoCost },
-            "hazards" => new() { ["id"] = item.ObjectId, ["kind"] = "barrel", ["position"] = position, ["yaw"] = 0 },
+            "hazards" => new() { ["id"] = item.ObjectId, ["kind"] = item.HazardKind, ["position"] = position, ["yaw"] = item.Rotation.Y },
+            "perkMachines" => new() { ["id"] = item.ObjectId, ["perk"] = item.PerkId, ["position"] = position },
+            "packAPunch" => new() { ["id"] = item.ObjectId, ["position"] = position, ["yaw"] = MapGameplay.QuarterYaw(item.Rotation.Y), ["cost"] = Math.Max(0, item.Cost) },
+            "equipment" => new() { ["id"] = item.ObjectId, ["item"] = "bouncing-betty", ["position"] = position, ["cost"] = Math.Max(0, item.Cost) },
             "navigation" => new() { ["id"] = item.ObjectId, ["position"] = position, ["neighbors"] = new JsonArray() },
             _ => null
         };
         if (entry is null) return;
+        if (field == "barriers")
+        {
+            entry["width"] = item.Width; entry["outward"] = Point(new Basis(Vector3.Up, item.Rotation.Y) * item.Outward);
+            var inside = item.GetChildren().OfType<ZombonzMapItem>().FirstOrDefault(child => child.DataPath.EndsWith("/insidePoint"));
+            if (inside is not null) entry["insidePoint"] = Point(MapGameplay.MapTransform(inside).Origin);
+            entry["approachPath"] = new JsonArray(item.GetChildren().OfType<ZombonzMapItem>().Where(child => child.DataPath.Contains("/approachPath/"))
+                .Select(child => (JsonNode)Point(MapGameplay.MapTransform(child).Origin)).ToArray());
+        }
+        if (field == "doors")
+        {
+            var blocker = item.GetChildren().OfType<ZombonzMapItem>().FirstOrDefault(child => child.DataPath.EndsWith("/blocker"));
+            if (blocker is not null)
+            {
+                var bounds = MapGameplay.MapTransform(blocker) * new Aabb(-blocker.BaseSize / 2, blocker.BaseSize);
+                entry["blocker"] = new JsonObject { ["min"] = Point(bounds.Position), ["max"] = Point(bounds.End) };
+            }
+            entry["requiresPower"] = item.RequiresPower;
+            if (item.DoorAppearance == "debris") entry["kind"] = "debris";
+        }
         if (field == "zombieSpawns" && item.BarrierId.Length > 0) entry["barrierId"] = item.BarrierId;
         var kind = field is "greybox" or "collisionBoxes" ? "box" : field == "props" ? "prop" : "gameplay";
         var suffix = field is "greybox" or "collisionBoxes" or "zombieSpawns" ? "" : "/position";
-        pending.Add(new(item, $"{parts[1]}/{(field == "navigation" ? "navigation/nodes" : field)}/{target.Count}{suffix}", kind));
+        var assigned = $"{parts[1]}/{(field == "navigation" ? "navigation/nodes" : field)}/{target.Count}";
+        pending.Add(new(item, assigned + suffix, kind));
+        foreach (var child in item.GetChildren().OfType<ZombonzMapItem>())
+            pending.Add(new(child, assigned + child.DataPath[item.DataPath.Length..], child.Kind));
         target.Add(entry);
+        if (item.GameplayType.Length > 0) MapGameplay.WritePresentation(document, item, item.ObjectId);
     }
 
     public static void WalkItems(JsonObject document, Node node, List<Addition>? pending = null)
     {
         pending ??= new();
-        if (node is ZombonzMapItem item)
+        var renames = MapPreview.ItemsIn(node).Where(item => item.GameplayType == "barriers" && item.Kind != "new")
+            .Select(item => (Old: Text(AtPath(document, item.DataPath[..item.DataPath.LastIndexOf('/')])?["id"]), New: item.ObjectId))
+            .Where(pair => pair.Old.Length > 0 && pair.Old != pair.New).ToArray();
+        void Visit(Node current)
         {
-            if (item.Kind == "new") AppendNew(document, item, pending);
-            else ApplyItem(document, item);
+            if (current is ZombonzMapItem item)
+            {
+                if (item.Kind == "new") AppendNew(document, item, pending);
+                else ApplyItem(document, item);
+            }
+            foreach (var child in current.GetChildren()) Visit(child);
         }
-        foreach (var child in node.GetChildren()) WalkItems(document, child, pending);
+        Visit(node);
+        foreach (var pair in renames)
+            foreach (var spawn in Items((JsonObject)document["gameplay"]!, "zombieSpawns").OfType<JsonObject>())
+                if (Text(spawn["barrierId"]) == pair.Old) spawn["barrierId"] = pair.New;
     }
 
     public static JsonArray CollectChanges(JsonNode before, JsonNode after)
