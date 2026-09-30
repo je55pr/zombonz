@@ -39,7 +39,7 @@ function untilDown(count: number, gait: ZombieGait, cap = 1200) {
 }
 
 describe('a zombie’s melee cadence', () => {
-  it('winds up before it hits: no blow on the first tick in reach, one after the wind-up, the next a whole swing later', () => {
+  it('does not hit on the first tick in reach: the blow goes live a tenth of the way through the swing, and the next swing is a whole swing later', () => {
     const { sim, zombies } = ring(1, 'walk');
     const [zombie] = zombies, timing = swingTiming(zombie);
     const log: Array<[number, SimulationEvent['type']]> = [];
@@ -47,8 +47,8 @@ describe('a zombie’s melee cadence', () => {
       for (const event of sim.tick()) if (event.type === 'zombieSwung' || event.type === 'zombieAttacked') log.push([tick, event.type]);
     }
     expect(log[0]).toEqual([1, 'zombieSwung']);
-    // The blow lands `windupTicks` after the swing began.
-    expect(log[1]).toEqual([1 + timing.windupTicks, 'zombieAttacked']);
+    // The blow lands `blowTicks` after the swing began (the arm is drawn coming down later, at `windupTicks`).
+    expect(log[1]).toEqual([1 + timing.blowTicks, 'zombieAttacked']);
     const blows = log.filter(([, type]) => type === 'zombieAttacked');
     // The player is not hit again while down, so only one full cycle shows in the blows: check the swings instead.
     const swings = log.filter(([, type]) => type === 'zombieSwung');
@@ -82,9 +82,10 @@ describe('a zombie’s melee cadence', () => {
       const { blows, downedAt } = untilDown(2, gait);
       expect(blows.length, gait).toBe(2);
       expect(blows[1] - blows[0], gait).toBeGreaterThanOrEqual(ZOMBIE_MELEE.hurtGraceTicks);
-      // The first blow only lands after a wind-up, and the second after the grace: two thirds of a second even for sprinters.
-      expect(downedAt, gait).toBeGreaterThanOrEqual(ZOMBIE_MELEE.swing[gait].windupTicks + ZOMBIE_MELEE.hurtGraceTicks);
-      expect(downedAt, gait).toBeGreaterThan(40);
+      // The first blow only lands once it is live (a tenth of the way through the swing), and the second after the grace.
+      const { windupTicks, recoveryTicks } = ZOMBIE_MELEE.swing[gait];
+      expect(downedAt, gait).toBeGreaterThanOrEqual(Math.ceil((windupTicks + recoveryTicks) * ZOMBIE_MELEE.liveFrom) + ZOMBIE_MELEE.hurtGraceTicks);
+      expect(downedAt, gait).toBeGreaterThan(20);
     }
   });
 
@@ -103,12 +104,13 @@ describe('a zombie’s melee cadence', () => {
 });
 
 describe('a blow needs a real chance to land', () => {
-  it('misses a player who steps out of reach during the wind-up, and the zombie carries on with the swing', () => {
+  it('misses a player who steps out of reach before the blow is live, and the zombie carries on with the swing', () => {
     const { sim, player, zombies } = ring(1, 'walk', 1);
     const [zombie] = zombies, { windupTicks, totalTicks } = swingTiming(zombie);
     sim.tick();
     expect(zombie.attackTicks).toBeGreaterThan(0);
-    player.position = { x: 0, y: 0, z: -2 };
+    // Out of reach for the whole swing: the zombie closes a metre or so while it swings, and they are further than that.
+    player.position = { x: 0, y: 0, z: -4 };
     zombie.position = { x: 0, y: 0, z: 1 };
     const events: SimulationEvent[] = [];
     for (let tick = 0; tick < totalTicks; tick++) events.push(...sim.tick());
@@ -178,8 +180,8 @@ describe('a blow needs a real chance to land', () => {
     expect(zombie.attackTicks).toBe(0);
   });
 
-  it('is measured across the floor: a zombie 1.05 m off starts a swing, one 1.7 m off walks closer first', () => {
-    const near = ring(1, 'walk', 1.05), far = ring(1, 'walk', 1.7);
+  it('is measured across the floor: a zombie 1.05 m off starts a swing, one 2.1 m off walks closer first', () => {
+    const near = ring(1, 'walk', 1.05), far = ring(1, 'walk', 2.1);
     near.zombies[0].moveSpeed = 0; far.zombies[0].moveSpeed = 0;
     near.sim.tick(); far.sim.tick();
     expect(near.zombies[0].attackTicks).toBeGreaterThan(0);

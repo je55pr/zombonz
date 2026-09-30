@@ -25,7 +25,7 @@ export interface ZombieAttackEvent {
   damage: number;
 }
 
-/** A zombie began a swing at a player: the wind-up starts, and the blow lands `swingTiming` ticks later if they are still in reach. */
+/** A zombie began a swing at a player: the blow is live from `swingTiming(...).blowTicks` on, and lands if they are in reach. */
 export interface ZombieSwingEvent {
   type: 'zombieSwung';
   zombieId: EntityId;
@@ -322,10 +322,10 @@ function advanceSwing(zombie: ZombieState, players: readonly PlayerState[], targ
     return [{ type: 'zombieSwung', zombieId: zombie.id, playerId: target.id }];
   }
   const events: Array<ZombieMeleeEvent | DamageEvent> = [];
-  // The blow is live from contact, the tick the arm comes down at the end of the wind-up, until the swing has finished (issue
-  // #210): it is a swipe, not a single tick, so whoever is in reach at any point in it is hit, once. A blow that finds the player
-  // in another zombie's grace lands when the grace ends, if they are still in reach and the swing is not over.
-  if (!zombie.struck && zombie.attackTicks >= timing.windupTicks) {
+  // The blow is live from a tenth of the way through the swing until it has finished (issue #210): it is a swipe, not a single
+  // tick, so whoever is in reach at any point in it is hit, once. A blow that finds the player in another zombie's grace lands
+  // when the grace ends, if they are still in reach and the swing is not over.
+  if (!zombie.struck && zombie.attackTicks >= timing.blowTicks) {
     // At whoever it was after if they are in reach, else anyone else who is.
     const victim = players.filter(player => player.alive && !player.downed && reach(player, 'strike'))
       .sort((a, b) => Number(b.id === zombie.targetId) - Number(a.id === zombie.targetId) || a.id.localeCompare(b.id))[0];

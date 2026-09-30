@@ -211,21 +211,20 @@ describe('a queue behind a fight', () => {
   });
 });
 
-describe('the blow is a swipe: live from contact to the end of the swing', () => {
+describe('the blow is a swipe: live from a tenth of the way in to the end of the swing', () => {
   const timing = swingTiming({ id: 'e:2', gait: 'run' });
-  /** The last tick of the swing, as an offset from contact. */
-  const last = timing.totalTicks - timing.windupTicks;
+  /** The last tick of the swing, as an offset from the tick the blow goes live. */
+  const last = timing.totalTicks - timing.blowTicks;
   /**
    * One swing at a player 1 m in front of a zombie that does not move, or 2 m if the script says so: `z(offset)` is the
-   * player's distance on the swing tick `offset` ticks from the moment of contact (the end of the wind-up). Gives the
-   * offsets the blow landed on.
+   * player's distance on the swing tick `offset` ticks from the tick the blow goes live. Gives the offsets the blow landed on.
    */
   function swing(z: (offset: number) => number, options: { grace?: number; gait?: ZombieGait } = {}): number[] {
     const zombie = createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, options.gait ?? 'run');
     zombie.yaw = 0;
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 1 });
-    const contact = swingTiming(zombie).windupTicks, landed: number[] = [];
-    // `grace` is how many ticks of another zombie's grace the player still has when the arm reaches contact.
+    const contact = swingTiming(zombie).blowTicks, landed: number[] = [];
+    // `grace` is how many ticks of another zombie's grace the player still has when the blow goes live.
     player.hurtGraceTicks = options.grace === undefined ? 0 : contact + options.grace;
     let swung = false;
     for (let tick = 0; tick < 600; tick++) {
@@ -242,20 +241,36 @@ describe('the blow is a swipe: live from contact to the end of the swing', () =>
   }
   const IN = 1, OUT = 2;
 
-  it('is about half the swing or a little more, from the end of the wind-up to the end', () => {
+  it('goes live a tenth of the way in, long before the arm is drawn coming down, and stays live to the end', () => {
     for (const gait of ['walk', 'run', 'sprint'] as const) for (const id of ['e:2', 'e:9', 'e:31'] as const) {
-      const { windupTicks, totalTicks } = swingTiming({ id, gait });
-      const share = (totalTicks - windupTicks + 1) / totalTicks;
-      expect(share, `${gait} ${id}`).toBeGreaterThan(0.45);
-      expect(share, `${gait} ${id}`).toBeLessThan(0.7);
+      const { windupTicks, totalTicks, blowTicks } = swingTiming({ id, gait });
+      expect(blowTicks / totalTicks, `${gait} ${id} starts`).toBeGreaterThan(0.08);
+      expect(blowTicks / totalTicks, `${gait} ${id} starts`).toBeLessThan(0.14);
+      expect(blowTicks, `${gait} ${id}`).toBeLessThan(windupTicks);
+      const share = (totalTicks - blowTicks + 1) / totalTicks;
+      expect(share, `${gait} ${id} share`).toBeGreaterThan(0.85);
     }
   });
 
-  it('lands a standing player\'s blow at contact, once', () => {
+  it('lands a standing player\'s blow on the first tick it is live, once', () => {
     expect(swing(() => IN)).toEqual([0]);
   });
 
-  it('misses a player who is out of reach from before contact to the end, however close they were', () => {
+  it('hits a player who waits in reach and steps back at the very end of the animation: they were hit long before', () => {
+    for (const gait of ['walk', 'run', 'sprint'] as const) {
+      expect(swing(offset => offset < last - 2 ? IN : OUT, { gait }), gait).toEqual([0]);
+    }
+  });
+
+  it(`reaches ${ZOMBIE_MELEE.reach.strikeRange} m: a player that far off in the swipe is hit, one a little further is not`, () => {
+    const reach = ZOMBIE_MELEE.reach.strikeRange;
+    expect(swing(() => reach - 0.1)).toEqual([0]);
+    expect(swing(() => reach + 0.1)).toEqual([]);
+    // And that is well past an arm's length for a body 0.64 across: a long reach, as asked for.
+    expect(reach).toBeGreaterThanOrEqual(1.8);
+  });
+
+  it('misses a player who is out of reach before the blow goes live and stays out, however close they were', () => {
     expect(swing(offset => offset < 0 ? IN : OUT)).toEqual([]);
   });
 
@@ -452,10 +467,11 @@ describe('what a crowd costs', () => {
   it('makes running into the middle of a group cost blows, though steering round it stays free', () => {
     for (const seed of [1, 2, 3, 4, 5, 6]) {
       expect(runCrowd({ approach: 'dash', zombies: 6, seed, seconds: 8 }).hits, `dash, seed ${seed}`).toBeGreaterThanOrEqual(1);
-      // Steering round a whole group can cost a blow or two (two is a life), never a wall: a way through is left.
+      // Steering round a whole group costs blows (a couple is a life), but it is not a wall: a way through is left, and it
+      // is always a better way than charging straight in.
       const weave = runCrowd({ approach: 'weave', zombies: 12, seed, seconds: 8 });
-      expect(weave.hits, `weave, seed ${seed}`).toBeLessThanOrEqual(2);
       expect(weave.seconds, `weave, seed ${seed}`).not.toBeNull();
+      expect(weave.hits, `weave, seed ${seed}`).toBeLessThan(runCrowd({ approach: 'dash', zombies: 12, seed, seconds: 8 }).hits / 2);
     }
   });
 

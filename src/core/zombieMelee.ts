@@ -3,9 +3,9 @@ import type { ZombieGait, ZombieState } from './types.ts';
 
 /**
  * How a zombie's melee is paced and where it can reach (see docs/combat.md). A swing has a wind-up, at the end of which
- * the blow lands, and a recovery, after which it may swing again. The blow is live from contact (the end of the wind-up) to the
- * end of the swing, once: whoever is in reach at any point in that swipe is hit. The client plays
- * the attack clip from the swing's own tick count, so what is drawn is what the rules are doing.
+ * the arm comes down, and a recovery, after which it may swing again. The blow is live from `liveFrom` of the way through
+ * the swing (well before the arm is drawn coming down) to its end, once: whoever is in reach at any point in that stretch is
+ * hit. The client plays the attack clip from the swing's own tick count.
  *
  * WaW gives runners and sprinters faster attack animations than walkers ("New faster hit ... when running", in
  * `_zombiemode.gsc`), so the pace quickens with the gait; the numbers themselves are ours. Its zombies also start a
@@ -20,7 +20,7 @@ const SWING: Readonly<Record<ZombieGait, { windupTicks: number; recoveryTicks: n
 
 export const ZOMBIE_MELEE = {
   damage: 50,
-  /** Ticks (at 60 a second) of wind-up, until the blow lands, and of recovery after it, for each gait. */
+  /** Ticks (at 60 a second) of wind-up, until the arm comes down, and of recovery after it, for each gait. */
   swing: SWING,
   /** Each zombie's own tempo: up to this many ticks more of wind-up and of recovery, fixed by its id, so a group never swings in step. */
   windupJitterTicks: 12,
@@ -31,8 +31,14 @@ export const ZOMBIE_MELEE = {
    * Farthest across the floor, in metres, a swing may start from and a blow still lands from; the difference is the
    * lunge a player can step back out of. Crawlers reach less far.
    */
-  reach: { startRange: 1.1, strikeRange: 1.5 },
-  crawlerReach: { startRange: 0.9, strikeRange: 1.3 },
+  reach: { startRange: 1.1, strikeRange: 1.8 },
+  crawlerReach: { startRange: 0.9, strikeRange: 1.6 },
+  /**
+   * How far through a swing (as a share of its whole length) the blow goes live (issue #210). From then to the swing's end,
+   * being in reach lands it, once. It used to be live only from the end of the wind-up, 40 to 45% of the way in, so a player
+   * who stayed out of reach until then and stepped back at the end avoided it altogether.
+   */
+  liveFrom: 0.1,
   /**
    * A zombie also starts its swing early, when the player, going at the speed and heading they have now, and the zombie,
    * still coming, will be within strike range as the blow lands (issue #210): otherwise a player who runs up to a zombie
@@ -51,10 +57,12 @@ export const ZOMBIE_MELEE = {
 } as const;
 
 export interface SwingTiming {
-  /** Ticks from the start of a swing until the blow lands. */
+  /** Ticks from the start of a swing until the arm comes down (what the animation's strike frame is played at). */
   windupTicks: number;
   /** Ticks in the whole swing. */
   totalTicks: number;
+  /** The tick the blow goes live: from here to `totalTicks`, being in reach lands it. */
+  blowTicks: number;
 }
 
 /** This zombie's swing: its gait's pace, stretched a little by its own tempo (fixed for the zombie's life). */
@@ -62,5 +70,6 @@ export function swingTiming(zombie: Pick<ZombieState, 'id' | 'gait'>): SwingTimi
   const { windupTicks, recoveryTicks } = ZOMBIE_MELEE.swing[zombie.gait];
   const hash = hashString(zombie.id);
   const wind = windupTicks + hash % (ZOMBIE_MELEE.windupJitterTicks + 1);
-  return { windupTicks: wind, totalTicks: wind + recoveryTicks + (hash >>> 8) % (ZOMBIE_MELEE.recoveryJitterTicks + 1) };
+  const total = wind + recoveryTicks + (hash >>> 8) % (ZOMBIE_MELEE.recoveryJitterTicks + 1);
+  return { windupTicks: wind, totalTicks: total, blowTicks: Math.max(1, Math.ceil(total * ZOMBIE_MELEE.liveFrom)) };
 }
