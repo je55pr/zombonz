@@ -11,7 +11,7 @@ You do not need a server to play: without one, the game falls back to swapping c
 
 - A free [Cloudflare account](https://dash.cloudflare.com/sign-up).
 - This repository, and the Node.js version in [`.nvmrc`](../.nvmrc), then `npm ci`.
-- Nothing else to install: Cloudflare's tool, Wrangler, is fetched by `npx` the first time it is used (a couple of hundred megabytes, kept in npm's cache).
+- Nothing else to install for the room server: Wrangler is pinned as a development dependency and comes down with `npm ci`.
 
 ## 1. Try it on your own computer
 
@@ -20,6 +20,8 @@ npm run server:dev
 ```
 
 This builds the game and serves it, and the room server, at <http://localhost:8787>. Open that in two browser tabs: in one choose **Multiplayer**, then **Host Game**, then a map; in the other **Multiplayer**, then **Join Game**, and type the code. Press Ctrl+C to stop.
+
+For an automated end-to-end check, install Playwright's Chromium once with `npx playwright install chromium`, then run `npm run test:e2e`. It starts a local Wrangler room server and Vite app, connects two isolated browser contexts over real WebRTC, starts a match, and checks replicated movement with a 30-second test timeout.
 
 ## 2. Put it online
 
