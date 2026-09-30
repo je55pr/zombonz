@@ -17,6 +17,7 @@
     "test:e2e": "npm run build && playwright test --config=playwright.config.ts",
     "check": "npm run generate:asset-manifest && npm run typecheck && npm run validate:maps && npm test && npm run build",
     "benchmark": "node scripts/benchmark.mjs",
+    "difficulty": "node scripts/difficulty.mjs",
     "server:dev": "node scripts/server.mjs dev",
     "server:deploy": "node scripts/server.mjs deploy"
   },
