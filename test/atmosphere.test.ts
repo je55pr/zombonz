@@ -26,7 +26,7 @@ describe('presentation atmosphere', () => {
         gains.push(node); return node;
       }
       decodeAudioData() { return Promise.resolve({}); }
-      createBufferSource() { return { buffer: null, loop: false, connect: vi.fn(), start: ambientStart, stop: vi.fn() }; }
+      createBufferSource() { return { buffer: null, loop: false, playbackRate: { value: 1 }, connect: vi.fn(), start: ambientStart, stop: vi.fn() }; }
       createOscillator() { oscillator(); throw new Error('Procedural audio must not run'); }
       close() { return Promise.resolve(); }
     }

@@ -195,10 +195,11 @@ Strong hits, and every explosion, can take a zombie's limbs off (never the pisto
 kills, and a zombie that loses a leg and lives crawls after you, slower and from a shorter reach. Knife swings
 hit one nearby zombie in front of the player, and health recovers after five
 damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
-and temporary damage tint. Original synthesized audio gives simple gun, melee,
-damage, box and round cues; it unlocks after user input and can be muted with M.
-Quiet synthesized wind and electrical hum fill the empty bunker after audio unlock;
-they fade out while solo play is paused. Practical lamps occasionally flicker.
+and temporary damage tint. Presentation-only recorded audio gives gun, melee, damage, box and round cues. World SFX are
+listener-relative with distance falloff and stereo pan; reusable gain/panner voices are pooled while the Web Audio
+buffer source itself is recreated as required by the API. SFX, UI and music/ambience have separate volume buses under
+the master setting. Web Audio is created/resumed only from user input and can be muted with M. Quiet recorded wind and
+electrical hum use the non-positional music/ambience bus and fade out while solo play is paused. Practical lamps occasionally flicker.
 Zombie kills can also drop Max Ammo, Double Points, Insta-Kill, Nuke or Carpenter pickups, using the
 classic rules. Each time the team's total earned points pass a threshold (2000 above the
 starting points, growing 14% after each drop), the next kill drops one. Any kill also has

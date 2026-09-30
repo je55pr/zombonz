@@ -3,6 +3,9 @@ import type { SimulationEvent } from '../core/simulation.ts';
 import { weaponDefinition } from '../core/weapon.ts';
 import { baseWeaponId, isUpgradedWeapon } from '../core/upgrades.ts';
 import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip, type AudioClip } from './audioClips.ts';
+import { SpatialAudioManager, type AudioBus } from './audioManager.ts';
+
+export { softCeilingCurve } from './audioManager.ts';
 
 type Clip = AudioClip;
 
@@ -44,19 +47,6 @@ const MAX_TRIM_DB = 12;
  */
 const MASTER_LEVEL = 0.7;
 
-/**
- * A soft ceiling for the output: unchanged up to 70% of full scale, then rounded off so overlapping
- * shots and explosions never exceed about -0.6 dBFS. (A WaveShaper rather than Chrome's
- * DynamicsCompressorNode, which cut even quiet gunfire by about 15 dB when measured.)
- */
-export function softCeilingCurve(points = 4097): Float32Array {
-  const curve = new Float32Array(points);
-  for (let i = 0; i < points; i++) {
-    const x = i / (points - 1) * 2 - 1, size = Math.abs(x);
-    curve[i] = size <= 0.7 ? x : Math.sign(x) * (0.7 + 0.3 * Math.tanh((size - 0.7) / 0.3));
-  }
-  return curve;
-}
 /** One-shot mix levels; everything else sits below the player's own gunfire. */
 const MIX = {
   gunfire: 1.4, explosion: 1, electric: 0.8, reload: 0.4, reloadDone: 0.35, knife: 0.5, hit: 0.35, headshot: 0.5,
@@ -69,8 +59,6 @@ const BLAST_ROLLOFF = { grenade: 0.16, mine: 0.16, barrel: 0.1, vehicle: 0.07 } 
 /** Events with a place in the world: everyone hears them, whoever caused them, from where they happened. */
 const WORLD_EVENTS: ReadonlySet<string> = new Set(['grenadeThrown', 'grenadeBounced', 'grenadeExploded', 'weaponExploded',
   'minePlaced', 'mineArmed', 'mineTriggered', 'mineExploded', 'hazardHit', 'hazardIgnited', 'hazardExploded', 'zombieSwung']);
-/** Positional sounds fade with distance and are culled past this (the map is about 35 m across). */
-const HEARING_RANGE = 36;
 
 /** The level (dBFS) of a buffer's loudest 50 ms window, for normalisation. */
 export function loudestWindowDb(samples: Float32Array, sampleRate: number): number {
@@ -93,62 +81,36 @@ export function normalisingGain(loudestDb: number): number {
 
 /** Recorded CC0 audio cues. Audio is presentation only and starts on user input. */
 export class GameAudio {
-  private context: AudioContext | null = null;
-  private output: GainNode | null = null;
+  private readonly manager: SpatialAudioManager;
   private readonly clips = new Map<Clip, AudioBuffer>();
   private readonly trims = new Map<Clip, number>();
-  private readonly activeClips = new Map<Clip, number>();
   private lastStepTick = -100;
   private lastZombieVoiceTick = -100;
   private lastZombieStepTick = -100;
   private nextStingTick = 60 * 50;
   private stepCount = 0;
   private muted = false;
-  /** Output gain when audible: the master level scaled by the player's volume setting. */
-  private level = MASTER_LEVEL;
   private paused = false;
-  private readonly unlock = () => this.start();
+
   private readonly onKeyDown = (event: KeyboardEvent) => {
     if (event.code === 'KeyM' && !event.repeat) {
       this.muted = !this.muted;
-      if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || this.paused ? 0 : this.level,
-        this.context.currentTime, 0.015);
+      this.manager.setMuted(this.muted);
     }
   };
 
-  constructor(private readonly surface: HTMLElement) {
-    surface.addEventListener('pointerdown', this.unlock);
-    window.addEventListener('keydown', this.unlock);
+  constructor(surface: HTMLElement) {
+    this.manager = new SpatialAudioManager(surface, context => { void this.loadClips(context); }, MASTER_LEVEL);
     window.addEventListener('keydown', this.onKeyDown);
   }
 
   /** Call within the level-selection gesture so the first round has audio immediately. */
-  startFromGesture(): void { this.start(); }
-
-  private start(): void {
-    if (!this.context) {
-      try {
-        this.context = new AudioContext({ latencyHint: 'interactive' });
-        this.output = this.context.createGain();
-        this.output.gain.value = this.muted || this.paused ? 0 : this.level;
-        // The soft ceiling keeps automatic fire, explosions and a crowd of zombies from clipping.
-        const ceiling = this.context.createWaveShaper?.();
-        if (ceiling) {
-          ceiling.curve = softCeilingCurve() as Float32Array<ArrayBuffer>;
-          this.output.connect(ceiling); ceiling.connect(this.context.destination);
-        } else this.output.connect(this.context.destination);
-        void this.loadClips();
-      } catch { return; }
-    }
-    if (this.context.state === 'suspended') void this.context.resume().catch(() => {});
-  }
+  startFromGesture(): void { this.manager.unlockFromGesture(); }
 
   /** The start screen has usually decoded every clip already; otherwise (dev previews) decode them now. */
-  private async loadClips(): Promise<void> {
-    const context = this.context;
-    if (!context) return;
+  private async loadClips(context: AudioContext): Promise<void> {
     await decodeAudioClips(context);
-    if (this.context !== context) return;
+    if (this.manager.context !== context) return;
     for (const clip of AUDIO_CLIPS) {
       const buffer = decodedAudioClip(clip);
       if (!buffer) continue;
@@ -162,48 +124,36 @@ export class GameAudio {
   }
 
   private loopClip(clip: Clip): void {
-    const context = this.context, output = this.output, buffer = this.clips.get(clip);
-    if (!context || !output || !buffer) return;
-    const source = context.createBufferSource(), gain = context.createGain();
-    source.buffer = buffer; source.loop = true;
-    gain.gain.value = clip === 'wind-loop' ? 0.07 : 0.045;
-    source.connect(gain); gain.connect(output); source.start();
-    if (clip === 'wind-loop') this.sampleWind = source;
-    else this.sampleVent = source;
+    const buffer = this.clips.get(clip);
+    if (!buffer) return;
+    this.manager.playLoop(clip, buffer, 'music', clip === 'wind-loop' ? 0.07 : 0.045);
   }
 
-  private sampleWind: AudioBufferSourceNode | null = null;
-  private sampleVent: AudioBufferSourceNode | null = null;
-
-  private playClip(clip: Clip, volume: number, pan = 0, rate = 1): boolean {
-    const context = this.context, output = this.output, buffer = this.clips.get(clip);
-    if (!context || !output || !buffer || this.muted || this.paused || context.state !== 'running') return false;
-    const active = this.activeClips.get(clip) ?? 0;
-    // Dense automatic fire and a Nuke should not spawn dozens of overlapping decoders.
-    if (active >= (clip.startsWith('gun-') ? 6 : clip.startsWith('zombie-') ? 3 : 8)) return true;
-    this.activeClips.set(clip, active + 1);
-    const source = context.createBufferSource(), gain = context.createGain(), stereo = context.createStereoPanner();
-    source.buffer = buffer;
-    source.playbackRate.value = rate;
-    gain.gain.value = volume * (this.trims.get(clip) ?? 1);
-    stereo.pan.value = Math.max(-1, Math.min(1, pan));
-    source.connect(gain); gain.connect(stereo); stereo.connect(output);
-    source.start();
-    source.onended = () => {
-      this.activeClips.set(clip, Math.max(0, (this.activeClips.get(clip) ?? 1) - 1));
-      source.disconnect(); gain.disconnect(); stereo.disconnect();
-    };
-    return true;
+  private playClip(clip: Clip, volume: number, pan = 0, rate = 1, bus: AudioBus = 'sfx'): boolean {
+    const buffer = this.clips.get(clip);
+    if (!buffer || this.muted || this.paused) return false;
+    const maxInstances = clip.startsWith('gun-') ? 6 : clip.startsWith('zombie-') ? 3 : 8;
+    return this.manager.play(clip, buffer, {
+      bus,
+      volume: volume * (this.trims.get(clip) ?? 1),
+      pan,
+      rate,
+      maxInstances,
+    });
   }
 
   private playAt(clip: Clip, volume: number, point: Vec3 | undefined, player: PlayerState | undefined, rate = 1,
     rolloff = 0.24): boolean {
-    if (!point || !player) return false;
-    const dx = point.x - player.position.x, dz = point.z - player.position.z;
-    const distance = Math.hypot(dx, dz);
-    if (distance > HEARING_RANGE) return false;
-    const pan = distance > 0.01 ? (dx * Math.cos(player.yaw) - dz * Math.sin(player.yaw)) / distance : 0;
-    return this.playClip(clip, volume / (1 + distance * rolloff), pan, rate);
+    const buffer = this.clips.get(clip);
+    if (!buffer || !point || !player || this.muted || this.paused) return false;
+    const maxInstances = clip.startsWith('gun-') ? 6 : clip.startsWith('zombie-') ? 3 : 8;
+    return this.manager.playSpatial(clip, buffer, point, { position: player.position, yaw: player.yaw }, {
+      bus: 'sfx',
+      volume: volume * (this.trims.get(clip) ?? 1),
+      rate,
+      rolloff,
+      maxInstances,
+    });
   }
 
   /**
@@ -217,18 +167,17 @@ export class GameAudio {
 
   setPaused(paused: boolean): void {
     this.paused = paused;
-    if (this.output && this.context) this.output.gain.setTargetAtTime(this.muted || paused ? 0 : this.level,
-      this.context.currentTime, 0.03);
+    this.manager.setPaused(paused);
   }
 
   /** 0 to 1 master volume from the settings menu. */
-  setVolume(volume: number): void {
-    this.level = MASTER_LEVEL * Math.max(0, Math.min(1, volume));
-    this.setPaused(this.paused);
-  }
+  setVolume(volume: number): void { this.manager.setMasterVolume(volume); }
+
+  /** Presentation bus controls for the future settings UI; these never enter deterministic game state. */
+  setBusVolume(bus: AudioBus, volume: number): void { this.manager.setBusVolume(bus, volume); }
 
   consume(events: readonly SimulationEvent[], playerId: EntityId, world: WorldState): void {
-    if (!this.context || this.muted || this.paused) return;
+    if (!this.manager.context || this.muted || this.paused) return;
     const playerEntity = world.entities[playerId];
     const player = playerEntity?.kind === 'player' ? playerEntity : undefined;
     if (player?.alive && !player.noclip && Math.hypot(player.velocity.x, player.velocity.z) > 0.2) {
@@ -261,7 +210,7 @@ export class GameAudio {
     // Now and then something unseen shifts in the dark between the moans.
     if (world.tick >= this.nextStingTick) {
       this.nextStingTick = world.tick + 60 * (45 + (world.tick * 7919) % 45);
-      this.playClip(variant('ambience-sting', 2, world.tick), MIX.sting, ((world.tick * 104729) % 200) / 100 - 1);
+      this.playClip(variant('ambience-sting', 2, world.tick), MIX.sting, ((world.tick * 104729) % 200) / 100 - 1, 1, 'music');
     }
     for (const event of events) {
       if ('playerId' in event && event.playerId !== playerId && event.type === 'weaponFired') {
@@ -280,7 +229,7 @@ export class GameAudio {
           this.playAt(variant('zombie-death', 2, Number(event.zombieId.slice(2))), MIX.zombieDeath,
             world.entities[event.zombieId]?.position, player); break;
         case 'powerActivated': this.playClip('electric-boom', MIX.explosion * 0.8); this.playClip('electric-powerup', MIX.electric); break;
-        case 'perkBought': this.playClip('pickup', MIX.pickup); this.playClip('electric-powerup', MIX.electric * 0.4); break;
+        case 'perkBought': this.playClip('pickup', MIX.pickup, 0, 1, 'ui'); this.playClip('electric-powerup', MIX.electric * 0.4); break;
         case 'playerRevived': this.playClip('pickup', MIX.pickup); break;
         case 'playerDowned': this.playClip('ambience-sting-2', MIX.sting * 3); this.playClip('flesh-hit', MIX.hurt); break;
         case 'playerRespawned': this.playClip('mechanical-click', MIX.reloadDone); break;
@@ -298,9 +247,9 @@ export class GameAudio {
         case 'weaponReloadCompleted':
           if (weaponDefinition(event.weaponId)?.pellets) this.playClip('shotgun-rack', MIX.reloadDone);
           break;
-        case 'pointsSpendRejected': this.playClip('buy-denied', MIX.reject); break;
-        case 'mysteryBoxUsed': this.playClip('mechanical-button', MIX.box); break;
-        case 'mysteryBoxClaimed': this.playClip('pickup', MIX.pickup); break;
+        case 'pointsSpendRejected': this.playClip('buy-denied', MIX.reject, 0, 1, 'ui'); break;
+        case 'mysteryBoxUsed': this.playClip('mechanical-button', MIX.box, 0, 1, 'ui'); break;
+        case 'mysteryBoxClaimed': this.playClip('pickup', MIX.pickup, 0, 1, 'ui'); break;
         case 'doorOpened': this.playClip('door-unlock', MIX.door); this.playClip('door-open', MIX.door * 0.8); break;
         case 'powerupCollected': this.playClip('electric-powerup', MIX.electric * 0.6); this.playClip('pickup', MIX.pickup * 0.6); break;
         case 'carpenterRepaired':
@@ -333,22 +282,22 @@ export class GameAudio {
           if (event.kind === 'barrel') this.boom('explosion-large', 1, BLAST_ROLLOFF.barrel, event.position, player);
           else this.boom('explosion-large', 0.8, BLAST_ROLLOFF.vehicle, event.position, player, 1.2);
           break;
-        case 'equipmentPurchased': this.playClip('pickup', MIX.pickup); this.playClip('mechanical-click', MIX.reloadDone, 0, 0.8); break;
-        case 'equipmentFull': this.playClip('buy-denied', MIX.reject); break;
+        case 'equipmentPurchased': this.playClip('pickup', MIX.pickup, 0, 1, 'ui'); this.playClip('mechanical-click', MIX.reloadDone, 0, 0.8); break;
+        case 'equipmentFull': this.playClip('buy-denied', MIX.reject, 0, 1, 'ui'); break;
         // Stand-ins from the recorded clips until the ones in docs/audio-wanted.md exist: a clank and a hum as the gun goes in,
         // the electric surge when it is ready, and the pickup when it is taken.
         case 'packAPunchStarted':
           this.playClip('door-metal', MIX.reload * 0.7, 0, 0.5); this.playClip('mechanical-button', MIX.box, 0, 0.7);
           this.playClip('electric-powerup', MIX.electric * 0.8, 0, 0.8); break;
         case 'packAPunchReady': this.playClip('electric-powerup', MIX.electric); this.playClip('pickup', MIX.pickup * 0.8, 0, 1.2); break;
-        case 'packAPunchCollected': this.playClip('pickup', MIX.pickup); this.playClip('mechanical-click', MIX.reloadDone, 0, 0.8); break;
-        case 'packAPunchRefused': this.playClip('buy-denied', MIX.reject); break;
+        case 'packAPunchCollected': this.playClip('pickup', MIX.pickup, 0, 1, 'ui'); this.playClip('mechanical-click', MIX.reloadDone, 0, 0.8); break;
+        case 'packAPunchRefused': this.playClip('buy-denied', MIX.reject, 0, 1, 'ui'); break;
         // Boards break where the zombie tearing them stands, so a far window is faint and panned.
         case 'barrierBoardRemoved': this.playAt(event.boards === 0 ? variant('wood-impact', 2, world.tick) : variant('wood-crack', 4, world.tick + event.boards),
           MIX.boardBreak, world.entities[event.zombieId]?.position, player); break;
         case 'barrierBoardRepaired': this.playClip(variant('wood-impact', 2, event.boards), MIX.boardRepair); break;
         // A low bell strike as each round begins; it takes one of three, by round, so a long run doesn't hear the same one each time.
-        case 'roundPhaseChanged': if (event.to === 'spawning') this.playClip(variant('round-start', 3, event.round), MIX.roundStart); break;
+        case 'roundPhaseChanged': if (event.to === 'spawning') this.playClip(variant('round-start', 3, event.round), MIX.roundStart, 0, 1, 'music'); break;
         case 'matchRestarted': this.lastStepTick = -100; this.lastZombieVoiceTick = -100; this.nextStingTick = 60 * 50;
           this.lastZombieStepTick = -100; break;
       }
@@ -356,11 +305,7 @@ export class GameAudio {
   }
 
   dispose(): void {
-    this.surface.removeEventListener('pointerdown', this.unlock);
-    window.removeEventListener('keydown', this.unlock);
     window.removeEventListener('keydown', this.onKeyDown);
-    this.sampleWind?.stop(); this.sampleVent?.stop();
-    void this.context?.close();
-    this.context = null;
+    this.manager.dispose();
   }
 }
