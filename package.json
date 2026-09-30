@@ -10,6 +10,8 @@
     "generate:asset-manifest": "node scripts/generate-bootstrap-manifest.mjs",
     "typecheck": "tsc --noEmit",
     "validate:maps": "node scripts/validate-maps.mjs",
+    "editor:setup": "node scripts/godot-map-editor.mjs setup",
+    "editor:check": "node scripts/godot-map-editor.mjs check",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run generate:asset-manifest && npm run typecheck && npm run validate:maps && npm test && npm run build",

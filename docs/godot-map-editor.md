@@ -1,6 +1,19 @@
 # Godot map authoring
 
-Open `tools/godot-map-editor/project.godot` with Godot 4.3 or newer. The bundled project was verified with Godot 4.7.2. Install this repository's Node dependencies with `npm install` before exporting. The Godot project is an editor only; the game still runs in the browser with Three.js.
+The map editor targets **Godot 4.7 .NET**, with its C# SDK pinned to **4.7.2**. The editor plugin, map nodes, Inspector and smoke check are written in C#. The game runs in the browser with Three.js and consumes the exported JSON.
+
+Install the [.NET edition of Godot 4.7.2](https://godotengine.org/download/archive/4.7.2-stable/) and a 64-bit [.NET SDK](https://dotnet.microsoft.com/download) (8 or newer). The standard Godot download cannot run the C# plugin. The project targets `net8.0`; a newer SDK such as .NET 10 can build it. Node.js is also required for map validation and browser previews.
+
+From the repository root, run:
+
+```text
+npm ci
+npm run editor:setup
+```
+
+Then import/open `tools/godot-map-editor/project.godot` in the **.NET** editor. The **Zombonz Maps** dock appears on the right. If it is disabled, build the project with Godot's **Build** button, then enable **Zombonz Map Authoring** under **Project → Project Settings → Plugins**. Build again after changing C# scripts. An external C# editor can be chosen under **Editor → Editor Settings → Dotnet → Editor**.
+
+`editor:setup` builds the C# project and migrates local scenes that still reference the old GDScript nodes. It preserves transforms and exported values, and saves an original `.tscn.gd-backup` beside each migrated scene. Close Godot before running setup on an existing authoring project. Local scenes and their backups are ignored by Git; keep any unsent level work in JSON by exporting it.
 
 Set the dock's source to `../../src/maps/data/bunker.v1.json` or `../../src/maps/data/asylum.v1.json`, then click **Import map into scene** to generate an authoring scene from the committed JSON. Godot scenes under `maps/` are local editor artifacts; commit the JSON after exporting. The dock provides:
 
@@ -10,12 +23,12 @@ Set the dock's source to `../../src/maps/data/bunker.v1.json` or `../../src/maps
 4. **Validate open map** checks common reference and placement mistakes. **Export open map** applies only changed values to the JSON source, runs the TypeScript validator, and saves the scene. It requires `node` on `PATH`. An invalid export leaves the JSON unchanged and shows the error in the dock.
 5. **Export and play in browser** runs the export, starts Vite on port 5173, and opens the selected map's start preview. Choose Solo from the game menu for normal round gameplay.
 
-The Godot scene stores editor handles, and the versioned JSON is the browser's source of truth. A newly added object receives its stable JSON path after export; reimport to expose any nested points created by its default template. Additional gameplay systems can add Inspector properties and import/export mappings in `addons/zombonz/plugin.gd`, while their data schema and runtime behavior remain in TypeScript.
+The Godot scene stores editor handles, and the versioned JSON is the browser's source of truth. A newly added object receives its stable JSON path after export; reimport to expose any nested points created by its default template. Additional gameplay systems can add Inspector properties in `addons/zombonz/ZombonzMapItem.cs`, scene handles in `MapScene.cs`, and import/export mappings in `MapDocument.cs`. Their data schema and runtime behavior are defined in TypeScript.
 
-For a headless editor smoke check:
+For the C# build and headless editor check, put the Godot .NET executable on `PATH` as `godot`, or set `GODOT` to its full path. On Windows, use the `_console.exe` executable so check output is visible:
 
 ```text
-godot --headless --editor --path tools/godot-map-editor --script res://smoke_test.gd
+npm run editor:check
 ```
 
-It imports Bunker, confirms an untouched scene leaves the document unchanged, moves the player spawn in memory, and adds a prop in memory. It does not alter the committed JSON.
+The check starts the actual Godot 4.7 .NET editor with the plugin enabled, then imports **Bunker and Asylum**, serializes their C# scene nodes, verifies untouched maps produce no JSON edits, moves a player spawn and adds a prop, exercises every add-object choice, and exports temporary copies through the same TypeScript validator as the dock. Invalid exports must leave those files unchanged. The committed maps and local authoring scenes are not changed by the smoke test. CI runs the same check with Godot 4.7.2 .NET.

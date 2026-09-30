@@ -49,6 +49,10 @@ for an earlier `dev` commit. To check a Pages build locally, run `npm run build:
 Use Node.js 22.12.0, then `npm ci` and `npm run dev`. Open the local address printed by Vite.
 Run `npm run check` for TypeScript validation, automated tests and a production build.
 
+For visual level editing, use **Godot 4.7 .NET** and run `npm run editor:setup`, then open
+`tools/godot-map-editor/project.godot`. The map authoring plugin uses C# and exports the JSON loaded
+by the browser game. See [the map editor setup and workflow](docs/godot-map-editor.md).
+
 The game opens on a start menu: **Solo**, **Multiplayer** and **Settings** (mouse or arrow keys,
 Enter to choose, Esc to go back). Multiplayer hosts or joins online co-op for up to four players:
 the host gets a five-letter room code and everyone else types it in (this needs the small game server in [`server/`](server), which
