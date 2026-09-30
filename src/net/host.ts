@@ -9,6 +9,7 @@ import {
   encodeSnapshotMessage, fromNetInput, mergeNetInputs, readClientMessage, type HostMessage, type LobbyPlayer, type NetInput,
 } from './protocol.ts';
 import { captureSnapshot } from './snapshot.ts';
+import { EventRateTelemetry, type NetworkDiagnostics } from './telemetry.ts';
 
 interface Peer {
   peerId: PeerId;
@@ -49,6 +50,8 @@ export class NetHost {
   private startedSeed: number | null = null;
   readonly changed = new Listeners<void>();
   readonly notices = new Listeners<HostNotice>();
+  private readonly snapshotTelemetry = new EventRateTelemetry();
+  private lastNetworkError: string | null = null;
   private readonly stops: Array<() => void>;
   private readonly cleanup: Array<() => void> = [];
 
@@ -63,6 +66,7 @@ export class NetHost {
           this.peers.set(event.peerId, { peerId: event.peerId, name: null, slot: null, playerId: null,
             reconnectToken: null, queue: [], last: null, ready: false });
         } else if (event.type === 'peerDisconnected') this.drop(event.peerId);
+        else if (event.type === 'transportError') { this.lastNetworkError = event.message; this.changed.emit(); }
       }),
     ];
   }
@@ -77,6 +81,21 @@ export class NetHost {
   }
   setHostName(name: string): void { this.hostName = cleanName(name, 'Player 1'); this.broadcastLobby(); }
   get inGame(): boolean { return this.phase === 'game'; }
+
+  diagnostics(): NetworkDiagnostics {
+    const peers = [...this.peers.values()].filter(peer => peer.name !== null).length;
+    return {
+      role: 'host', state: this.phase, peers,
+      rttMs: null,
+      snapshotRateHz: this.phase === 'game' ? this.snapshotTelemetry.report(this.now()) : null,
+      snapshotLossPercent: null,
+      interpolationDelayMs: null,
+      snapshotAgeMs: null,
+      bufferDepth: null,
+      renderDelayTicks: null,
+      lastError: this.lastNetworkError,
+    };
+  }
 
   /** Resources owned by the lobby transport (such as its signalling room) close with the host. */
   addCleanup(cleanup: () => void): void { this.cleanup.push(cleanup); }
@@ -274,6 +293,7 @@ export class NetHost {
     if (events.length) this.transport.broadcastReliable(encodeMessage({ t: 'ev', ep: this.epoch, k: tick, e: [...events] }));
     if (tick % this.snapshotInterval !== 0 && !events.some(event => event.type === 'matchRestarted')) return;
     const body = encodeSnapshotBody(captureSnapshot(this.simulation));
+    if ([...this.peers.values()].some(peer => peer.playerId)) this.snapshotTelemetry.observe(this.now());
     for (const peer of this.peers.values()) {
       if (peer.playerId) this.transport.sendUnreliable(peer.peerId, encodeSnapshotMessage(this.epoch, peer.last?.s ?? -1, body));
     }
