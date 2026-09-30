@@ -18,6 +18,10 @@ Core modules must not import Three.js or browser APIs. Rendering may interpolate
 
 Physical devices map to serializable gameplay actions. Core systems consume actions, not keyboard/mouse events directly.
 
+## Audio boundary
+
+Audio is presentation-only. `GameAudio` translates authoritative simulation events into clip choices; `SpatialAudioManager` owns browser Web Audio routing. Positional world SFX use listener-relative pan and distance falloff, while UI and music/ambience are non-positional buses. SFX, UI and music buses sit beneath one master gain/soft ceiling and may be adjusted independently without entering simulation state. One-shot `AudioBufferSourceNode`s are necessarily single-use, but gain/panner voice chains are pooled and reused. Audio context creation/resume happens only from a user pointer/key gesture so browser autoplay policy cannot become a gameplay dependency.
+
 ## Networking boundary
 
 Multiplayer transports are adapters around core commands/state/events. WebRTC is the first planned transport, not an assumption embedded in gameplay systems.
