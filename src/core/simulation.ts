@@ -40,12 +40,14 @@ import {
   createSpawnDirector, remainingSpawns, tickSpawnDirector, DEFAULT_SPAWN_CONFIG,
   type SpawnDirectorConfig, type SpawnDirectorState, type ZombieSpawnPoint,
 } from './spawning.ts';
-import { createNavigationQuery, hasClearNavigationLine, type NavigationGraph, type NavigationQuery } from './navigation.ts';
+import { SimulationProbe } from './profiling.ts';
+import { CollisionIndex } from './collisionIndex.ts';
+import { hasClearNavigationLine, navigationFieldFor, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, ZombieState } from './types.ts';
 import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
 import { SeededRng, mix32 } from './rng.ts';
 import {
-  createZombieState, separateZombies, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
+  ZOMBIE_MOVEMENT, createZombieState, separateZombies, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
   type ZombieMeleeEvent,
 } from './zombie.ts';
 import {
@@ -136,6 +138,8 @@ export interface GameSimulationOptions {
 
 export class GameSimulation {
   state: SimulationState;
+  /** When set, times each stage of every tick (diagnostics only; see profiling.ts). */
+  probe: SimulationProbe | null = null;
   readonly playerIds: EntityId[] = [];
   private readonly map: SimulationMap;
   private readonly roundConfig?: RoundConfig;
@@ -143,7 +147,8 @@ export class GameSimulation {
   private readonly economyConfig: EconomyConfig;
   private readonly powerupConfig: PowerupConfig;
   private readonly playerSpawns: readonly Vec3[];
-  private navigationCache?: { doors: string; query: NavigationQuery };
+  /** What is solid right now, and the way round it, remade only when a door opens, the box moves or a hazard blows. */
+  private solidsCache?: { key: string; boxes: CollisionBox[]; index: CollisionIndex; movable: CollisionBox[]; query?: NavigationQuery };
   /** The solid bodies of this match's Pack-a-Punch machines. */
   private packBlockers: CollisionBox[] = [];
 
@@ -160,10 +165,13 @@ export class GameSimulation {
       }
     }
     this.state = this.createMatchState(options.seed);
+    // Zombies find their way with a graph laid out once per map; make it now rather than on the first question.
+    if (this.map.navigationGraph) navigationFieldFor(this.map.navigationGraph, this.map.collisionBoxes, ZOMBIE_MOVEMENT.radius, this.map.walkSurfaces);
   }
 
   private createMatchState(seed: number): SimulationState {
     const world = createWorld(seed);
+    this.solidsCache = undefined;
     this.playerIds.length = 0;
     for (const spawn of this.playerSpawns) {
       const id = allocateEntityId(world);
@@ -275,15 +283,35 @@ export class GameSimulation {
 
   /** The map's own walls, closed doors and the box: what hazards are placed against. */
   private wallBoxes(): CollisionBox[] {
-    const boxes = this.state.mysteryBoxes.filter(box => box.locations.length && box.phase !== 'away')
-      .map(box => mysteryBoxBlocker(box.locations[box.locationIndex]));
-    return [...this.map.collisionBoxes, ...closedDoorBlockers(this.state.doors), ...boxes, ...this.packBlockers];
+    return [...this.map.collisionBoxes, ...this.movableWalls()];
   }
 
-  /** Everything solid to walk into: the walls, and every hazard that has not vanished. */
+  /** The walls that come and go: doors still shut, the box where it stands, the Pack-a-Punch machines. */
+  private movableWalls(): CollisionBox[] {
+    const boxes = this.state.mysteryBoxes.filter(box => box.locations.length && box.phase !== 'away')
+      .map(box => mysteryBoxBlocker(box.locations[box.locationIndex]));
+    return [...closedDoorBlockers(this.state.doors), ...boxes, ...this.packBlockers];
+  }
+
+  /**
+   * Everything solid to walk into: the walls, and every hazard that has not vanished. This is the list the
+   * simulation itself holds and reuses until something changes, so treat it as read-only.
+   */
   collisionBoxes(): CollisionBox[] {
-    const walls = this.wallBoxes(), solids = hazardSolids(this.map.hazards ?? [], this.state.hazards);
-    return solids.length ? walls.concat(solids) : walls;
+    return this.solids().boxes;
+  }
+
+  private solids(): { boxes: CollisionBox[]; index: CollisionIndex; movable: CollisionBox[]; query?: NavigationQuery } {
+    // Opening doors, the box moving and hazards going off each change what blocks the way.
+    const key = [...this.state.doors.map(door => `${door.id}:${door.open}`),
+      ...this.state.mysteryBoxes.map(box => `${box.id}:${box.phase === 'away' ? -1 : box.locationIndex}`),
+      ...this.state.hazards.map(hazard => `${hazard.id}:${hazard.phase === 'exploded'}`)].join('|');
+    if (this.solidsCache?.key !== key) {
+      const movable = [...this.movableWalls(), ...hazardSolids(this.map.hazards ?? [], this.state.hazards)];
+      const boxes = [...this.map.collisionBoxes, ...movable];
+      this.solidsCache = { key, boxes, index: new CollisionIndex(boxes), movable };
+    }
+    return this.solidsCache;
   }
 
   /**
@@ -349,15 +377,10 @@ export class GameSimulation {
   }
 
   private navigationQuery(): NavigationQuery {
-    // Opening doors and the box moving both change what blocks the way.
-    const doors = [...this.state.doors.map(door => `${door.id}:${door.open}`),
-      ...this.state.mysteryBoxes.map(box => `${box.id}:${box.phase === 'away' ? -1 : box.locationIndex}`),
-      ...this.state.hazards.map(hazard => `${hazard.id}:${hazard.phase === 'exploded'}`)].join('|');
-    if (this.navigationCache?.doors !== doors) {
-      this.navigationCache = { doors, query: createNavigationQuery(this.map.navigationGraph,
-        this.collisionBoxes(), 0.32, this.map.walkSurfaces) };
-    }
-    return this.navigationCache!.query;
+    const solids = this.solids();
+    solids.query ??= navigationFieldFor(this.map.navigationGraph, this.map.collisionBoxes, ZOMBIE_MOVEMENT.radius,
+      this.map.walkSurfaces).query(solids.movable);
+    return solids.query;
   }
 
   private reachableInteractables(player: PlayerState): InteractableState[] {
@@ -403,6 +426,8 @@ export class GameSimulation {
       if (restartRequested) return [this.restart()];
       return [];
     }
+    const probe = this.probe;
+    probe?.begin();
     const events: SimulationEvent[] = [];
     const world = this.state.world;
     events.push(...tickPowerupLifetime(this.state.powerups));
@@ -426,8 +451,9 @@ export class GameSimulation {
         if (frame.actions.reload?.pressed) events.push(...beginReload(player));
         continue;
       }
-      updatePlayerMovement(player, frame, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
-        [...this.collisionBoxes(), ...(this.map.shotBlockers ?? [])]);
+      const solid = this.collisionBoxes();
+      updatePlayerMovement(player, frame, deltaSeconds, solid, this.map.walkSurfaces,
+        [...solid, ...(this.map.shotBlockers ?? [])]);
       events.push(...tickWeaponState(player));
       if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));
@@ -468,6 +494,7 @@ export class GameSimulation {
       }
     }
 
+    probe?.lap('players');
     for (const player of livingPlayers(world)) {
       const frame = playerFrames.get(player.id)!;
       // A swing already begun lands its blow this tick, when its count runs out; a new one starts after.
@@ -490,6 +517,7 @@ export class GameSimulation {
         this.state.powerups.doublePointsTicksRemaining > 0 ? 2 : 1));
     }
 
+    probe?.lap('combat');
     // Everything that goes bang this tick: grenades, Bouncing Betties, then burning barrels and vehicles.
     const instaKill = this.state.powerups.instaKillTicksRemaining > 0;
     const blastEvents: SimulationEvent[] = [];
@@ -528,6 +556,7 @@ export class GameSimulation {
       }
     }
 
+    probe?.lap('blasts');
     const navigate = this.navigationQuery();
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {
       // Never strand a round's enemies behind unopened rooms or stair debris.
@@ -576,8 +605,10 @@ export class GameSimulation {
       }
     }
 
+    probe?.lap('spawning');
     const players = livingPlayers(world);
     const zombies = this.zombies();
+    const solids = this.solids();
     prepareBarriers(this.state.barriers, zombies);
     for (const zombie of zombies) {
       if (zombie.entry) {
@@ -585,18 +616,23 @@ export class GameSimulation {
         const swipe = tickWindowAttack(zombie, barrier, players);
         events.push(...swipe.events);
         if (!swipe.engaged) {
-          events.push(...updateZombieEntry(zombie, barrier, zombies, deltaSeconds, this.collisionBoxes(), world.tick, world.seed));
+          events.push(...updateZombieEntry(zombie, barrier, zombies, deltaSeconds, solids.boxes, world.tick, world.seed));
         }
+        probe?.lap('entries');
         continue;
       }
       updateZombiePursuit(
-        zombie, players, deltaSeconds, this.collisionBoxes(), this.map.walkSurfaces,
+        zombie, players, deltaSeconds, solids.boxes, this.map.walkSurfaces,
         this.map.navigationGraph,
         navigate,
+        solids.index,
       );
-      events.push(...tickZombieMelee(zombie, players, this.collisionBoxes()));
+      probe?.lap('pursuit');
+      events.push(...tickZombieMelee(zombie, players, solids.boxes));
+      probe?.lap('melee');
     }
-    separateZombies(zombies, players, this.collisionBoxes(), this.map.walkSurfaces);
+    separateZombies(zombies, players, solids.boxes, this.map.walkSurfaces, solids.index);
+    probe?.lap('separation');
     if (this.state.traps.length) {
       events.push(...tickTraps(this.state.traps, this.zombies(), livingPlayers(world), world.tick));
       syncTrapInteractables(this.state.traps, this.interactables(), this.state.power.on);
@@ -653,6 +689,7 @@ export class GameSimulation {
       if (entity.deadTicks >= 300) removeEntity(world, entity.id);
     }
     world.tick += 1;
+    probe?.end();
     return events;
   }
 }

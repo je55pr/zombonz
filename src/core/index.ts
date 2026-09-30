@@ -1,5 +1,7 @@
 export * from './clock.ts';
+export * from './profiling.ts';
 export * from './collision.ts';
+export * from './collisionIndex.ts';
 export * from './input.ts';
 export * from './player.ts';
 export * from './rng.ts';

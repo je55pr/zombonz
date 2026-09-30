@@ -1,4 +1,6 @@
-import { sampleWalkHeight, type CollisionBox, type WalkSurface } from './collision.ts';
+import { sampleWalkHeight, segmentHitsExpandedBox, type CollisionBox, type WalkSurface } from './collision.ts';
+import { CollisionIndex } from './collisionIndex.ts';
+import { work } from './profiling.ts';
 import type { Vec3 } from './types.ts';
 
 export interface NavigationNode {
@@ -68,44 +70,6 @@ export function shortestNavigationPath(
   return ids.map((id) => nodes.get(id)!);
 }
 
-function segmentHitsExpandedBox(
-  start: Vec3,
-  end: Vec3,
-  box: CollisionBox,
-  radius: number,
-  height: number,
-): boolean {
-  const minX = box.min.x - radius;
-  const maxX = box.max.x + radius;
-  const minZ = box.min.z - radius;
-  const maxZ = box.max.z + radius;
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const dz = end.z - start.z;
-  const minY = box.min.y - height + 1e-6;
-  const maxY = box.max.y - 1e-6;
-  let near = 0;
-  let far = 1;
-  // Avoid allocating four temporary arrays for every box/line test.
-  for (let axis = 0; axis < 3; axis++) {
-    const origin = axis === 0 ? start.x : axis === 1 ? start.y : start.z;
-    const delta = axis === 0 ? dx : axis === 1 ? dy : dz;
-    const min = axis === 0 ? minX : axis === 1 ? minY : minZ;
-    const max = axis === 0 ? maxX : axis === 1 ? maxY : maxZ;
-    if (Math.abs(delta) < 1e-9) {
-      if (origin < min || origin > max) return false;
-      continue;
-    }
-    let t1 = (min - origin) / delta;
-    let t2 = (max - origin) / delta;
-    if (t1 > t2) [t1, t2] = [t2, t1];
-    near = Math.max(near, t1);
-    far = Math.min(far, t2);
-    if (near > far) return false;
-  }
-  return far >= 0 && near <= 1;
-}
-
 export function hasClearNavigationLine(
   start: Vec3,
   end: Vec3,
@@ -131,60 +95,237 @@ export function navigationWaypoint(
 
 export type NavigationQuery = (start: Vec3, goal: Vec3) => Vec3;
 
-// Compile door-dependent edges once; a round can share this query across all zombies.
+/** A body tall enough to test lines with is 1.72 m, as the zombies are. */
+const LINE_HEIGHT = 1.72;
+/** Nodes are found through a grid of this cell size. */
+const NODE_CELL = 3;
+/** Answers about where a position is nearest the graph are remembered for this many positions. */
+const NEAREST_MEMORY = 256;
+/** Routes are remembered for this many start/goal pairs before the memory is cleared. */
+const ROUTE_MEMORY = 4096;
+
+/**
+ * Everything about a map's navigation that does not change while a match runs: the graph laid out for quick lookup,
+ * which links are clear of the fixed walls and are floor all the way, and a grid over the walls. Build one per map
+ * (see `navigationFieldFor`); then `query` makes the question-answerer for the moment's doors and other movable
+ * solids, which is cheap enough to remake whenever one changes.
+ */
+export class NavigationField {
+  private readonly nodes: readonly NavigationNode[];
+  /** For each node, the nodes it links to, in id order (the order routes are searched in). */
+  private readonly links: Int32Array[];
+  /** `links`, cut to the ones clear of the fixed walls and walkable, worked out the first time each is wanted. */
+  private readonly clearLinks: Array<Int32Array | undefined>;
+  private readonly walls: CollisionIndex;
+  private readonly gridMinX: number;
+  private readonly gridMinZ: number;
+  private readonly gridMaxX: number;
+  private readonly gridMaxZ: number;
+  private readonly gridMinY: number;
+  private readonly gridMaxY: number;
+  private readonly columns: number;
+  private readonly rows: number;
+  private readonly buckets: number[][];
+  private readonly tested: Uint32Array;
+  private testEpoch = 0;
+  private readonly parent: Int32Array;
+  private readonly reached: Uint32Array;
+  private reachEpoch = 0;
+  private readonly queue: Int32Array;
+
+  constructor(readonly graph: NavigationGraph | undefined, readonly fixed: readonly CollisionBox[],
+    readonly radius: number, readonly surfaces: readonly WalkSurface[]) {
+    this.nodes = graph?.nodes ?? [];
+    const count = this.nodes.length;
+    const indexOf = new Map<string, number>(this.nodes.map((node, index) => [node.id, index]));
+    this.links = this.nodes.map(node => Int32Array.from([...node.neighbors].sort()
+      .flatMap(id => indexOf.has(id) ? [indexOf.get(id)!] : [])));
+    this.clearLinks = new Array(count).fill(undefined);
+    this.walls = new CollisionIndex(fixed);
+    let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const { position } of this.nodes) {
+      minX = Math.min(minX, position.x); maxX = Math.max(maxX, position.x);
+      minZ = Math.min(minZ, position.z); maxZ = Math.max(maxZ, position.z);
+      minY = Math.min(minY, position.y); maxY = Math.max(maxY, position.y);
+    }
+    if (!count) minX = minZ = maxX = maxZ = minY = maxY = 0;
+    this.gridMinX = minX; this.gridMaxX = maxX; this.gridMinZ = minZ; this.gridMaxZ = maxZ; this.gridMinY = minY; this.gridMaxY = maxY;
+    this.columns = Math.floor((maxX - minX) / NODE_CELL) + 1;
+    this.rows = Math.floor((maxZ - minZ) / NODE_CELL) + 1;
+    this.buckets = Array.from({ length: this.columns * this.rows }, () => []);
+    this.nodes.forEach(({ position }, index) => {
+      this.buckets[this.row(position.z) * this.columns + this.column(position.x)].push(index);
+    });
+    this.tested = new Uint32Array(count);
+    this.parent = new Int32Array(count);
+    this.reached = new Uint32Array(count);
+    this.queue = new Int32Array(count);
+  }
+
+  /** Whether this field was built for these very walls, radius and floors. */
+  matches(fixed: readonly CollisionBox[], radius: number, surfaces: readonly WalkSurface[]): boolean {
+    return radius === this.radius && surfaces === this.surfaces && fixed.length === this.fixed.length
+      && fixed.every((box, index) => box === this.fixed[index]);
+  }
+
+  private column(x: number): number {
+    return Math.min(this.columns - 1, Math.max(0, Math.floor((x - this.gridMinX) / NODE_CELL)));
+  }
+
+  private row(z: number): number {
+    return Math.min(this.rows - 1, Math.max(0, Math.floor((z - this.gridMinZ) / NODE_CELL)));
+  }
+
+  /** The links of a node that a body can walk against the fixed walls and floors alone. */
+  private clear(index: number): Int32Array {
+    let links = this.clearLinks[index];
+    if (links) return links;
+    const from = this.nodes[index].position, open: number[] = [];
+    for (const other of this.links[index]) {
+      const to = this.nodes[other].position;
+      work.navigationLineTests++;
+      if (!this.walls.blocks(from, to, this.radius, LINE_HEIGHT) && hasWalkableConnection(from, to, this.surfaces)) open.push(other);
+    }
+    links = Int32Array.from(open);
+    this.clearLinks[index] = links;
+    return links;
+  }
+
+  /**
+   * The answerer of "which way do I go to get from here to there" for the fixed walls plus `movable` solids (the
+   * doors that are shut, the box, hazards): the point to head for. It is straight at the goal when the way is
+   * clear, else the furthest node along the shortest route that can be walked to directly, and the start itself
+   * when there is no way. The route is a fewest-links one over the links these solids leave open.
+   */
+  query(movable: readonly CollisionBox[] = []): NavigationQuery {
+    work.navigationRebuilds++;
+    const { nodes, radius, surfaces } = this;
+    const blocked = (a: Vec3, b: Vec3) => this.walls.blocks(a, b, radius, LINE_HEIGHT)
+      || movable.some(box => segmentHitsExpandedBox(a, b, box, radius, LINE_HEIGHT));
+    const traversable = (a: Vec3, b: Vec3) => { work.navigationLineTests++; return !blocked(a, b) && hasWalkableConnection(a, b, surfaces); };
+    const open: Array<Int32Array | undefined> = new Array(nodes.length).fill(undefined);
+    const openLinks = (index: number): Int32Array => {
+      let links = open[index];
+      if (links) return links;
+      links = this.clear(index);
+      if (movable.length) {
+        const from = nodes[index].position;
+        links = links.filter(other => !movable.some(box => segmentHitsExpandedBox(from, nodes[other].position, box, radius, LINE_HEIGHT)));
+      }
+      open[index] = links;
+      return links;
+    };
+    const routes = new Map<number, Int32Array>();
+    const nearest = new Map<string, number>();
+    const nearestReachable = (position: Vec3): number => {
+      const key = `${position.x},${position.y},${position.z}`;
+      const known = nearest.get(key);
+      if (known !== undefined) { work.navigationNodeHits++; return known; }
+      const found = this.nearestWhere(position, traversable);
+      if (nearest.size >= NEAREST_MEMORY) nearest.delete(nearest.keys().next().value!);
+      nearest.set(key, found);
+      return found;
+    };
+    return (start, goal) => {
+      work.navigationQueries++;
+      if (traversable(start, goal)) { work.navigationDirect++; return goal; }
+      if (nodes.length === 0) return goal;
+      const startNode = nearestReachable(start);
+      const goalNode = nearestReachable(goal);
+      if (startNode < 0 || goalNode < 0) return start;
+      const routeKey = startNode * nodes.length + goalNode;
+      let route = routes.get(routeKey);
+      if (route) work.navigationSearchHits++;
+      else {
+        work.navigationSearches++;
+        route = this.route(openLinks, startNode, goalNode);
+        if (routes.size >= ROUTE_MEMORY) routes.clear();
+        routes.set(routeKey, route);
+      }
+      if (route.length === 0) return start;
+      for (let index = route.length - 1; index >= 0; index -= 1) {
+        const position = nodes[route[index]].position;
+        if (traversable(start, position)) return position;
+      }
+      return nodes[route[0]].position;
+    };
+  }
+
+  /**
+   * The node nearest `position` (ties to the smaller id) that `reachable` accepts, or -1. Nodes are tried nearest
+   * first from a widening ring, so only those closer than the answer are ever tried.
+   */
+  private nearestWhere(position: Vec3, reachable: (from: Vec3, to: Vec3) => boolean): number {
+    if (!this.nodes.length) return -1;
+    if (++this.testEpoch >= 0xffff_ffff) { this.tested.fill(0); this.testEpoch = 1; }
+    const epoch = this.testEpoch;
+    const farthest = Math.max(Math.abs(position.x - this.gridMinX), Math.abs(position.x - this.gridMaxX)) ** 2
+      + Math.max(Math.abs(position.z - this.gridMinZ), Math.abs(position.z - this.gridMaxZ)) ** 2
+      + Math.max(Math.abs(position.y - this.gridMinY), Math.abs(position.y - this.gridMaxY)) ** 2;
+    for (let radius = NODE_CELL; ; radius *= 2) {
+      const limit = radius * radius;
+      const found: Array<{ index: number; distance: number }> = [];
+      const c1 = this.column(position.x + radius), r1 = this.row(position.z + radius);
+      for (let r = this.row(position.z - radius); r <= r1; r++) for (let c = this.column(position.x - radius); c <= c1; c++) {
+        for (const index of this.buckets[r * this.columns + c]) {
+          if (this.tested[index] === epoch) continue;
+          const distance = distanceSquared(this.nodes[index].position, position);
+          if (distance <= limit) found.push({ index, distance });
+        }
+      }
+      found.sort((a, b) => a.distance - b.distance || this.nodes[a.index].id.localeCompare(this.nodes[b.index].id));
+      for (const { index } of found) {
+        this.tested[index] = epoch;
+        work.navigationNodeScans++;
+        if (reachable(position, this.nodes[index].position)) return index;
+      }
+      if (limit >= farthest) return -1;
+    }
+  }
+
+  /** The fewest-links route from one node to another over the links `open` allows (empty when there is none). */
+  private route(open: (index: number) => Int32Array, start: number, goal: number): Int32Array {
+    if (start === goal) return Int32Array.of(start);
+    if (++this.reachEpoch >= 0xffff_ffff) { this.reached.fill(0); this.reachEpoch = 1; }
+    const epoch = this.reachEpoch, { queue, parent, reached } = this;
+    reached[start] = epoch; parent[start] = -1; queue[0] = start;
+    let tail = 1;
+    for (let head = 0; head < tail; head++) {
+      const from = queue[head];
+      for (const next of open(from)) {
+        if (reached[next] === epoch) continue;
+        reached[next] = epoch; parent[next] = from;
+        if (next === goal) {
+          const path: number[] = [];
+          for (let node = goal; node >= 0; node = parent[node]) path.push(node);
+          return Int32Array.from(path.reverse());
+        }
+        queue[tail++] = next;
+      }
+    }
+    return new Int32Array(0);
+  }
+}
+
+const fields = new WeakMap<NavigationGraph, NavigationField>();
+
+/** The field for these walls and floors, made once and shared by everything that asks for the same. */
+export function navigationFieldFor(graph: NavigationGraph | undefined, fixed: readonly CollisionBox[], radius: number,
+  surfaces: readonly WalkSurface[]): NavigationField {
+  if (!graph) return new NavigationField(graph, fixed, radius, surfaces);
+  let field = fields.get(graph);
+  if (!field?.matches(fixed, radius, surfaces)) { field = new NavigationField(graph, fixed, radius, surfaces); fields.set(graph, field); }
+  return field;
+}
+
+/** A query over the given walls, all treated as fixed. A round can share this one across all its zombies. */
 export function createNavigationQuery(
   graph: NavigationGraph | undefined,
   collisionBoxes: readonly CollisionBox[],
   radius = 0,
   surfaces: readonly WalkSurface[] = [],
 ): NavigationQuery {
-  const traversable = (a: Vec3, b: Vec3) => hasClearNavigationLine(a, b, collisionBoxes, radius)
-    && hasWalkableConnection(a, b, surfaces);
-  const byId = graph ? nodeMap(graph) : new Map<string, NavigationNode>();
-  let openGraph: NavigationGraph | undefined;
-  const paths = new Map<string, NavigationNode[]>();
-  const nearestCache = new Map<string, NavigationNode | undefined>();
-  const nearestReachable = (position: Vec3) => {
-    const key = `${position.x},${position.y},${position.z}`;
-    if (nearestCache.has(key)) return nearestCache.get(key);
-    let best: NavigationNode | undefined;
-    let bestDistance = Infinity;
-    for (const node of graph?.nodes ?? []) {
-      const distance = distanceSquared(node.position, position);
-      if ((distance < bestDistance || (distance === bestDistance && node.id.localeCompare(best!.id) < 0))
-        && traversable(position, node.position)) {
-        best = node; bestDistance = distance;
-      }
-    }
-    if (nearestCache.size >= 256) nearestCache.delete(nearestCache.keys().next().value!);
-    nearestCache.set(key, best);
-    return best;
-  };
-  return (start, goal) => {
-    if (traversable(start, goal)) return goal;
-    if (!graph || graph.nodes.length === 0) return goal;
-    const startNode = nearestReachable(start);
-    const goalNode = nearestReachable(goal);
-    if (!startNode || !goalNode) return start;
-    openGraph ??= { nodes: graph.nodes.map(node => ({ ...node,
-      neighbors: node.neighbors.filter(id => {
-        const next = byId.get(id);
-        return next && traversable(node.position, next.position);
-      }),
-    })) };
-    const pathKey = JSON.stringify([startNode.id, goalNode.id]);
-    let path = paths.get(pathKey);
-    if (!path) {
-      path = shortestNavigationPath(openGraph, startNode.id, goalNode.id);
-      paths.set(pathKey, path);
-    }
-    if (path.length === 0) return start;
-    for (let index = path.length - 1; index >= 0; index -= 1) {
-      const node = path[index];
-      if (traversable(start, node.position)) return node.position;
-    }
-    return path[0].position;
-  };
+  return navigationFieldFor(graph, collisionBoxes, radius, surfaces).query();
 }
 
 // A clear line through air is not a route between floors. Sample support along
@@ -192,10 +333,15 @@ export function createNavigationQuery(
 export function hasWalkableConnection(a: Vec3, b: Vec3, surfaces: readonly WalkSurface[]): boolean {
   if (!surfaces.length) return true;
   const count = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.15));
+  work.navigationFloorSamples += count;
+  // Only floors the line passes over can matter.
+  const lowX = Math.min(a.x, b.x) - 1e-6, highX = Math.max(a.x, b.x) + 1e-6;
+  const lowZ = Math.min(a.z, b.z) - 1e-6, highZ = Math.max(a.z, b.z) + 1e-6;
+  const under = surfaces.filter(surface => surface.maxX >= lowX && surface.minX <= highX && surface.maxZ >= lowZ && surface.minZ <= highZ);
   let height = a.y;
   for (let i = 1; i <= count; i++) {
     const t = i / count;
-    const next = sampleWalkHeight(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, height, surfaces, 0.2);
+    const next = sampleWalkHeight(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, height, under, 0.2);
     if (Math.abs(next - height) > 0.21 || Math.abs(next - (a.y + (b.y - a.y) * t)) > 0.35) return false;
     height = next;
   }

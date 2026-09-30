@@ -274,8 +274,10 @@ On Asylum, `&power=on` starts with the power on, and `&traps=on` also sets both 
 `/?preview=barrier` runs a live wave at the first window for entry-animation checks.
 `/?preview=stress&perf=1` runs a development-only 24-zombie wave with open doors and
 god mode for repeatable performance checks. Add `&round=N` to any preview URL to start its wave at
-round N, for example `/?preview=start&round=9` to face a round of sprinters. `npm run benchmark` measures a headless
-24-zombie stair-routing scenario (mean/p95 tick time); it does not measure GPU time or FPS.
+round N, for example `/?preview=start&round=9` to face a round of sprinters. `npm run benchmark` runs headless
+stress scenarios (24 zombies trained round Asylum's power side, a spawn wave, the Bunker) and reports tick time as
+mean/p95/p99/max with a per-stage breakdown and exact work counts; it does not measure GPU time or FPS (see
+[simulation performance](docs/simulation-performance.md)).
 `/?preview=assets&weapon=kar98k` provides a stationary target for firing/death checks.
 That preview places a Max Ammo pickup in front of the player and guarantees another when the target dies. Add
 `&powerup=doublePoints`, `&powerup=instaKill`, `&powerup=nuke` or `&powerup=carpenter` to inspect the other pickup models.

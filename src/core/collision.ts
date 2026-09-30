@@ -1,3 +1,4 @@
+import { work } from './profiling.ts';
 import type { Vec3 } from './types.ts';
 
 export interface CollisionBox {
@@ -19,6 +20,7 @@ export function moveWithCollision(
   let x = position.x;
   let z = position.z;
   const y = position.y;
+  work.moves++; work.moveBoxTests += 2 * boxes.length;
 
   let targetX = x + delta.x;
   for (const box of boxes) {
@@ -47,6 +49,49 @@ export function moveWithCollision(
   z = targetZ;
 
   return { x, y: y + delta.y, z };
+}
+
+/**
+ * Whether a body `radius` wide and `height` tall, walking the straight line from `start` to `end`, runs into `box`:
+ * whether the line enters the box grown by the radius on every side, at a height where the body would touch it.
+ */
+export function segmentHitsExpandedBox(
+  start: Vec3,
+  end: Vec3,
+  box: CollisionBox,
+  radius: number,
+  height: number,
+): boolean {
+  work.navigationBoxTests++;
+  const minX = box.min.x - radius;
+  const maxX = box.max.x + radius;
+  const minZ = box.min.z - radius;
+  const maxZ = box.max.z + radius;
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dz = end.z - start.z;
+  const minY = box.min.y - height + 1e-6;
+  const maxY = box.max.y - 1e-6;
+  let near = 0;
+  let far = 1;
+  // Avoid allocating four temporary arrays for every box/line test.
+  for (let axis = 0; axis < 3; axis++) {
+    const origin = axis === 0 ? start.x : axis === 1 ? start.y : start.z;
+    const delta = axis === 0 ? dx : axis === 1 ? dy : dz;
+    const min = axis === 0 ? minX : axis === 1 ? minY : minZ;
+    const max = axis === 0 ? maxX : axis === 1 ? maxY : maxZ;
+    if (Math.abs(delta) < 1e-9) {
+      if (origin < min || origin > max) return false;
+      continue;
+    }
+    let t1 = (min - origin) / delta;
+    let t2 = (max - origin) / delta;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    near = Math.max(near, t1);
+    far = Math.min(far, t2);
+    if (near > far) return false;
+  }
+  return far >= 0 && near <= 1;
 }
 
 export interface WalkSurface {

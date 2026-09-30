@@ -1,6 +1,8 @@
+import { work } from './profiling.ts';
 import type { BarrierState } from './barrier.ts';
 import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, sampleWalkHeight } from './collision.ts';
+import type { CollisionIndex } from './collisionIndex.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
 import { mix32, hashString } from './rng.ts';
 import { hasClearNavigationLine, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
@@ -129,6 +131,8 @@ export function updateZombiePursuit(
   walkSurfaces: readonly WalkSurface[] = [],
   navigationGraph?: NavigationGraph,
   navigationQuery?: NavigationQuery,
+  /** The same walls as `collisionBoxes`, indexed: moves then look only at the walls around the zombie. */
+  solids?: CollisionIndex,
 ): void {
   if (!zombie.alive) return;
   const target = chooseZombieTarget(zombie, players);
@@ -163,13 +167,9 @@ export function updateZombiePursuit(
   zombie.velocity.z = velocityZ;
   if (planarDistance > 0) faceToward(zombie, Math.atan2(dx, dz), deltaSeconds);
   const requested = { x: velocityX * deltaSeconds, y: 0, z: velocityZ * deltaSeconds };
-  const next = moveWithCollision(
-    zombie.position,
-    requested,
-    ZOMBIE_MOVEMENT.radius,
-    zombie.limbs & LEGS_MASK ? CRAWLER.height : ZOMBIE_MOVEMENT.height,
-    collisionBoxes,
-  );
+  const height = zombie.limbs & LEGS_MASK ? CRAWLER.height : ZOMBIE_MOVEMENT.height;
+  const next = solids ? solids.move(zombie.position, requested, ZOMBIE_MOVEMENT.radius, height)
+    : moveWithCollision(zombie.position, requested, ZOMBIE_MOVEMENT.radius, height, collisionBoxes);
   next.y = sampleWalkHeight(next.x, next.z, zombie.position.y, walkSurfaces);
   zombie.position = next;
 }
@@ -293,10 +293,12 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
  * that has walked into a player is pushed back out. Walls still hold. Call once a tick, after the zombies have moved.
  */
 export function separateZombies(zombies: readonly ZombieState[], players: readonly PlayerState[],
-  boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[]): void {
+  boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[], solids?: CollisionIndex): void {
   const gap = ZOMBIE_MOVEMENT.radius * 2 * 0.9, playerGap = ZOMBIE_MOVEMENT.radius + 0.3;
   const shove = (zombie: ZombieState, dx: number, dz: number) => {
-    const next = moveWithCollision(zombie.position, { x: dx, y: 0, z: dz }, ZOMBIE_MOVEMENT.radius, ZOMBIE_MOVEMENT.height, boxes);
+    const delta = { x: dx, y: 0, z: dz };
+    const next = solids ? solids.move(zombie.position, delta, ZOMBIE_MOVEMENT.radius, ZOMBIE_MOVEMENT.height)
+      : moveWithCollision(zombie.position, delta, ZOMBIE_MOVEMENT.radius, ZOMBIE_MOVEMENT.height, boxes);
     next.y = sampleWalkHeight(next.x, next.z, zombie.position.y, surfaces);
     zombie.position = next;
   };
@@ -308,8 +310,10 @@ export function separateZombies(zombies: readonly ZombieState[], players: readon
     for (let j = i + 1; j < zombies.length; j++) {
       const b = zombies[j];
       if (!b.alive || Math.abs(a.position.y - b.position.y) > 1) continue;
+      work.separationPairs++;
       let dx = a.position.x - b.position.x, dz = a.position.z - b.position.z, distance = Math.hypot(dx, dz);
       if (distance >= gap) continue;
+      work.separationShoves++;
       if (distance < 1e-4) { const angle = (mix32(hashString(a.id) ^ hashString(b.id)) / 0x1_0000_0000) * Math.PI * 2; dx = Math.cos(angle); dz = Math.sin(angle); distance = 1; }
       const overlap = gap - Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z), ux = dx / distance, uz = dz / distance;
       const aFree = free(a), bFree = free(b);

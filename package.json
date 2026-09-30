@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run generate:asset-manifest && npm run typecheck && npm run validate:maps && npm test && npm run build",
-    "benchmark": "node --experimental-strip-types scripts/benchmark.ts",
+    "benchmark": "node scripts/benchmark.mjs",
     "server:dev": "node scripts/server.mjs dev",
     "server:deploy": "node scripts/server.mjs deploy"
   },
