@@ -8,7 +8,7 @@ profiler overlay and the benchmark scenarios.
 
 `npm run benchmark` builds a repeatable stress run and times the simulation tick by tick. The main one, **train**, is the
 worst case a player can make on purpose: 24 zombies (two thirds runners, a third sprinters) chase a player who walks a full
-lap of Asylum at 4.2 m/s (a hair faster than a sprinter): out of the German start, up its stair, through the upstairs
+lap of Asylum at 3.3 m/s (a hair faster than a sprinter's 3.24): out of the German start, up its stair, through the upstairs
 rooms and the power room, down the American stair, through the hallway and back, with each door opening as the player
 reaches it. Ticks are 60 a second, so one has 16.7 ms.
 
@@ -103,8 +103,11 @@ lines and 1,500 moves.
 
 ### Not done, and why
 
-- **Separation is still every pair of zombies.** At the game's cap of 24 that is 276 distance checks a tick (0.02 to
-  0.06 ms), so a spatial grid would cost more than it saves. It is the first thing to change if the cap is raised.
+- **Separation is still every pair of zombies.** At the game's cap of 24 that is 276 distance checks a pass. Since the
+  zombie difficulty pass (issue #210) it runs up to four passes a tick, stopping as soon as nothing is more than 5 mm
+  overlapped, so a crowd pressing on a zombie that holds its ground settles; that is about 800 checks a tick in the
+  Bunker's crowd and 0.07 to 0.17 ms on average, so a spatial grid would still cost more than it saves. It is the first
+  thing to change if the cap is raised.
 - **Routes are searched per start and goal node pair**, not as one search from the goal that every zombie shares. That
   would need far fewer searches (one per player per tick), but it changes which of several equally short routes zombies
   take, and the point of this change was to keep every answer the same. It is the next step if door openings, the one

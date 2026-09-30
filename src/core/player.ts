@@ -6,7 +6,7 @@ import { GRENADE_RULES } from './grenade.ts';
 import { createStarterWeaponState } from './weapon.ts';
 
 export const PLAYER_MOVEMENT = {
-  maxSpeed: 4.2,
+  maxSpeed: 4.0,
   sprintMultiplier: 1.5,
   aimMultiplier: 0.65,
   acceleration: 22,

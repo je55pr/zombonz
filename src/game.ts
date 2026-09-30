@@ -417,6 +417,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   if (net?.role === 'host') net.host.attach(simulation);
   if (net?.role === 'client') net.client.attach(simulation, playerId, {
     collision: () => simulation.collisionBoxes(), walkSurfaces: map.walkSurfaces, shotBlockers: map.shotBlockers,
+    zombies: () => simulation.zombies(),
   });
   // Development builds expose the running match for inspection from the browser console.
   if (import.meta.env.DEV) Object.assign(window, { zombonz: { simulation, playerId, net, effects: blastEffects, weaponView, camera, frame, renderer, scene, skinnedViews, present, gore: goreEffects } });

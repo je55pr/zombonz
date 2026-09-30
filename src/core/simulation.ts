@@ -47,7 +47,7 @@ import type { EntityId, InteractableState, PlayerState, Vec3, WorldState, Zombie
 import { addEntity, allocateEntityId, createWorld, removeEntity } from './world.ts';
 import { SeededRng, mix32 } from './rng.ts';
 import {
-  ZOMBIE_MOVEMENT, createZombieState, separateZombies, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
+  ZOMBIE_MOVEMENT, blockPlayerByZombies, createZombieState, separateZombies, tickWindowAttack, tickZombieMelee, updateZombiePursuit, zombieGaitForRound, zombieLookFor,
   type ZombieMeleeEvent,
 } from './zombie.ts';
 import {
@@ -472,8 +472,10 @@ export class GameSimulation {
         continue;
       }
       const solid = this.collisionBoxes();
+      const from = { ...player.position };
       updatePlayerMovement(player, frame, deltaSeconds, solid, this.map.walkSurfaces,
         [...solid, ...(this.map.shotBlockers ?? [])]);
+      blockPlayerByZombies(player, from, this.zombies(), solid);
       events.push(...tickWeaponState(player));
       if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
       if (frame.actions.reload?.pressed) events.push(...beginReload(player));

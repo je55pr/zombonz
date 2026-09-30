@@ -100,17 +100,26 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
 - **Reach is real.** A swing starts within 1.1 m across the floor (0.9 m for a crawler) and a blow still lands out to 1.3 m,
   the lunge a player can step back out of; the target must be on the same floor (within 0.9 m) with nothing solid between
   their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
-  zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). A zombie stands its ground to swing, so the blow
-  is aimed where the player was, and a player who steps back out of reach in the wind-up is missed.
+  zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). The blow is aimed where the player is when it lands,
+  so a player who steps back out of reach in the wind-up is missed.
+- **A zombie keeps coming while it swings, and reads where the player is going** (issue #210). A swing is a lunge on the move,
+  not a halt: the zombie closes on the player through the wind-up and the recovery, and stops only when it touches them (it
+  never pushes them along). It also starts a swing when the player, at the speed and heading they have now, and it, still
+  coming, will be within strike range as the wind-up ends (looking at most 2 m of their travel between them ahead), so it
+  begins about 3 m out for a player running at it and the blow arrives with them, rather than the player getting in and out
+  untouched. A player who stops short, turns off or backs away once it has begun is missed if that takes them out of reach;
+  one who turns away before it begins is not swung at.
 - **Windows.** A zombie tearing boards swipes once a board is gone, at a player inside within 1 m of the window plane and
   no farther to the side than the opening plus 0.3 m: an arm's length through the gap, not the length of the room. It stops
   tearing while it swings, a crawler cannot swipe at all, and a swing is dropped if the window is rebuilt first.
 - **Blows come one at a time.** A landed blow gives the player 30 ticks (0.5 s) of grace against every other zombie; a
   blow that arrives in the grace waits, its arm out, until it has passed. So a crowd's blows are spaced, and someone hit
   once can step away, shoot or knife before the second.
-- **Zombies do not stand inside each other or the player.** Each tick, pairs closer than their bodies (0.58 m) are pushed
-  apart (all of it for the one free to move, when the other is mid-swing or coming through a window), zombies that have
-  walked into a player are pushed back out, and the walls still hold. A crowd spreads round its target.
+- **Zombies do not stand inside each other or the player, and the player cannot walk through them.** Each tick, pairs closer
+  than their bodies (0.58 m) are pushed apart (all of it for the one free to move, when the other is mid-swing or coming
+  through a window), and the walls still hold. A crowd spreads round its target. A player is stopped by a zombie's body
+  (0.66 m from its middle) and slides round it; a swinging zombie holds its ground, a free one gives way a little. Zombies
+  queued behind a fight are not taken for stuck. See [zombie difficulty](zombie-difficulty.md) (issue #210).
 
 The damage per blow is unchanged at 50, so two blows still down a 100-health player (250 with Juggernog takes five), as in
 WaW; only when they land has changed. Ticks (at 60 a second) from a zombie's first swing until the player goes down, with

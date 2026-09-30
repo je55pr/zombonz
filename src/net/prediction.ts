@@ -3,9 +3,10 @@ import { DOWN_RULES } from '../core/downs.ts';
 import { tickPlayerRecovery } from '../core/health.ts';
 import type { InputFrame } from '../core/input.ts';
 import { PLAYER_MOVEMENT, playerEyeHeight, updatePlayerMovement } from '../core/player.ts';
+import { blockPlayerByZombies } from '../core/zombie.ts';
 import { GRENADE_RULES } from '../core/grenade.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
-import type { PlayerState } from '../core/types.ts';
+import type { PlayerState, ZombieState } from '../core/types.ts';
 import {
   beginMelee, beginReload, firePlayerWeapon, rayFromPlayer, switchWeapon, tickMelee, tickWeaponState, wantsToFire,
 } from '../core/weapon.ts';
@@ -15,6 +16,11 @@ export interface PredictionWorld {
   collision(): CollisionBox[];
   walkSurfaces: readonly WalkSurface[];
   shotBlockers: readonly CollisionBox[];
+  /**
+   * The zombies as this client sees them (the host's word, a moment old), which the player's own movement is stopped by
+   * as on the host. Left out, the predicted player walks through them and is pulled back.
+   */
+  zombies?(): readonly ZombieState[];
 }
 
 /**
@@ -43,7 +49,9 @@ export function predictPlayerTick(player: PlayerState, frame: InputFrame, world:
     events.push(...tickWeaponState(player));
     if (frame.actions.reload?.pressed) events.push(...beginReload(player));
   } else {
+    const from = { ...player.position };
     updatePlayerMovement(player, frame, deltaSeconds, collision, world.walkSurfaces, blockers);
+    if (world.zombies) blockPlayerByZombies(player, from, world.zombies(), collision);
     events.push(...tickWeaponState(player));
     if (frame.actions.switchWeapon?.pressed) events.push(...switchWeapon(player));
     if (frame.actions.reload?.pressed) events.push(...beginReload(player));

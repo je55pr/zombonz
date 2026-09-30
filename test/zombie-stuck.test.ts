@@ -287,6 +287,7 @@ describe('a zombie on the Bunker\'s HELP stairs', () => {
     sim.getPlayer(sim.playerIds[0])!.godMode = true;
     for (const door of sim.state.doors) if (door.id !== 'help-room') door.open = true;
     const zombie = createZombieState(allocateEntityId(sim.state.world), { x: -9.535, y: 2.549382276049935, z: 7.778504281755681 }, 1, 'walk');
+    zombie.moveSpeed = 0.8; // the gait's own speed, whatever pace its id would give it
     addEntity(sim.state.world, zombie);
     for (let tick = 0; tick < 60 * 8; tick++) sim.tick();
     expect(Math.hypot(zombie.position.x + 9.535, zombie.position.z - 7.7785)).toBeGreaterThan(3);
@@ -378,7 +379,7 @@ describe('the benchmark routes', () => {
     const bunker = runBunkerRoute({ ticks: 900 });
     expect(bunker.stalls.stuckZombies).toBe(0);
     expect(bunker.stalls.longestSeconds).toBeLessThan(STUCK_SECONDS);
-  });
+  }, 60_000);
 
   it('keep 24 zombies moving through a lap of Asylum with doors opening as the player passes', () => {
     const train = runAsylumTraining({ ticks: 2400, warmup: 60 });
