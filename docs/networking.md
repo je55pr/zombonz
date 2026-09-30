@@ -276,6 +276,12 @@ round with 24 zombies encodes to under 16 KB.
 
 Development builds expose `window.zombonz` (`{ simulation, playerId, net }`) for inspection.
 
+### Live network diagnostics
+
+Press **F4** during a match (or add `?netdiag` to the URL) to open the network diagnostics panel. A client shows its role and connection state, smoothed RTT, received snapshot rate, approximate snapshot loss, interpolation delay, buffer depth, render lag and the age of the newest authoritative snapshot. Snapshot loss is estimated from missing snapshot ticks over a rolling three-second window; an out-of-order packet that later arrives fills its tick and reduces the estimate again. Hosts show their role/state, connected peer count and actual snapshot publication rate. Host RTT/loss are shown as unavailable rather than guessed because clients do not acknowledge snapshots. The latest transport error is retained in the panel when one is reported.
+
+This overlay is presentation-only: it reads network state and never changes deterministic simulation state.
+
 For browser-level regression coverage, `npm run test:e2e` starts the local room server plus Vite, opens two isolated Chromium contexts, connects them through the actual signalling/WebRTC path, starts a two-player match and verifies client movement reaches the host and reconciles back. Failures retain a trace, screenshot and JSON page/network log.
 
 ## Not yet
@@ -283,4 +289,3 @@ For browser-level regression coverage, `npm run test:e2e` starts the local room 
 - Room-code signalling is done (see [server-setup.md](server-setup.md)); game discovery or a public lobby list would be separate future work.
 - A TURN relay for networks that block direct connections (#46).
 - A reconnect UI for the copy-paste fallback; room-code games can already reclaim a reserved slot after a drop.
-- A fuller in-game diagnostics overlay (#45); for now there is a ping readout, and the connection test above.

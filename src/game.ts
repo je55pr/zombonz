@@ -10,6 +10,7 @@ import { ADS_LOOK_SCALE, aimedFov } from './client/aim.ts';
 import { loadBindings, type KeyBindings } from './client/bindings.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
+import { NetworkDiagnosticsOverlay } from './client/networkDiagnosticsOverlay.ts';
 import { SIMULATION_STAGES, SimulationProbe, addWork, emptyWork, slowestStage, type SimulationStage } from './core/profiling.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
 import { ActorBatch } from './client/actorBatch.ts';
@@ -427,6 +428,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     netCleanup.push(...stops);
   }
   const performanceOverlay = new PerformanceOverlay(renderer);
+  const networkOverlay = new NetworkDiagnosticsOverlay(() => net?.role === 'host'
+    ? net.host.diagnostics() : net?.role === 'client' ? net.client.diagnostics() : null);
   renderer.info.autoReset = false;
   let previousSeconds: number | undefined;
   let lastShadowSeconds = -Infinity;
@@ -594,6 +597,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const hudEnded = profiling ? performance.now() : 0;
     const calls = profiling ? renderer.info.render.calls : 0;
     const triangles = profiling ? renderer.info.render.triangles : 0;
+    networkOverlay.render(renderer);
     performanceOverlay.render(renderer);
     if (profiling) performanceOverlay.sample({
       intervalMs: interval, cpuMs: performance.now() - started,
@@ -705,7 +709,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       if (net?.role === 'client') net.client.leave();
       for (const view of playerViews.values()) view.dispose();
       pause.dispose(); input.dispose(); audio.dispose(); hud.dispose(); blastEffects.clear(); goreEffects.dispose();
-      performanceOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose();
+      performanceOverlay.dispose(); networkOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose();
       for (const view of skinnedViews.values()) view.dispose();
       skinnedViews.clear(); zombieViews.clear();
       renderer.dispose();

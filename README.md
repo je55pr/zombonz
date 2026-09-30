@@ -99,6 +99,14 @@ F3 toggles the frame profiler (`?perf` opens it automatically). It shows average
 versus regular scene cost, draw calls, triangles, and active rigs. GPU draw time appears
 when the browser supports asynchronous timer queries; it excludes browser presentation,
 so CPU and GPU times should not be added together. The panel stays dormant while hidden.
+
+F4 toggles the multiplayer network diagnostics (`?netdiag` opens it automatically). Clients see
+connection state/role, smoothed RTT, received snapshot rate, an approximate rolling snapshot-loss
+percentage, the 100 ms interpolation target, buffer depth, render lag and snapshot age. Hosts show
+connection state, connected peers and their actual snapshot publication rate; RTT/loss are correctly
+left to clients because the host does not receive snapshot acknowledgements. Transport errors appear
+in the panel without changing the simulation.
+
 Rendering follows the display refresh rate, with interpolated movement and immediate
 mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
 1x pixel density and no MSAA. The moon's shadow map (1024px, 2048px on the larger Asylum) holds only the

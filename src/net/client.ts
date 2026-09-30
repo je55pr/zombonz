@@ -10,6 +10,7 @@ import {
   type HostMessage, type LobbyPlayer, type NetInput,
 } from './protocol.ts';
 import { applySnapshot, type WorldSnapshot } from './snapshot.ts';
+import { SnapshotTelemetry, type NetworkDiagnostics } from './telemetry.ts';
 
 /** Remote players and zombies are drawn this far behind the newest snapshot, so there is always a next one. */
 export const INTERPOLATION_DELAY_TICKS = 2 * SNAPSHOT_INTERVAL_TICKS;
@@ -68,6 +69,8 @@ export class NetClient {
   private renderTick: number | null = null;
   private queuedEvents: Array<{ tick: number; events: SimulationEvent[] }> = [];
   private restartPending = false;
+  private readonly snapshotTelemetry = new SnapshotTelemetry();
+  private lastNetworkError: string | null = null;
   /** How far the drawn position still trails a correction; it decays to nothing. */
   readonly correction: Vec3 = { x: 0, y: 0, z: 0 };
   /** Round-trip time to the host, smoothed, in milliseconds. */
@@ -85,7 +88,12 @@ export class NetClient {
     this.stops = [
       transport.onMessage(message => this.receive(message.payload)),
       transport.onLifecycle(event => {
-        if (event.type === 'peerDisconnected' || event.type === 'transportClosed') this.finish(event.reason ?? 'Lost the connection to the host.');
+        if (event.type === 'transportError') {
+          this.lastNetworkError = event.message;
+          this.changed.emit();
+        } else if (event.type === 'peerDisconnected' || event.type === 'transportClosed') {
+          this.finish(event.reason ?? 'Lost the connection to the host.');
+        }
       }),
     ];
     transport.sendReliable(encodeMessage({ t: 'hello', v: PROTOCOL_VERSION, name,
@@ -143,7 +151,7 @@ export class NetClient {
     if (epoch < this.epoch) return false;
     if (epoch > this.epoch) {
       this.epoch = epoch; this.buffer = []; this.applied = null; this.renderTick = null;
-      this.queuedEvents = []; this.restartPending = true;
+      this.queuedEvents = []; this.restartPending = true; this.snapshotTelemetry.reset();
     }
     return true;
   }
@@ -158,6 +166,7 @@ export class NetClient {
   private receiveSnapshot(epoch: number, ack: number, snapshot: WorldSnapshot): void {
     if (!this.newEpoch(epoch) || !this.simulation) return;
     if (this.buffer.some(held => held.tick === snapshot.tick)) return;
+    this.snapshotTelemetry.observe(snapshot.tick, this.now());
     const newest = this.buffer.length === 0 || snapshot.tick > this.buffer[this.buffer.length - 1].tick;
     this.buffer.push(snapshot);
     this.buffer.sort((a, b) => a.tick - b.tick);
@@ -198,6 +207,23 @@ export class NetClient {
     // Before the first snapshot there is nothing to correct against; wait in place.
     if (!this.applied) return [];
     return predictPlayerTick(this.predicted, fromNetInput(input, this.predicted), this.world, input.s);
+  }
+
+  diagnostics(): NetworkDiagnostics {
+    const now = this.now();
+    const snapshots = this.snapshotTelemetry.report(now, SNAPSHOT_INTERVAL_TICKS);
+    const newestTick = this.buffer.at(-1)?.tick ?? null;
+    return {
+      role: 'client', state: this.phase, peers: this.phase === 'closed' ? 0 : 1,
+      rttMs: this.pingMs,
+      snapshotRateHz: snapshots.rateHz,
+      snapshotLossPercent: snapshots.lossPercent,
+      interpolationDelayMs: this.interpolationDelay / 60 * 1000,
+      snapshotAgeMs: snapshots.ageMs,
+      bufferDepth: this.buffer.length,
+      renderDelayTicks: newestTick !== null && this.renderTick !== null ? Math.max(0, newestTick - this.renderTick) : null,
+      lastError: this.lastNetworkError ?? this.closeReason,
+    };
   }
 
   /**

@@ -173,6 +173,8 @@ describe('co-op sessions', () => {
     const match = startMatch(net);
     expect(match.clientSims).toHaveLength(2);
     expect(net.clients.every(client => client.phase === 'game')).toBe(true);
+    expect(net.host.diagnostics()).toMatchObject({ role: 'host', state: 'game', peers: 2 });
+    expect(net.clients[0].diagnostics()).toMatchObject({ role: 'client', state: 'game', peers: 1, interpolationDelayMs: 100 });
   });
 
   it('turn away a fifth player, a different version, and anyone after the start', () => {
@@ -267,6 +269,7 @@ describe('co-op sessions', () => {
     const spawn = playerSpawnPoints(map, 3)[2];
     expect(Math.hypot(drawn.x - spawn.x, drawn.z - spawn.z)).toBeGreaterThan(1);
     expect(Math.hypot(drawn.x - truth.x, drawn.z - truth.z)).toBeLessThan(1);
+    expect(net.clients[0].diagnostics().snapshotLossPercent).toBeGreaterThan(0);
     let previous = -Infinity;
     for (let i = 0; i < 30; i++) {
       const frame = net.clients[0].frame(1 / 60);
