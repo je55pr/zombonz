@@ -101,6 +101,8 @@ The GitHub Pages copy of the game, or any other, can use your server instead of 
 - **"Could not reach the game server" when joining.** WebSockets may be blocked on that network. In the browser's developer console, `new WebSocket('wss://<your address>/signal/echo').onmessage = event => console.log(event.data)` prints `{"t":"echo","ok":true}` where they work. **Use connection codes instead** gets around it.
 - **"No game with that code."** The host has to stay on the Host Game screen, and codes never contain 0, 1, I, L or O, so a typo is caught.
 - **Both players reach the room but never connect to each other.** That is the players' networks not allowing a direct connection, not the server. **Test my connection** on both shows why (a "symmetric NAT" or blocked UDP is the usual cause); there is no relay server yet (see [networking.md](networking.md)). **Copy log** in the lobby gives a timeline to send along.
+- **The automatic deploy fails at "Check the Cloudflare secrets are set".** The secret it names is empty or missing. `gh secret set` hides what you paste, so an empty paste is easy to miss: set it again in GitHub's web page instead (**Settings**, **Secrets and variables**, **Actions**, the secret, **Update**), where you can see the box fill, then re-run the failed run from the Actions tab.
+- **The automatic deploy fails later with an error from Cloudflare** (authentication, or permission). The token is probably for another account, has expired, or was not made from the **Edit Cloudflare Workers** template: make a new one and set the secret again.
 - **`wrangler` says you are not logged in.** Run `npx wrangler login` again.
 
 ## Taking it down

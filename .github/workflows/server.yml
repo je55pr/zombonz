@@ -24,6 +24,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Check the Cloudflare secrets are set
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # A secret can exist and still be empty (pasting into a hidden prompt is easy to get wrong): say so now, before spending minutes on a build.
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error title=Secret missing::The repository secret $name is empty or not set. Add it under Settings > Secrets and variables > Actions (see docs/server-setup.md)."
+              missing=1
+            fi
+          done
+          exit $missing
+
       - name: Checkout
         uses: actions/checkout@v4
 
