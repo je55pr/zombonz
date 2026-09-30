@@ -18,6 +18,7 @@ export class Listeners<T> {
     return () => { this.listeners.delete(listener); };
   }
   emit(value: T): void { for (const listener of [...this.listeners]) listener(value); }
+  get size(): number { return this.listeners.size; }
 }
 
 /** A host transport over any number of peer links, each added once it is connected. */

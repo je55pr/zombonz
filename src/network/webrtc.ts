@@ -23,7 +23,7 @@ const LATE_GRACE_MS = 4000;
 /** More than this ahead means the two clocks disagree, not that anyone is waiting. */
 const MAX_WAIT_MS = 2 * 60 * 1000;
 /** Once started, how long a connection has to come up. */
-const CONNECT_TIMEOUT_MS = 20000;
+export const CONNECT_TIMEOUT_MS = 20000;
 
 /**
  * How long to wait, in milliseconds, before a start time given in the game server's clock. Throws when it has gone by.
@@ -61,7 +61,7 @@ export function clockOffset(): Promise<number> {
 }
 
 /** What happened to one connection, in order, to send back when it does not work. No addresses. */
-class ConnectionLog {
+export class ConnectionLog {
   private readonly began = Date.now();
   private readonly lines: string[] = [];
   add(text: string): void { this.lines.push(`+${((Date.now() - this.began) / 1000).toFixed(1)} s  ${text}`); }
@@ -90,7 +90,7 @@ export interface PendingJoin {
   cancel(): void;
 }
 
-function openChannels(pc: RTCPeerConnection) {
+export function openChannels(pc: RTCPeerConnection) {
   // Negotiated channels exist on both sides without a separate announcement.
   const reliable = pc.createDataChannel('reliable', { negotiated: true, id: 0, ordered: true });
   const fast = pc.createDataChannel('fast', { negotiated: true, id: 1, ordered: false, maxRetransmits: 0 });
@@ -110,7 +110,7 @@ function gatherCandidates(pc: RTCPeerConnection): Promise<void> {
 }
 
 /** Writes the connection's state changes to the log, and which kinds of address it ended up using. */
-function watch(pc: RTCPeerConnection, log: ConnectionLog): void {
+export function watch(pc: RTCPeerConnection, log: ConnectionLog): void {
   pc.addEventListener('icegatheringstatechange', () => log.add(`addresses: ${pc.iceGatheringState}`));
   pc.addEventListener('iceconnectionstatechange', () => log.add(`ice: ${pc.iceConnectionState}`));
   pc.addEventListener('connectionstatechange', () => {
@@ -132,7 +132,7 @@ function watch(pc: RTCPeerConnection, log: ConnectionLog): void {
   });
 }
 
-function linkWhenOpen(pc: RTCPeerConnection, channels: ReturnType<typeof openChannels>, timeoutMs: number, failure: string): Promise<PeerLink> {
+export function linkWhenOpen(pc: RTCPeerConnection, channels: ReturnType<typeof openChannels>, timeoutMs: number, failure: string): Promise<PeerLink> {
   const { reliable, fast } = channels;
   const messages = new Listeners<[DeliveryClass, TransportPayload]>();
   const closes = new Listeners<string | undefined>();

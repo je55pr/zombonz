@@ -9,6 +9,10 @@ import type { DownloadStatus } from './client/menu.ts';
 
 type GameModule = typeof import('./game.ts');
 type NetPlay = import('./game.ts').NetPlay;
+type NetHost = import('./net/host.ts').NetHost;
+type NetClient = import('./net/client.ts').NetClient;
+type StartInfo = import('./net/client.ts').StartInfo;
+type LobbyPlayer = import('./net/protocol.ts').LobbyPlayer;
 
 const gameCanvas = document.querySelector<HTMLCanvasElement>('#game');
 if (!gameCanvas) throw new Error('Missing #game canvas.');
@@ -80,24 +84,32 @@ async function openConnectionTest(): Promise<void> {
   connectionTest = new ConnectionTestView(buildId, () => { connectionTest = undefined; });
 }
 
-/** The co-op lobby, over the menu: hosting on the chosen map, or joining someone's game. */
-async function openLobby(mode: { kind: 'host'; map: MapId } | { kind: 'join' }): Promise<void> {
+/**
+ * The co-op lobby, over the menu: hosting on the chosen map, or joining someone's game. A copy of the game that has a game server
+ * (server/) gets the room lobby, with a short code to type; one without, or a player who asked for it, gets the lobby with connection codes.
+ */
+async function openLobby(mode: { kind: 'host'; map: MapId } | { kind: 'join' }, options: { codes?: boolean } = {}): Promise<void> {
   if (lobby) return;
-  const { LobbyView } = await import('./client/lobby.ts');
+  const [{ LobbyView }, { RoomLobbyView }, { signalAvailable }] = await Promise.all([
+    import('./client/lobby.ts'), import('./client/roomLobby.ts'), import('./network/signaling.ts'),
+  ]);
+  const rooms = !options.codes && await signalAvailable();
   if (lobby || !game) return;
   const module = game;
-  lobby = new LobbyView(mode, {
-    hostStarted: (host, players, seed, map) => {
+  const callbacks = {
+    hostStarted: (host: NetHost, players: LobbyPlayer[], seed: number, map: MapId) => {
       lobby = undefined;
       void startSession(module, map, { role: 'host', host, players, seed });
     },
-    clientStarted: (client, start) => {
+    clientStarted: (client: NetClient, start: StartInfo) => {
       lobby = undefined;
       void startSession(module, start.map, { role: 'client', client, start });
     },
     back: () => { lobby = undefined; },
     testConnection: () => { void openConnectionTest(); },
-  });
+    useCodes: () => { lobby = undefined; void openLobby(mode, { codes: true }); },
+  };
+  lobby = rooms ? new RoomLobbyView(mode, callbacks) : new LobbyView(mode, callbacks);
 }
 
 /**
