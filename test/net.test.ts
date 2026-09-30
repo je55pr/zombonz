@@ -3,7 +3,7 @@ import { createInputFrame, type GameSimulation, type InputFrame, type Simulation
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { createMatch, playerSpawnPoints } from '../src/maps/match.ts';
 import { NetClient } from '../src/net/client.ts';
-import { NetHost } from '../src/net/host.ts';
+import { NetHost, RECONNECT_WINDOW_MS } from '../src/net/host.ts';
 import {
   PROTOCOL_VERSION, encodeMessage, encodeSnapshotBody, fromNetInput, readClientMessage, toNetInput,
 } from '../src/net/protocol.ts';
@@ -81,6 +81,9 @@ describe('protocol', () => {
   it('refuses malformed client messages', () => {
     const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
     expect(readClientMessage(bytes({ t: 'hello', v: PROTOCOL_VERSION, name: 'Jess' }))).toEqual({ t: 'hello', v: PROTOCOL_VERSION, name: 'Jess' });
+    expect(readClientMessage(bytes({ t: 'hello', v: PROTOCOL_VERSION, name: 'Jess', resume: 'slot-token' })))
+      .toEqual({ t: 'hello', v: PROTOCOL_VERSION, name: 'Jess', resume: 'slot-token' });
+    expect(readClientMessage(bytes({ t: 'hello', v: PROTOCOL_VERSION, name: 'Jess', resume: 7 }))).toBeNull();
     expect(readClientMessage(bytes({ t: 'input', f: [{ s: 1, h: 0, p: 0, r: 0, y: 'x', x: 0 }] }))).toBeNull();
     expect(readClientMessage(bytes({ t: 'input', f: Array(40).fill({ s: 1, h: 0, p: 0, r: 0, y: 0, x: 0 }) }))).toBeNull();
     expect(readClientMessage(new TextEncoder().encode('{nope'))).toBeNull();
@@ -287,6 +290,63 @@ describe('co-op sessions', () => {
     expect(notices).toEqual(['Friend 1 left the game']);
     expect(match.clientSims[1].getPlayer(gone)!.alive).toBe(false);
     expect(net.clients[0].phase).toBe('closed');
+  });
+
+  it('reserve a disconnected match slot for 30 seconds and restore that player when the token returns', () => {
+    const net = session(2);
+    const match = startMatch(net);
+    const token = net.clients[0].resumeToken;
+    const slot = net.clients[0].slot;
+    expect(token).toBeTruthy(); expect(slot).toBe(1);
+    const playerId = match.hostSim.playerIds[slot!];
+    const player = match.hostSim.getPlayer(playerId)!;
+    player.points = 1234; player.health = 55;
+    const notices: string[] = [];
+    net.clients[1].notices.add(notice => notices.push(notice));
+
+    net.links[0].a.close('wifi dropped');
+    net.flush();
+    expect(match.hostSim.state.leftPlayers).toEqual([playerId]);
+    expect(player.alive).toBe(false);
+
+    const replacement = createMemoryLinks();
+    net.links.push(replacement);
+    net.transport.addPeer('peer-returned', replacement.a);
+    const returned = new NetClient(linkClientTransport(replacement.b), 'A different typed name', { resumeToken: token });
+    net.flush();
+
+    expect(returned.phase).toBe('game');
+    expect(returned.slot).toBe(slot);
+    expect(returned.resumeToken).toBe(token);
+    expect(match.hostSim.state.leftPlayers).toEqual([]);
+    expect(player).toMatchObject({ alive: true, health: 55, points: 1234 });
+    expect(notices).toEqual(['Friend 1 left the game', 'Friend 1 rejoined the game']);
+  });
+
+  it('refuse a reconnect token after its reservation window expires', () => {
+    let now = 10_000;
+    const transport = new LinkHostTransport();
+    const host = new NetHost(transport, 'Host', 'asylum', 3, () => now);
+    const first = createMemoryLinks();
+    transport.addPeer('first', first.a);
+    const client = new NetClient(linkClientTransport(first.b), 'Friend');
+    const flush = (...pairs: MemoryLinkPair[]) => {
+      for (let round = 0; round < 6 && pairs.reduce((sum, pair) => sum + pair.flush(), 0) > 0; round++) { /* settle */ }
+    };
+    flush(first);
+    const token = client.resumeToken!;
+    host.start(77, now);
+    host.attach(createMatch(map, 2, 77));
+    flush(first);
+    first.a.close('gone');
+    now += RECONNECT_WINDOW_MS + 1;
+
+    const later = createMemoryLinks();
+    transport.addPeer('later', later.a);
+    const reconnect = new NetClient(linkClientTransport(later.b), 'Friend', { resumeToken: token });
+    flush(later);
+    expect(reconnect.phase).toBe('closed');
+    expect(reconnect.closeReason).toMatch(/reconnect window expired/i);
   });
 
   it('follow the host into a restarted match, and close when the host leaves', () => {

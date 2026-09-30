@@ -36,9 +36,16 @@ export interface ClientFrame {
  * snapshots (smoothly, and replaying inputs the host hasn't used yet), and draws everything else
  * slightly in the past, between snapshots.
  */
+export interface NetClientOptions {
+  now?: () => number;
+  interpolationDelay?: number;
+  resumeToken?: string | null;
+}
+
 export class NetClient {
   phase: 'joining' | 'lobby' | 'game' | 'closed' = 'joining';
   slot: number | null = null;
+  resumeToken: string | null = null;
   map: MapId | null = null;
   players: LobbyPlayer[] = [];
   closeReason: string | null = null;
@@ -67,16 +74,22 @@ export class NetClient {
   pingMs: number | null = null;
   private readonly stops: Array<() => void>;
 
-  constructor(private readonly transport: ClientTransport, name: string, private readonly now: () => number = () => performance.now(),
-    /** How far behind the newest snapshot remote entities are drawn, in ticks. */
-    private readonly interpolationDelay = INTERPOLATION_DELAY_TICKS) {
+  private readonly now: () => number;
+  /** How far behind the newest snapshot remote entities are drawn, in ticks. */
+  private readonly interpolationDelay: number;
+
+  constructor(private readonly transport: ClientTransport, name: string, options: NetClientOptions = {}) {
+    this.now = options.now ?? (() => performance.now());
+    this.interpolationDelay = options.interpolationDelay ?? INTERPOLATION_DELAY_TICKS;
+    this.resumeToken = options.resumeToken ?? null;
     this.stops = [
       transport.onMessage(message => this.receive(message.payload)),
       transport.onLifecycle(event => {
         if (event.type === 'peerDisconnected' || event.type === 'transportClosed') this.finish(event.reason ?? 'Lost the connection to the host.');
       }),
     ];
-    transport.sendReliable(encodeMessage({ t: 'hello', v: PROTOCOL_VERSION, name }));
+    transport.sendReliable(encodeMessage({ t: 'hello', v: PROTOCOL_VERSION, name,
+      ...(this.resumeToken ? { resume: this.resumeToken } : {}) }));
   }
 
   private finish(reason: string): void {
@@ -97,7 +110,12 @@ export class NetClient {
     const message = decodeMessage(payload) as HostMessage | null;
     if (!message || this.phase === 'closed') return;
     switch (message.t) {
-      case 'welcome': this.slot = message.slot; if (this.phase === 'joining') this.phase = 'lobby'; this.changed.emit(); break;
+      case 'welcome':
+        this.slot = message.slot;
+        if (typeof message.resume === 'string') this.resumeToken = message.resume;
+        if (this.phase === 'joining') this.phase = 'lobby';
+        this.changed.emit();
+        break;
       case 'lobby': this.map = message.map; this.players = message.players; this.changed.emit(); break;
       case 'reject': this.finish(message.reason); break;
       case 'end': this.finish(message.reason); break;
@@ -108,6 +126,7 @@ export class NetClient {
         this.changed.emit();
         break;
       case 'left': this.notices.emit(`${message.name} left the game`); break;
+      case 'returned': this.notices.emit(`${message.name} rejoined the game`); break;
       case 'snap': this.receiveSnapshot(message.ep, message.ack, message.s); break;
       case 'ev': this.receiveEvents(message.ep, message.k, message.e); break;
     }

@@ -118,6 +118,12 @@ export interface MatchRestartedEvent {
   seed: number;
 }
 
+/** The parts of a player temporarily suppressed while their network connection is absent. */
+export interface PlayerPresenceState {
+  alive: boolean;
+  downed: PlayerState['downed'];
+}
+
 export function nextMatchSeed(seed: number): number {
   return (seed + 0x9e3779b9) >>> 0;
 }
@@ -247,11 +253,25 @@ export class GameSimulation {
     return { type: 'matchRestarted', previousSeed, seed: this.state.world.seed };
   }
 
-  /** Takes a player who left (a disconnected co-op peer) out of the match for good. */
-  removePlayer(id: EntityId): void {
+  /** Takes a disconnected co-op player out of active play, returning enough state to restore a short reconnect. */
+  removePlayer(id: EntityId): PlayerPresenceState | null {
     if (!this.state.leftPlayers.includes(id)) this.state.leftPlayers.push(id);
     const player = this.getPlayer(id);
-    if (player) { player.alive = false; player.downed = null; player.velocity = { x: 0, y: 0, z: 0 }; }
+    if (!player) return null;
+    const presence = { alive: player.alive, downed: player.downed } satisfies PlayerPresenceState;
+    player.alive = false; player.downed = null; player.velocity = { x: 0, y: 0, z: 0 };
+    return presence;
+  }
+
+  /** Returns a temporarily disconnected player to the match without changing their inventory, score, health or position. */
+  restorePlayer(id: EntityId, presence: PlayerPresenceState): void {
+    const index = this.state.leftPlayers.indexOf(id);
+    if (index >= 0) this.state.leftPlayers.splice(index, 1);
+    const player = this.getPlayer(id);
+    if (!player) return;
+    player.alive = presence.alive;
+    player.downed = presence.downed;
+    player.velocity = { x: 0, y: 0, z: 0 };
   }
 
   /**

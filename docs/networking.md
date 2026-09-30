@@ -43,7 +43,7 @@ the room (after a couple of seconds' grace, in case the host's end is a moment b
 `src/network/signaling.ts` is the WebSocket client.
 
 Limits, to keep a room from being a problem for the server: four connections; messages up to 16 KB; at most 80 messages in 10 seconds
-per connection (a real connection sends a few dozen in its first second); and a room closes after 30 minutes. Room codes are names, not
+per connection (a real connection sends a few dozen in its first second); and a room has a 12-hour safety cap if its host never closes it. Room codes are names, not
 secrets: anyone with the code and the address can ask to join, so a room is only as private as its code. The server accepts connections
 from any address, so a copy of the game hosted elsewhere can use it (see `VITE_SIGNAL_URL` below).
 
@@ -180,7 +180,7 @@ Client to host:
 
 | Message | Channel | Meaning |
 | --- | --- | --- |
-| `hello { v, name }` | reliable | Join the lobby. Refused if the version differs, the lobby is full, or the match has begun. |
+| `hello { v, name, resume? }` | reliable | Join the lobby, or reclaim a disconnected match slot with the host-issued reconnect token. Refused if the version differs, the lobby is full, the match has begun without a valid token, or the reconnect window expired. |
 | `ready` | reliable | Loaded the map. The host holds the first wave until everyone is ready, or 20 s have passed. |
 | `input { f: NetInput[] }` | fast | This client's latest inputs (up to 8, repeated in each message so one lost packet costs nothing). |
 
@@ -188,13 +188,14 @@ Host to client:
 
 | Message | Channel | Meaning |
 | --- | --- | --- |
-| `welcome { slot }` | reliable | Admitted, as player `slot` (the host is slot 0). |
+| `welcome { slot, resume }` | reliable | Admitted as player `slot` (the host is slot 0), with the opaque token that can reclaim that slot after a short drop. |
 | `reject { reason }` | reliable | Not admitted, and why. |
 | `lobby { map, players }` | reliable | Who is in the lobby. |
 | `start { map, seed, players }` | reliable | Build the match and start. |
 | `ev { ep, k, e }` | reliable | The events of host tick `k`, in restart epoch `ep`. |
 | `snap { ep, ack, s }` | fast | A snapshot; `ack` is the last of this client's inputs the host has used. |
-| `left { slot, name }` | reliable | A player disconnected. |
+| `left { slot, name }` | reliable | A player disconnected and was removed from active play. |
+| `returned { slot, name }` | reliable | A disconnected player reclaimed their reserved slot. |
 | `end { reason }` | reliable | The host closed the game. |
 
 `NetInput` holds a sequence number, the held, pressed and released buttons as bitmasks over
@@ -255,10 +256,16 @@ round with 24 zombies encodes to under 16 KB.
 
 ## Session rules
 
-- **Lobby:** the host and up to three players join in order and get slots 1–3. Players still
-  connecting when the match starts are turned away. No one can join mid-match.
-- **Leaving:** a player who disconnects is taken out of the match (`GameSimulation.removePlayer`),
-  and the others see a notice. When the host leaves, every client returns to the menu with a message.
+- **Lobby:** the host owns slot assignment. Up to three clients receive unique slots 1–3; before the match starts,
+  disconnected lobby slots are released and the connected players are compacted into the authoritative match slots. Players still
+  connecting when the match starts are turned away. No new player can join mid-match.
+- **Leaving and reconnecting:** a player who disconnects is immediately taken out of active play (`GameSimulation.removePlayer`),
+  and the others see a notice. Their host-issued token reserves that exact match slot for **30 seconds**. In a room-code game, the
+  signalling room stays open with the match; the same browser remembers the room code and token for the tab, so choosing **Join Game**
+  again (the room code is prefilled) can reclaim the slot. The host restores the player's inventory, score, health, position and
+  downed/alive state, sends the current match start information and snapshot, and the other players see a rejoin notice. After the
+  window expires the token is refused. The copy-paste fallback uses the same authoritative token rules, but currently has no in-game
+  way to negotiate a fresh WebRTC link after a drop. When the host leaves, every client returns to the menu with a message.
 - **Last stand:**
   - A killing blow downs a player, and a teammate revives them by holding E beside them.
   - A player who bleeds out comes back at the next round.
@@ -271,8 +278,8 @@ Development builds expose `window.zombonz` (`{ simulation, playerId, net }`) for
 
 ## Not yet
 
-- Room-code servers are done (see [server-setup.md](server-setup.md)); what is left of #39 and #40 is a lobby list, and a way to find a game without a code.
+- Room-code signalling is done (see [server-setup.md](server-setup.md)); game discovery or a public lobby list would be separate future work.
 - A TURN relay for networks that block direct connections (#46).
-- Reconnecting after a drop.
+- A reconnect UI for the copy-paste fallback; room-code games can already reclaim a reserved slot after a drop.
 - An automated two-browser test (#44).
 - A fuller in-game diagnostics overlay (#45); for now there is a ping readout, and the connection test above.

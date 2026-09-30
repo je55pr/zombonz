@@ -138,6 +138,8 @@ async function startSession(module: GameModule, map: MapId, net?: NetPlay): Prom
     }, net);
   } catch (error) {
     console.error('Unable to start the game', error);
+    if (net?.role === 'host') net.host.close('The game could not start.');
+    if (net?.role === 'client') net.client.leave();
     showMenu();
     return;
   }

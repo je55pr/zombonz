@@ -110,7 +110,7 @@ export class LobbyView {
       this.transport = new LinkHostTransport();
       this.host = new NetHost(this.transport, cleanName(name.value, 'Player 1'), mode.map);
       this.host.changed.add(() => this.renderPlayers());
-      this.host.notices.add(notice => this.status(`${notice.name} ${notice.kind === 'joined' ? 'joined.' : 'left.'}`));
+      this.host.notices.add(notice => this.status(`${notice.name} ${notice.kind === 'left' ? 'left.' : notice.kind === 'returned' ? 'rejoined.' : 'joined.'}`));
       this.renderPlayers();
     }
     name.focus();

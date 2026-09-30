@@ -420,7 +420,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   if (net) {
     feedback.setNames(names);
     const stops = net.role === 'host'
-      ? [net.host.notices.add(notice => feedback.notice(`${notice.name.toUpperCase()} ${notice.kind === 'left' ? 'LEFT THE GAME' : 'JOINED'}`,
+      ? [net.host.notices.add(notice => feedback.notice(`${notice.name.toUpperCase()} ${notice.kind === 'left' ? 'LEFT THE GAME' : notice.kind === 'returned' ? 'REJOINED' : 'JOINED'}`,
         simulation.state.world.tick))]
       : [net.client.notices.add(notice => feedback.notice(notice.toUpperCase(), simulation.state.world.tick)),
         net.client.closed.add(reason => hooks.onDisconnected?.(reason))];

@@ -13,8 +13,8 @@ export const MAX_IN_ROOM = 4;
 export const MAX_MESSAGE_CHARS = 16 * 1024;
 /** More messages than this in a window closes the connection: a real connection sends a few dozen in its first second. */
 export const RATE_LIMIT = { messages: 80, windowMs: 10_000 };
-/** A room closes this long after it opened: setting up a connection takes seconds, and this only stops one being left open forever. */
-export const ROOM_LIFETIME_MS = 30 * 60 * 1000;
+/** Safety cap for a room whose host never closes it. Active matches keep the room available for reconnects. */
+export const ROOM_LIFETIME_MS = 12 * 60 * 60 * 1000;
 
 export type Role = 'host' | 'join';
 
