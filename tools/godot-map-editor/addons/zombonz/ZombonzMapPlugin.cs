@@ -18,6 +18,7 @@ public partial class ZombonzMapPlugin : EditorPlugin
         _sourceInput = new LineEdit { Text = "../../src/maps/data/bunker.v1.json", TooltipText = "JSON file relative to the Godot project" };
         _controls.AddChild(_sourceInput);
         AddButton("Import map into scene", ImportMap);
+        AddButton("Refresh models and textures", RefreshPreview);
         _addKind = new OptionButton();
         foreach (var kind in MapScene.NewObjectKinds) _addKind.AddItem(kind);
         _controls.AddChild(_addKind);
@@ -87,9 +88,18 @@ public partial class ZombonzMapPlugin : EditorPlugin
         var root = OpenRoot();
         var kind = _addKind.GetItemText(_addKind.Selected);
         var item = MapScene.AddNew(root, OpenDocument(), kind);
+        MapPreview.Refresh(root, OpenDocument());
         EditorInterface.Singleton.EditNode(item);
         EditorInterface.Singleton.MarkSceneAsUnsaved();
         _message.Text = "Added " + kind + ". Set its ID and fields in the Inspector, then export.";
+    }
+
+    private void RefreshPreview()
+    {
+        var warnings = MapPreview.Refresh(OpenRoot(), OpenDocument());
+        EditorInterface.Singleton.MarkSceneAsUnsaved();
+        _message.Text = warnings.Count == 0 ? "Models and textures refreshed. Scene edits are preserved."
+            : "Preview incomplete:\n" + string.Join('\n', warnings.Take(8));
     }
 
     private void ValidateOpenMap()
