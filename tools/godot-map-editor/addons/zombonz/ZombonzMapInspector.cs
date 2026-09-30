@@ -48,7 +48,7 @@ public partial class ZombonzMapInspector : EditorInspectorPlugin
             nameof(ZombonzMapItem.WeaponId) or nameof(ZombonzMapItem.WeaponCost) or nameof(ZombonzMapItem.AmmoCost) => game != "wallWeapons",
             nameof(ZombonzMapItem.MaxBoards) or nameof(ZombonzMapItem.Outward) => game != "barriers",
             nameof(ZombonzMapItem.Width) => game is not ("barriers" or "doors"),
-            nameof(ZombonzMapItem.RequiresPower) => game is not ("doors" or "traps"),
+            nameof(ZombonzMapItem.RequiresPower) => game != "doors",
             nameof(ZombonzMapItem.DoorAppearance) or nameof(ZombonzMapItem.DoorLabel) => game != "doors",
             nameof(ZombonzMapItem.HazardKind) => game != "hazards",
             nameof(ZombonzMapItem.PerkId) => game != "perkMachines",

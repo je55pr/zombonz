@@ -11,6 +11,10 @@ public sealed class MapPreviewAssets
     private readonly Dictionary<string, PackedScene> _models = new();
     private readonly Dictionary<string, Texture2D> _textures = new();
     private readonly Dictionary<string, OrmMaterial3D> _materials = new();
+    // Keep managed wrappers alive while Godot reuses the corresponding native resources.
+    // Otherwise repeated refreshes can race .NET finalization of weak cached wrappers.
+    private static readonly Dictionary<string, Resource> SessionCache = new();
+    private static readonly HashSet<Resource> EmbeddedResources = new();
 
     public MapPreviewAssets()
     {
@@ -44,10 +48,37 @@ public sealed class MapPreviewAssets
 
     private static T LoadCached<T>(string path, bool fresh = false) where T : Resource
     {
+        if (!fresh && SessionCache.TryGetValue(path, out var cached)) return (T)cached;
         // The cache is ignored by the filesystem scanner; register its UIDs explicitly.
         var uid = ResourceLoader.GetResourceUid(path);
         if (uid != ResourceUid.InvalidId && !ResourceUid.HasId(uid)) ResourceUid.AddId(uid, path);
-        return ResourceLoader.Load<T>(path, cacheMode: fresh ? ResourceLoader.CacheMode.Ignore : ResourceLoader.CacheMode.Reuse);
+        var resource = ResourceLoader.Load<T>(path, cacheMode: fresh ? ResourceLoader.CacheMode.Ignore : ResourceLoader.CacheMode.Reuse);
+        SessionCache[path] = resource;
+        if (resource is PackedScene packed)
+        {
+            var sample = packed.Instantiate();
+            try { RetainEmbedded(sample); }
+            finally { sample.Free(); }
+        }
+        return resource;
+    }
+
+    private static void RetainEmbedded(Node node)
+    {
+        if (node is MeshInstance3D mesh && mesh.Mesh is not null)
+        {
+            EmbeddedResources.Add(mesh.Mesh);
+            if (mesh.Skin is not null) EmbeddedResources.Add(mesh.Skin);
+            for (var surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
+            {
+                if (mesh.GetActiveMaterial(surface) is not BaseMaterial3D material) continue;
+                EmbeddedResources.Add(material);
+                foreach (var slot in Enum.GetValues<BaseMaterial3D.TextureParam>().Where(slot => slot != BaseMaterial3D.TextureParam.Max))
+                    if (material.GetTexture(slot) is { } texture) EmbeddedResources.Add(texture);
+                if (material is OrmMaterial3D { OrmTexture: { } orm }) EmbeddedResources.Add(orm);
+            }
+        }
+        foreach (var child in node.GetChildren()) RetainEmbedded(child);
     }
 
     public PackedScene Model(string asset, bool rebuild = false, string category = "props")
@@ -75,6 +106,7 @@ public sealed class MapPreviewAssets
                 if (scene is null) throw new IOException("Empty model: " + asset);
                 try
                 {
+                    RetainEmbedded(scene);
                     Bounds(scene); // Never save an unusable model to the cache again.
                     using var packed = new PackedScene();
                     if (packed.Pack(scene) != Error.Ok) throw new IOException("Could not pack model: " + asset);
@@ -111,6 +143,7 @@ public sealed class MapPreviewAssets
         var root = create();
         try
         {
+            RetainEmbedded(root);
             void Own(Node node)
             {
                 node.SceneFilePath = "";

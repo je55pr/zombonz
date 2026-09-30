@@ -22,7 +22,12 @@ public partial class SmokeTest : Node
         var coldModel = assets.Model("wooden-table", rebuild: true).Instantiate<Node3D>();
         try { Require(MapPreviewAssets.Bounds(coldModel).Size.Length() > 0, "Cold model import has no renderable meshes"); }
         finally { coldModel.Free(); }
-        foreach (var id in new[] { "bunker", "asylum" }) CheckMap(id);
+        foreach (var id in new[] { "bunker", "asylum" })
+        {
+            // Exercise cached native resources after the previous map's managed wrappers are collected.
+            GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
+            CheckMap(id);
+        }
         Require(sourceFiles.SequenceEqual(System.IO.Directory.GetFiles(propsDirectory, "*", SearchOption.AllDirectories).Order()),
             "Preview import extracted new files into the browser's source assets");
         GD.Print("C# map editor (" + (Engine.IsEditorHint() ? "editor" : "runtime") + "): both maps load textured models and PBR surfaces, preserve previews after reopening, preserve untouched JSON, edit, add objects, and export through the browser validator.");
@@ -200,7 +205,7 @@ public partial class SmokeTest : Node
             var move = new Vector3(2, 0, 3);
             var door = Find("doors"); var blocker = door.GetChildren().OfType<ZombonzMapItem>().Single();
             var oldBlocker = MapGameplay.MapTransform(blocker).Origin;
-            door.Position += move; door.DoorLabel = "TEST"; door.Cost = 750;
+            door.Position += move; door.DoorLabel = "TEST"; door.Cost = 750; door.RequiresPower = true;
             var barrier = Find("barriers");
             var inside = barrier.GetChildren().OfType<ZombonzMapItem>().First(item => item.DataPath.EndsWith("/insidePoint"));
             var oldInside = MapGameplay.MapTransform(inside).Origin;
@@ -210,11 +215,13 @@ public partial class SmokeTest : Node
             var gun = Find("wallWeapons"); gun.Rotation += new Vector3(0, Mathf.Pi / 2, 0); gun.WeaponId = "mp40";
             var barrel = Find("hazards"); barrel.HazardKind = "jeep"; barrel.Rotation += new Vector3(0, 0.5f, 0);
             var mystery = Find("mysteryBoxes"); mystery.Position += move;
-            var pap = Find("packAPunch"); pap.Rotation += new Vector3(0, Mathf.Pi / 2, 0);
+            var pap = Find("packAPunch"); pap.Rotation += new Vector3(0, Mathf.Pi / 2, 0); pap.Cost = 4500;
             MapGameplay.Prepare(root, candidate); // Refresh/migration must not detach linked children or reset edits.
             Require(MapGameplay.MapTransform(blocker).Origin.IsEqualApprox(oldBlocker + move), "Door blocker did not follow its door");
             Require(MapGameplay.MapTransform(inside).Origin.IsEqualApprox(oldInside + move), "Barrier inside point did not follow its anchor");
             MapDocument.WalkItems(candidate, root);
+            Require(MapDocument.Boolean(candidate["gameplay"]!["doors"]![0]!["requiresPower"]), "Could not add a door's optional power requirement");
+            Require(MapDocument.Number(candidate["gameplay"]!["packAPunch"]![0]!["cost"]) == 4500, "Could not edit an optional Pack-a-Punch cost");
             Require(MapDocument.Vector(MapDocument.AtPath(candidate, inside.DataPath)).IsEqualApprox(oldInside + move), "Nested point export used local coordinates");
             Require(MapDocument.Vector(candidate["gameplay"]!["barriers"]![0]!["approachPath"]![0]).IsEqualApprox(oldRoute + move), "Approach route did not follow barrier");
             var window = MapDocument.Items((JsonObject)candidate["presentation"]!, "windows").First(item => MapDocument.Text(item?["id"]) == barrier.ObjectId);

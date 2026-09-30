@@ -39,6 +39,7 @@ public static class MapGameplay
                 item.PerkId = Text(fields["perk"], "juggernog");
                 item.Outward = fields["outward"] is null ? Vector3.Forward : Vector(fields["outward"]);
                 item.Width = (float)Number(fields["width"], 1.5);
+                if (type == "packAPunch" && fields["cost"] is null && item.Cost < 0) item.Cost = 5000;
                 if (type == "doors")
                 {
                     var style = document["presentation"]?["doorStyles"]?[Text(fields["id"])] as JsonObject;

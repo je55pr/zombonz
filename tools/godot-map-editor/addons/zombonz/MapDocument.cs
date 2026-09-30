@@ -87,11 +87,14 @@ public static class MapDocument
             true, item.GameplayType == "packAPunch");
         if (item.Kind == "prop" && parent["size"] is JsonObject propSize) SetPosition(propSize, size);
         SetField(parent, "cost", JsonValue.Create(item.Cost)!, item.Cost >= 0);
+        if (item.GameplayType == "packAPunch" && !parent.ContainsKey("cost") && item.Cost >= 0 && item.Cost != 5000)
+            parent["cost"] = item.Cost;
         SetField(parent, "weaponId", JsonValue.Create(item.WeaponId)!, item.WeaponId.Length > 0);
         SetField(parent, "weaponCost", JsonValue.Create(item.WeaponCost)!);
         SetField(parent, "ammoCost", JsonValue.Create(item.AmmoCost)!);
         SetField(parent, "maxBoards", JsonValue.Create(item.MaxBoards)!);
         SetField(parent, "requiresPower", JsonValue.Create(item.RequiresPower)!);
+        if (item.GameplayType == "doors" && !parent.ContainsKey("requiresPower") && item.RequiresPower) parent["requiresPower"] = true;
         SetField(parent, "asset", JsonValue.Create(item.Asset)!, item.Asset.Length > 0);
         if (item.GameplayType == "hazards") parent["kind"] = item.HazardKind;
         if (item.GameplayType == "perkMachines") parent["perk"] = item.PerkId;
