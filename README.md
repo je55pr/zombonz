@@ -18,7 +18,7 @@ Browser-based, round-driven co-op zombie survival game built with Three.js.
 ## Multiplayer direction
 
 - Player-hosted authoritative multiplayer, using WebRTC DataChannels for small co-op sessions, is playable now: players connect by swapping short copy-paste codes, with no server (see [online co-op](docs/networking.md)).
-- A tiny signalling service for short room codes, and TURN fallback where direct connectivity fails, are still to come.
+- A tiny signalling service for short room codes is implemented in [`server/`](server) and documented in [online co-op](docs/networking.md); TURN fallback where direct connectivity fails is still to come.
 - Gameplay/protocol code must not assume four players even if 1-4 is the first practical test target.
 - Large sessions such as 16/32/64 players are a later architecture/performance investigation and may require a server/relay topology rather than one browser maintaining a classic small-lobby host star.
 - Dedicated/headless hosting remains a later option rather than a requirement for the first playable.
