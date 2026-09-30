@@ -103,6 +103,7 @@ export function createZombieState(id: EntityId, position: Vec3, round: number, g
     attackTicks: 0,
     attackStyle: 0,
     stall: 0,
+    blow: 0,
     anchorX: position.x,
     anchorZ: position.z,
     alive: true,
@@ -315,22 +316,35 @@ function advanceSwing(zombie: ZombieState, players: readonly PlayerState[], targ
   if (zombie.attackTicks === 0) {
     if (!target || zombie.attackCooldownTicks > 0 || !reach(target, 'start')) return [];
     zombie.attackTicks = 1;
+    zombie.blow = 0;
     zombie.attackStyle = (zombie.attackStyle + 1) % 8;
     zombie.targetId = target.id;
     return [{ type: 'zombieSwung', zombieId: zombie.id, playerId: target.id }];
   }
   const events: Array<ZombieMeleeEvent | DamageEvent> = [];
-  if (zombie.attackTicks === timing.windupTicks) {
-    // The blow: at whoever it was after if they are still in reach, else anyone else who is.
-    const victims = players.filter(player => player.alive && !player.downed && reach(player, 'strike'))
-      .sort((a, b) => Number(b.id === zombie.targetId) - Number(a.id === zombie.targetId) || a.id.localeCompare(b.id));
-    const victim = victims[0];
-    if (victim) {
-      // Another zombie has just hit them: wait, arm out, until the moment has passed.
-      if (victim.hurtGraceTicks > 0) return events;
-      victim.hurtGraceTicks = ZOMBIE_MELEE.hurtGraceTicks;
-      events.push({ type: 'zombieAttacked', zombieId: zombie.id, playerId: victim.id, damage: ZOMBIE_MELEE.damage },
-        ...damagePlayer(victim, ZOMBIE_MELEE.damage));
+  // The blow has a window (issue #210), not one tick: the arm is coming down for a few ticks before contact and follows
+  // through for a few after, and whoever is in reach in that time is hit, at the moment of contact or as soon as they are.
+  const { beforeTicks, afterTicks } = ZOMBIE_MELEE.hitWindow, contact = timing.windupTicks, at = zombie.attackTicks;
+  if (zombie.blow !== 2 && at >= contact - beforeTicks && at <= contact + afterTicks) {
+    // At whoever it was after if they are still in reach, else anyone else who is.
+    let victim: PlayerState | undefined = players.filter(player => player.alive && !player.downed && reach(player, 'strike'))
+      .sort((a, b) => Number(b.id === zombie.targetId) - Number(a.id === zombie.targetId) || a.id.localeCompare(b.id))[0];
+    if (at < contact) {
+      // The arm is coming down on someone: the blow has them, if they are gone by the time it lands (see below).
+      if (victim) zombie.blow = 1;
+    } else {
+      if (!victim && at === contact && zombie.blow === 1) victim = players.find(player => player.id === zombie.targetId && player.alive && !player.downed);
+      if (victim) {
+        if (victim.hurtGraceTicks > 0) {
+          // Another zombie has just hit them: wait, arm out, until the moment has passed (and only while they are still in reach).
+          if (at === contact) { zombie.blow = 0; return events; }
+        } else {
+          victim.hurtGraceTicks = ZOMBIE_MELEE.hurtGraceTicks;
+          zombie.blow = 2;
+          events.push({ type: 'zombieAttacked', zombieId: zombie.id, playerId: victim.id, damage: ZOMBIE_MELEE.damage },
+            ...damagePlayer(victim, ZOMBIE_MELEE.damage));
+        }
+      }
     }
   }
   zombie.attackTicks += 1;

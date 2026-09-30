@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BODY_CONTACT, PLAYER_MOVEMENT, ZOMBIE_GAIT_SPEEDS, ZOMBIE_GIVE, ZOMBIE_PACE_SPREAD, addEntity, allocateEntityId,
-  WEDGE_DEPTH, ZOMBIE_MELEE, updateZombiePursuit, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, tickZombieMelee, type CollisionBox, type GameSimulation, type PlayerState, type ZombieState,
+  WEDGE_DEPTH, ZOMBIE_MELEE, swingTiming, updateZombiePursuit, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, tickZombieMelee, type CollisionBox, type GameSimulation, type PlayerState, type ZombieGait, type ZombieState,
 } from '../src/core/index.ts';
 import { frameFor, openGround, runChase, runCrowd, runRunUp } from '../src/bench/difficulty.ts';
 import { predictPlayerTick } from '../src/net/prediction.ts';
@@ -208,6 +208,88 @@ describe('a queue behind a fight', () => {
     const line = [zombie('e:2', -6), zombie('e:3', -6.58), zombie('e:4', -7.16)];
     separateZombies(line, [player], [], []);
     for (const body of line) expect(body.stall, body.id).toBe(179);
+  });
+});
+
+describe('a blow has a window, not one tick', () => {
+  const { beforeTicks, afterTicks } = ZOMBIE_MELEE.hitWindow;
+  /**
+   * One swing at a player 1 m in front of a zombie that does not move, or 2 m if the script says so: `z(offset)` is the
+   * player's distance on the swing tick `offset` ticks from the moment of contact (`elapsed` counts real ticks, which run on
+   * while a held arm's swing tick does not). Gives the offsets the blow landed on.
+   */
+  function swing(z: (offset: number, elapsed: number) => number, options: { grace?: number; gait?: ZombieGait; calls?: number[] } = {}): number[] {
+    const zombie = createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, options.gait ?? 'run');
+    zombie.yaw = 0;
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 1 });
+    const contact = swingTiming(zombie).windupTicks, landed: number[] = [];
+    // `grace` is how many ticks of another zombie's grace the player still has when the arm reaches contact.
+    player.hurtGraceTicks = options.grace === undefined ? 0 : contact + options.grace;
+    let swung = false;
+    for (let tick = 0; tick < 600; tick++) {
+      const ticks = zombie.attackTicks;
+      player.position.z = ticks === 0 ? 1 : z(ticks - contact, tick - contact);
+      if (player.hurtGraceTicks > 0 && ticks > 0) player.hurtGraceTicks -= 1;
+      const events = tickZombieMelee(zombie, [player]);
+      if (events.some(event => event.type === 'zombieAttacked')) { landed.push(ticks - contact); options.calls?.push(tick - contact); }
+      if (zombie.attackTicks > 0) swung = true;
+      else if (swung) break;
+      player.health = 100;
+    }
+    return landed;
+  }
+  const IN = 1, OUT = 2;
+
+  it('lands a standing player\'s blow at the moment of contact, once', () => {
+    expect(swing(() => IN)).toEqual([0]);
+  });
+
+  it('lands on a player who was in reach as the arm came down and has stepped out by contact', () => {
+    expect(swing(offset => offset < 0 ? IN : OUT)).toEqual([0]);
+    // In reach only on the last tick of the lead-in still counts.
+    expect(swing(offset => offset === -1 ? IN : OUT)).toEqual([0]);
+  });
+
+  it('misses a player who was out of reach for the whole window, however close they were before it', () => {
+    expect(swing(offset => offset < -beforeTicks ? IN : OUT)).toEqual([]);
+  });
+
+  it('lands on a player who comes into reach after contact, as soon as they do, until the window closes', () => {
+    // There is some follow-through (five ticks is a twelfth of a second), whatever the window is tuned to.
+    expect(swing(offset => offset < 5 ? OUT : IN), 'five ticks late').toEqual([5]);
+    for (let late = 1; late <= afterTicks; late++) expect(swing(offset => offset < late ? OUT : IN), `${late} ticks late`).toEqual([late]);
+    expect(swing(offset => offset < afterTicks + 1 ? OUT : IN), 'one tick past the window').toEqual([]);
+  });
+
+  it('is one blow a swing however long the player stays in reach', () => {
+    expect(swing(() => IN, { gait: 'sprint' })).toHaveLength(1);
+    expect(swing(() => IN, { gait: 'walk' })).toHaveLength(1);
+  });
+
+  it('is one blow a swing even with a second player in reach: it does not hit both', () => {
+    const zombie = createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, 'run');
+    zombie.yaw = 0;
+    const players = [createPlayerState('e:1', { x: 0, y: 0, z: 1 }), createPlayerState('e:3', { x: 0.2, y: 0, z: 1 })];
+    let blows = 0, swung = false;
+    for (let tick = 0; tick < 600; tick++) {
+      const landed = tickZombieMelee(zombie, players).filter(event => event.type === 'zombieAttacked').length;
+      blows += landed;
+      // The one who was hit backs away at once; the other stays where the arm is still coming through.
+      if (landed) players[0].position.z = 3;
+      for (const player of players) { if (player.hurtGraceTicks > 0) player.hurtGraceTicks -= 1; player.health = 100; }
+      if (zombie.attackTicks > 0) swung = true;
+      else if (swung) break;
+    }
+    expect(blows).toBe(1);
+  });
+
+  it('still waits, arm out, through another zombie\'s grace, and only while the player stays in reach', () => {
+    const calls: number[] = [];
+    expect(swing(() => IN, { grace: 20, calls })).toEqual([0]);
+    // Held at contact for the grace, then it lands: twenty ticks after contact, not at it.
+    expect(calls[0]).toBeGreaterThanOrEqual(19);
+    // Out of reach once the arm is held: the blow does not follow them.
+    expect(swing((_, elapsed) => elapsed < 3 ? IN : OUT, { grace: 20 })).toEqual([]);
   });
 });
 

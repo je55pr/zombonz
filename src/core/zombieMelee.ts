@@ -3,7 +3,7 @@ import type { ZombieGait, ZombieState } from './types.ts';
 
 /**
  * How a zombie's melee is paced and where it can reach (see docs/combat.md). A swing has a wind-up, at the end of which
- * the blow lands (if the target is still in reach), and a recovery, after which it may swing again. The client plays
+ * the blow lands (on whoever is in reach in the blow's window, see `hitWindow`), and a recovery, after which it may swing again. The client plays
  * the attack clip from the swing's own tick count, so what is drawn is what the rules are doing.
  *
  * WaW gives runners and sprinters faster attack animations than walkers ("New faster hit ... when running", in
@@ -32,6 +32,13 @@ export const ZOMBIE_MELEE = {
    */
   reach: { startRange: 1.1, strikeRange: 1.3 },
   crawlerReach: { startRange: 0.9, strikeRange: 1.1 },
+  /**
+   * The blow's window (issue #210): the blow lands at contact (`windupTicks` in) on someone in reach then, but also on someone
+   * who was in reach in the last `beforeTicks` of the arm coming down and has stepped out by contact, and on someone who
+   * comes into reach up to `afterTicks` after, as the arm follows through. A single-tick check missed blows that looked like
+   * they should land. Twelve ticks is a fifth of a second; a player who sidesteps is out of reach for all of it or is hit.
+   */
+  hitWindow: { beforeTicks: 4, afterTicks: 8 },
   /**
    * A zombie also starts its swing early, when the player, going at the speed and heading they have now, and the zombie,
    * still coming, will be within strike range as the blow lands (issue #210): otherwise a player who runs up to a zombie
