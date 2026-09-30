@@ -27,10 +27,10 @@ public sealed class MapPreviewAssets
         return resolved;
     }
 
-    private static string CachePath(string source, string extension)
+    private static string CachePath(string source, string extension, string recipe = "v1")
     {
         var hash = Convert.ToHexString(SHA256.HashData(System.IO.File.ReadAllBytes(source))).ToLowerInvariant();
-        return Cache + "v1-" + Engine.GetVersionInfo()["major"].AsInt32() + "-" + Engine.GetVersionInfo()["minor"].AsInt32()
+        return Cache + recipe + "-" + Engine.GetVersionInfo()["major"].AsInt32() + "-" + Engine.GetVersionInfo()["minor"].AsInt32()
             + "-" + Engine.GetVersionInfo()["patch"].AsInt32() + "-" + hash + extension;
     }
 
@@ -38,30 +38,42 @@ public sealed class MapPreviewAssets
     {
         var result = ResourceSaver.Save(resource, path, ResourceSaver.SaverFlags.Compress);
         if (result != Error.Ok) throw new IOException("Could not cache preview: " + result);
-        return ResourceLoader.Load<T>(path) ?? throw new IOException("Could not read cached preview: " + path);
+        return ResourceLoader.Load<T>(path, cacheMode: ResourceLoader.CacheMode.Ignore)
+            ?? throw new IOException("Could not read cached preview: " + path);
     }
 
-    public PackedScene Model(string asset)
+    public PackedScene Model(string asset, bool rebuild = false)
     {
-        if (_models.TryGetValue(asset, out var cached)) return cached;
+        if (!rebuild && _models.TryGetValue(asset, out var loaded)) return loaded;
+        PackedScene? cached;
         var source = PublicPath("/assets/props/" + asset + "/model.glb");
-        var path = CachePath(source, ".scn");
-        if (System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) cached = ResourceLoader.Load<PackedScene>(path);
+        // v1 editor caches contain ImporterMeshInstance3D nodes, which do not render.
+        var path = CachePath(source, ".scn", "v2");
+        if (!rebuild && System.IO.File.Exists(ProjectSettings.GlobalizePath(path))) cached = ResourceLoader.Load<PackedScene>(path);
         else
         {
             using var importer = new GltfDocument();
-            using var state = new GltfState();
-            var result = importer.AppendFromFile(source, state);
-            if (result != Error.Ok) throw new IOException($"Could not import {asset}: {result}");
-            var scene = importer.GenerateScene(state);
-            if (scene is null) throw new IOException("Empty model: " + asset);
+            using var state = new GltfState { HandleBinaryImageMode = GltfState.HandleBinaryImageModeEnum.EmbedAsUncompressed };
+            // Godot registers this conversion automatically at runtime, but not in the editor.
+            // Scope it to our import so the editor's regular asset-import pipeline is unaffected.
+            using var converter = new GltfDocumentExtensionConvertImporterMesh();
+            GltfDocument.RegisterGltfDocumentExtension(converter);
             try
             {
-                using var packed = new PackedScene();
-                if (packed.Pack(scene) != Error.Ok) throw new IOException("Could not pack model: " + asset);
-                cached = Save(packed, path);
+                var result = importer.AppendFromFile(source, state);
+                if (result != Error.Ok) throw new IOException($"Could not import {asset}: {result}");
+                var scene = importer.GenerateScene(state);
+                if (scene is null) throw new IOException("Empty model: " + asset);
+                try
+                {
+                    Bounds(scene); // Never save an unusable model to the cache again.
+                    using var packed = new PackedScene();
+                    if (packed.Pack(scene) != Error.Ok) throw new IOException("Could not pack model: " + asset);
+                    cached = Save(packed, path);
+                }
+                finally { scene.Free(); }
             }
-            finally { scene.Free(); }
+            finally { GltfDocument.UnregisterGltfDocumentExtension(converter); }
         }
         return _models[asset] = cached ?? throw new IOException("Invalid model cache: " + asset);
     }
@@ -124,7 +136,7 @@ public sealed class MapPreviewAssets
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
     }
 
-    public static Aabb Bounds(Node3D model)
+    public static Aabb Bounds(Node model)
     {
         Aabb? bounds = null;
         void Visit(Node node, Transform3D transform)

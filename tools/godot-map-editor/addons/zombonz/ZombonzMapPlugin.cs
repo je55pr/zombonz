@@ -34,6 +34,12 @@ public partial class ZombonzMapPlugin : EditorPlugin
         AddDock(_dock);
         _inspector = new ZombonzMapInspector();
         AddInspectorPlugin(_inspector);
+        // Opt-in CLI check executes imports in the same editor context as the dock buttons.
+        if (OS.GetEnvironment("ZOMBONZ_EDITOR_SMOKE_TEST") == "1")
+        {
+            try { SmokeTest.RunChecks(); }
+            catch (Exception error) { GD.PushError(error.ToString()); }
+        }
     }
 
     public override void _ExitTree()
