@@ -61,6 +61,10 @@ jobs:
         run: npm run build
         env:
           VITE_BUILD_ID: ${{ github.sha }}
+          VITE_STUN_URLS: ${{ vars.VITE_STUN_URLS }}
+          VITE_TURN_URLS: ${{ vars.VITE_TURN_URLS }}
+          VITE_TURN_USERNAME: ${{ secrets.TURN_USERNAME }}
+          VITE_TURN_CREDENTIAL: ${{ secrets.TURN_CREDENTIAL }}
 
       - name: Deploy to Cloudflare
         uses: cloudflare/wrangler-action@v4

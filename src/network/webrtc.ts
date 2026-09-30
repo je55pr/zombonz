@@ -1,12 +1,14 @@
 import { CodeError, buildSdp, decodeSession, encodeSession, parseSdp } from './codes.ts';
+import { ICE_SERVERS, connectivityFailure } from './ice.ts';
 import { Listeners, type PeerLink } from './link.ts';
 import type { DeliveryClass, TransportPayload } from './transport.ts';
 
+export { ICE_SERVERS } from './ice.ts';
+
 /**
- * Browser-to-browser links set up by copy-paste codes, with no server of our own. Public STUN servers
- * tell each browser its internet-facing address; players on one home network don't even need those.
+ * Browser-to-browser links set up by copy-paste codes, with no server of our own. ICE servers come from deployment
+ * configuration: STUN discovers public addresses, while an optional TURN server relays traffic when direct paths fail.
  */
-export const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }];
 const GATHER_TIMEOUT_MS = 4000;
 
 /**
@@ -222,8 +224,8 @@ export function linkWhenOpen(pc: RTCPeerConnection, channels: ReturnType<typeof 
   });
 }
 
-const HOST_FAILURE = 'Could not connect. Your friend has to be counting down to the same moment, and one of the networks may be blocking direct connections. Make a new invite and try again.';
-const JOIN_FAILURE = 'Could not connect. The host has to paste your reply and press Connect before your countdown ends; if they did, one of the networks may be blocking direct connections. Make a new reply code and try again.';
+const HOST_FAILURE = `${connectivityFailure('host')} Your friend also has to be counting down to the same moment. Make a new invite and try again.`;
+const JOIN_FAILURE = `${connectivityFailure('join')} Make a new reply code and try again.`;
 
 export async function createInvite(): Promise<PendingInvite> {
   const log = new ConnectionLog();

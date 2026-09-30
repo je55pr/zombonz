@@ -44,9 +44,12 @@ jobs:
         run: npm run build:pages
         env:
           VITE_BUILD_ID: ${{ github.sha }}
-          # Optional: a repository variable holding the address of a game server (docs/server-setup.md), so this copy uses rooms too.
-          # Unset, this copy has none and players connect with codes.
+          # Optional deployment networking settings (docs/server-setup.md).
           VITE_SIGNAL_URL: ${{ vars.VITE_SIGNAL_URL }}
+          VITE_STUN_URLS: ${{ vars.VITE_STUN_URLS }}
+          VITE_TURN_URLS: ${{ vars.VITE_TURN_URLS }}
+          VITE_TURN_USERNAME: ${{ secrets.TURN_USERNAME }}
+          VITE_TURN_CREDENTIAL: ${{ secrets.TURN_CREDENTIAL }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
