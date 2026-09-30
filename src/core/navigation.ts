@@ -164,6 +164,9 @@ export class NavigationField {
     this.queue = new Int32Array(count);
   }
 
+  /** Whether the graph has gained or lost nodes since this field was built (real maps never do; a test or tool might). */
+  get stale(): boolean { return this.nodes.length !== this.links.length; }
+
   /** Whether this field was built for these very walls, radius and floors. */
   matches(fixed: readonly CollisionBox[], radius: number, surfaces: readonly WalkSurface[]): boolean {
     return radius === this.radius && surfaces === this.surfaces && fixed.length === this.fixed.length
@@ -323,7 +326,7 @@ export function navigationFieldFor(graph: NavigationGraph | undefined, fixed: re
   surfaces: readonly WalkSurface[]): NavigationField {
   if (!graph) return new NavigationField(graph, fixed, radius, surfaces);
   let field = fields.get(graph);
-  if (!field?.matches(fixed, radius, surfaces)) { field = new NavigationField(graph, fixed, radius, surfaces); fields.set(graph, field); }
+  if (!field || field.stale || !field.matches(fixed, radius, surfaces)) { field = new NavigationField(graph, fixed, radius, surfaces); fields.set(graph, field); }
   return field;
 }
 

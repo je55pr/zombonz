@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CollisionIndex, closedDoorBlockers, createDoorState, createNavigationQuery, hasClearNavigationLine, moveWithCollision,
-  navigationFieldFor, resetWork, work, type CollisionBox, type Vec3,
+  navigationFieldFor, resetWork, work, type CollisionBox, type Vec3, type WalkSurface,
 } from '../src/core/index.ts';
 import { ASYLUM_MAP } from '../src/maps/asylum.ts';
 import { BUNKER_MAP } from '../src/maps/bunker.ts';
@@ -73,6 +73,21 @@ describe('the indexed navigation gives the answers of a scan of everything', () 
     for (const [from, to] of [['spawn', 'power-north'], ['german-stair-foot', 'kitchen-north'], ['american-south-a', 'left-upstairs-west']]) {
       expect(fast(byId.get(from)!, byId.get(to)!)).toBe(reference(byId.get(from)!, byId.get(to)!));
     }
+  });
+});
+
+describe('the shared navigation field', () => {
+  it('is made again if the graph it was made for gains a node', () => {
+    const nodes = [{ id: 'a', position: { x: 0, y: 0, z: 0 }, neighbors: ['b'] }, { id: 'b', position: { x: 4, y: 0, z: 0 }, neighbors: ['a'] }];
+    const graph = { nodes };
+    const wall: CollisionBox[] = [{ min: { x: 1.8, y: 0, z: -9 }, max: { x: 2.2, y: 3, z: 9 } }];
+    const floors: WalkSurface[] = [];
+    const first = navigationFieldFor(graph, wall, 0.32, floors);
+    expect(navigationFieldFor(graph, wall, 0.32, floors)).toBe(first);
+    nodes.push({ id: 'c', position: { x: 0, y: 0, z: 9.5 }, neighbors: [] });
+    const second = navigationFieldFor(graph, wall, 0.32, floors);
+    expect(second).not.toBe(first);
+    expect(second.stale).toBe(false);
   });
 });
 
