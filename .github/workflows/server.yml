@@ -1,0 +1,57 @@
+name: Deploy game server
+
+# Every push to dev publishes the game and its room server to Cloudflare (docs/server-setup.md), once the typecheck and tests pass.
+# It does nothing until you turn it on: set the repository variable DEPLOY_SERVER to true, and add the repository secrets
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. A fork without them skips it.
+# To roll back, re-run this workflow from the Actions tab on an earlier dev commit (or run `npx wrangler rollback`); the build ID
+# on the F2 screen, and in Multiplayer > Test my connection, shows what is live.
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deployment at a time; a newer push waits for one in progress rather than cancelling it.
+concurrency:
+  group: server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ vars.DEPLOY_SERVER == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use pinned Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build the game for the server
+        run: npm run build
+        env:
+          VITE_BUILD_ID: ${{ github.sha }}
+
+      - name: Deploy to Cloudflare
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # The Wrangler version this was set up and tried with; change it when you want to.
+          wranglerVersion: '4.144.0'
+          command: deploy
