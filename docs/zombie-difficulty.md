@@ -45,15 +45,23 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
   zombie touching others that are swinging, or that are against a player, has its stall count restarted; a jam with no
   fighter in it (zombies wedged on a corner) recovers as before.
 
+- **Zombies keep coming while they swing** (`updateZombiePursuit`). They used to halt within 1.1 m and plant their feet to
+  swing, stopping short of a player they could have reached. A zombie now closes on its target through the wind-up and the
+  recovery, and stops only when it touches them (`ARRIVED`), so it never pushes them along. Three things follow: a zombie
+  that is mid-swing is not counted as stalled (it is busy, not stuck); one swinging on the spot holds its ground while one
+  swinging on the move is jostled like any other; and separation now runs as up to four passes (stopping as soon as nothing
+  is more than 5 mm off), because a queue pressing on a zombie that holds its ground could not be settled in one.
 - **Zombies read where you are going** (`willConnect` in `tickZombieMelee`, `ZOMBIE_MELEE.anticipation`). A zombie also
-  starts its swing when the player, at the speed and heading they have now, will be in strike range as the blow lands, so it
-  begins 3 m or so out for a player running at it and the blow arrives with them. It looks at most 2 m of their travel ahead,
-  and only at a player moving at 0.5 m/s or more who is in front of it. It stands its ground to swing, so a player who stops
-  short, turns off or backs away once it has begun is missed, and turning away early (at 2.5 m in the table below) dodges it.
+  starts its swing when the player, at the speed and heading they have now, and it, still coming, will be within strike range
+  as the blow lands, so it begins about 3 m out for a player running at it and the blow arrives with them. It looks at most
+  2 m of the two's travel ahead and only at a player in front of it. A player who stops short, turns off or backs away once it
+  has begun is missed if that takes them out of reach; a zombie is committed by then and still closing, so a feint has to be
+  made before the swing begins (4 m out in the table below), not after.
 
 Not changed: round sizes, zombie health, the spawn interval and the 24-alive cap (all ported from WaW/BO1, and solo and
-co-op scale as before: each extra player adds a full share to a round), the gait roll by round, the melee timings (only when a swing may start changed), damage
-(50 a blow) and the half-second grace after a blow.
+co-op scale as before: each extra player adds a full share to a round), the gait roll by round, the melee timings (only
+when a swing may start, and whether the zombie moves during it, changed), damage (50 a blow) and the half-second grace
+after a blow.
 
 ## The numbers
 
@@ -82,26 +90,29 @@ taken (with the player unkillable, so a run that is stopped keeps taking them) a
 | Zombies in the group | 1 | 2 | 3 | 6 | 12 |
 | --- | --- | --- | --- | --- | --- |
 | straight through, before | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 |
-| straight through, after | 0.0 / 6 | 0.0 / 6 | 13.8 / 0 | 14.0 / 0 | 14.0 / 0 |
-| steering round, before and after | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 |
+| straight through, after | 0.0 / 6 | 1.0 / 6 | 14.0 / 0 | 14.0 / 0 | 14.0 / 0 |
+| steering round, before | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 | 0.0 / 6 |
+| steering round, after | 0.0 / 6 | 0.0 / 6 | 0.7 / 6 | 1.0 / 6 | 1.0 / 6 |
 
-Read as: one or two zombies can be run round; three side by side (bodies 1.1 m apart, so no gap a player fits) are a wall,
-and running into one is a dead stop under blows (14 in eight seconds; in a real game two put the player down). The way round
-stays open. That is the shape asked for: running through a crowd is no longer free, and a player with good movement still
+Read as: one or two zombies can be run past (two cost a blow); three side by side (bodies 1.1 m apart, so no gap a player
+fits) are a wall, and running into one is a dead stop under blows (14 in eight seconds; in a real game two put the player
+down). The way round stays open, but a player who steers close round a whole group now takes a blow, at most one, where
+before it was free. That is the shape asked for: running through a crowd is no longer free, and a player with good movement still
 creates space and trains a horde.
 
 **Running up to a sprinter and away again** (`runRunUp`): the player runs at one coming for them, turns at the distance
 shown and runs the other way; blows taken per run (mean of six tempos), and how far off the zombie began its swing.
 
-| Player turns at | 0.7 m (touching) | 1.5 m | 2.5 m |
+| Player turns at | 0.7 m (touching) | 2.5 m | 4 m |
 | --- | --- | --- | --- |
-| walking, before | 0.0, swing at 1.2 m | 0.0, 1.1 m | 0.0, 1.1 m |
-| walking, after | 1.0, swing at 3.2 m | 0.5, 3.2 m | 0.0, 3.2 m |
-| sprinting, before | 0.0, swing at 1.2 m | 0.0, 1.2 m | 0.0, 1.1 m |
+| walking, before | 0.0, swing at 1.2 m | 0.0, 1.1 m | 0.0, no swing |
+| walking, after | 1.3, swing at 3.3 m | 1.0, 3.3 m | 0.0, 3.3 m |
+| sprinting, before | 0.0, swing at 1.2 m | 0.0, 1.1 m | 0.0, no swing |
 | sprinting, after | 1.0, swing at 3.4 m | 1.0, 3.4 m | 0.0, 3.4 m |
 
-So running right up is punished (one blow, which is half a life), a feint turned away at 2.5 m still dodges it, and in
-between depends on how quickly the player can reverse.
+So running right up is punished (a blow, which is half a life; a walker gets a second as it follows), and a player who turns
+after the swing has begun is caught too, because the zombie is committed and still closing. Turning away at 4 m, before it
+begins, dodges it (and the zombie swings at nothing).
 
 ## Tuning it by feel
 
@@ -111,12 +122,15 @@ between depends on how quickly the player can reverse.
 | `ZOMBIE_PACE_SPREAD` | 0.08 | How strung out a horde gets; 0 makes every zombie of a gait identical. |
 | `ZOMBIE_GIVE` | 0.3 | How much a free zombie yields to a shoulder; 0 makes every zombie a wall. |
 | `WEDGE_DEPTH` | 0.05 m | How deep in the bodies round them a player is before they are stopped where they were. |
-| `ZOMBIE_MELEE.anticipation` | 2 m, 0.5 m/s | How far ahead of a moving player a zombie will start its swing (raise `maxLeadMetres` and it starts from further out and catches more feints). |
+| `ZOMBIE_MELEE.anticipation` | 2 m | How far ahead a zombie reads (the two's travel while it winds up): it never starts a swing from further out than reach plus this, about 3.3 m. Raise it and it swings from further out and catches more feints. |
+| `ARRIVED` | touching plus 4 cm | How near a zombie gets before it stops closing on its target. |
 | rest of `ZOMBIE_MELEE` (`zombieMelee.ts`) | unchanged | Wind-ups, recoveries, reach, arcs and the hurt grace: how long a player in contact survives. |
 
 `npm run difficulty` recomputes the tables above; the tests in `test/zombie-difficulty.test.ts` will say which claim a
 change breaks (walking must always outpace the fastest zombie a horde can hold, a group of three or more must stop a
-straight run, steering round must stay free, running right up to a zombie must connect, and turning away early must dodge).
+straight run, steering round must cost at most a blow, running right up to a zombie must connect, and turning away before
+its swing begins must dodge; a zombie must keep coming while it swings, not be counted stuck, and not merge into the ones
+beside it).
 
 ## Not covered
 

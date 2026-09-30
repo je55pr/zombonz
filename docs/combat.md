@@ -100,12 +100,15 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
 - **Reach is real.** A swing starts within 1.1 m across the floor (0.9 m for a crawler) and a blow still lands out to 1.3 m,
   the lunge a player can step back out of; the target must be on the same floor (within 0.9 m) with nothing solid between
   their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
-  zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). A zombie stands its ground to swing, so the blow
-  is aimed where the player was, and a player who steps back out of reach in the wind-up is missed.
-- **A zombie reads where the player is going** (issue #210). It also starts a swing when the player, at the speed and heading
-  they have now, will be in strike range as the wind-up ends (looking at most 2 m of their travel ahead, for a player moving
-  at 0.5 m/s or more), so one who runs up to a zombie is hit as they arrive rather than getting in and out untouched. One who
-  stops short, turns off or backs away once it has begun is missed, and so is one who turns away early enough.
+  zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). The blow is aimed where the player is when it lands,
+  so a player who steps back out of reach in the wind-up is missed.
+- **A zombie keeps coming while it swings, and reads where the player is going** (issue #210). A swing is a lunge on the move,
+  not a halt: the zombie closes on the player through the wind-up and the recovery, and stops only when it touches them (it
+  never pushes them along). It also starts a swing when the player, at the speed and heading they have now, and it, still
+  coming, will be within strike range as the wind-up ends (looking at most 2 m of their travel between them ahead), so it
+  begins about 3 m out for a player running at it and the blow arrives with them, rather than the player getting in and out
+  untouched. A player who stops short, turns off or backs away once it has begun is missed if that takes them out of reach;
+  one who turns away before it begins is not swung at.
 - **Windows.** A zombie tearing boards swipes once a board is gone, at a player inside within 1 m of the window plane and
   no farther to the side than the opening plus 0.3 m: an arm's length through the gap, not the length of the room. It stops
   tearing while it swings, a crawler cannot swipe at all, and a swing is dropped if the window is rebuilt first.
