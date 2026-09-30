@@ -13,6 +13,10 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
    zombie out of a ring round the player instead, so the player shouldered through a group at full speed. A swing needs a
    wind-up and a strike reach of 1.3 m, and a player moving at 6 m/s is out of reach before it lands.
 
+3. **Running up to a zombie and away again cost nothing.** A swing only began within 1.1 m, and its blow lands 22 to 42
+   ticks later where the player *was*, so a player who ran at a zombie and turned away was out of the 1.3 m strike range
+   before it landed. Training zombies that way never got hit.
+
 ## What changed
 
 - **Sprinters are 3.6 m/s, not 4.1** (six sevenths of the player's walk). Walking away from any zombie now opens a gap;
@@ -41,8 +45,14 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
   zombie touching others that are swinging, or that are against a player, has its stall count restarted; a jam with no
   fighter in it (zombies wedged on a corner) recovers as before.
 
+- **Zombies read where you are going** (`willConnect` in `tickZombieMelee`, `ZOMBIE_MELEE.anticipation`). A zombie also
+  starts its swing when the player, at the speed and heading they have now, will be in strike range as the blow lands, so it
+  begins 3 m or so out for a player running at it and the blow arrives with them. It looks at most 2 m of their travel ahead,
+  and only at a player moving at 0.5 m/s or more who is in front of it. It stands its ground to swing, so a player who stops
+  short, turns off or backs away once it has begun is missed, and turning away early (at 2.5 m in the table below) dodges it.
+
 Not changed: round sizes, zombie health, the spawn interval and the 24-alive cap (all ported from WaW/BO1, and solo and
-co-op scale as before: each extra player adds a full share to a round), the gait roll by round, the melee timings, damage
+co-op scale as before: each extra player adds a full share to a round), the gait roll by round, the melee timings (only when a swing may start changed), damage
 (50 a blow) and the half-second grace after a blow.
 
 ## The numbers
@@ -80,6 +90,19 @@ and running into one is a dead stop under blows (14 in eight seconds; in a real 
 stays open. That is the shape asked for: running through a crowd is no longer free, and a player with good movement still
 creates space and trains a horde.
 
+**Running up to a sprinter and away again** (`runRunUp`): the player runs at one coming for them, turns at the distance
+shown and runs the other way; blows taken per run (mean of six tempos), and how far off the zombie began its swing.
+
+| Player turns at | 0.7 m (touching) | 1.5 m | 2.5 m |
+| --- | --- | --- | --- |
+| walking, before | 0.0, swing at 1.2 m | 0.0, 1.1 m | 0.0, 1.1 m |
+| walking, after | 1.0, swing at 3.2 m | 0.5, 3.2 m | 0.0, 3.2 m |
+| sprinting, before | 0.0, swing at 1.2 m | 0.0, 1.2 m | 0.0, 1.1 m |
+| sprinting, after | 1.0, swing at 3.4 m | 1.0, 3.4 m | 0.0, 3.4 m |
+
+So running right up is punished (one blow, which is half a life), a feint turned away at 2.5 m still dodges it, and in
+between depends on how quickly the player can reverse.
+
 ## Tuning it by feel
 
 | Constant | Now | What it does |
@@ -88,11 +111,12 @@ creates space and trains a horde.
 | `ZOMBIE_PACE_SPREAD` | 0.08 | How strung out a horde gets; 0 makes every zombie of a gait identical. |
 | `ZOMBIE_GIVE` | 0.3 | How much a free zombie yields to a shoulder; 0 makes every zombie a wall. |
 | `WEDGE_DEPTH` | 0.05 m | How deep in the bodies round them a player is before they are stopped where they were. |
-| `ZOMBIE_MELEE` (`zombieMelee.ts`) | unchanged | Wind-ups, recoveries, reach, arcs and the hurt grace: how long a player in contact survives. |
+| `ZOMBIE_MELEE.anticipation` | 2 m, 0.5 m/s | How far ahead of a moving player a zombie will start its swing (raise `maxLeadMetres` and it starts from further out and catches more feints). |
+| rest of `ZOMBIE_MELEE` (`zombieMelee.ts`) | unchanged | Wind-ups, recoveries, reach, arcs and the hurt grace: how long a player in contact survives. |
 
 `npm run difficulty` recomputes the tables above; the tests in `test/zombie-difficulty.test.ts` will say which claim a
 change breaks (walking must always outpace the fastest zombie a horde can hold, a group of three or more must stop a
-straight run, and steering round must stay free).
+straight run, steering round must stay free, running right up to a zombie must connect, and turning away early must dodge).
 
 ## Not covered
 

@@ -102,6 +102,10 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
   their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
   zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). A zombie stands its ground to swing, so the blow
   is aimed where the player was, and a player who steps back out of reach in the wind-up is missed.
+- **A zombie reads where the player is going** (issue #210). It also starts a swing when the player, at the speed and heading
+  they have now, will be in strike range as the wind-up ends (looking at most 2 m of their travel ahead, for a player moving
+  at 0.5 m/s or more), so one who runs up to a zombie is hit as they arrive rather than getting in and out untouched. One who
+  stops short, turns off or backs away once it has begun is missed, and so is one who turns away early enough.
 - **Windows.** A zombie tearing boards swipes once a board is gone, at a player inside within 1 m of the window plane and
   no farther to the side than the opening plus 0.3 m: an arm's length through the gap, not the length of the room. It stops
   tearing while it swings, a crawler cannot swipe at all, and a swing is dropped if the window is rebuilt first.
