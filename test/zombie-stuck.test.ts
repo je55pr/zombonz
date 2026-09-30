@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CONTACT, GameSimulation, STALL, ZOMBIE_MELEE, ZOMBIE_MOVEMENT, addEntity, allocateEntityId, createNavigationQuery, createPlayerState,
+  CONTACT, GameSimulation, STALL, ZOMBIE_MELEE, ZOMBIE_MOVEMENT, ZOMBIE_SPACING, addEntity, allocateEntityId, createNavigationQuery, createPlayerState,
   createZombieEntry, createZombieState, freeSpotNear, hasClearNavigationLine, moveWithCollision, pushOutOfBoxes, separateZombies, trackZombieProgress,
   updateZombiePursuit, resetWork, work, type CollisionBox, type NavigationGraph, type PlayerState, type Vec3, type WalkSurface, type ZombieState,
 } from '../src/core/index.ts';
@@ -151,14 +151,14 @@ describe('a crowd pressed against a wall', () => {
     // b is on the open side (west) of a, which is against the wall: a cannot go east, so b must go further west.
     separateZombies([a, b], [], boxes, surfaces);
     expect(a.position.x).toBe(face);
-    expect(Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z)).toBeGreaterThanOrEqual(R * 2 * 0.9 - 1e-9);
+    expect(Math.hypot(a.position.x - b.position.x, a.position.z - b.position.z)).toBeGreaterThanOrEqual(ZOMBIE_SPACING - 1e-9);
   });
 
   it('still pushes two free zombies apart half each', () => {
     const a = createZombieState('e:2', { x: 5, y: 0, z: 5 }, 1), b = createZombieState('e:3', { x: 5.2, y: 0, z: 5 }, 1);
     separateZombies([a, b], [], boxes, surfaces);
-    expect(a.position.x).toBeCloseTo(5 - (R * 1.8 - 0.2) / 2);
-    expect(b.position.x).toBeCloseTo(5.2 + (R * 1.8 - 0.2) / 2);
+    expect(a.position.x).toBeCloseTo(5 - (ZOMBIE_SPACING - 0.2) / 2);
+    expect(b.position.x).toBeCloseTo(5.2 + (ZOMBIE_SPACING - 0.2) / 2);
   });
 
   it('all get past the wall to the player, none left standing against it', () => {

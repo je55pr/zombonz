@@ -423,6 +423,13 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
   return { engaged: zombie.attackTicks > 0 || target !== null, events };
 }
 
+/**
+ * How far apart zombies keep their middles, in metres: a little more than a body's width (0.64), so a swarm takes up more room
+ * and does not pack into a knot. It was 0.58 (bodies overlapping a tenth); the wider it is, the wider a horde stands round its
+ * target and the further it strings out behind a player.
+ */
+export const ZOMBIE_SPACING = 0.72;
+
 /** How far apart a player's middle and a zombie's are when their bodies touch. */
 export const BODY_CONTACT = PLAYER_MOVEMENT.radius + ZOMBIE_MOVEMENT.radius;
 /** A zombie this near its target has got to them and stops closing (a step from touching). */
@@ -501,7 +508,7 @@ function pushPlayerOut(player: PlayerState, zombies: readonly ZombieState[], box
  */
 export function separateZombies(zombies: readonly ZombieState[], players: readonly PlayerState[],
   boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[], solids?: CollisionIndex): void {
-  const gap = ZOMBIE_MOVEMENT.radius * 2 * 0.9, playerGap = BODY_CONTACT;
+  const gap = ZOMBIE_SPACING, playerGap = BODY_CONTACT;
   /** Pushes a zombie, walls permitting, and says how far along the push it got. */
   const shove = (zombie: ZombieState, dx: number, dz: number): number => {
     const delta = { x: dx, y: 0, z: dz };

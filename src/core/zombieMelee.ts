@@ -30,8 +30,8 @@ export const ZOMBIE_MELEE = {
    * Farthest across the floor, in metres, a swing may start from and a blow still lands from; the difference is the
    * lunge a player can step back out of. Crawlers reach less far.
    */
-  reach: { startRange: 1.1, strikeRange: 1.3 },
-  crawlerReach: { startRange: 0.9, strikeRange: 1.1 },
+  reach: { startRange: 1.1, strikeRange: 1.5 },
+  crawlerReach: { startRange: 0.9, strikeRange: 1.3 },
   /**
    * The blow's window (issue #210): the blow lands at contact (`windupTicks` in) on someone in reach then, but also on someone
    * who was in reach in the last `beforeTicks` of the arm coming down and has stepped out by contact, and on someone who
@@ -53,7 +53,7 @@ export const ZOMBIE_MELEE = {
   startArc: 0.9,
   strikeArc: 1.3,
   /** After a blow lands the player is safe from every other zombie's for this many ticks, so a group's blows come one at a time. */
-  hurtGraceTicks: 30,
+  hurtGraceTicks: 18,
 } as const;
 
 export interface SwingTiming {

@@ -82,9 +82,9 @@ describe('a zombie’s melee cadence', () => {
       const { blows, downedAt } = untilDown(2, gait);
       expect(blows.length, gait).toBe(2);
       expect(blows[1] - blows[0], gait).toBeGreaterThanOrEqual(ZOMBIE_MELEE.hurtGraceTicks);
-      // The first blow only lands after a wind-up, and the second after the grace: over a second even for sprinters.
+      // The first blow only lands after a wind-up, and the second after the grace: two thirds of a second even for sprinters.
       expect(downedAt, gait).toBeGreaterThanOrEqual(ZOMBIE_MELEE.swing[gait].windupTicks + ZOMBIE_MELEE.hurtGraceTicks);
-      expect(downedAt, gait).toBeGreaterThan(50);
+      expect(downedAt, gait).toBeGreaterThan(40);
     }
   });
 
@@ -178,8 +178,8 @@ describe('a blow needs a real chance to land', () => {
     expect(zombie.attackTicks).toBe(0);
   });
 
-  it('is measured across the floor: a zombie 1.05 m off starts a swing, one 1.4 m off walks closer first', () => {
-    const near = ring(1, 'walk', 1.05), far = ring(1, 'walk', 1.4);
+  it('is measured across the floor: a zombie 1.05 m off starts a swing, one 1.7 m off walks closer first', () => {
+    const near = ring(1, 'walk', 1.05), far = ring(1, 'walk', 1.7);
     near.zombies[0].moveSpeed = 0; far.zombies[0].moveSpeed = 0;
     near.sim.tick(); far.sim.tick();
     expect(near.zombies[0].attackTicks).toBeGreaterThan(0);
