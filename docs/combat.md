@@ -97,7 +97,7 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
   zombie's own tempo adds up to 12 ticks to the wind-up and 10 to the recovery, fixed by its id, so a group never swings in step.
 - **The client plays the attack clip from the swing's tick count** (`attackClipTime`), so the arm comes down on the tick the
   blow lands, and the head and arms the hit volumes use are where they are drawn. The zombie grunts as it starts.
-- **Reach is real.** A swing starts within 1.1 m across the floor (0.9 m for a crawler) and a blow still lands out to 1.3 m,
+- **Reach is real.** A swing starts within 1.1 m across the floor (0.9 m for a crawler) and a blow still lands out to 1.5 m (1.3 for a crawler),
   the lunge a player can step back out of; the target must be on the same floor (within 0.9 m) with nothing solid between
   their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
   zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). The blow is aimed where the player is when it lands,
@@ -117,11 +117,11 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
 - **Windows.** A zombie tearing boards swipes once a board is gone, at a player inside within 1 m of the window plane and
   no farther to the side than the opening plus 0.3 m: an arm's length through the gap, not the length of the room. It stops
   tearing while it swings, a crawler cannot swipe at all, and a swing is dropped if the window is rebuilt first.
-- **Blows come one at a time.** A landed blow gives the player 30 ticks (0.5 s) of grace against every other zombie; a
+- **Blows come one at a time.** A landed blow gives the player 18 ticks (0.3 s) of grace against every other zombie; a
   blow that arrives in the grace waits, its arm out, until it has passed. So a crowd's blows are spaced, and someone hit
   once can step away, shoot or knife before the second.
 - **Zombies do not stand inside each other or the player, and the player cannot walk through them.** Each tick, pairs closer
-  than their bodies (0.58 m) are pushed apart (all of it for the one free to move, when the other is mid-swing or coming
+  than ZOMBIE_SPACING (0.72 m, a little over a body's 0.64 width) are pushed apart (all of it for the one free to move, when the other is mid-swing or coming
   through a window), and the walls still hold. A crowd spreads round its target. A player is stopped by a zombie's body
   (0.66 m from its middle) and slides round it; a swinging zombie holds its ground, a free one gives way a little. Zombies
   queued behind a fight are not taken for stuck. See [zombie difficulty](zombie-difficulty.md) (issue #210).
@@ -133,9 +133,9 @@ the player standing still and the zombies arriving together (`test/zombie-melee.
 | Zombies | Walker: first blow / down | Runner | Sprinter |
 | --- | --- | --- | --- |
 | 1 | 47 / 158 (2.6 s) | 35 / 122 (2.0 s) | 27 / 98 (1.6 s) |
-| 2 | 47 / 77 (1.3 s) | 35 / 65 (1.1 s) | 27 / 57 (0.9 s) |
-| 4 | 47 / 77 (1.3 s) | 35 / 65 (1.1 s) | 27 / 57 (0.9 s) |
-| 6 | 43 / 73 (1.2 s) | 31 / 61 (1.0 s) | 23 / 53 (0.9 s) |
+| 2 | 47 / 65 (1.1 s) | 35 / 53 (0.9 s) | 27 / 45 (0.8 s) |
+| 4 | 47 / 65 (1.1 s) | 35 / 53 (0.9 s) | 27 / 45 (0.8 s) |
+| 6 | 43 / 61 (1.0 s) | 31 / 49 (0.8 s) | 23 / 41 (0.7 s) |
 
 Before, two or more zombies in reach put a player down on the first tick they met.
 
@@ -159,7 +159,7 @@ left and right arm, left and right leg) rides in snapshots and replays like any 
 
 A zombie with a leg gone and life left is a **crawler**: `zombiePose` puts it in the crawl pose (a low body with the head up
 and the arms reaching), it moves at most a metre a second (`CRAWLER.speed`), is only 0.7 m tall to walls (so it passes under
-what a standing zombie cannot), starts a swing from 0.9 m and lands it from 1.1 m rather than 1.1 and 1.3, and cannot swipe
+what a standing zombie cannot), starts a swing from 0.9 m and lands it from 1.3 m rather than 1.1 and 1.5, and cannot swipe
 through a window. It still hunts, hits, tears boards and vaults, and is killed and paid for like any zombie. A zombie shot off
 a wall it is climbing cannot hold on: it falls, dead, and the shooter is credited (`method: 'fall'`).
 

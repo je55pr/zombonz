@@ -58,9 +58,15 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
   lands at contact on whoever is in reach then, and also on whoever was in reach in the 4 ticks before and has stepped out, and
   whoever comes into reach in the 8 ticks after. A standing player is hit on the same tick as before; a dodge has to be made a
   little sooner (4 ticks, about 70 ms). Each swing is still one blow (`ZombieState.blow`, host-only).
-  What it does not do is reach further: running past a zombie at arm's length is hit 100% of the time at 1.2 m or closer and
-  0% at 1.4 m or further, with the window or without it (`ZOMBIE_MELEE.reach.strikeRange` is 1.3 m), and a player who
-  is passing is already met by the early swing. If blows that look close still miss, that distance is the number to look at.
+  What it does not do is reach further: with the reach then at 1.3 m, running past a zombie at arm's length was hit 100% of
+  the time at 1.2 m or closer and 0% at 1.4 m or further, with the window or without it, because a player who is passing is
+  already met by the early swing. (The reach was raised afterwards, below.)
+- **Reach 1.5 m, grace 0.3 s, a wider swarm** (tuned after the window). `ZOMBIE_MELEE.reach.strikeRange` is 1.5 m (a crawler's 1.3), so
+  running past a zombie at arm's length is now hit at up to 1.4 m and missed from 1.5 m. A landed blow gives the player 18 ticks
+  (0.3 s) of grace, not 30, so a crowd's blows come faster: two zombies down a player in 0.8 s (sprinters), 1.1 s (walkers),
+  where it was 0.9 and 1.3. And `ZOMBIE_SPACING` is 0.72 m between zombies' middles, up from 0.58: a swarm round a standing
+  player is about 14% wider (90% of it within 1.8 m of its middle, was 1.6) and a horde on a walking player's heels about a third
+  wider at 5 s (2.2 m, was 1.6); nearest neighbours sit 0.72 m apart, not 0.57.
 - **Zombies read where you are going** (`willConnect` in `tickZombieMelee`, `ZOMBIE_MELEE.anticipation`). A zombie also
   starts its swing when the player, at the speed and heading they have now, and it, still coming, will be within strike range
   as the blow lands, so it begins about 3 m out for a player running at it and the blow arrives with them. It looks at most
@@ -70,8 +76,7 @@ below for whatever they are set to, and `test/zombie-difficulty.test.ts` pins ho
 
 Not changed: round sizes, zombie health, the spawn interval and the 24-alive cap (all ported from WaW/BO1, and solo and
 co-op scale as before: each extra player adds a full share to a round), the gait roll by round, the melee timings (only
-when a swing may start, and whether the zombie moves during it, changed), damage (50 a blow) and the half-second grace
-after a blow.
+when a swing may start, and whether the zombie moves during it, changed), damage (50 a blow).
 
 ## The numbers
 
@@ -134,6 +139,9 @@ begins, dodges it (and the zombie swings at nothing).
 | `ZOMBIE_GIVE` | 0.3 | How much a free zombie yields to a shoulder; 0 makes every zombie a wall. |
 | `WEDGE_DEPTH` | 0.05 m | How deep in the bodies round them a player is before they are stopped where they were. |
 | `ZOMBIE_MELEE.anticipation` | 2 m | How far ahead a zombie reads (the two's travel while it winds up): it never starts a swing from further out than reach plus this, about 3.3 m. Raise it and it swings from further out and catches more feints. |
+| `ZOMBIE_MELEE.reach.strikeRange` | 1.5 m (crawler 1.3) | How far a blow lands from. Raise it and more near-misses connect and more of a crowd reaches over its front row. |
+| `ZOMBIE_MELEE.hurtGraceTicks` | 18 (0.3 s) | How long a player is safe from every other zombie after a blow: lower it and a crowd's blows come faster. |
+| `ZOMBIE_SPACING` | 0.72 m | How far apart zombies keep their middles: a bigger number makes a wider, looser swarm. |
 | `ZOMBIE_MELEE.hitWindow` | 4 before, 8 after (ticks) | How long the blow is live around contact: raise either and more near-misses land; both 0 is the old one-tick check. |
 | `ARRIVED` | touching plus 4 cm | How near a zombie gets before it stops closing on its target. |
 | rest of `ZOMBIE_MELEE` (`zombieMelee.ts`) | unchanged | Wind-ups, recoveries, reach, arcs and the hurt grace: how long a player in contact survives. |
