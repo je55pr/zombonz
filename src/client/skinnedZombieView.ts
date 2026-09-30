@@ -147,9 +147,11 @@ export class SkinnedZombieView {
   private pace(action: THREE.AnimationAction, name: ZombieAnimation, zombie: ZombieState): void {
     const pace = CLIP_PACE[this.assetId ?? 'peter_d'];
     const crawling = (zombie.limbs & LEGS_MASK) !== 0;
-    if (name === 'walk') action.timeScale = crawling ? 0.55 * this.look.tempo : clamp(this.look.tempo * ZOMBIE_GAIT_SPEEDS.walk / pace.walk, TEMPO_LIMITS);
+    // Each zombie has its own pace (a little either side of its gait's), so its feet are matched to that.
+    const ground = zombie.moveSpeed > 0 ? zombie.moveSpeed : ZOMBIE_GAIT_SPEEDS[zombie.gait];
+    if (name === 'walk') action.timeScale = crawling ? 0.55 * this.look.tempo : clamp(this.look.tempo * ground / pace.walk, TEMPO_LIMITS);
     // The models have no sprint clip: the run cycle at the zombie's ground speed, so feet stay planted (capped, so they do not blur).
-    else if (name === 'run') action.timeScale = clamp(this.look.tempo * ZOMBIE_GAIT_SPEEDS[zombie.gait] / pace.run, TEMPO_LIMITS);
+    else if (name === 'run') action.timeScale = clamp(this.look.tempo * ground / pace.run, TEMPO_LIMITS);
     else if (name === 'idle') action.timeScale = this.look.tempo;
     else if (name === 'death') action.timeScale = this.look.deathSpeed;
     else action.timeScale = this.look.tempo;

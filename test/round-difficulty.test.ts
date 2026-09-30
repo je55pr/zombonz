@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CLASSIC_SPAWN_CONFIG, DEFAULT_ROUND_CONFIG, GameSimulation, SeededRng, ZOMBIE_GAIT_SPEEDS, PLAYER_MOVEMENT,
-  createSpawnDirector, spawnIntervalForRound, zombieCountForRound, zombieGaitForRound,
+  CLASSIC_SPAWN_CONFIG, DEFAULT_ROUND_CONFIG, GameSimulation, SeededRng, ZOMBIE_GAIT_SPEEDS, ZOMBIE_PACE_SPREAD, PLAYER_MOVEMENT,
+  createSpawnDirector, createZombieState, spawnIntervalForRound, zombieCountForRound, zombieGaitForRound, zombiePaceFactor,
   type ZombieGait, type ZombieState,
 } from '../src/core/index.ts';
 
@@ -58,12 +58,30 @@ describe('zombie gaits', () => {
     expect(gaitShare(10)).toEqual({ walk: 0, run: 0, sprint: 1 });
   });
 
-  it('lets sprinters nearly match a walking player but not a sprinting one', () => {
-    expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeGreaterThan(PLAYER_MOVEMENT.maxSpeed * 0.9);
-    expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeLessThan(PLAYER_MOVEMENT.maxSpeed);
+  it('keeps sprinters close behind a walking player without ever holding them', () => {
+    // Issue #210: at 98% of a walking player's speed a sprinter never let go; now even the fastest zombie a horde can
+    // hold (its gait's speed and the most its pace may be over) is left behind by walking, and sprinting leaves it far behind.
+    const fastest = ZOMBIE_GAIT_SPEEDS.sprint * (1 + ZOMBIE_PACE_SPREAD);
+    expect(fastest).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.95);
+    expect(ZOMBIE_GAIT_SPEEDS.sprint).toBeGreaterThan(PLAYER_MOVEMENT.maxSpeed * 0.8);
+    expect(fastest).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * PLAYER_MOVEMENT.sprintMultiplier * 0.7);
     // Round-one walkers are a slow shamble and runners a jog: a walking player leaves both behind.
     expect(ZOMBIE_GAIT_SPEEDS.walk).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.2);
     expect(ZOMBIE_GAIT_SPEEDS.run).toBeLessThan(PLAYER_MOVEMENT.maxSpeed * 0.6);
+  });
+
+  it('gives every zombie its own pace within the spread, the same for the same id', () => {
+    const paces = Array.from({ length: 500 }, (_, i) => zombiePaceFactor(`e:${i}`));
+    expect(Math.min(...paces)).toBeGreaterThanOrEqual(1 - ZOMBIE_PACE_SPREAD);
+    expect(Math.max(...paces)).toBeLessThanOrEqual(1 + ZOMBIE_PACE_SPREAD);
+    // Spread across the range, not bunched at one end.
+    expect(Math.min(...paces)).toBeLessThan(1 - ZOMBIE_PACE_SPREAD * 0.9);
+    expect(Math.max(...paces)).toBeGreaterThan(1 + ZOMBIE_PACE_SPREAD * 0.9);
+    expect(zombiePaceFactor('e:7')).toBe(zombiePaceFactor('e:7'));
+    for (const gait of ['walk', 'run', 'sprint'] as const) {
+      const zombie = createZombieState('e:7', { x: 0, y: 0, z: 0 }, 1, gait);
+      expect(zombie.moveSpeed).toBeCloseTo(ZOMBIE_GAIT_SPEEDS[gait] * zombiePaceFactor('e:7'), 3);
+    }
   });
 
   it('assigns spawned gaits deterministically from the match seed', () => {

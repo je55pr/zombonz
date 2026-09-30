@@ -4,6 +4,7 @@ import type { CollisionBox, WalkSurface } from './collision.ts';
 import { moveWithCollision, pushOutOfBoxes, sampleWalkHeight } from './collision.ts';
 import type { CollisionIndex } from './collisionIndex.ts';
 import { damagePlayer, type DamageEvent } from './health.ts';
+import { PLAYER_MOVEMENT, playerHeight } from './player.ts';
 import { mix32, hashString } from './rng.ts';
 import { hasClearNavigationLine, hasWalkableConnection, navigationWaypoint, type NavigationGraph, type NavigationQuery } from './navigation.ts';
 import type { SeededRng } from './rng.ts';
@@ -36,10 +37,24 @@ export type ZombieMeleeEvent = ZombieAttackEvent | ZombieSwingEvent;
 /**
  * Walkers shamble at their walk cycle's own ground pace (about 0.75 m/s), so feet don't slide and an
  * early round is as slow as WaW's. Runners jog at about half the player's 4.2 m/s walk (their run cycle
- * covers about 1.84 m/s and plays slightly faster). Sprinters sit just under the player's walk, so only
- * sprinting opens a gap.
+ * covers about 1.84 m/s and plays slightly faster). Sprinters run at 3.6, six sevenths of the player's walk: at
+ * 4.1 (issue #210) they matched a walking player, so once sprint stamina ran out a late-round horde stayed on top of
+ * them for good. Now walking away always opens a gap, slowly; sprinting opens a big one; a corner or a dead end still
+ * costs the player what it should. See docs/zombie-difficulty.md.
  */
-export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 0.8, run: 2.2, sprint: 4.1 };
+export const ZOMBIE_GAIT_SPEEDS: Readonly<Record<ZombieGait, number>> = { walk: 0.8, run: 2.2, sprint: 3.6 };
+
+/**
+ * Each zombie's own pace is its gait's speed within this fraction either way (fixed by its id, so it is the same on every
+ * peer for the zombie's life): a horde that is all sprinters still strings out into a line behind a player who walks
+ * away, instead of arriving as one blob.
+ */
+export const ZOMBIE_PACE_SPREAD = 0.08;
+
+/** The factor (1 - spread to 1 + spread) a zombie's speed is its gait's speed times. */
+export function zombiePaceFactor(id: EntityId): number {
+  return 1 + ((mix32(hashString(id) ^ 0x5bd1e995) % 2001) / 1000 - 1) * ZOMBIE_PACE_SPREAD;
+}
 
 /**
  * WaW/BO1 set_run_speed: roll [speed, speed + 35); up to 35 walks, up to 70 runs, beyond sprints.
@@ -76,7 +91,7 @@ export function createZombieState(id: EntityId, position: Vec3, round: number, g
     velocity: { x: 0, y: 0, z: 0 },
     health: zombieHealthForRound(round),
     gait,
-    moveSpeed: ZOMBIE_GAIT_SPEEDS[gait],
+    moveSpeed: Math.round(ZOMBIE_GAIT_SPEEDS[gait] * zombiePaceFactor(id) * 1000) / 1000,
     attackCooldownTicks: 0,
     targetId: null,
     entry: null,
@@ -374,15 +389,83 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
   return { engaged: zombie.attackTicks > 0 || target !== null, events };
 }
 
+/** How far apart a player's middle and a zombie's are when their bodies touch. */
+export const BODY_CONTACT = PLAYER_MOVEMENT.radius + ZOMBIE_MOVEMENT.radius;
+
+/**
+ * The share of a squeeze that a zombie free to move (not mid-swing, not coming through a window) gives way by, so a
+ * player can shoulder past one slowly. One that is swinging does not give way at all: it is a wall.
+ */
+export const ZOMBIE_GIVE = 0.3;
+
+/** Deeper than this into the bodies round them, a player is wedged and stops where they were (see `blockPlayerByZombies`). */
+export const WEDGE_DEPTH = 0.05;
+
+/**
+ * Keeps a player out of the zombies' bodies, as the walls keep them out of a wall (issue #210): a player runs into a
+ * zombie and stops, or slides round it, rather than pushing through it. Call after the player has moved from `from`.
+ * A swinging zombie holds its ground; one that is free gives way a little (`ZOMBIE_GIVE`; `separateZombies` then moves it
+ * the rest of the way, walls permitting), so no crowd is quite a hard wall. The push cannot carry the player through a
+ * wall, and only what carried the player into the zombie is taken off their speed, so they keep what runs along it.
+ * Wedged between bodies, with no spot within reach that clears them all, the player stops where they were.
+ */
+export function blockPlayerByZombies(player: PlayerState, from: Vec3, zombies: readonly ZombieState[], boxes: readonly CollisionBox[]): void {
+  if (!player.alive || player.downed || player.noclip) return;
+  const near = zombies.filter(zombie => zombie.alive && !zombie.entry && Math.abs(player.position.y - zombie.position.y) <= 1
+    && Math.hypot(player.position.x - zombie.position.x, player.position.z - zombie.position.z) < BODY_CONTACT + 0.5);
+  if (!near.length) return;
+  const height = playerHeight(player);
+  if (pushPlayerOut(player, near, boxes, height, true) > WEDGE_DEPTH) {
+    player.position = { x: from.x, y: player.position.y, z: from.z };
+    player.velocity.x = 0; player.velocity.z = 0;
+    pushPlayerOut(player, near, boxes, height, false);
+  }
+}
+
+/** Pushes the player out of the bodies they overlap, a few passes for when one push leads into another; how deep the worst overlap is left. */
+function pushPlayerOut(player: PlayerState, zombies: readonly ZombieState[], boxes: readonly CollisionBox[], height: number, give: boolean): number {
+  /** How far into a free zombie the player may stay (its give), by zombie. */
+  const allowed = new Map<EntityId, number>();
+  for (let pass = 0; pass < 4; pass++) {
+    let touched = false;
+    for (const zombie of zombies) {
+      let dx = player.position.x - zombie.position.x, dz = player.position.z - zombie.position.z, distance = Math.hypot(dx, dz);
+      let overlap = BODY_CONTACT - (allowed.get(zombie.id) ?? 0) - distance;
+      if (overlap <= 0) continue;
+      touched = true;
+      let shared = 0;
+      if (give && pass === 0 && zombie.attackTicks === 0) {
+        shared = ZOMBIE_GIVE;
+        allowed.set(zombie.id, overlap * shared);
+        overlap *= 1 - shared;
+      }
+      if (distance < 1e-4) { dx = Math.sin(zombie.yaw); dz = Math.cos(zombie.yaw); distance = 1; }
+      const ux = dx / distance, uz = dz / distance;
+      player.position = moveWithCollision(player.position, { x: ux * overlap, y: 0, z: uz * overlap },
+        PLAYER_MOVEMENT.radius, height, boxes);
+      const into = player.velocity.x * ux + player.velocity.z * uz;
+      if (into < 0) { player.velocity.x -= into * ux * (1 - shared); player.velocity.z -= into * uz * (1 - shared); }
+    }
+    if (!touched) break;
+  }
+  let deepest = 0;
+  for (const zombie of zombies) {
+    const distance = Math.hypot(player.position.x - zombie.position.x, player.position.z - zombie.position.z);
+    deepest = Math.max(deepest, BODY_CONTACT - (allowed.get(zombie.id) ?? 0) - distance);
+  }
+  return deepest;
+}
+
 /**
  * Keeps zombies out of each other and out of the players they hunt, so a crowd spreads round its target instead of piling
  * onto one point (whose blows would then all land together). Each pair closer than their bodies allow is pushed apart, half
  * each (all of it for the one that is free to move, when the other is mid-swing or coming through a window), and a zombie
- * that has walked into a player is pushed back out. Walls still hold. Call once a tick, after the zombies have moved.
+ * that has walked into a player is pushed back out (unless it is swinging, and the player can be stopped: then the player
+ * is the one held off, see `blockPlayerByZombies`). Walls still hold. Call once a tick, after the zombies have moved.
  */
 export function separateZombies(zombies: readonly ZombieState[], players: readonly PlayerState[],
   boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[], solids?: CollisionIndex): void {
-  const gap = ZOMBIE_MOVEMENT.radius * 2 * 0.9, playerGap = ZOMBIE_MOVEMENT.radius + 0.3;
+  const gap = ZOMBIE_MOVEMENT.radius * 2 * 0.9, playerGap = BODY_CONTACT;
   /** Pushes a zombie, walls permitting, and says how far along the push it got. */
   const shove = (zombie: ZombieState, dx: number, dz: number): number => {
     const delta = { x: dx, y: 0, z: dz };
@@ -395,6 +478,8 @@ export function separateZombies(zombies: readonly ZombieState[], players: readon
   };
   // Free to be moved: on the ground, out in the open, and not in the middle of a swing.
   const free = (zombie: ZombieState) => !zombie.entry && zombie.attackTicks === 0;
+  /** Pairs pressed against each other, to find who is queued behind a fight (see `holdBehindFighters`). */
+  let touching: Array<[number, number]> | null = null;
   for (let i = 0; i < zombies.length; i++) {
     const a = zombies[i];
     if (!a.alive) continue;
@@ -403,6 +488,7 @@ export function separateZombies(zombies: readonly ZombieState[], players: readon
       if (!b.alive || Math.abs(a.position.y - b.position.y) > 1) continue;
       work.separationPairs++;
       let dx = a.position.x - b.position.x, dz = a.position.z - b.position.z, distance = Math.hypot(dx, dz);
+      if (distance < gap + TOUCH_SLACK) (touching ??= []).push([i, j]);
       if (distance >= gap) continue;
       work.separationShoves++;
       if (distance < 1e-4) { const angle = (mix32(hashString(a.id) ^ hashString(b.id)) / 0x1_0000_0000) * Math.PI * 2; dx = Math.cos(angle); dz = Math.sin(angle); distance = 1; }
@@ -421,10 +507,41 @@ export function separateZombies(zombies: readonly ZombieState[], players: readon
     if (!zombie.alive || zombie.entry) continue;
     for (const player of players) {
       if (!player.alive || Math.abs(player.position.y - zombie.position.y) > 1) continue;
+      // A swinging zombie holds its ground against a player who is stopped by it (blockPlayerByZombies); a downed player
+      // is not, so a zombie over one is still pushed off.
+      if (zombie.attackTicks > 0 && !player.downed) continue;
       const dx = zombie.position.x - player.position.x, dz = zombie.position.z - player.position.z, distance = Math.hypot(dx, dz);
       if (distance >= playerGap) continue;
       const push = playerGap - distance, ux = distance > 1e-4 ? dx / distance : Math.sin(zombie.yaw), uz = distance > 1e-4 ? dz / distance : Math.cos(zombie.yaw);
       shove(zombie, ux * push, uz * push);
     }
   }
+  if (touching) holdBehindFighters(zombies, players, touching);
+}
+
+/** How much nearer than touching two bodies must be to count as pressed together. */
+const TOUCH_SLACK = 0.1;
+
+/**
+ * A zombie queued behind others that are fighting (swinging, or against a player) is held up by them, not stuck on the
+ * map, so its stall count starts again: otherwise it is taken for stuck after three seconds and put down somewhere
+ * close (`freeSpotNear`), which in a crowd is through the ones in front of it, on top of the player. A jam with no
+ * fighter in it (zombies wedged on a corner, say) is not held, and recovers as before.
+ */
+function holdBehindFighters(zombies: readonly ZombieState[], players: readonly PlayerState[], touching: ReadonlyArray<readonly [number, number]>): void {
+  const parent = zombies.map((_, index) => index);
+  const find = (index: number): number => {
+    while (parent[index] !== index) { parent[index] = parent[parent[index]]; index = parent[index]; }
+    return index;
+  };
+  for (const [i, j] of touching) parent[find(i)] = find(j);
+  const fighting = new Set<number>();
+  zombies.forEach((zombie, index) => {
+    if (zombie.alive && (zombie.attackTicks > 0 || players.some(player => player.alive
+      && Math.hypot(player.position.x - zombie.position.x, player.position.z - zombie.position.z) < BODY_CONTACT + 0.25))) fighting.add(find(index));
+  });
+  zombies.forEach((zombie, index) => {
+    if (!zombie.alive || !fighting.has(find(index))) return;
+    zombie.stall = 0; zombie.anchorX = zombie.position.x; zombie.anchorZ = zombie.position.z;
+  });
 }

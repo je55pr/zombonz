@@ -188,7 +188,8 @@ describe('crawling', () => {
   it('is slower than a runner or a sprinter, and no slower than a walker', () => {
     expect(crawlerAfter('sprint', 60)).toBeCloseTo(CRAWLER.speed, 1);
     expect(crawlerAfter('run', 60)).toBeCloseTo(CRAWLER.speed, 1);
-    expect(crawlerAfter('walk', 60)).toBeCloseTo(0.8, 1);
+    // A walker's own pace (a little either side of 0.8, by its id) is under the crawl.
+    expect(crawlerAfter('walk', 60)).toBeCloseTo(createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, 'walk').moveSpeed, 2);
   });
 
   it('fits under what a standing zombie cannot pass: a beam a metre up blocks one and not the other', () => {
