@@ -10,6 +10,7 @@ import { ADS_LOOK_SCALE, aimedFov } from './client/aim.ts';
 import { loadBindings, type KeyBindings } from './client/bindings.ts';
 import { SoloPauseController } from './client/pause.ts';
 import { PerformanceOverlay } from './client/performance.ts';
+import { SIMULATION_STAGES, SimulationProbe, addWork, emptyWork, slowestStage, type SimulationStage } from './core/profiling.ts';
 import { batchStaticMeshes } from './client/staticBatch.ts';
 import { ActorBatch } from './client/actorBatch.ts';
 import { interpolatePosition } from './client/interpolation.ts';
@@ -432,6 +433,10 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   let disposed = false;
   let frameId = 0;
 
+  /** With the F3 profiler open, times each simulation tick (see core/profiling.ts) and tallies them for the frame. */
+  const simulationProbe = new SimulationProbe(() => performance.now());
+  const frameTicks: { ms: number[]; work: ReturnType<typeof emptyWork>; slowestMs: number; stage: SimulationStage } =
+    { ms: [], work: emptyWork(), slowestMs: -1, stage: SIMULATION_STAGES[0] };
   function simulate(dt: number): void {
     previousPositions.clear();
     const world = simulation.state.world;
@@ -454,6 +459,10 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
         [playerId]: inputFrame }, dt);
       // The running preview teammate runs on the spot, to show the run cycle.
       if (matePosition) previewMate!.position = matePosition;
+      if (simulation.probe) {
+        frameTicks.ms.push(simulationProbe.tickMs); addWork(frameTicks.work, simulationProbe.work);
+        if (simulationProbe.tickMs > frameTicks.slowestMs) { frameTicks.slowestMs = simulationProbe.tickMs; frameTicks.stage = slowestStage(simulationProbe.stages); }
+      }
       if (net?.role === 'host') net.host.publish(events);
     }
     present(events);
@@ -522,6 +531,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const interval = lastFrameSeconds === undefined ? 0 : (nowSeconds - lastFrameSeconds) * 1000;
     lastFrameSeconds = nowSeconds;
     const tickBefore = simulation.state.world.tick;
+    simulation.probe = profiling ? simulationProbe : null;
+    if (profiling) { frameTicks.ms = []; frameTicks.work = emptyWork(); frameTicks.slowestMs = -1; }
     const simulationStarted = profiling ? performance.now() : 0;
     advance(nowSeconds);
     const simulationEnded = profiling ? performance.now() : 0;
@@ -597,6 +608,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       shadowFrame, ticks: simulation.state.world.tick - tickBefore,
       calls, triangles, rigs: skinnedViews.size + playerViews.size,
       scale: renderer.getPixelRatio(),
+      ...(frameTicks.ms.length ? { tickMs: frameTicks.ms, slowestStage: frameTicks.stage, work: frameTicks.work } : {}),
     });
     frameId = requestAnimationFrame(frame);
   }

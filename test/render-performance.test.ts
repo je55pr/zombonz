@@ -7,6 +7,7 @@ import { interpolatePosition } from '../src/client/interpolation.ts';
 import { CanvasHud, type HudSnapshot } from '../src/client/hud.ts';
 import { FixedStepClock } from '../src/core/clock.ts';
 import { FrameProfiler, type FrameProfile } from '../src/client/performance.ts';
+import { emptyWork } from '../src/core/profiling.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -33,6 +34,38 @@ describe('render performance contracts', () => {
     expect(report.regularSceneMs).toBe(2);
     expect(report.rigs).toBe(24);
     expect(profiler.add(frame)).toBeNull();
+  });
+
+  it('reports the simulation tick by tick, so a single slow tick shows among fast ones', () => {
+    const profiler = new FrameProfiler();
+    const frame: FrameProfile = {
+      intervalMs: 100, cpuMs: 8, simulationMs: 6, networkMs: 0, actorsMs: 1, detailsMs: 0.5, sceneMs: 2, weaponMs: 0.5,
+      hudMs: 1, overlayMs: 0.5, shadowFrame: false, ticks: 6, calls: 90, triangles: 120_000, rigs: 24, scale: 1,
+    };
+    const work = emptyWork();
+    work.navigationQueries = 144; work.navigationLineTests = 1500; work.navigationBoxTests = 9000;
+    let report = null;
+    for (let i = 0; i < 10; i++) {
+      // Six ticks a frame, sixty in the second; one of them is nine times the rest.
+      const slow = i === 4;
+      report = profiler.add({ ...frame, tickMs: slow ? [1, 1, 9, 1, 1, 1] : [1, 1, 1, 1, 1, 1],
+        ...(slow ? { slowestStage: 'pursuit' as const } : { slowestStage: 'rest' as const }), work });
+    }
+    const tick = report!.tick!;
+    expect(tick.ticks.count).toBe(60);
+    expect(tick.ticks.mean).toBeCloseTo(68 / 60);
+    expect(tick.ticks.p50).toBe(1);
+    expect(tick.ticks.p95).toBe(1);
+    expect(tick.ticks.p99).toBe(9);
+    expect(tick.ticks.max).toBe(9);
+    expect(tick.slowestStage).toBe('pursuit');
+    expect(tick.work.navigationQueries).toBe(24);
+    expect(tick.work.navigationLineTests).toBe(250);
+    expect(tick.work.navigationBoxTests).toBe(1500);
+    // Without tick timings (a client in a shared game) there is no tick report, and nothing breaks.
+    let bare = null;
+    for (let i = 0; i < 10; i++) bare = profiler.add(frame);
+    expect(bare!.tick).toBeNull();
   });
 
   it('batches static geometry without changing world bounds or animated objects', () => {

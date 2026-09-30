@@ -56,11 +56,24 @@ export function workSince(before: Readonly<WorkCounters>): WorkCounters {
   return result;
 }
 
+/** The sum of several ticks' work, for a report that averages it. */
+export function addWork(total: WorkCounters, more: Readonly<WorkCounters>): void {
+  for (const key of Object.keys(total) as WorkCounter[]) total[key] += more[key];
+}
+
+/** A tally with nothing counted yet. */
+export function emptyWork(): WorkCounters { return { ...ZERO }; }
+
 /** The stages of one simulation tick that are timed separately. */
 export const SIMULATION_STAGES = ['players', 'combat', 'blasts', 'spawning', 'entries', 'pursuit', 'melee', 'separation', 'rest'] as const;
 export type SimulationStage = typeof SIMULATION_STAGES[number];
 
 export type StageTimes = Record<SimulationStage, number>;
+
+/** The stage a tick spent longest in. */
+export function slowestStage(stages: Readonly<StageTimes>): SimulationStage {
+  return SIMULATION_STAGES.reduce((best, stage) => stages[stage] > stages[best] ? stage : best);
+}
 
 /**
  * Times the stages of each tick. Attach one to a `GameSimulation` (`simulation.probe = ...`) and it fills in
