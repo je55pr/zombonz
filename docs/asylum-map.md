@@ -138,7 +138,11 @@ A killing blow puts a player down instead of killing them, as in World at War:
 - A teammate holding use beside them for three seconds revives them, or a second and a half with
   Quick Revive. The revive starts over if the reviver lets go.
 - They get their guns back when revived.
-- Otherwise they bleed out after 30 seconds and come back at the start of the next round.
+- Otherwise they bleed out after 30 seconds. In co-op they then spectate a standing, connected teammate;
+  fire cycles forward and aim cycles backward, and an invalid target is replaced automatically.
+- They come back at the start of the next round at their authored player spawn. Points, points earned,
+  kills, headshots and solo Quick Revive use count persist. Combat inventory does not: the respawn gets
+  full health, the starter pistol, fresh grenades, no second gun, no perks and no Bouncing Betties.
 - When no one is left standing to revive, the game is over. Solo without Quick Revive, that is
   straight away.
 

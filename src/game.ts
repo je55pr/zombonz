@@ -15,6 +15,7 @@ import { SIMULATION_STAGES, SimulationProbe, addWork, emptyWork, slowestStage, t
 import { batchStaticMeshes } from './client/staticBatch.ts';
 import { ActorBatch } from './client/actorBatch.ts';
 import { interpolatePosition } from './client/interpolation.ts';
+import { selectSpectateTarget } from './client/spectate.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import { HudFeedback } from './client/feedback.ts';
 import { GameAudio } from './client/audio.ts';
@@ -306,6 +307,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   // `?hitboxes=1` draws the capsules shots are tested against over every zombie.
   const hitboxView = new URLSearchParams(location.search).get('hitboxes') === '1' ? new HitboxView(scene) : null;
   const previousPositions = new Map<EntityId, Vec3>();
+  let spectateTargetId: EntityId | null = null;
   const skinnedViews = new Map<EntityId, SkinnedZombieView>();
   // Every zombie model there is: which one a zombie is drawn with is its look (`ZombieState.variant`), chosen when it spawned.
   const zombieAssets = new Map<string, ZombieAsset>();
@@ -383,8 +385,10 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
         view = new PlayerView(name, simulation.playerIds.indexOf(id));
         playerViews.set(id, view); scene.add(view.root);
       }
-      if (player && !simulation.state.leftPlayers.includes(id)) view.update(player, previous.get(id), alpha, tick);
-      else view.root.visible = false;
+      if (player && !simulation.state.leftPlayers.includes(id)) {
+        view.update(player, previous.get(id), alpha, tick);
+        if (id === spectateTargetId) view.root.visible = false;
+      } else view.root.visible = false;
     }
   }
 
@@ -450,6 +454,11 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     }
     // With the menu open in a shared game, the player just stands still.
     const inputFrame = pause.paused && net ? createInputFrame(0) : input.consume();
+    const localPlayer = simulation.getPlayer(playerId);
+    if (localPlayer && !localPlayer.alive) {
+      const direction = inputFrame.actions.fire?.pressed ? 1 : inputFrame.actions.aim?.pressed ? -1 : 0;
+      spectateTargetId = selectSpectateTarget(simulation, playerId, spectateTargetId, direction);
+    } else spectateTargetId = null;
     if (pause.paused && net) inputFrame.actions.cancelGrenade = { held: false, pressed: true, released: false, value: 0 };
     if (forceAim) inputFrame.actions.aim = { held: true, pressed: false, released: false, value: 1 };
     let events: SimulationEvent[];
@@ -486,19 +495,25 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     for (const view of skinnedViews.values()) view.dispose();
     skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
   }
-  function syncCamera(alpha = 1): void {
-    const player = simulation.getPlayer(playerId);
-    if (!player) return;
-    const position = interpolatePosition(previousPositions.get(playerId), player.position, alpha);
-    // In last stand the view drops to the floor and lists to one side.
-    // A client's view eases out of any correction from the host rather than jumping.
-    const correction = net?.role === 'client' ? net.client.correction : { x: 0, y: 0, z: 0 };
+  function syncCamera(alpha = 1, remotePrevious: ReadonlyMap<EntityId, Vec3> = previousPositions) {
+    const local = simulation.getPlayer(playerId);
+    if (!local) return null;
+    if (local.alive) spectateTargetId = null;
+    else spectateTargetId = selectSpectateTarget(simulation, playerId, spectateTargetId);
+    const subject = spectateTargetId ? simulation.getPlayer(spectateTargetId) ?? local : local;
+    const localView = subject.id === playerId;
+    const previous = localView ? previousPositions.get(subject.id) : remotePrevious.get(subject.id) ?? previousPositions.get(subject.id);
+    const position = interpolatePosition(previous, subject.position, alpha);
+    // In last stand the view drops to the floor and lists to one side. A spectating camera rides the
+    // teammate's authoritative view but does not inherit the dead client's prediction correction or freelook.
+    const correction = localView && net?.role === 'client' ? net.client.correction : { x: 0, y: 0, z: 0 };
     camera.position.set(position.x + correction.x,
-      position.y + correction.y + (player.downed ? DOWN_RULES.eyeHeight : playerEyeHeight(player)), position.z + correction.z);
-    const look = input.pendingLook();
-    camera.rotation.x = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(PLAYER_MOVEMENT.maxPitch, player.pitch + look.pitch));
-    camera.rotation.y = player.yaw + look.yaw;
-    camera.rotation.z = player.downed ? 0.22 : 0;
+      position.y + correction.y + (subject.downed ? DOWN_RULES.eyeHeight : playerEyeHeight(subject)), position.z + correction.z);
+    const look = localView ? input.pendingLook() : { yaw: 0, pitch: 0 };
+    camera.rotation.x = Math.max(-PLAYER_MOVEMENT.maxPitch, Math.min(PLAYER_MOVEMENT.maxPitch, subject.pitch + look.pitch));
+    camera.rotation.y = subject.yaw + look.yaw;
+    camera.rotation.z = subject.downed ? 0.22 : 0;
+    return subject;
   }
 
   function resize(): void {
@@ -546,8 +561,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     if (netFrame) present(netFrame.events);
     const networkEnded = profiling ? performance.now() : 0;
     const remote = netFrame ?? { alpha, tick: simulation.state.world.tick - 1 + alpha, previous: previousPositions };
-    syncCamera(alpha);
-    const playerForCamera = simulation.getPlayer(playerId);
+    const playerForCamera = syncCamera(remote.alpha, remote.previous);
     // Aiming zooms the player's chosen field of view in (more for a rifle than a pistol); sprinting widens it a little.
     const targetFov = playerForCamera?.aiming ? aimedFov(settings.fov, playerForCamera.weapon.weaponId)
       : playerForCamera?.sprinting ? settings.fov + 4 : settings.fov;
@@ -591,8 +605,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       pingMs: net?.role === 'client' && net.client.pingMs !== null ? Math.round(net.client.pingMs / 10) * 10 : null,
       canRestart: net?.role !== 'client',
       feedback: feedback.snapshot(simulation.state.world.tick),
+      spectating: spectateTargetId ? names.get(spectateTargetId) ?? 'Player' : null,
       assetNotice: waiting ?? zombieAssetNotice ?? weaponView.notice ?? environmentNotice }, performance.now(),
-      player ? { spread: currentSpread(player), verticalFov: camera.fov } : undefined);
+      player?.alive ? { spread: currentSpread(player), verticalFov: camera.fov } : undefined);
     performanceOverlay.endGpu();
     const hudEnded = profiling ? performance.now() : 0;
     const calls = profiling ? renderer.info.render.calls : 0;

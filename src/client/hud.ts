@@ -54,6 +54,8 @@ export interface HudSnapshot {
   gameOver: boolean;
   /** Teammates in a co-op game, one per line: name, points, and whether they are down or out. */
   team: string;
+  /** The living teammate this bled-out player is currently watching. */
+  spectating?: string | null;
   /** Round-trip time to the host, for a client in a co-op game. */
   pingMs: number | null;
   /** False for a co-op client: only the host restarts. */
@@ -431,6 +433,10 @@ export class CanvasHud {
     if (snapshot.assetNotice) this.text(snapshot.assetNotice, centre, height - 112, { size: 20, weight: 500, color: DIM, align: 'center' });
     if (snapshot.feedback?.message && !snapshot.gameOver) {
       this.text(snapshot.feedback.message, centre, height * 0.6, { size: 34, align: 'center', spacing: 2 });
+    }
+    if (snapshot.spectating && !snapshot.gameOver) {
+      this.text(`SPECTATING ${snapshot.spectating.toUpperCase()}`, centre, 74,
+        { size: 24, weight: 500, color: DIM, align: 'center', spacing: 3 });
     }
     if (snapshot.nearbyPowerup && !snapshot.gameOver) {
       this.text(snapshot.nearbyPowerup, centre, height * (snapshot.reviveProgress > 0 ? 0.52 : 0.655),
