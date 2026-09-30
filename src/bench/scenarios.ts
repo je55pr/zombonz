@@ -99,7 +99,8 @@ class StallWatch {
       const moved = before ? Math.hypot(zombie.position.x - before.x, zombie.position.z - before.z) : Infinity;
       const far = Math.hypot(player.x - zombie.position.x, player.z - zombie.position.z) > 4;
       const wanting = Math.hypot(zombie.velocity.x, zombie.velocity.z) > 0;
-      const stalled = before !== undefined && moved < 0.4 && far && wanting && zombie.attackTicks === 0 && !zombie.entry;
+      // Stalled: under a sixth of its own pace over the second, though it means to move.
+      const stalled = before !== undefined && moved < zombie.moveSpeed / 6 && far && wanting && zombie.attackTicks === 0 && !zombie.entry;
       const run = stalled ? before!.run + 1 : 0;
       if (stalled) this.stalledSeconds += 1;
       this.longestSeconds = Math.max(this.longestSeconds, run);

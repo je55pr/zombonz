@@ -103,6 +103,8 @@ const NODE_CELL = 3;
 const NEAREST_MEMORY = 256;
 /** Routes are remembered for this many start/goal pairs before the memory is cleared. */
 const ROUTE_MEMORY = 4096;
+/** Within this far of the first node of its route, a body counts as standing at it and heads for the next. */
+const AT_NODE = 0.25;
 
 /**
  * Everything about a map's navigation that does not change while a match runs: the graph laid out for quick lookup,
@@ -195,7 +197,7 @@ export class NavigationField {
    * The answerer of "which way do I go to get from here to there" for the fixed walls plus `movable` solids (the
    * doors that are shut, the box, hazards): the point to head for. It is straight at the goal when the way is
    * clear, else the furthest node along the shortest route that can be walked to directly, and the start itself
-   * when there is no way. The route is a fewest-links one over the links these solids leave open.
+   * when there is no way. (Each end of the route is the nearest node that can be walked to, or failing that the nearest.) The route is a fewest-links one over the links these solids leave open.
    */
   query(movable: readonly CollisionBox[] = []): NavigationQuery {
     work.navigationRebuilds++;
@@ -221,7 +223,10 @@ export class NavigationField {
       const key = `${position.x},${position.y},${position.z}`;
       const known = nearest.get(key);
       if (known !== undefined) { work.navigationNodeHits++; return known; }
-      const found = this.nearestWhere(position, traversable);
+      // A spot no node can be walked to from (a nook between nodes) heads for the nearest node anyway: standing still
+      // there forever is worse than pressing toward it and sliding along whatever is in the way.
+      let found = this.nearestWhere(position, traversable);
+      if (found < 0) found = this.nearestWhere(position, () => true);
       if (nearest.size >= NEAREST_MEMORY) nearest.delete(nearest.keys().next().value!);
       nearest.set(key, found);
       return found;
@@ -243,11 +248,15 @@ export class NavigationField {
         routes.set(routeKey, route);
       }
       if (route.length === 0) return start;
-      for (let index = route.length - 1; index >= 0; index -= 1) {
+      // Standing at the route's first node, the way on is the next: whether some far node is in sight from this very
+      // spot can turn on a centimetre, and heading back for the first one then forth again is how a body ends up dithering.
+      const first = nodes[route[0]].position;
+      const lowest = route.length > 1 && Math.hypot(first.x - start.x, first.z - start.z) < AT_NODE && Math.abs(first.y - start.y) < 1 ? 1 : 0;
+      for (let index = route.length - 1; index >= lowest; index -= 1) {
         const position = nodes[route[index]].position;
         if (traversable(start, position)) return position;
       }
-      return nodes[route[0]].position;
+      return nodes[route[lowest]].position;
     };
   }
 

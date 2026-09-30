@@ -5,7 +5,7 @@ import type { MapId } from '../maps/catalog.ts';
 import type { WorldSnapshot } from './snapshot.ts';
 
 /** Bumped whenever messages or snapshots change shape; mismatched builds refuse to connect. */
-export const PROTOCOL_VERSION = 8;
+export const PROTOCOL_VERSION = 9;
 export const MAX_PLAYERS = 4;
 /** The host sends a snapshot every third tick: 20 a second. */
 export const SNAPSHOT_INTERVAL_TICKS = 3;
@@ -81,8 +81,11 @@ export function clampPitch(pitch: number): number {
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+/** Only the host runs the zombies, so a zombie's stall bookkeeping (see ZombieState) is no use to a client and stays off the wire. */
+const HOST_ONLY = new Set(['stall', 'anchorX', 'anchorZ']);
 /** Positions and timers only need a tenth of a millimetre; trimming the digits halves a snapshot. */
-function trimNumbers(_key: string, value: unknown): unknown {
+function trimNumbers(key: string, value: unknown): unknown {
+  if (HOST_ONLY.has(key)) return undefined;
   return typeof value === 'number' && !Number.isInteger(value) ? Math.round(value * 1e4) / 1e4 : value;
 }
 

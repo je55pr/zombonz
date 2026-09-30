@@ -21,6 +21,12 @@ export function referenceNavigationQuery(graph: NavigationGraph | undefined, box
       if ((distance < bestDistance || (distance === bestDistance && node.id.localeCompare(best!.id) < 0))
         && traversable(position, node.position)) { best = node; bestDistance = distance; }
     }
+    if (best) return best;
+    // No node can be walked to from here: the nearest one, all the same.
+    for (const node of graph?.nodes ?? []) {
+      const distance = distanceSquared(node.position, position);
+      if (distance < bestDistance || (distance === bestDistance && node.id.localeCompare(best!.id) < 0)) { best = node; bestDistance = distance; }
+    }
     return best;
   };
   return (start, goal) => {
@@ -30,7 +36,10 @@ export function referenceNavigationQuery(graph: NavigationGraph | undefined, box
     if (!startNode || !goalNode) return start;
     const path = shortestNavigationPath(openGraph!, startNode.id, goalNode.id);
     if (path.length === 0) return start;
-    for (let index = path.length - 1; index >= 0; index -= 1) if (traversable(start, path[index].position)) return path[index].position;
-    return path[0].position;
+    // Standing at the route's first node, head for the next one.
+    const first = path[0].position;
+    const lowest = path.length > 1 && Math.hypot(first.x - start.x, first.z - start.z) < 0.25 && Math.abs(first.y - start.y) < 1 ? 1 : 0;
+    for (let index = path.length - 1; index >= lowest; index -= 1) if (traversable(start, path[index].position)) return path[index].position;
+    return path[lowest].position;
   };
 }
