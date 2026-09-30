@@ -77,8 +77,10 @@ existing cached runtime query. Upper slabs separately occlude bullets.
 All eight ground entries and four upstairs entries have exterior approaches, individual board tearing,
 single-zombie vault reservation, indoor pursuit and hold-E repairs. Zombies appear about
 15 m out in the fog (the cave breach's at the far end of its collapsed tunnel), at three
-spots per entry, and shamble in. Spawn selection excludes entries whose
-interior landing cannot reach a living player. L god mode,
+spots per entry, and shamble in. Spawn selection excludes entries whose interior landing cannot reach a
+standing player. Among the remaining entries it prefers hidden approaches at least 10 m from every standing player,
+with deterministic distance weighting. The three scatter spots share one entry weight. If every valid entry is visible
+or too close, all valid entries remain available as a weighted fallback rather than stopping the round. L god mode,
 K noclip, imported zombies and first-person gun assets are unchanged.
 
 ## Checks
