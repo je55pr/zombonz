@@ -60,7 +60,7 @@ const network = (overrides: Partial<ReturnType<typeof summariseAddresses>> = {})
 });
 const report = (overrides: Partial<ConnectionReport> = {}): ConnectionReport => ({
   build: 'abc1234', protocol: 8, browser: 'Chrome 141 on Windows', at: '2026-09-29T21:30:12.000Z', online: true, stun: stun(),
-  addresses: network(), self: goodSelf, durationMs: 4200, ...overrides,
+  addresses: network(), clock: { offset: 466, uncertainty: 110, samples: 8 }, self: goodSelf, durationMs: 4200, ...overrides,
 });
 
 describe('the verdict', () => {
@@ -81,6 +81,14 @@ describe('the verdict', () => {
     const blocked = judge(report({ stun: stun(false), addresses: network({ publicV4: 0, publicV6: false, mapping: 'none' }) }));
     expect(blocked.level).toBe('bad');
     expect(blocked.detail).toMatch(/work|school|VPN/);
+  });
+
+  it('warns that the clock could not be checked, when nothing else is wrong, because the start time depends on it', () => {
+    const verdict = judge(report({ clock: null }));
+    expect(verdict.level).toBe('warn');
+    expect(verdict.headline).toMatch(/clock could not be checked/);
+    // A worse problem still comes first.
+    expect(judge(report({ clock: null, online: false })).headline).toMatch(/offline/i);
   });
 
   it('warns when only IPv6 or only one server answered', () => {
@@ -106,6 +114,9 @@ describe('the text a friend sends back', () => {
     expect(text).toContain('Public IPv4: same public port for every server');
     expect(text).toContain('Public IPv6: found');
     expect(text).toContain('Relay (TURN): none');
+    expect(text).toContain('Clock: 466 ms behind the game server (within 110)');
+    expect(formatReport(report({ clock: { offset: -1200, uncertainty: 130, samples: 8 } }))).toContain('Clock: 1200 ms ahead of the game server (within 130)');
+    expect(formatReport(report({ clock: null }))).toContain('Clock: could not be checked against the game server');
     expect(text).toContain('reliable channel ok, fast channel ok (invite made in 0.1 s, connected in 0.2 s)');
     expect(text).not.toMatch(/\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/);
     expect(text).not.toMatch(/[0-9a-f]{1,4}(:[0-9a-f]{1,4}){3,}/i);
@@ -175,6 +186,7 @@ function fakeBrowser(gather: (urls: string[]) => Gathered, options: { invite?: '
   // The host's link and the joiner's are the two ends of one pair, unless the scenario says they never join up.
   const [hostLink, joinLink] = options.invite === 'unlinked' ? [pair()[0], pair()[1]] : pair();
   return {
+    clock: async () => ({ offset: -1200, uncertainty: 130, samples: 8 }),
     createConnection: configuration => new FakeConnection(configuration) as unknown as RTCPeerConnection,
     createInvite: async () => {
       if (options.invite === 'fail') throw new Error('This browser has no WebRTC.');
@@ -198,6 +210,7 @@ describe('running the test', () => {
     expect(result.addresses).toMatchObject({ publicV4: 1, publicV6: true, mapping: 'same' });
     expect(result.browser).toBe('Chrome 141 on Windows');
     expect(result.self).toMatchObject({ ok: true, reliable: true, fast: true });
+    expect(result.clock).toEqual({ offset: -1200, uncertainty: 130, samples: 8 });
     expect(judge(result).level).toBe('good');
     expect(formatReport(result).split('\n')[1]).toMatch(/^Result: GOOD - /);
   });

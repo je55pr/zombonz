@@ -4,7 +4,7 @@ import { NetClient, type StartInfo } from '../net/client.ts';
 import { NetHost } from '../net/host.ts';
 import { MAX_PLAYERS, cleanName, type LobbyPlayer } from '../net/protocol.ts';
 import { LinkHostTransport, linkClientTransport } from '../network/link.ts';
-import { answerInvite, createInvite, type PendingInvite, type PendingJoin } from '../network/webrtc.ts';
+import { answerInvite, clockMeasurement, createInvite, type PendingInvite, type PendingJoin } from '../network/webrtc.ts';
 
 export interface LobbyCallbacks {
   hostStarted(host: NetHost, players: LobbyPlayer[], seed: number, map: MapId): void;
@@ -90,6 +90,8 @@ export class LobbyView {
       <p class="lobby-hint">Everyone needs this same version of the game. Connections go straight between players' browsers.</p>
     </div>`;
     parent.append(this.element);
+    // Measured now, in the background, so it is ready by the time an invite or reply needs it.
+    void clockMeasurement();
     const name = this.find<HTMLInputElement>('[data-name]');
     name.value = savedName() || (hosting ? 'Player 1' : '');
     name.addEventListener('input', () => {

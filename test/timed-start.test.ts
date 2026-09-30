@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodeError, buildSdp, decodeSession, encodeSession, type CompactSession } from '../src/network/codes.ts';
-import { START_DELAY_MS, answerInvite, createInvite, timeUntilStart } from '../src/network/webrtc.ts';
+import { START_DELAY_MS, answerInvite, createInvite, estimateClock, timeUntilStart } from '../src/network/webrtc.ts';
 
 const MDNS = '0b1c2d3e-4f50-4a61-8b72-93a4b5c6d7e8.local';
 /** The host's session, as its browser would offer it. */
@@ -152,8 +152,10 @@ describe('the joiner', () => {
     const join = await answerInvite(encodeSession('invite', hostOffer));
     await vi.advanceTimersByTimeAsync(START_DELAY_MS);
     const log = join.log();
-    expect(log).toMatch(/reply made: host, srflx; clock behind by 0 ms; starting in 45 s/);
-    expect(log).toMatch(/\+45\.\d s {2}starting/);
+    // Times are by the server's clock (here the computer's own, as it cannot be checked), so two players' logs can be laid side by side.
+    const start = new Date(join.startsAt).toISOString().slice(11, 21);
+    expect(log).toContain(`reply made: host, srflx; start set for ${start} server time; clock not checked; starting in 45 s`);
+    expect(log).toContain(`+45.0 s  starting at ${start} server time`);
     expect(log).not.toMatch(/\d+\.\d+\.\d+\.\d+/);
     expect(log).not.toContain('.local');
     join.cancel();
@@ -227,44 +229,119 @@ describe('the host', () => {
     await vi.advanceTimersByTimeAsync(10_000);
     const log = invite.log();
     expect(log).toMatch(/invite made: host, srflx/);
-    expect(log).toMatch(/reply read: host, srflx; clock behind by 0 ms; starting in 10\.0 s/);
-    expect(log).toMatch(/\+10\.\d s {2}starting/);
+    const start = new Date(1_790_000_010_000).toISOString().slice(11, 21);
+    expect(log).toContain(`reply read: host, srflx; start set for ${start} server time; clock not checked; starting in 10.0 s`);
+    expect(log).toContain(`+10.0 s  starting at ${start} server time`);
     expect(log).not.toMatch(/\d+\.\d+\.\d+\.\d+/);
     invite.cancel();
   });
 });
 
-describe('the clock', () => {
+describe('the clock estimate', () => {
+  /** What a server whose clock runs `offset` ms ahead of this computer's would answer to a request sent at `sent`: a date cut to the second. */
+  const sample = (offset: number, sent: number, rtt = 100) => ({ date: Math.floor((sent + rtt / 2 + offset) / 1000) * 1000, sent, received: sent + rtt });
+
+  it('has nothing to say without samples', () => {
+    expect(estimateClock([])).toBeNull();
+  });
+
+  it('knows a second-long range from one sample, and narrows it with more, whatever the phase of the second', () => {
+    const one = estimateClock([sample(5300, 10_000)])!;
+    expect(one.uncertainty).toBeGreaterThan(400);
+    for (const [offset, start] of [[5300, 10_000], [-1200, 10_437], [162_000, 3_951], [0, 999_913], [700, 12_345_678]]) {
+      const samples = Array.from({ length: 8 }, (_, i) => sample(offset, start + i * 220));
+      const reading = estimateClock(samples)!;
+      // The true offset is inside what it claims, and the claim is a few hundred milliseconds wide at most.
+      expect(Math.abs(reading.offset - offset), `${offset} from ${start}`).toBeLessThanOrEqual(reading.uncertainty + 1e-6);
+      expect(reading.uncertainty).toBeLessThan(400);
+      expect(reading.samples).toBe(8);
+    }
+  });
+
+  it('cannot be misled by a request that stalled for seconds: it only adds a wide range of its own', () => {
+    const good = Array.from({ length: 8 }, (_, i) => sample(5300, 20_000 + i * 220));
+    const stalled = { date: Math.floor((20_000 + 5000 + 5300) / 1000) * 1000, sent: 20_000, received: 30_165 };
+    const withStall = estimateClock([stalled, ...good])!, without = estimateClock(good)!;
+    expect(withStall.offset).toBe(without.offset);
+    expect(withStall.uncertainty).toBe(without.uncertainty);
+  });
+
+  it('falls back to the middle of the middles, and claims no precision, when the ranges cannot all be true', () => {
+    const reading = estimateClock([sample(5000, 10_000), sample(5000, 10_200), sample(9000, 10_400)])!;
+    expect(reading.uncertainty).toBe(1000);
+    expect(Math.abs(reading.offset - 5000)).toBeLessThan(1000);
+  });
+});
+
+describe('the clock measurement', () => {
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.resetModules(); });
 
-  async function offsetWith(headers: Record<string, string>, localNow: number): Promise<number> {
+  /** Measures a clock that is `offset` ms ahead of this computer's, through a fake `fetch` that answers as a server would, from a page at `localNow`. */
+  async function measure(offset: number, localNow: number, extra: Record<string, string> = {}, requests?: string[]): Promise<{ offset: number; uncertainty: number; samples: number } | null> {
     vi.resetModules();
     vi.useFakeTimers({ now: localNow });
-    vi.stubGlobal('location', { pathname: '/zombonz/' });
-    vi.stubGlobal('fetch', async () => ({ headers: new Headers(headers) }));
+    vi.stubGlobal('location', { href: 'https://example.test/zombonz/index.html' });
+    vi.stubGlobal('fetch', async (url: URL, init: { method: string }) => {
+      requests?.push(`${init.method} ${url.pathname}`);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      return { headers: new Headers({ date: new Date(Math.floor((Date.now() + offset) / 1000) * 1000).toUTCString(), ...extra }) };
+    });
     const module = await import('../src/network/webrtc.ts');
-    return module.clockOffset();
+    const reading = module.clockMeasurement();
+    await vi.advanceTimersByTimeAsync(5000);
+    return reading;
   }
-  const http = (ms: number) => new Date(ms).toUTCString();
 
-  it('is how far behind the server this computer is, from the Date header', async () => {
-    const local = Date.parse('2026-09-30T12:00:00.000Z');
-    // The server says 12:00:05; this computer says 12:00:00. Add half a second: the header is cut to whole seconds.
-    expect(await offsetWith({ date: http(local + 5000) }, local)).toBe(5500);
+  it('finds how far behind the server this computer is, to within a few hundred milliseconds', async () => {
+    for (const [offset, start] of [[5300, 1_790_000_000_000], [-1200, 1_790_000_000_437], [162_000, 1_790_000_000_951], [0, 1_790_000_000_777]]) {
+      const reading = (await measure(offset, start))!;
+      expect(Math.abs(reading.offset - offset), String(offset)).toBeLessThanOrEqual(reading.uncertainty + 1);
+      expect(reading.uncertainty).toBeLessThan(400);
+      expect(reading.samples).toBe(8);
+    }
   });
 
-  it('counts the seconds a cached answer has sat, and is negative for a clock that runs ahead', async () => {
-    const local = Date.parse('2026-09-30T12:00:00.000Z');
-    expect(await offsetWith({ date: http(local + 5000), age: '3' }, local)).toBe(8500);
-    expect(await offsetWith({ date: http(local - 20_000) }, local)).toBe(-19_500);
+  it('asks for pages that do not exist, one after another and never twice for the same one, next to the page itself', async () => {
+    const requests: string[] = [];
+    await measure(0, 1_790_000_000_000, {}, requests);
+    expect(requests).toHaveLength(8);
+    expect(new Set(requests).size).toBe(8);
+    expect(requests.every(request => /^HEAD \/zombonz\/__clock_\d+_\d$/.test(request))).toBe(true);
   });
 
-  it('is zero when the server says nothing useful, or cannot be reached', async () => {
-    const local = Date.parse('2026-09-30T12:00:00.000Z');
-    expect(await offsetWith({}, local)).toBe(0);
+  it('does not add the Age header, which put two computers 160 seconds out in a real test', async () => {
+    const plain = (await measure(5300, 1_790_000_000_000))!;
+    const aged = (await measure(5300, 1_790_000_000_000, { age: '160' }))!;
+    expect(aged.offset).toBe(plain.offset);
+  });
+
+  it('is measured once', async () => {
+    const requests: string[] = [];
     vi.resetModules();
-    vi.stubGlobal('location', { pathname: '/' });
+    vi.useFakeTimers({ now: 1_790_000_000_000 });
+    vi.stubGlobal('location', { href: 'https://example.test/' });
+    vi.stubGlobal('fetch', async (url: URL) => { requests.push(url.pathname); return { headers: new Headers({ date: new Date().toUTCString() }) }; });
+    const module = await import('../src/network/webrtc.ts');
+    const first = module.clockMeasurement(), second = module.clockMeasurement();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await first).toBe(await second);
+    expect(requests).toHaveLength(8);
+    expect(await module.clockOffset()).toBe((await first)!.offset);
+  });
+
+  it('is null, and offset zero, when the server gives no date or cannot be reached, without waiting around', async () => {
+    vi.resetModules();
+    vi.stubGlobal('location', { href: 'https://example.test/' });
     vi.stubGlobal('fetch', async () => { throw new Error('offline'); });
-    expect(await (await import('../src/network/webrtc.ts')).clockOffset()).toBe(0);
+    const offline = await import('../src/network/webrtc.ts');
+    expect(await offline.clockMeasurement()).toBeNull();
+    expect(await offline.clockOffset()).toBe(0);
+    vi.resetModules();
+    vi.stubGlobal('fetch', async () => ({ headers: new Headers({}) }));
+    vi.useFakeTimers({ now: 1_790_000_000_000 });
+    const silent = await import('../src/network/webrtc.ts');
+    const reading = silent.clockMeasurement();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(await reading).toBeNull();
   });
 });

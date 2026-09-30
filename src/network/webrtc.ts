@@ -36,28 +36,77 @@ export function timeUntilStart(start: number, clockOffset: number, now: number):
   return Math.max(0, wait);
 }
 
-let measuredOffset: Promise<number> | null = null;
+/** What is known about how far this computer's clock is behind the game server's. */
+export interface ClockReading {
+  /** Milliseconds this computer's clock is behind the server's; negative when it is ahead. */
+  offset: number;
+  /** The reading is good to this many milliseconds either way. */
+  uncertainty: number;
+  samples: number;
+}
+
 /**
- * How far this computer's clock is behind the game server's, in milliseconds (negative when it is ahead): from the `Date` header
- * of a request to the page's own server, with the seconds it was cached for added. Good to about a second. Zero if it can't be
- * measured, which is right for most computers.
+ * The offset from whole-second `Date` headers. Each sample says: the server's clock read `date` (cut down to the second) at some
+ * moment between `sent` and `received` by this computer's clock. So the offset lies between `date - received` and `date + 1000 - sent`,
+ * and every sample narrows that: several requests spread over a second or so pin it down to a few hundred milliseconds, and a request
+ * that stalled for seconds can only widen its own range, never mislead. Null with no samples.
  */
-export function clockOffset(): Promise<number> {
-  measuredOffset ??= (async () => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 3000);
-    try {
-      const before = Date.now();
-      const response = await fetch(`${location.pathname}?clock=${before}`, { method: 'HEAD', cache: 'no-store', signal: controller.signal });
-      const after = Date.now();
-      const date = Date.parse(response.headers.get('date') ?? '');
-      if (Number.isNaN(date)) return 0;
-      const age = Number(response.headers.get('age') ?? 0);
-      // A Date header is whole seconds, cut off: the real time is half a second later on average.
-      return date + (Number.isFinite(age) ? age * 1000 : 0) + 500 - (before + after) / 2;
-    } catch { return 0; } finally { clearTimeout(timer); }
+export function estimateClock(samples: ReadonlyArray<{ date: number; sent: number; received: number }>): ClockReading | null {
+  if (!samples.length) return null;
+  let low = -Infinity, high = Infinity;
+  for (const sample of samples) {
+    low = Math.max(low, sample.date - sample.received);
+    high = Math.min(high, sample.date + 1000 - sample.sent);
+  }
+  if (low <= high) return { offset: (low + high) / 2, uncertainty: (high - low) / 2, samples: samples.length };
+  // The ranges do not meet (this computer's clock was adjusted while measuring, say): the middle of the middles, and no claim to precision.
+  const middles = samples.map(sample => sample.date + 500 - (sample.sent + sample.received) / 2).sort((a, b) => a - b);
+  return { offset: middles[Math.floor(middles.length / 2)], uncertainty: 1000, samples: samples.length };
+}
+
+const CLOCK_SAMPLES = 8;
+const CLOCK_SPACING_MS = 120;
+
+let measuredClock: Promise<ClockReading | null> | null = null;
+/**
+ * Measures this computer's clock against the game server's, once: a handful of requests for a page that does not exist, one after
+ * another, reading the `Date` header of each (a missing page is never served from a cache, so its date is the server's now; a
+ * cached page can come back with a date that is not). The `Age` header is deliberately not used: a cache that has already brought
+ * `Date` up to date makes adding it wrong, which put two computers 160 seconds out, and out of step with each other, in a real test.
+ * Null if the server gives no date, which is right for most computers.
+ */
+export function clockMeasurement(): Promise<ClockReading | null> {
+  measuredClock ??= (async () => {
+    const samples: Array<{ date: number; sent: number; received: number }> = [];
+    for (let i = 0; i < CLOCK_SAMPLES; i++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 3000);
+      try {
+        const sent = Date.now();
+        const response = await fetch(new URL(`__clock_${sent}_${i}`, location.href), { method: 'HEAD', cache: 'no-store', signal: controller.signal });
+        const received = Date.now();
+        const date = Date.parse(response.headers.get('date') ?? '');
+        if (!Number.isNaN(date)) samples.push({ date, sent, received });
+      } catch {
+        // A request lost after others got through only makes the reading less exact; failing from the start means there is nothing to read.
+        if (!samples.length) break;
+      } finally { clearTimeout(timer); }
+      if (i < CLOCK_SAMPLES - 1) await new Promise(resolve => setTimeout(resolve, CLOCK_SPACING_MS));
+    }
+    return estimateClock(samples);
   })();
-  return measuredOffset;
+  return measuredClock;
+}
+
+/** How far this computer's clock is behind the game server's, in milliseconds: zero if it could not be measured. */
+export async function clockOffset(): Promise<number> { return (await clockMeasurement())?.offset ?? 0; }
+
+/** "23:44:31.2": a moment by the server's clock, for a log, so two players' logs can be laid side by side. */
+function serverTime(localMs: number, offset: number): string { return new Date(localMs + offset).toISOString().slice(11, 21); }
+/** "clock behind by 466 ms (within 120)", or that it was not checked. */
+function describeClock(clock: ClockReading | null): string {
+  if (!clock) return 'clock not checked';
+  return `clock ${clock.offset >= 0 ? 'behind' : 'ahead'} by ${Math.abs(Math.round(clock.offset))} ms (within ${Math.round(clock.uncertainty)})`;
 }
 
 /** What happened to one connection, in order, to send back when it does not work. No addresses. */
@@ -193,15 +242,16 @@ export async function createInvite(): Promise<PendingInvite> {
       if (used) throw new CodeError('This invite was already used. Make a new invite for each player.');
       const session = decodeSession('reply', replyCode);
       if (session.start === undefined) throw new CodeError('That reply code is from an older version of the game.');
-      const offset = await clockOffset();
+      const clock = await clockMeasurement();
+      const offset = clock?.offset ?? 0;
       const wait = timeUntilStart(session.start, offset, Date.now());
       used = true;
-      log.add(`reply read: ${session.candidates.map(candidate => candidate.type).join(', ')}; clock ${offset >= 0 ? 'behind' : 'ahead'} by ${Math.abs(Math.round(offset))} ms; starting in ${(wait / 1000).toFixed(1)} s`);
+      log.add(`reply read: ${session.candidates.map(candidate => candidate.type).join(', ')}; start set for ${serverTime(session.start, 0)} server time; ${describeClock(clock)}; starting in ${(wait / 1000).toFixed(1)} s`);
       scheduled?.(Date.now() + wait);
       // Nothing is tried until the moment both sides named: see START_DELAY_MS.
       if (wait > 0) await new Promise<void>(resolve => { wake = resolve; setTimeout(resolve, wait); });
       if (cancelled) throw new CodeError('Cancelled.');
-      log.add('starting');
+      log.add(`starting at ${serverTime(Date.now(), offset)} server time`);
       const opened = linkWhenOpen(pc, channels, timeoutMs, HOST_FAILURE);
       opened.catch(() => {}); // Reported through the returned promise.
       try {
@@ -229,22 +279,24 @@ export async function answerInvite(inviteCode: string, options: { timeoutMs?: nu
   await pc.setLocalDescription(await pc.createOffer());
   await gatherCandidates(pc);
   const own = parseSdp(pc.localDescription!.sdp);
-  const offset = await clockOffset();
+  const clock = await clockMeasurement();
+  const offset = clock?.offset ?? 0;
   const startsAt = Date.now() + startDelayMs;
-  const reply = encodeSession('reply', { ...own, start: Math.round(startsAt + offset) });
-  log.add(`reply made: ${own.candidates.map(candidate => candidate.type).join(', ')}; clock ${offset >= 0 ? 'behind' : 'ahead'} by ${Math.abs(Math.round(offset))} ms; starting in ${(startDelayMs / 1000).toFixed(0)} s`);
+  const start = Math.round(startsAt + offset);
+  const reply = encodeSession('reply', { ...own, start });
+  log.add(`reply made: ${own.candidates.map(candidate => candidate.type).join(', ')}; start set for ${serverTime(start, 0)} server time; ${describeClock(clock)}; starting in ${(startDelayMs / 1000).toFixed(0)} s`);
   let unusable: (error: Error) => void = () => {};
   const rejected = new Promise<never>((_, reject) => { unusable = reject; });
   const connected = Promise.race([linkWhenOpen(pc, channels, startDelayMs + timeoutMs, JOIN_FAILURE), rejected]);
   connected.catch(() => {}); // Reported through the returned promise.
   const timer = setTimeout(() => {
-    log.add('starting');
+    log.add(`starting at ${serverTime(Date.now(), offset)} server time`);
     // The host's invite is used here as the answer to our offer: the host is the DTLS server, this side the client.
     pc.setRemoteDescription({ type: 'answer', sdp: buildSdp({ ...host, setup: 'passive' }) }).catch(() => {
       log.add('the invite could not be used');
       pc.close();
       unusable(new CodeError('That invite code could not be used. Ask the host for a new one.'));
     });
-  }, startDelayMs);
+  }, Math.max(0, startsAt - Date.now()));
   return { reply, startsAt, connected, log: () => log.text(), cancel: () => { clearTimeout(timer); pc.close(); } };
 }
