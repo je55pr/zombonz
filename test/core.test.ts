@@ -51,7 +51,7 @@ describe('world state', () => {
       godMode: false, noclip: false, noclipAnchor: null, sprinting: false, stance: 'stand', grounded: true,
       grenadeWindupTicks: 0, sprintTicks: 240, sprintRechargeDelayTicks: 0, aiming: false, spreadBloom: 0,
       recoveryDelayTicks: 0, meleeCooldownTicks: 0, meleeStrikeTicks: 0, hurtGraceTicks: 0, grenadeCharges: 2, mineCharges: 0,
-      repairRewardRound: 0, repairPointsEarned: 0,
+      bouncingBettyOwned: false, repairRewardRound: 0, repairPointsEarned: 0,
       holsteredWeapon: null, switchTicksRemaining: 0,
       yaw: 0, pitch: 0, health: 100, points: 500, pointsEarned: 500, kills: 0, headshots: 0,
       weapon: { weaponId: 'starter-pistol', cooldownTicks: 0, magazineAmmo: 8, reserveAmmo: 32, reloadTicksRemaining: 0 },
