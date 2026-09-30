@@ -82,8 +82,8 @@ export function clampPitch(pitch: number): number {
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-/** Only the host runs the zombies, so a zombie's stall and blow bookkeeping (see ZombieState) is no use to a client and stays off the wire. */
-const HOST_ONLY = new Set(['stall', 'anchorX', 'anchorZ', 'blow']);
+/** Only the host runs the zombies, so a zombie's stall and struck bookkeeping (see ZombieState) is no use to a client and stays off the wire. */
+const HOST_ONLY = new Set(['stall', 'anchorX', 'anchorZ', 'struck']);
 /** Positions and timers only need a tenth of a millimetre; trimming the digits halves a snapshot. */
 function trimNumbers(key: string, value: unknown): unknown {
   if (HOST_ONLY.has(key)) return undefined;

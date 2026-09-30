@@ -211,14 +211,16 @@ describe('a queue behind a fight', () => {
   });
 });
 
-describe('a blow has a window, not one tick', () => {
-  const { beforeTicks, afterTicks } = ZOMBIE_MELEE.hitWindow;
+describe('the blow is a swipe: live from contact to the end of the swing', () => {
+  const timing = swingTiming({ id: 'e:2', gait: 'run' });
+  /** The last tick of the swing, as an offset from contact. */
+  const last = timing.totalTicks - timing.windupTicks;
   /**
    * One swing at a player 1 m in front of a zombie that does not move, or 2 m if the script says so: `z(offset)` is the
-   * player's distance on the swing tick `offset` ticks from the moment of contact (`elapsed` counts real ticks, which run on
-   * while a held arm's swing tick does not). Gives the offsets the blow landed on.
+   * player's distance on the swing tick `offset` ticks from the moment of contact (the end of the wind-up). Gives the
+   * offsets the blow landed on.
    */
-  function swing(z: (offset: number, elapsed: number) => number, options: { grace?: number; gait?: ZombieGait; calls?: number[] } = {}): number[] {
+  function swing(z: (offset: number) => number, options: { grace?: number; gait?: ZombieGait } = {}): number[] {
     const zombie = createZombieState('e:2', { x: 0, y: 0, z: 0 }, 1, options.gait ?? 'run');
     zombie.yaw = 0;
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 1 });
@@ -228,10 +230,10 @@ describe('a blow has a window, not one tick', () => {
     let swung = false;
     for (let tick = 0; tick < 600; tick++) {
       const ticks = zombie.attackTicks;
-      player.position.z = ticks === 0 ? 1 : z(ticks - contact, tick - contact);
+      player.position.z = ticks === 0 ? 1 : z(ticks - contact);
       if (player.hurtGraceTicks > 0 && ticks > 0) player.hurtGraceTicks -= 1;
       const events = tickZombieMelee(zombie, [player]);
-      if (events.some(event => event.type === 'zombieAttacked')) { landed.push(ticks - contact); options.calls?.push(tick - contact); }
+      if (events.some(event => event.type === 'zombieAttacked')) landed.push(ticks - contact);
       if (zombie.attackTicks > 0) swung = true;
       else if (swung) break;
       player.health = 100;
@@ -240,25 +242,31 @@ describe('a blow has a window, not one tick', () => {
   }
   const IN = 1, OUT = 2;
 
-  it('lands a standing player\'s blow at the moment of contact, once', () => {
+  it('is about half the swing or a little more, from the end of the wind-up to the end', () => {
+    for (const gait of ['walk', 'run', 'sprint'] as const) for (const id of ['e:2', 'e:9', 'e:31'] as const) {
+      const { windupTicks, totalTicks } = swingTiming({ id, gait });
+      const share = (totalTicks - windupTicks + 1) / totalTicks;
+      expect(share, `${gait} ${id}`).toBeGreaterThan(0.45);
+      expect(share, `${gait} ${id}`).toBeLessThan(0.7);
+    }
+  });
+
+  it('lands a standing player\'s blow at contact, once', () => {
     expect(swing(() => IN)).toEqual([0]);
   });
 
-  it('lands on a player who was in reach as the arm came down and has stepped out by contact', () => {
-    expect(swing(offset => offset < 0 ? IN : OUT)).toEqual([0]);
-    // In reach only on the last tick of the lead-in still counts.
-    expect(swing(offset => offset === -1 ? IN : OUT)).toEqual([0]);
+  it('misses a player who is out of reach from before contact to the end, however close they were', () => {
+    expect(swing(offset => offset < 0 ? IN : OUT)).toEqual([]);
   });
 
-  it('misses a player who was out of reach for the whole window, however close they were before it', () => {
-    expect(swing(offset => offset < -beforeTicks ? IN : OUT)).toEqual([]);
+  it('lands the moment a player comes into reach at any point in the swipe, up to its last tick', () => {
+    for (const late of [1, 5, 12, Math.floor(last / 2), last]) {
+      expect(swing(offset => offset < late ? OUT : IN), `${late} ticks after contact`).toEqual([late]);
+    }
   });
 
-  it('lands on a player who comes into reach after contact, as soon as they do, until the window closes', () => {
-    // There is some follow-through (five ticks is a twelfth of a second), whatever the window is tuned to.
-    expect(swing(offset => offset < 5 ? OUT : IN), 'five ticks late').toEqual([5]);
-    for (let late = 1; late <= afterTicks; late++) expect(swing(offset => offset < late ? OUT : IN), `${late} ticks late`).toEqual([late]);
-    expect(swing(offset => offset < afterTicks + 1 ? OUT : IN), 'one tick past the window').toEqual([]);
+  it('has nothing left to land once the swing is over', () => {
+    expect(swing(offset => offset <= last ? OUT : IN)).toEqual([]);
   });
 
   it('is one blow a swing however long the player stays in reach', () => {
@@ -283,13 +291,12 @@ describe('a blow has a window, not one tick', () => {
     expect(blows).toBe(1);
   });
 
-  it('still waits, arm out, through another zombie\'s grace, and only while the player stays in reach', () => {
-    const calls: number[] = [];
-    expect(swing(() => IN, { grace: 20, calls })).toEqual([0]);
-    // Held at contact for the grace, then it lands: twenty ticks after contact, not at it.
-    expect(calls[0]).toBeGreaterThanOrEqual(19);
-    // Out of reach once the arm is held: the blow does not follow them.
-    expect(swing((_, elapsed) => elapsed < 3 ? IN : OUT, { grace: 20 })).toEqual([]);
+  it('lands when another zombie\'s grace ends, if the player is still in reach and the swing is not over', () => {
+    expect(swing(() => IN, { grace: 10 })).toEqual([10]);
+    // Out of reach by then: nothing follows them.
+    expect(swing(offset => offset < 5 ? IN : OUT, { grace: 10 })).toEqual([]);
+    // A grace that outlasts the swing costs the blow.
+    expect(swing(() => IN, { grace: last + 5 })).toEqual([]);
   });
 });
 
