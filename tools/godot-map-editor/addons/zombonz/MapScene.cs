@@ -5,7 +5,7 @@ using static MapDocument;
 /// <summary>Builds editable map handles without depending on an open editor window.</summary>
 public static class MapScene
 {
-    public static readonly string[] NewObjectKinds = { "Prop", "Greybox", "Collision box", "Zombie spawn", "Barrier", "Door", "Wall weapon", "Hazard", "Navigation node" };
+    public static readonly string[] NewObjectKinds = { "Prop", "Greybox", "Collision box", "Zombie spawn", "Barrier", "Door", "Wall weapon", "Barrel", "Jeep", "Truck", "Navigation node", "Perk machine", "Pack-a-Punch", "Equipment buy" };
 
     public static ZombonzMapRoot Build(JsonObject document, string sourceFile, bool previewAssets = true)
     {
@@ -38,7 +38,7 @@ public static class MapScene
         }
         var nodes = gameplay["navigation"]?["nodes"] as JsonArray ?? new JsonArray();
         for (var i = 0; i < nodes.Count; i++)
-            AddMarker(root, $"gameplay/navigation/nodes/{i}/position", (JsonObject)nodes[i]!["position"]!, "Nav " + Text(nodes[i]!["id"]), Colors.DarkGreen, groupName: "Routes");
+            AddMarker(root, $"gameplay/navigation/nodes/{i}/position", (JsonObject)nodes[i]!["position"]!, "Nav " + Text(nodes[i]!["id"]), Colors.DarkGreen, (JsonObject)nodes[i]!, "Routes");
         foreach (var field in new[] { "collisionBoxes", "shotBlockers" })
         {
             var boxes = Items(gameplay, field);
@@ -50,6 +50,7 @@ public static class MapScene
             for (var i = 0; i < boxes.Count; i++) AddBox(root, $"presentation/{field}/{i}", (JsonObject)boxes[i]!, $"{field} {i}", new Color(0.4f, 0.6f, 0.9f, 0.3f), "Geometry");
         }
         AddArray(root, presentation, "presentation", "props", "position", "Prop", new Color(0.6f, 0.45f, 0.3f));
+        MapGameplay.Prepare(root, document);
         if (previewAssets)
             foreach (var warning in MapPreview.Refresh(root, document)) GD.PushWarning(warning);
         return root;
@@ -148,13 +149,26 @@ public static class MapScene
                 item = AddBox(root, "new/gameplay/collisionBoxes", new JsonObject { ["min"] = Point(origin - Vector3.One / 2), ["max"] = Point(origin + Vector3.One / 2) }, "New collision", new Color(1, 0.2f, 0.2f, 0.25f), "Collision");
                 break;
             default:
-                var field = kind switch { "Zombie spawn" => "zombieSpawns", "Barrier" => "barriers", "Door" => "doors", "Wall weapon" => "wallWeapons", "Hazard" => "hazards", "Navigation node" => "navigation/nodes", _ => throw new ArgumentException("Unknown object type: " + kind) };
+                var field = kind switch { "Zombie spawn" => "zombieSpawns", "Barrier" => "barriers", "Door" => "doors", "Wall weapon" => "wallWeapons", "Hazard" or "Barrel" or "Jeep" or "Truck" => "hazards", "Navigation node" => "navigation/nodes", "Perk machine" => "perkMachines", "Pack-a-Punch" => "packAPunch", "Equipment buy" => "equipment", _ => throw new ArgumentException("Unknown object type: " + kind) };
                 item = AddMarker(root, "new/gameplay/" + field, Point(origin), "New " + kind, Colors.Cyan);
+                item.GameplayType = field == "navigation/nodes" ? "routePoint" : field;
+                item.HazardKind = kind == "Jeep" ? "jeep" : kind == "Truck" ? "truck" : "barrel";
+                if (kind == "Door") { item.Width = 2.4f; item.Cost = 1000; }
+                if (kind == "Wall weapon") { item.WeaponId = "kar98k"; item.Position += Vector3.Up; }
+                if (kind == "Perk machine") item.Position += Vector3.Up;
+                if (kind == "Pack-a-Punch") item.Cost = 5000;
+                if (kind == "Equipment buy") item.Cost = 1000;
                 break;
         }
         item.Kind = "new";
         item.ObjectId = "new-" + kind.ToLowerInvariant().Replace(' ', '-');
+        var baseId = item.ObjectId;
+        var suffix = 2;
+        while (MapPreview.ItemsIn(root).Any(other => other != item && other.ObjectId == item.ObjectId)) item.ObjectId = baseId + "-" + suffix++;
+        // New objects have no array index yet; use a unique temporary path for linked children.
+        if (kind is "Barrier" or "Door") item.DataPath += "/" + Guid.NewGuid().ToString("N");
         if (kind == "Barrier") item.MaxBoards = 6;
+        MapGameplay.Prepare(root, document);
         return item;
     }
 }

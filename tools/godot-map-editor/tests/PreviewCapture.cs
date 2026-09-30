@@ -12,6 +12,49 @@ public partial class PreviewCapture : Node
             var viewport = new SubViewport { Size = new Vector2I(1280, 800), OwnWorld3D = true,
                 RenderTargetUpdateMode = SubViewport.UpdateMode.Always, Msaa3D = Viewport.Msaa.Msaa4X };
             AddChild(viewport);
+            if (OS.GetCmdlineUserArgs().Contains("--gameplay"))
+            {
+                foreach (var gallery in new[] { "hazards", "entries", "machines" })
+                {
+                    var source = "../../src/maps/data/" + (gallery == "machines" ? "asylum" : "bunker") + ".v1.json";
+                    var document = MapDocument.Read(ZombonzMapPlugin.SourcePath(source));
+                    var root = MapScene.Build(document, source);
+                    if (gallery == "hazards") { MapScene.AddNew(root, document, "Truck"); MapPreview.Refresh(root, document); }
+                    viewport.AddChild(root);
+                    root.GetNode<Node3D>("Geometry").Visible = false; root.GetNode<Node3D>("Props").Visible = false;
+                    foreach (var mesh in root.GetNode("Preview").GetChildren().OfType<MeshInstance3D>()) mesh.Visible = false;
+                    var items = MapPreview.ItemsIn(root).ToArray();
+                    foreach (var item in items) item.Visible = false;
+                    var types = gallery == "hazards" ? new[] { "barrel", "jeep", "truck" }
+                        : gallery == "entries" ? new[] { "doors", "barriers", "wallWeapons", "playerSpawn" }
+                        : new[] { "perkMachines", "mysteryBoxes", "packAPunch" };
+                    for (var index = 0; index < types.Length; index++)
+                    {
+                        var type = types[index];
+                        var item = items.First(item => gallery == "hazards" ? item.GameplayType == "hazards" && item.HazardKind == type : item.GameplayType == type);
+                        item.Visible = true; item.Position = new Vector3((index - (types.Length - 1) / 2f) * 3.8f, type == "wallWeapons" ? 1 : 0, 0);
+                        item.Rotation = Vector3.Zero;
+                        if (type == "perkMachines") item.Position += Vector3.Up;
+                        if (type == "mysteryBoxes") item.GetNode<Node3D>("Art").Position = Vector3.Zero;
+                        if (type == "wallWeapons")
+                        {
+                            var wall = new MeshInstance3D { Mesh = new BoxMesh { Size = new Vector3(2.5f, 2.8f, 0.12f) }, Position = item.Position + new Vector3(0, 0.4f, -0.07f),
+                                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.32f, 0.31f, 0.27f) } };
+                            root.AddChild(wall);
+                        }
+                    }
+                    root.AddChild(new MeshInstance3D { Mesh = new PlaneMesh { Size = new Vector2(40, 40) },
+                        MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.24f, 0.26f, 0.28f) } });
+                    var camera = new Camera3D { Fov = 60, Current = true, Position = new Vector3(7, 5, 13) };
+                    root.AddChild(camera); camera.LookAt(new Vector3(0, 1, 0));
+                    for (var frame = 0; frame < 12; frame++) await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+                    using var capture = viewport.GetTexture().GetImage();
+                    var path = System.IO.Path.Combine(output, "godot-gameplay-" + gallery + ".png");
+                    if (capture.SavePng(path) != Error.Ok) throw new IOException("Could not capture " + path);
+                    GD.Print(path); root.Free();
+                }
+                GetTree().Quit(); return;
+            }
             foreach (var id in new[] { "bunker", "asylum" })
             {
                 var source = $"../../src/maps/data/{id}.v1.json";

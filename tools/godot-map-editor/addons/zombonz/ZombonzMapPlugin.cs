@@ -10,6 +10,7 @@ public partial class ZombonzMapPlugin : EditorPlugin
     private Label _message = null!;
     private OptionButton _addKind = null!;
     private ZombonzMapInspector? _inspector;
+    private readonly List<(CheckButton Button, Func<ZombonzMapRoot, bool> Read)> _previewToggles = new();
 
     public override void _EnterTree()
     {
@@ -19,6 +20,12 @@ public partial class ZombonzMapPlugin : EditorPlugin
         _controls.AddChild(_sourceInput);
         AddButton("Import map into scene", ImportMap);
         AddButton("Refresh models and textures", RefreshPreview);
+        AddPreviewToggle("Labels", root => root.ShowLabels, (root, value) => root.ShowLabels = value);
+        AddPreviewToggle("Spawn guides", root => root.ShowSpawns, (root, value) => root.ShowSpawns = value);
+        AddPreviewToggle("Entry routes", root => root.ShowRoutes, (root, value) => root.ShowRoutes = value);
+        AddPreviewToggle("Collision boxes", root => root.ShowCollision, (root, value) => root.ShowCollision = value);
+        AddPreviewToggle("Purchased wall guns", root => root.ShowPurchasedWallGuns, (root, value) => root.ShowPurchasedWallGuns = value);
+        SceneChanged += SyncPreviewToggles;
         _addKind = new OptionButton();
         foreach (var kind in MapScene.NewObjectKinds) _addKind.AddItem(kind);
         _controls.AddChild(_addKind);
@@ -44,8 +51,30 @@ public partial class ZombonzMapPlugin : EditorPlugin
 
     public override void _ExitTree()
     {
+        SceneChanged -= SyncPreviewToggles;
+        _previewToggles.Clear();
         if (_inspector is not null) { RemoveInspectorPlugin(_inspector); _inspector.Dispose(); _inspector = null; }
         if (_dock is not null) { RemoveDock(_dock); _dock.QueueFree(); _dock = null; }
+    }
+
+    private void AddPreviewToggle(string text, Func<ZombonzMapRoot, bool> read, Action<ZombonzMapRoot, bool> write)
+    {
+        var button = new CheckButton { Text = text, Disabled = true, TooltipText = "Editor preview only; does not change gameplay." };
+        button.Toggled += value =>
+        {
+            if (EditorInterface.Singleton.GetEditedSceneRoot() is not ZombonzMapRoot root) return;
+            write(root, value); MapPreview.ApplyVisibility(root); EditorInterface.Singleton.MarkSceneAsUnsaved();
+        };
+        _controls.AddChild(button); _previewToggles.Add((button, read));
+    }
+
+    private void SyncPreviewToggles(Node scene)
+    {
+        foreach (var (button, read) in _previewToggles)
+        {
+            button.Disabled = scene is not ZombonzMapRoot;
+            if (scene is ZombonzMapRoot root) button.SetPressedNoSignal(read(root));
+        }
     }
 
     private void AddButton(string text, Action action)
@@ -94,7 +123,9 @@ public partial class ZombonzMapPlugin : EditorPlugin
         var root = OpenRoot();
         var kind = _addKind.GetItemText(_addKind.Selected);
         var item = MapScene.AddNew(root, OpenDocument(), kind);
+        if (kind == "Collision box") root.ShowCollision = true;
         MapPreview.Refresh(root, OpenDocument());
+        SyncPreviewToggles(root);
         EditorInterface.Singleton.EditNode(item);
         EditorInterface.Singleton.MarkSceneAsUnsaved();
         _message.Text = "Added " + kind + ". Set its ID and fields in the Inspector, then export.";
@@ -135,6 +166,9 @@ public partial class ZombonzMapPlugin : EditorPlugin
             if (result != 0) { _message.Text = "Export failed. Node.js is required. " + OutputText(output); return false; }
         }
         foreach (var addition in pending) { addition.Item.DataPath = addition.Path; addition.Item.Kind = addition.Kind; }
+        // Keep existing scenes in sync with references updated when a barrier ID changes.
+        foreach (var item in MapPreview.ItemsIn(root).Where(item => item.GameplayType == "zombieSpawns"))
+            item.BarrierId = MapDocument.Text(MapDocument.AtPath(document, item.DataPath)?["barrierId"]);
         EditorInterface.Singleton.SaveScene();
         _message.Text = $"Exported {changes.Count} change(s) to {SourcePath(root.SourceFile)}";
         return true;

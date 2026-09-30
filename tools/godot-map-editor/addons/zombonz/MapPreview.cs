@@ -9,17 +9,20 @@ public static class MapPreview
     {
         var assets = new MapPreviewAssets();
         var warnings = new List<string>();
+        MapGameplay.Prepare(root, document);
         foreach (var item in ItemsIn(root).ToArray())
         {
             var isProp = item.Kind == "prop" || item.DataPath == "new/presentation/props";
             var isBox = item.DataPath.StartsWith("presentation/greybox/") || item.DataPath.StartsWith("presentation/scenery/")
                 || item.DataPath == "new/presentation/greybox";
-            if (!isProp && !isBox) continue;
+            var isGameplay = item.GameplayType.Length > 0 && item.GameplayType != "collision";
+            if (!isProp && !isBox && !isGameplay) continue;
             // Keep the old view until a complete replacement is ready (missing assets stay editable).
             Node3D? art = null;
             try
             {
-                if (isProp)
+                if (isGameplay) art = GameplayPreview.Build(assets, root, item, document);
+                else if (isProp)
                 {
                     art = assets.Prop(item.Asset, item.BaseSize * item.Scale.Abs());
                     // The JSON stores a target size; the browser fits uniformly instead of stretching.
@@ -73,7 +76,27 @@ public static class MapPreview
             catch (Exception error) { warnings.Add("Prism: " + error.Message); }
         }
         Own(root, extras);
+        ApplyVisibility(root);
         return warnings.Distinct().ToList();
+    }
+
+    public static void ApplyVisibility(ZombonzMapRoot root)
+    {
+        void Visit(Node node)
+        {
+            if (node is Label3D label && label.Name == "EditorLabel") label.Visible = root.ShowLabels;
+            if (node is Node3D spatial && node.Name == "PurchasedGun") spatial.Visible = root.ShowPurchasedWallGuns;
+            if (node is ZombonzMapItem item)
+            {
+                if (item.GameplayType == "routePoint") item.Visible = root.ShowRoutes;
+                if (item.GameplayType is "playerSpawn" or "zombieSpawns") item.Visible = root.ShowSpawns;
+                if (item.GameplayType == "collision") item.Visible = root.ShowCollision;
+            }
+            foreach (var child in node.GetChildren()) Visit(child);
+        }
+        Visit(root);
+        if (root.GetNodeOrNull<Node3D>("Collision") is { } collision) collision.Visible = root.ShowCollision;
+        if (root.GetNodeOrNull<Node3D>("Routes") is { } routes) routes.Visible = root.ShowRoutes;
     }
 
     private static ArrayMesh Prism(JsonObject prism)
@@ -149,7 +172,7 @@ public static class MapPreview
         foreach (var child in node.GetChildren()) foreach (var descendant in ItemsIn(child)) yield return descendant;
     }
 
-    private static void Own(ZombonzMapRoot root, Node node)
+    internal static void Own(ZombonzMapRoot root, Node node)
     {
         if (node != root) node.Owner = root;
         // Cached GLBs are scene instances; their internal ownership must remain intact.

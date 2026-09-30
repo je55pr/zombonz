@@ -19,4 +19,15 @@ public partial class ZombonzMapItem : Node3D
     [Export] public int AmmoCost { get; set; } = 100;
     [Export] public string BarrierId { get; set; } = "";
     [Export] public string Material { get; set; } = "wall";
+
+    [ExportGroup("Game object")]
+    [Export] public string GameplayType { get; set; } = "";
+    [Export(PropertyHint.Enum, "barrel,jeep,truck")] public string HazardKind { get; set; } = "barrel";
+    [Export(PropertyHint.Enum, "juggernog,double-tap,speed-cola,quick-revive")] public string PerkId { get; set; } = "juggernog";
+    [Export(PropertyHint.Range, "0.1,20,0.05,or_greater")] public float Width { get; set; } = 1.5f;
+    [Export] public Vector3 Outward { get; set; } = Vector3.Forward;
+    [Export(PropertyHint.Enum, "planks,debris")] public string DoorAppearance { get; set; } = "planks";
+    [Export] public string DoorLabel { get; set; } = "";
+    [Export] public float InitialYaw { get; set; }
+    [Export] public Vector3 PreviewOffset { get; set; }
 }
