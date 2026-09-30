@@ -97,22 +97,24 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
   zombie's own tempo adds up to 12 ticks to the wind-up and 10 to the recovery, fixed by its id, so a group never swings in step.
 - **The client plays the attack clip from the swing's tick count** (`attackClipTime`), so the arm comes down on the tick the
   blow lands, and the head and arms the hit volumes use are where they are drawn. The zombie grunts as it starts.
-- **Reach is real.** A swing starts within 1.1 m across the floor (0.9 m for a crawler) and a blow still lands out to 1.5 m (1.3 for a crawler),
+- **Reach is real.** A swing starts within 1.1 m across the floor (0.9 m for a crawler) and a blow still lands out to 1.8 m (1.6 for a crawler),
   the lunge a player can step back out of; the target must be on the same floor (within 0.9 m) with nothing solid between
   their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
   zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). The blow is aimed where the player is when it lands,
   so a player who steps back out of reach in the wind-up is missed.
-- **The blow is a swipe, not one tick** (issue #210). It is live from contact, the tick the arm comes down at the end of the
-  wind-up, to the end of the swing: about half the animation, a little more (51 to 68%, depending on the gait and the zombie's own tempo, from 35 to 65
-  ticks). Whoever is in reach at any point in that stretch is hit, the moment they are in it, once: a swing is one blow, whoever
-  it lands on. A player standing in reach is hit on exactly the contact tick; one who steps out before contact is missed, one who
-  comes into reach later in the swipe is not. A blow that finds the player in another zombie's grace lands when the grace ends,
-  if they are still in reach and the swing is not over (the arm does not stop and wait).
+- **The blow is a swipe, live from a tenth of the way in** (issue #210). It goes live 10% of the way through the swing
+  (`ZOMBIE_MELEE.liveFrom`: 6 to 12 ticks, well before the arm is drawn coming down) and stays live to the end: 90% of the
+  animation. Whoever is in reach at any point in that stretch is hit, the moment they are in it, once: a swing is one blow,
+  whoever it lands on. A player standing in reach is hit on the first live tick; one who is out of reach until then is hit the
+  moment they come in; one who is out of reach for the whole stretch is missed. (It used to go live only as the arm came down,
+  40 to 45% in, so a player who stayed out of reach until then and stepped back at the end avoided it altogether.) A blow
+  that finds the player in another zombie's grace lands when the grace ends, if they are still in reach and the swing is not
+  over (the arm does not stop and wait).
 - **A zombie keeps coming while it swings, and reads where the player is going** (issue #210). A swing is a lunge on the move,
   not a halt: the zombie closes on the player through the wind-up and the recovery, and stops only when it touches them (it
   never pushes them along). It also starts a swing when the player, at the speed and heading they have now, and it, still
   coming, will be within strike range as the wind-up ends (looking at most 2 m of their travel between them ahead), so it
-  begins about 3 m out for a player running at it and the blow arrives with them, rather than the player getting in and out
+  begins about 4 m out for a player running at it and the blow arrives with them, rather than the player getting in and out
   untouched. A player who stops short, turns off or backs away once it has begun is missed if that takes them out of reach;
   one who turns away before it begins is not swung at.
 - **Windows.** A zombie tearing boards swipes once a board is gone, at a player inside within 1 m of the window plane and
@@ -133,12 +135,14 @@ the player standing still and the zombies arriving together (`test/zombie-melee.
 
 | Zombies | Walker: first blow / down | Runner | Sprinter |
 | --- | --- | --- | --- |
-| 1 | 47 / 158 (2.6 s) | 35 / 122 (2.0 s) | 27 / 98 (1.6 s) |
-| 2 | 47 / 65 (1.1 s) | 35 / 53 (0.9 s) | 27 / 45 (0.8 s) |
-| 4 | 47 / 65 (1.1 s) | 35 / 53 (0.9 s) | 27 / 45 (0.8 s) |
-| 6 | 43 / 61 (1.0 s) | 31 / 49 (0.8 s) | 23 / 41 (0.7 s) |
+| 1 | 12 / 123 (2.0 s) | 10 / 97 (1.6 s) | 8 / 79 (1.3 s) |
+| 2 | 12 / 30 (0.5 s) | 10 / 28 (0.5 s) | 8 / 26 (0.4 s) |
+| 4 | 12 / 30 (0.5 s) | 10 / 28 (0.5 s) | 8 / 26 (0.4 s) |
+| 6 | 12 / 30 (0.5 s) | 10 / 28 (0.5 s) | 8 / 26 (0.4 s) |
 
-Before, two or more zombies in reach put a player down on the first tick they met.
+The first blow lands a tenth of the way into the swing, so two zombies arriving together put a player down in about half a
+second (the second blow comes one grace later, 0.3 s). Issue #131 found two arriving together near-instant death; the first
+fix made it 1.3 s, and this pass (issue #210) has taken it back to about 0.5 s on purpose, for crowds that are dangerous.
 
 ## Dismemberment and crawlers (issues #135 and #139)
 
@@ -160,7 +164,7 @@ left and right arm, left and right leg) rides in snapshots and replays like any 
 
 A zombie with a leg gone and life left is a **crawler**: `zombiePose` puts it in the crawl pose (a low body with the head up
 and the arms reaching), it moves at most a metre a second (`CRAWLER.speed`), is only 0.7 m tall to walls (so it passes under
-what a standing zombie cannot), starts a swing from 0.9 m and lands it from 1.3 m rather than 1.1 and 1.5, and cannot swipe
+what a standing zombie cannot), starts a swing from 0.9 m and lands it from 1.6 m rather than 1.1 and 1.8, and cannot swipe
 through a window. It still hunts, hits, tears boards and vaults, and is killed and paid for like any zombie. A zombie shot off
 a wall it is climbing cannot hold on: it falls, dead, and the shooter is credited (`method: 'fall'`).
 

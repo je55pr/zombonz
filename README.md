@@ -190,7 +190,7 @@ always opens a gap (see [zombie difficulty](docs/zombie-difficulty.md)), but zom
 Zombie health rises with each round. Headshots deal double damage (quadruple with the Kar98k, which one-shots through round 3;
 the starting pistol takes two on round 1), and only where the head is drawn: a zombie is ten capsules that follow what it is doing
 (see [docs/combat.md](docs/combat.md); `?hitboxes=1` draws them). Hip-fire wanders, a lot at range and on the move, so aim for
-anything far off. A zombie winds up before it hits and its blows land one at a time, so two arriving together do not down you at once.
+anything far off. A zombie's blow goes live a tenth of the way into its swing and lasts to the end of it, so being in its reach (1.8 m) at any point hurts; blows land one at a time, 0.3 s apart, so two arriving together down you in about half a second.
 Strong hits, and every explosion, can take a zombie's limbs off (never the pistol's or the knife's): a head goes with the shot that
 kills, and a zombie that loses a leg and lives crawls after you, slower and from a shorter reach. Knife swings
 hit one nearby zombie in front of the player, and health recovers after five
