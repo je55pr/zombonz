@@ -7,7 +7,7 @@ public static class MapScene
 {
     public static readonly string[] NewObjectKinds = { "Prop", "Greybox", "Collision box", "Zombie spawn", "Barrier", "Door", "Wall weapon", "Hazard", "Navigation node" };
 
-    public static ZombonzMapRoot Build(JsonObject document, string sourceFile)
+    public static ZombonzMapRoot Build(JsonObject document, string sourceFile, bool previewAssets = true)
     {
         var metadata = (JsonObject)document["metadata"]!;
         var root = new ZombonzMapRoot { Name = Text(metadata["id"]).Capitalize() + "Map", SourceFile = sourceFile };
@@ -50,6 +50,8 @@ public static class MapScene
             for (var i = 0; i < boxes.Count; i++) AddBox(root, $"presentation/{field}/{i}", (JsonObject)boxes[i]!, $"{field} {i}", new Color(0.4f, 0.6f, 0.9f, 0.3f), "Geometry");
         }
         AddArray(root, presentation, "presentation", "props", "position", "Prop", new Color(0.6f, 0.45f, 0.3f));
+        if (previewAssets)
+            foreach (var warning in MapPreview.Refresh(root, document)) GD.PushWarning(warning);
         return root;
     }
 
@@ -68,7 +70,7 @@ public static class MapScene
         var material = new StandardMaterial3D { AlbedoColor = color };
         if (color.A < 1) material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
         if (unshaded) material.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
-        var view = new MeshInstance3D { Mesh = mesh, MaterialOverride = material };
+        var view = new MeshInstance3D { Name = "Handle", Mesh = mesh, MaterialOverride = material };
         item.AddChild(view); view.Owner = root;
     }
 
@@ -113,6 +115,7 @@ public static class MapScene
             BaseSize = prop["size"] is null ? Vector3.One : Vector(prop["size"])
         };
         Attach(root, item, new BoxMesh { Size = item.BaseSize }, new Color(0.6f, 0.45f, 0.3f, 0.5f), "Props");
+        item.GetNode<MeshInstance3D>("Handle").Position = new Vector3(0, item.BaseSize.Y / 2, 0);
         return item;
     }
 
