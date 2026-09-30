@@ -38,16 +38,18 @@ describe('timed power-ups', () => {
     const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
     tryDropPowerup(state, zombie, [], 42, 1, forced);
     const collector = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
-    collector.weapon.magazineAmmo = 2; collector.weapon.reserveAmmo = 1;
+    collector.weapon.magazineAmmo = 2; collector.weapon.reserveAmmo = 1; collector.mineCharges = 0;
     collector.holsteredWeapon = createWeaponState('bar'); collector.holsteredWeapon.reserveAmmo = 3;
     const teammate = createPlayerState('e:2', { x: 10, y: 0, z: 0 });
-    teammate.weapon.reserveAmmo = 0;
+    teammate.weapon.reserveAmmo = 0; teammate.mineCharges = 1;
     expect(collectPowerups(state, [teammate, collector], [], forced)).toEqual([
       { type: 'powerupCollected', dropId: 'p:1', kind: 'maxAmmo', playerId: 'e:1' },
     ]);
-    expect(collector.weapon).toMatchObject({ magazineAmmo: 2, reserveAmmo: 32 });
+    expect(collector.weapon).toMatchObject({ magazineAmmo: 2, reserveAmmo: 80 });
     expect(collector.holsteredWeapon.reserveAmmo).toBe(140);
-    expect(teammate.weapon.reserveAmmo).toBe(32);
+    expect(teammate.weapon.reserveAmmo).toBe(80);
+    expect(collector.mineCharges).toBe(2);
+    expect(teammate.mineCharges).toBe(2);
     expect(state.drops).toEqual([]);
   });
 
@@ -228,13 +230,14 @@ describe('classic power-up drop rules', () => {
     expect(events.map(event => event.type)).toContain('powerupSpawned');
   });
 
-  it('Max Ammo also refills grenades', () => {
+  it('Max Ammo refills grenades and configured equipment to their caps', () => {
     const state = createPowerupState(), zombie = createZombieState('e:9', { x: 0, y: 0, z: 0 }, 1);
     tryDropPowerup(state, zombie, [], 42, 1, forced);
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
-    player.grenadeCharges = 0;
+    player.grenadeCharges = 0; player.mineCharges = 1;
     collectPowerups(state, [player], [], forced);
     expect(player.grenadeCharges).toBe(4);
+    expect(player.mineCharges).toBe(2);
   });
 });
 

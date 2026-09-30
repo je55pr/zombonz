@@ -21,7 +21,10 @@ export interface WeaponDefinition {
   fireIntervalTicks: number;
   trigger: 'semi' | 'auto';
   magazineSize: number;
+  /** Reserve ammo on a fresh copy of this weapon. */
   startingReserveAmmo: number;
+  /** Maximum reserve ammo after refills. Defaults to `startingReserveAmmo` when omitted. */
+  maxReserveAmmo?: number;
   reloadTicks: number;
   /** Half-angle of the cone shots land in when fired from the hip, standing still, before the cone widens with movement and bloom. */
   hipSpreadRadians: number;
@@ -66,7 +69,7 @@ export function hitZoneMultiplier(definition: WeaponDefinition, zone: HitZoneId)
 export const WEAPON_DEFINITIONS: Readonly<Record<string, WeaponDefinition>> = {
   'starter-pistol': {
     id: 'starter-pistol', name: 'M1911', damage: 50, range: 60, fireIntervalTicks: 12, trigger: 'semi', gibs: false,
-    magazineSize: 8, startingReserveAmmo: 32, reloadTicks: 90, hipSpreadRadians: 0.045,
+    magazineSize: 8, startingReserveAmmo: 32, maxReserveAmmo: 80, reloadTicks: 90, hipSpreadRadians: 0.045,
     penetration: { maxTargets: 2, damageRetention: 0.7 },
   },
   kar98k: {
@@ -230,6 +233,11 @@ export function weaponDefinition(id: string): WeaponDefinition | undefined {
 
 export function weaponName(id: string): string {
   return weaponDefinition(id)?.name ?? id.toUpperCase();
+}
+
+/** Maximum reserve a refill may give this weapon. */
+export function weaponReserveCapacity(definition: WeaponDefinition): number {
+  return definition.maxReserveAmmo ?? definition.startingReserveAmmo;
 }
 
 export function createWeaponState(weaponId: string): WeaponState {
