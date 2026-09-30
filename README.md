@@ -162,7 +162,12 @@ The bunker uses imported environment materials and props alongside procedural de
 boarded windows, overhead beams,
 stairwell openings, scattered rubble, lamps, moonlight and an exterior treeline.
 Dimensions and props are an approximation, not a one-to-one recreation of the original game.
-Zombies spawn outside and follow eight ground-level plus four upstairs window approaches. They tear out
+Zombies spawn outside and follow eight ground-level plus four upstairs window approaches. Before each spawn,
+entrances that cannot currently route to any standing player are excluded. Of the remaining entrances, the director
+prefers ones at least 10 m from every standing player and hidden behind world geometry; farther safe entrances receive
+more deterministic weight. If every route-valid entrance is visible or too close, all remain eligible as a weighted
+fallback so a round cannot stall. Scatter points behind one barrier share that entrance's weight rather than multiplying
+its odds. They tear out
 the six boards one at a time, in a random order (any board still up may go, and rebuilding
 fills a random gap; the match seed decides, so every player sees the same), climb through the
 sill, then pursue players through open rooms and stairs. The boards sit in two groups, three

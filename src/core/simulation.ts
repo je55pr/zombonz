@@ -37,7 +37,7 @@ import {
   createRoundState, updateRoundState, type RoundConfig, type RoundEvent, type RoundState,
 } from './rounds.ts';
 import {
-  createSpawnDirector, remainingSpawns, tickSpawnDirector, DEFAULT_SPAWN_CONFIG,
+  createSpawnDirector, remainingSpawns, spawnSelectionWeights, tickSpawnDirector, DEFAULT_SPAWN_CONFIG,
   type SpawnDirectorConfig, type SpawnDirectorState, type ZombieSpawnPoint,
 } from './spawning.ts';
 import { SimulationProbe } from './profiling.ts';
@@ -579,25 +579,36 @@ export class GameSimulation {
     probe?.lap('blasts');
     const navigate = this.navigationQuery();
     if (this.state.round.phase === 'spawning' && this.state.spawnDirector) {
-      // Never strand a round's enemies behind unopened rooms or stair debris.
+      // Never strand a round's enemies behind unopened rooms or stair debris. Once route-valid entrances are known,
+      // prefer ones that are hidden and not close to any standing player; if none are safe, weighted fallback keeps
+      // the round moving instead of deadlocking the spawn director.
       const director = this.state.spawnDirector;
       const needsSpawn = director.spawned < director.total && director.ticksUntilNext <= 0
         && livingEntityCount(world, 'zombie') < (this.spawnConfig?.maxAlive ?? DEFAULT_SPAWN_CONFIG.maxAlive);
-      // The director still ticks every fixed step. Only resolve routes when it can spawn.
+      const alivePlayers = livingPlayers(world);
+      const standingPlayers = alivePlayers.filter(player => !player.downed);
+      const routePlayers = standingPlayers.length ? standingPlayers : alivePlayers;
+      // The director still ticks every fixed step. Only resolve routes and visibility when it can spawn.
       const availableSpawns = this.map.zombieSpawns.map((spawn, index) => ({ spawn, index }))
         .filter(({ spawn }) => {
           if (director.round < (spawn.minRound ?? 1)) return false;
           if (!needsSpawn) return true;
           const destination = spawn.barrierId
             ? this.state.barriers.find(barrier => barrier.id === spawn.barrierId)!.insidePoint : spawn;
-          return !this.map.navigationGraph || livingPlayers(world).some(player => navigate(destination, player.position) !== destination);
+          return !this.map.navigationGraph || routePlayers.some(player => navigate(destination, player.position) !== destination);
         });
+      const spawnWeights = needsSpawn ? spawnSelectionWeights(
+        availableSpawns.map(({ spawn }) => spawn),
+        standingPlayers.map(player => ({ position: player.position, eyeHeight: playerEyeHeight(player) })),
+        this.shotBlockers(),
+      ) : undefined;
       const request = tickSpawnDirector(
         this.state.spawnDirector,
         livingEntityCount(world, 'zombie'),
         availableSpawns.map(({ spawn }) => spawn),
         world.seed,
         this.spawnConfig,
+        spawnWeights,
       );
       if (request) {
         const id = allocateEntityId(world);
@@ -613,7 +624,9 @@ export class GameSimulation {
           const next = barrier.approachPath[1] ?? barrier.position;
           zombie.yaw = Math.atan2(next.x - request.position.x, next.z - request.position.z);
         } else {
-          const nearest = livingPlayers(world)[0];
+          const nearest = routePlayers.reduce<PlayerState | null>((best, player) => !best
+            || Math.hypot(player.position.x - request.position.x, player.position.z - request.position.z)
+              < Math.hypot(best.position.x - request.position.x, best.position.z - request.position.z) ? player : best, null);
           if (nearest) zombie.yaw = Math.atan2(nearest.position.x - request.position.x, nearest.position.z - request.position.z);
         }
         addEntity(world, zombie);

@@ -1,7 +1,84 @@
 import { SeededRng } from './rng.ts';
+import type { CollisionBox } from './collision.ts';
+import { clearLine } from './ray.ts';
 import type { Vec3 } from './types.ts';
 
 export interface ZombieSpawnPoint extends Vec3 { barrierId?: string; minRound?: number }
+
+export interface SpawnObserver {
+  position: Vec3;
+  eyeHeight: number;
+}
+
+export const SPAWN_SAFETY = {
+  /** A spawn closer than this to any standing player is avoided while a safer entrance exists. */
+  minimumDistance: 10,
+  /** Aim at roughly a zombie's chest when asking whether a player has direct line of sight. */
+  sightHeight: 1.15,
+  /** Visible entrances remain possible only as a fallback, but are less likely than hidden ones. */
+  visibleFallbackWeight: 0.25,
+  /** Beyond this distance, extra metres stop increasing an entrance's lottery weight. */
+  distanceWeightCap: 30,
+} as const;
+
+/**
+ * Gives every spawn point a deterministic-selection weight while treating all points behind the same
+ * barrier as one entrance. Safety is evaluated per scatter point, so one visible dot does not condemn
+ * hidden siblings. If any entrance has at least one safe point, entrances with none receive zero
+ * weight; otherwise all route-valid entrances stay eligible as a fallback.
+ */
+export function spawnSelectionWeights(
+  spawnPoints: readonly ZombieSpawnPoint[],
+  observers: readonly SpawnObserver[],
+  blockers: readonly CollisionBox[],
+): number[] {
+  if (!spawnPoints.length) return [];
+  const groups = new Map<string, number[]>();
+  spawnPoints.forEach((spawn, index) => {
+    const key = spawn.barrierId ?? `direct:${index}`;
+    const list = groups.get(key);
+    if (list) list.push(index); else groups.set(key, [index]);
+  });
+
+  const points = spawnPoints.map(spawn => {
+    let nearest = Infinity;
+    let visible = false;
+    for (const observer of observers) {
+      nearest = Math.min(nearest, Math.hypot(spawn.x - observer.position.x, spawn.z - observer.position.z));
+      if (!visible && clearLine(
+        { x: observer.position.x, y: observer.position.y + observer.eyeHeight, z: observer.position.z },
+        { x: spawn.x, y: spawn.y + SPAWN_SAFETY.sightHeight, z: spawn.z }, blockers,
+      )) visible = true;
+    }
+    const safe = observers.length === 0 || (!visible && nearest >= SPAWN_SAFETY.minimumDistance);
+    const distanceWeight = observers.length === 0 ? 1
+      : Math.max(0.25, Math.min(SPAWN_SAFETY.distanceWeightCap, nearest) / SPAWN_SAFETY.minimumDistance);
+    const score = distanceWeight * (visible ? SPAWN_SAFETY.visibleFallbackWeight : 1);
+    return { safe, score };
+  });
+
+  const scoredGroups = [...groups.values()].map(indices => ({
+    indices,
+    safeIndices: indices.filter(index => points[index].safe),
+  }));
+  const hasSafeEntrance = scoredGroups.some(group => group.safeIndices.length > 0);
+  const weights = Array(spawnPoints.length).fill(0) as number[];
+
+  for (const group of scoredGroups) {
+    const eligible = hasSafeEntrance ? group.safeIndices : group.indices;
+    if (!eligible.length) continue;
+
+    // The entrance receives the average score of its eligible scatter points, then that total is
+    // redistributed inside the entrance. Adding more authored dots therefore does not multiply its odds.
+    const entranceWeight = eligible.reduce((sum, index) => sum + points[index].score, 0) / eligible.length;
+    const pointTotal = eligible.reduce((sum, index) => sum + points[index].score, 0);
+    for (const index of eligible) {
+      weights[index] = pointTotal > 0 ? entranceWeight * points[index].score / pointTotal
+        : entranceWeight / eligible.length;
+    }
+  }
+  return weights;
+}
 
 /** Fixed-cadence, linear round sizes; useful for tests and development previews. */
 export interface LinearSpawnConfig {
@@ -88,9 +165,25 @@ export function remainingSpawns(state: SpawnDirectorState | null): number {
   return state ? Math.max(0, state.total - state.spawned) : 0;
 }
 
-function chooseSpawnIndex(seed: number, round: number, spawned: number, count: number): number {
+function chooseSpawnIndex(seed: number, round: number, spawned: number, count: number, weights?: readonly number[]): number {
   const mixedSeed = (seed ^ Math.imul(round, 2654435761) ^ Math.imul(spawned + 1, 2246822507)) >>> 0;
-  return new SeededRng(mixedSeed).int(0, count);
+  const rng = new SeededRng(mixedSeed);
+  if (weights?.length === count) {
+    const total = weights.reduce((sum, weight) => sum + (Number.isFinite(weight) && weight > 0 ? weight : 0), 0);
+    if (total > 0) {
+      let pick = rng.next() * total;
+      let last = 0;
+      for (let index = 0; index < count; index++) {
+        const weight = Number.isFinite(weights[index]) && weights[index] > 0 ? weights[index] : 0;
+        if (weight <= 0) continue;
+        last = index;
+        if (pick < weight) return index;
+        pick -= weight;
+      }
+      return last;
+    }
+  }
+  return rng.int(0, count);
 }
 export function tickSpawnDirector(
   state: SpawnDirectorState,
@@ -98,13 +191,14 @@ export function tickSpawnDirector(
   spawnPoints: readonly Vec3[],
   worldSeed: number,
   config: SpawnDirectorConfig = DEFAULT_SPAWN_CONFIG,
+  spawnWeights?: readonly number[],
 ): SpawnRequest | null {
   if (state.spawned >= state.total || aliveZombies >= config.maxAlive || spawnPoints.length === 0) return null;
   if (state.ticksUntilNext > 0) {
     state.ticksUntilNext -= 1;
     return null;
   }
-  const spawnIndex = chooseSpawnIndex(worldSeed, state.round, state.spawned, spawnPoints.length);
+  const spawnIndex = chooseSpawnIndex(worldSeed, state.round, state.spawned, spawnPoints.length, spawnWeights);
   const point = spawnPoints[spawnIndex];
   const request = { spawnIndex, position: { x: point.x, y: point.y, z: point.z } };
   state.spawned += 1;

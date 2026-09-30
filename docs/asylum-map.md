@@ -72,7 +72,10 @@ than appearing at the boards:
   wing's outer wall and cross its roof to the window.
 
 Each entry has three spots where its zombies appear, scattered about the start of its route, so a
-round's zombies come in spread out rather than single file. Routes, spawn spots, lanes and planted
+round's zombies come in spread out rather than single file. Those three points share one entrance-selection weight.
+An entry must currently route to a standing player; hidden entries at least 10 m from every standing player are preferred,
+and farther safe entries get more deterministic weight. If none are safe, all route-valid entries remain eligible as a
+weighted fallback so spawning cannot deadlock. Routes, spawn spots, lanes and planted
 trees are checked against every wall and piece of scenery by `test/entry-routes.test.ts`.
 
 ## Surroundings
