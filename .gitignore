@@ -6,4 +6,8 @@ coverage/
 .DS_Store
 .godot/
 tools/godot-map-editor/maps/*.tscn
+tools/godot-map-editor/maps/**/*.tscn
+tools/godot-map-editor/maps/**/*.gd-backup
+tools/godot-map-editor/.vs/
+tools/godot-map-editor/*.csproj.user
 .wrangler/

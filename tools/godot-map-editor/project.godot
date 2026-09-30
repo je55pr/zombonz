@@ -2,7 +2,10 @@ config_version=5
 
 [application]
 config/name="Zombonz Map Editor"
-config/features=PackedStringArray("4.3", "GL Compatibility")
+config/features=PackedStringArray("4.7", "C#", "GL Compatibility")
+
+[dotnet]
+project/assembly_name="ZombonzMapEditor"
 
 [editor_plugins]
 enabled=PackedStringArray("res://addons/zombonz/plugin.cfg")
