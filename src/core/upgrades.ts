@@ -99,6 +99,7 @@ export function upgradedDefinition(base: WeaponDefinition, spec: UpgradeSpec): W
     damage: Math.round(base.damage * (spec.damage ?? 2)),
     magazineSize: spec.magazine ?? Math.round(base.magazineSize * 1.5),
     startingReserveAmmo: spec.reserve ?? Math.round(base.startingReserveAmmo * 1.5),
+    maxReserveAmmo: spec.reserve ?? Math.round((base.maxReserveAmmo ?? base.startingReserveAmmo) * 1.5),
     reloadTicks: Math.round(base.reloadTicks * (spec.reload ?? 0.85)),
     hipSpreadRadians: base.hipSpreadRadians * (spec.spread ?? 0.85),
   };

@@ -24,6 +24,8 @@ describe('weapon arsenal', () => {
       expect(weaponName(definition.id)).toBe(definition.name);
       expect(definition.magazineSize).toBeGreaterThan(0);
       expect(definition.startingReserveAmmo % definition.magazineSize, definition.id).toBe(0);
+      expect(definition.maxReserveAmmo ?? definition.startingReserveAmmo, definition.id)
+        .toBeGreaterThanOrEqual(definition.startingReserveAmmo);
     }
     expect(weaponName('starter-pistol')).toBe('M1911');
   });

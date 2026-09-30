@@ -16,10 +16,10 @@ const wall: WallWeaponDefinition = {
   prompt: 'Press E: Kar98k [200] / Ammo [100]',
 };
 
-function simulation(startingPoints = 500) {
+function simulation(startingPoints = 500, wallWeapon: WallWeaponDefinition = wall) {
   return new GameSimulation({
     seed: 2,
-    map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [], wallWeapons: [wall] },
+    map: { collisionBoxes: [], walkSurfaces: [], zombieSpawns: [], wallWeapons: [wallWeapon] },
     playerSpawns: [{ x: 0, y: 0, z: 0 }],
     economyConfig: { startingPoints, hitReward: 10, killBonus: 50 },
     roundConfig: { initialWaitTicks: 9999, intermissionTicks: 9999 },
@@ -78,6 +78,19 @@ describe('wall weapon purchases', () => {
     expect(player.points).toBe(200);
     expect(player.weapon).toMatchObject({ weaponId: 'kar98k', magazineAmmo: 1, reserveAmmo: 50 });
     expect(sim.state.wallWeapons[0].purchased).toBe(true);
+  });
+
+  it('uses maximum reserve capacity for ammo refills while preserving the loaded magazine', () => {
+    const starterWall: WallWeaponDefinition = { ...wall, id: 'test-starter', weaponId: 'starter-pistol' };
+    const sim = simulation(500, starterWall);
+    const playerId = sim.playerIds[0], player = sim.getPlayer(playerId)!;
+    expect(player.weapon).toMatchObject({ magazineAmmo: 8, reserveAmmo: 32 });
+    player.weapon.magazineAmmo = 3;
+
+    const events = sim.tick({ [playerId]: interactFrame() });
+    expect(events.some(event => event.type === 'wallWeaponAmmoPurchased')).toBe(true);
+    expect(player.weapon).toMatchObject({ magazineAmmo: 3, reserveAmmo: 80 });
+    expect(player.points).toBe(400);
   });
 
   it('synchronizes the display state and clears it for a new match', () => {

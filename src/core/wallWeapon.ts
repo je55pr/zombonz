@@ -1,7 +1,9 @@
 import { spendPoints, type EconomyEvent } from './economy.ts';
 import { createInteractableState, type InteractionEvent } from './interaction.ts';
 import type { EntityId, InteractableState, PlayerState, Vec3 } from './types.ts';
-import { equipWeapon, ownedWeaponOrUpgrade, weaponDefinition, WEAPON_DEFINITIONS } from './weapon.ts';
+import {
+  equipWeapon, ownedWeaponOrUpgrade, weaponDefinition, weaponReserveCapacity, WEAPON_DEFINITIONS,
+} from './weapon.ts';
 
 export interface WallWeaponDefinition {
   id: string;
@@ -69,7 +71,8 @@ export function handleWallWeaponInteraction(
   const owned = ownedWeaponOrUpgrade(player, wall.weaponId);
   const ownsWeapon = !!owned;
   const definition = weaponDefinition(owned?.weaponId ?? wall.weaponId)!;
-  if (owned && owned.reserveAmmo >= definition.startingReserveAmmo) {
+  const reserveCapacity = weaponReserveCapacity(definition);
+  if (owned && owned.reserveAmmo >= reserveCapacity) {
     return [{ type: 'wallWeaponAmmoFull', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId }];
   }
   const cost = ownsWeapon ? wall.ammoCost : wall.weaponCost;
@@ -78,7 +81,7 @@ export function handleWallWeaponInteraction(
   if (spend.type === 'pointsSpendRejected') return [spend];
 
   // Reserve refill preserves the magazine, reload progress and fire cadence.
-  if (owned) owned.reserveAmmo = definition.startingReserveAmmo;
+  if (owned) owned.reserveAmmo = reserveCapacity;
   else { equipWeapon(player, wall.weaponId); wall.purchased = true; }
   const event: WallWeaponEvent = ownsWeapon
     ? { type: 'wallWeaponAmmoPurchased', playerId: player.id, wallWeaponId: wall.id, weaponId: wall.weaponId }

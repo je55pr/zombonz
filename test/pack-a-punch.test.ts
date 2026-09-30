@@ -437,8 +437,8 @@ describe('an upgraded gun among the other ways to get and refill guns', () => {
     const powerups = createPowerupState(500);
     powerups.drops.push({ id: 'p', kind: 'maxAmmo', position: { x: 0, y: 0, z: 0 }, ticksRemaining: 1000 });
     collectPowerups(powerups, [player], []);
-    expect(player.weapon.reserveAmmo).toBe(UPGRADED_WEAPON_DEFINITIONS['kar98k-pap'].startingReserveAmmo);
-    expect(player.holsteredWeapon!.reserveAmmo).toBe(WEAPON_DEFINITIONS['starter-pistol'].startingReserveAmmo);
+    expect(player.weapon.reserveAmmo).toBe(UPGRADED_WEAPON_DEFINITIONS['kar98k-pap'].maxReserveAmmo);
+    expect(player.holsteredWeapon!.reserveAmmo).toBe(WEAPON_DEFINITIONS['starter-pistol'].maxReserveAmmo);
   });
 
   it('fires, reloads and shows in the HUD like any other gun', () => {
