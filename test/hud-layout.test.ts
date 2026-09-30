@@ -61,6 +61,13 @@ describe('the gameplay HUD shows state, not controls', () => {
     expect(draw({ interactionPrompt: 'E  Buy the Kar98k [200]' }).texts).toContain('E');
   });
 
+  it('shows who a bled-out player is spectating without adding another controls strip', () => {
+    const { texts } = draw({ spectating: 'Buddy' });
+    expect(texts).toContain('SPECTATING BUDDY');
+    expect(texts).not.toContain('FIRE');
+    expect(texts).not.toContain('AIM');
+  });
+
   /** Where each grenade or mine icon is drawn: the centres they are translated to. */
   const icons = (calls: Call[]) => {
     const points: Array<{ x: number; y: number }> = [];

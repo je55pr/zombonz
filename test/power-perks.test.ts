@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BOX_RULES, GameSimulation, PERKS, PLAYER_HEALTH, TRAP_RULES, beginReload, createInputFrame, createMysteryBox,
+  BOX_RULES, GameSimulation, GRENADE_RULES, PERKS, PLAYER_HEALTH, TRAP_RULES, beginReload, createInputFrame, createMysteryBox,
   createPlayerState, createTrap, createZombieState, damagePlayer, equipWeapon, firePlayerWeapon, rayFromPlayer,
   sampleWalkHeight, teddyChance, DOWN_RULES, chooseZombieTarget, tickMysteryBoxes, tickPlayerRecovery, tickTraps, useMysteryBox, WEAPON_DEFINITIONS,
   type InteractionEvent, type MysteryBoxLocation, type PerkId,
@@ -350,6 +350,15 @@ describe('last stand', () => {
       playerSpawns: [{ x: 0, y: 0, z: 0 }, { x: 3, y: 0, z: 0 }] });
     const downed = sim.getPlayer(sim.playerIds[0])!;
     downed.points = 1234;
+    downed.pointsEarned = 4321;
+    downed.kills = 8;
+    downed.headshots = 3;
+    downed.selfRevives = 2;
+    downed.grenadeCharges = 0;
+    downed.mineCharges = 2;
+    downed.bouncingBettyOwned = true;
+    downed.perks = ['juggernog'];
+    equipWeapon(downed, 'thompson');
     knockDown(sim, downed);
     // With no zombies the rounds turn over every few ticks, so the respawn follows soon after.
     const types: string[] = [];
@@ -357,7 +366,12 @@ describe('last stand', () => {
       for (const event of sim.tick()) if ('playerId' in event && event.playerId === downed.id) types.push(event.type);
     }
     expect(types.filter(type => type === 'playerBledOut' || type === 'playerRespawned')).toEqual(['playerBledOut', 'playerRespawned']);
-    expect(downed).toMatchObject({ alive: true, health: 100, points: 1234, downed: null, position: { x: 0, y: 0, z: 0 } });
+    expect(downed).toMatchObject({
+      alive: true, health: 100, points: 1234, pointsEarned: 4321, kills: 8, headshots: 3, selfRevives: 2,
+      downed: null, position: { x: 0, y: 0, z: 0 }, perks: [], grenadeCharges: GRENADE_RULES.starting,
+      mineCharges: 0, bouncingBettyOwned: false, holsteredWeapon: null,
+      weapon: { weaponId: DOWN_RULES.pistol },
+    });
   });
 
   it('ends the game when nobody is left standing to revive', () => {

@@ -83,7 +83,10 @@ swings across the view and its blow lands at the strike, 0.15 s in, whatever is 
 throw a grenade with T or middle mouse, set a Bouncing Betty with G, switch weapons
 with Q or the mouse wheel, interact with E, and restart after game over with Enter.
 A killing blow puts you into last stand with a pistol: a teammate can revive you by holding E beside
-you, you bleed out after 30 seconds, and solo play ends there unless you drank Quick Revive
+you, you bleed out after 30 seconds, and solo play ends there unless you drank Quick Revive.
+In co-op, a bled-out player spectates a standing teammate until the next round; fire cycles forward
+and aim cycles backward through valid teammates. Respawning keeps points and lifetime score stats,
+but starts a fresh combat loadout: starter pistol, no perks, no Betties and fresh grenades
 (see [Asylum](docs/asylum-map.md#last-stand)).
 M mutes game audio. Escape releases the mouse and opens the pause menu, with Resume,
 Restart, Settings and Quit to Main Menu. Losing focus or hiding the tab also pauses the game,
