@@ -91,6 +91,23 @@ public partial class ZombonzMapPlugin : EditorPlugin
     public static string SourcePath(string relativePath) => System.IO.Path.GetFullPath(
         System.IO.Path.Combine(ProjectSettings.GlobalizePath("res://"), relativePath));
 
+    internal static (bool Ok, string Message) ValidateWithTypeScript(JsonObject document)
+    {
+        var candidatePath = System.IO.Path.Combine(OS.GetUserDataDir(), $"zombonz-map-validation-{Guid.NewGuid():N}.json");
+        try
+        {
+            System.IO.File.WriteAllText(candidatePath, document.ToJsonString());
+            var output = new Godot.Collections.Array();
+            var script = SourcePath("../../scripts/validate-maps.mjs");
+            var result = OS.Execute("node", new[] { script, candidatePath }, output, true);
+            var message = OutputText(output).Trim();
+            if (result == 0) return (true, message);
+            if (string.IsNullOrWhiteSpace(message)) message = "Node.js is required to run the shared TypeScript map validator.";
+            return (false, message);
+        }
+        finally { System.IO.File.Delete(candidatePath); }
+    }
+
     private ZombonzMapRoot OpenRoot() => EditorInterface.Singleton.GetEditedSceneRoot() as ZombonzMapRoot
         ?? throw new InvalidOperationException("Open a Zombonz map scene first.");
     private JsonObject OpenDocument() => MapDocument.Read(SourcePath(OpenRoot().SourceFile));
@@ -101,6 +118,8 @@ public partial class ZombonzMapPlugin : EditorPlugin
         var document = MapDocument.Read(SourcePath(source));
         var errors = MapDocument.Validate(document);
         if (errors.Count > 0) throw new InvalidDataException("Import failed: " + errors[0]);
+        var shared = ValidateWithTypeScript(document);
+        if (!shared.Ok) throw new InvalidDataException("Import failed:\n" + shared.Message);
         var root = MapScene.Build(document, source);
         try
         {
@@ -144,7 +163,10 @@ public partial class ZombonzMapPlugin : EditorPlugin
         var document = OpenDocument();
         MapDocument.WalkItems(document, OpenRoot());
         var errors = MapDocument.Validate(document);
-        _message.Text = errors.Count == 0 ? "Map valid." : "Validation failed:\n" + string.Join('\n', errors.Take(8));
+        if (errors.Count > 0) { _message.Text = "Validation failed:\n" + string.Join('\n', errors.Take(8)); return; }
+        var shared = ValidateWithTypeScript(document);
+        _message.Text = shared.Ok ? "Map valid (shared TypeScript validator)."
+            : "Validation failed:\n" + shared.Message;
     }
 
     private bool ExportMap()
