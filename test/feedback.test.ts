@@ -25,7 +25,17 @@ describe('local combat feedback', () => {
     feedback.consume([{ type: 'playerDamaged', playerId: 'e:1', amount: 50, health: 50 }], 'e:1', 3);
     expect(feedback.snapshot(3)).toMatchObject({ message: null, damageVignette: true });
     feedback.consume([{ type: 'matchRestarted', previousSeed: 1, seed: 2 }], 'e:1', 4);
-    expect(feedback.snapshot(4)).toEqual({ message: null, hitMarker: null, damageVignette: false });
+    expect(feedback.snapshot(4)).toEqual({ message: null, hitMarker: null, damageVignette: false, damagePulse: 0 });
+  });
+
+  it('fades the local damage pulse instead of snapping the vignette off', () => {
+    const feedback = new HudFeedback();
+    feedback.consume([{ type: 'playerDamaged', playerId: 'e:1', amount: 50, health: 50 }], 'e:1', 10);
+    expect(feedback.snapshot(10).damagePulse).toBe(1);
+    const middle = feedback.snapshot(26).damagePulse ?? 0;
+    expect(middle).toBeGreaterThan(0);
+    expect(middle).toBeLessThan(1);
+    expect(feedback.snapshot(42)).toMatchObject({ damageVignette: false, damagePulse: 0 });
   });
 
   it('keeps important failures while routine purchases stay off centre screen', () => {

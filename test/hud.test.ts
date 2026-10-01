@@ -44,6 +44,7 @@ describe('gameplay HUD snapshot', () => {
       roundPhase: 'waiting',
       interactionPrompt: 'Press E: Kar98k [200] / Ammo [100]',
       lastStand: null,
+      bleedoutTicks: null,
       team: '',
       pingMs: null,
       canRestart: true,

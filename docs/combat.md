@@ -172,8 +172,10 @@ The client draws all of this (`src/client/skinnedZombieView.ts`, `zombieRig.ts`,
   updated while none is alive (`GORE_BUDGET` in `goreEffects.ts`).
 - A crawler's skeleton is aimed each frame at the joints of the simulation's crawl volumes, its arms taking turns.
 
-There is no reduced-gore setting yet, but `GoreDirector` is the one place the effects are triggered, so one would be a single
-flag there.
+`Combat effects` is presentation-only and has Full / Reduced / Minimal levels. `GoreDirector` scales particle counts and limb-copy
+work from that setting; Reduced keeps a smaller version of the gore, while Minimal keeps only sparse impact blood and no thrown
+limb copies or persistent pools. The same preference scales ordinary world-hit sparks/dust and blast camera shake without changing
+any hit, damage, dismemberment or network state.
 
 ## Looks and variety (issue #134)
 

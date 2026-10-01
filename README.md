@@ -59,7 +59,7 @@ the host gets a five-letter room code and everyone else types it in (this needs 
 [docs/server-setup.md](docs/server-setup.md) shows how to run for free on Cloudflare; a copy of the game without one falls back to swapping
 short codes over chat or text) ([how it works](docs/networking.md)). **Test my connection**
 there (and in the lobby) checks whether a network will allow it and gives a text report to send to a friend. Settings
-holds mouse sensitivity, field of view and volume, saved in this browser. While the menu is open it
+holds mouse sensitivity, field of view, volume and **Combat effects** (Full / Reduced / Minimal), saved in this browser. While the menu is open it
 downloads the game code and every model and texture the game uses (about 88 MB), with a progress
 bar, then unpacks them (decodes the textures and parses the props, zombie and starting pistol).
 Solo and Multiplayer unlock when both finish (Settings works throughout). The files are kept in
@@ -194,8 +194,12 @@ anything far off. A zombie winds up before it hits and its blows land one at a t
 Strong hits, and every explosion, can take a zombie's limbs off (never the pistol's or the knife's): a head goes with the shot that
 kills, and a zombie that loses a leg and lives crawls after you, slower and from a shorter reach. Knife swings
 hit one nearby zombie in front of the player, and health recovers after five
-damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state,
-and temporary damage tint. Presentation-only recorded audio gives gun, melee, damage, box and round cues. World SFX are
+damage-free seconds. The canvas HUD shows hit/kill feedback, ammo and reload state, and a health-percentage injury treatment:
+a short damage pulse plus increasingly dark/bloody peripheral vision below 70% health. Full combat effects also tighten the
+world FOV by at most 3 degrees as health falls; last stand begins there and slowly reaches 5 degrees by the end of the 30-second
+bleedout. Reduced halves the FOV effect and trims particles/shake; Minimal keeps essential hitmarkers, low-health warning and
+remote muzzle flashes but removes injury FOV and blast shake. Ordinary shots that end on world geometry make a small pooled
+spark/dust impact, and replicated teammates show a reusable muzzle flash at their gun. Presentation-only recorded audio gives gun, melee, damage, box and round cues. World SFX are
 listener-relative with distance falloff and stereo pan; reusable gain/panner voices are pooled while the Web Audio
 buffer source itself is recreated as required by the API. SFX, UI and music/ambience have separate volume buses under
 the master setting. Web Audio is created/resumed only from user input and can be muted with M. Quiet recorded wind and

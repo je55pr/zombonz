@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import type { PlayerState, Vec3 } from '../core/types.ts';
+import type { SimulationEvent } from '../core/simulation.ts';
+import { upgradeGlow } from '../core/upgrades.ts';
 import { interpolatePosition } from './interpolation.ts';
 import { loadModel } from './runtimeAssets.ts';
 import { readyWeaponModel } from './weaponView.ts';
@@ -37,6 +39,10 @@ export class PlayerView {
   private readonly fallback = new THREE.Group();
   private readonly revive: THREE.Sprite;
   private readonly gunMount = new THREE.Group();
+  private readonly gunModel = new THREE.Group();
+  private readonly muzzleFlash = new THREE.Mesh(new THREE.SphereGeometry(1, 8, 6),
+    new THREE.MeshBasicMaterial({ color: 0xffd57a, transparent: true, opacity: 0.9, depthWrite: false,
+      blending: THREE.AdditiveBlending }));
   private readonly nameTag: THREE.Sprite;
   private model: THREE.Object3D | null = null;
   private gunId: string | null = null;
@@ -46,6 +52,7 @@ export class PlayerView {
   private lastTick: number | null = null;
   private hand: THREE.Object3D | null = null;
   private readonly handPoint = new THREE.Vector3();
+  private muzzleFlashUntil = -1;
 
   constructor(name: string, slot: number) {
     const uniform = new THREE.MeshStandardMaterial({ color: UNIFORMS[slot % UNIFORMS.length], roughness: 0.9 });
@@ -53,6 +60,9 @@ export class PlayerView {
     body.position.y = 0.85; this.fallback.add(body);
     this.root.add(this.fallback);
     this.root.add(this.gunMount);
+    this.gunMount.add(this.gunModel, this.muzzleFlash);
+    this.muzzleFlash.name = 'remote-muzzle-flash';
+    this.muzzleFlash.scale.set(0.045, 0.045, 0.11); this.muzzleFlash.position.set(0, 0, -0.5); this.muzzleFlash.visible = false;
     this.nameTag = label(name, '#e5ddc8', 0.22, true); this.nameTag.position.y = 2.05; this.root.add(this.nameTag);
     this.revive = label('REVIVE', '#e0402f', 0.3, false); this.revive.position.y = 1.1; this.revive.visible = false;
     this.root.add(this.revive);
@@ -92,6 +102,16 @@ export class PlayerView {
     this.current = name;
   }
 
+  events(events: readonly SimulationEvent[], playerId: PlayerState['id'], tick: number): void {
+    for (const event of events) {
+      if (event.type !== 'weaponFired' || event.playerId !== playerId) continue;
+      const color = upgradeGlow(event.weaponId) ?? (event.weaponId === 'irrlicht' ? 0x7dff9a
+        : event.weaponId === 'molniya' ? 0x8fd8ff : 0xffd57a);
+      (this.muzzleFlash.material as THREE.MeshBasicMaterial).color.setHex(color);
+      this.muzzleFlashUntil = Math.max(this.muzzleFlashUntil, tick + 4);
+    }
+  }
+
   update(player: PlayerState, previous: Vec3 | undefined, alpha: number, tick: number): void {
     this.root.visible = player.alive;
     if (!player.alive) return;
@@ -121,6 +141,7 @@ export class PlayerView {
     this.lastTick = tick;
     this.mixer?.update(dt);
     this.gunMount.visible = !downed;
+    this.muzzleFlash.visible = !downed && tick < this.muzzleFlashUntil;
     if (this.hand) {
       this.root.updateMatrixWorld(true);
       this.gunMount.position.copy(this.root.worldToLocal(this.hand.getWorldPosition(this.handPoint)));
@@ -129,10 +150,12 @@ export class PlayerView {
     if (this.gunId !== player.weapon.weaponId) {
       const model = readyWeaponModel(player.weapon.weaponId);
       if (model) {
-        this.gunMount.clear();
+        this.gunModel.clear();
         const gun = model.root.clone(true);
         gun.position.set(0, 0, 0); gun.rotation.set(0, 0, 0); gun.scale.setScalar(1.05);
-        this.gunMount.add(gun); this.gunId = player.weapon.weaponId;
+        this.gunModel.add(gun);
+        this.muzzleFlash.position.copy(model.muzzle).multiplyScalar(1.05);
+        this.gunId = player.weapon.weaponId;
       }
     }
   }

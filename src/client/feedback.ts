@@ -5,6 +5,8 @@ export interface FeedbackSnapshot {
   message: string | null;
   hitMarker: 'body' | 'head' | 'kill' | null;
   damageVignette: boolean;
+  /** Smooth 1 -> 0 pulse after local damage; the boolean above remains for cheap HUD invalidation/tests. */
+  damagePulse?: number;
 }
 
 /** Short, visual reactions to authoritative events. No gameplay decision lives here. */
@@ -14,6 +16,7 @@ export class HudFeedback {
   private marker: FeedbackSnapshot['hitMarker'] = null;
   private markerUntil = 0;
   private hurtUntil = 0;
+  private hurtStart = 0;
   private names = new Map<EntityId, string>();
 
   /** Teammates' names, for messages about them in a co-op game. */
@@ -24,7 +27,7 @@ export class HudFeedback {
   consume(events: readonly SimulationEvent[], playerId: EntityId, tick: number): void {
     if (events.some(event => event.type === 'matchRestarted')) {
       this.message = ''; this.messageUntil = 0; this.marker = null;
-      this.markerUntil = 0; this.hurtUntil = 0;
+      this.markerUntil = 0; this.hurtUntil = 0; this.hurtStart = 0;
       return;
     }
     let message = '';
@@ -50,7 +53,7 @@ export class HudFeedback {
         case 'zombieDied':
           this.marker = 'kill'; this.markerUntil = tick + 16;
           break;
-        case 'playerDamaged': this.hurtUntil = tick + 32; break;
+        case 'playerDamaged': this.hurtStart = tick; this.hurtUntil = tick + 32; break;
         case 'wallWeaponAmmoFull': say('AMMO ALREADY FULL', 3); break;
         case 'equipmentFull': say('EQUIPMENT FULL', 3); break;
         case 'mysteryBoxUnavailable': say('NO NEW WEAPONS IN BOX', 3); break;
@@ -69,10 +72,13 @@ export class HudFeedback {
   }
 
   snapshot(tick: number): FeedbackSnapshot {
+    const hurt = tick < this.hurtUntil ? Math.max(0, Math.min(1, (this.hurtUntil - tick) / Math.max(1, this.hurtUntil - this.hurtStart))) : 0;
     return {
       message: tick < this.messageUntil ? this.message : null,
       hitMarker: tick < this.markerUntil ? this.marker : null,
-      damageVignette: tick < this.hurtUntil,
+      damageVignette: hurt > 0,
+      // Sixteen visual steps over the half-second pulse are smooth enough while avoiding a full HUD texture upload every frame.
+      damagePulse: Math.round(hurt * hurt * 16) / 16,
     };
   }
 }

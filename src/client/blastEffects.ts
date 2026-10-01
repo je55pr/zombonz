@@ -391,14 +391,23 @@ export class BlastEffects {
     void seed;
   }
 
-  /** A spark and a puff where a bullet struck metal. */
-  strike(position: { x: number; y: number; z: number }, seed: number): void {
+  /** A small pooled spark/dust puff where an ordinary bullet ended on world geometry. */
+  strike(position: { x: number; y: number; z: number }, seed: number, intensity = 1): void {
+    const amount = Math.max(0, Math.min(1, intensity));
+    if (amount <= 0) return;
     this.active = true;
     const random = seeded(seed);
-    for (let i = 0; i < 7; i++) {
+    const sparks = Math.max(1, Math.round(7 * amount));
+    for (let i = 0; i < sparks; i++) {
       const v = this.spray(random, 4, 1.2);
       this.puff(random, { ...position, ...v, life: 0.25 + random() * 0.3, from: 0.05, to: 0.02, drag: 1, lift: -9, cell: CELL.spark, alpha: 1 },
         this.fireballs, MAX_FIRE, 0xfff0b0, 0xff6a10);
+    }
+    const dust = Math.max(1, Math.round(3 * amount));
+    for (let i = 0; i < dust; i++) {
+      const v = this.spray(random, 0.8, 0.25);
+      this.puff(random, { ...position, ...v, life: 0.35 + random() * 0.35, from: 0.08, to: 0.18, drag: 2.2, lift: 0.35,
+        cell: CELL.smoke, alpha: 0.35 * amount }, this.clouds, MAX_SMOKE, 0x958b7a, 0x4a4640);
     }
   }
 

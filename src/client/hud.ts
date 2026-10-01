@@ -17,6 +17,7 @@ const PERK_ICONS: Readonly<Record<PerkId, { fill: string; mark: string }>> = {
   'quick-revive': { fill: 'rgba(30,86,160,0.9)', mark: 'QR' },
 };
 import type { FeedbackSnapshot } from './feedback.ts';
+import { damagePresentation } from './damagePresentation.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
 import { Crosshair, NukeFlash, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
@@ -46,6 +47,10 @@ export interface HudSnapshot {
   interactionPrompt: string | null;
   /** In last stand: "BLEEDING OUT 24" or "GETTING BACK UP". */
   lastStand: string | null;
+  /** Remaining bleedout ticks, for gradual presentation while downed. */
+  bleedoutTicks?: number | null;
+  /** 0 minimal, 1 reduced, 2 full. Supplied by the presentation layer. */
+  combatEffects?: number;
   /** A revive under way, by or on this player: 0 to 1 in twentieths (so the canvas repaints rarely). */
   reviveProgress: number;
   nearbyPowerup: string | null;
@@ -102,6 +107,7 @@ export function buildHudSnapshot(
     interactionPrompt: simulation.interactionCandidate(playerId)?.prompt ?? null,
     lastStand: player.downed ? player.downed.selfRevive ? 'GETTING BACK UP'
       : `BLEEDING OUT  ${Math.ceil(player.downed.bleedoutTicks / 60)}` : null,
+    bleedoutTicks: player.downed?.bleedoutTicks ?? null,
     reviveProgress: Math.round(revive * 20) / 20,
     nearbyPowerup: nearbyDrop ? nearbyDrop.kind === 'maxAmmo' ? 'MAX AMMO'
       : nearbyDrop.kind === 'doublePoints' ? 'DOUBLE POINTS'
@@ -342,11 +348,36 @@ export class CanvasHud {
     c.setTransform(scale, 0, 0, scale, 0, 0);
     const width = this.canvas.width / scale, height = LAYOUT_HEIGHT, centre = width / 2, right = width - 44;
     this.layout = { width, height, scale };
-    if (snapshot.feedback?.damageVignette || snapshot.health <= 50) {
-      const edge = c.createRadialGradient(centre, height / 2, height * 0.24, centre, height / 2, width * 0.67);
-      edge.addColorStop(0, 'rgba(80,0,0,0)');
-      edge.addColorStop(1, snapshot.feedback?.damageVignette ? 'rgba(150,0,0,0.67)' : 'rgba(100,0,0,0.32)');
+    const damage = snapshot.spectating ? damagePresentation(snapshot.maxHealth, snapshot.maxHealth, null, 0, snapshot.combatEffects ?? 2)
+      : damagePresentation(snapshot.health, snapshot.maxHealth,
+        snapshot.bleedoutTicks == null ? null : { bleedoutTicks: snapshot.bleedoutTicks },
+        snapshot.feedback?.damagePulse ?? (snapshot.feedback?.damageVignette ? 1 : 0), snapshot.combatEffects ?? 2);
+    if (damage.injury > 0.001 || damage.pulse > 0.001) {
+      // Keep the crosshair area comparatively clean; injury gathers in the peripheral vision instead.
+      const edge = c.createRadialGradient(centre, height / 2, height * 0.2, centre, height / 2, width * 0.69);
+      edge.addColorStop(0, 'rgba(70,0,0,0)');
+      edge.addColorStop(0.58, `rgba(78,0,0,${damage.injury * 0.06 + damage.pulse * 0.04})`);
+      edge.addColorStop(1, `rgba(92,0,0,${Math.min(0.78, damage.injury * 0.58 + damage.pulse * 0.42)})`);
       c.fillStyle = edge; c.fillRect(0, 0, width, height);
+
+      // Fixed irregular peripheral stains avoid a perfectly circular "Photoshop vignette" without animation noise.
+      if ((snapshot.combatEffects ?? 2) > 0 && damage.injury + damage.pulse > 0.18) {
+        c.save();
+        const stain = Math.min(0.5, damage.injury * 0.3 + damage.pulse * 0.22);
+        c.fillStyle = `rgba(72,0,0,${stain})`;
+        for (const [x, y, rx, ry, turn] of [
+          [0.02, 0.17, 0.15, 0.27, -0.35], [0.98, 0.28, 0.13, 0.3, 0.28],
+          [0.14, 0.98, 0.24, 0.12, 0.12], [0.84, 0.99, 0.21, 0.11, -0.16],
+          [0.48, 0.01, 0.2, 0.075, 0.04],
+        ] as const) {
+          c.beginPath(); c.ellipse(width * x, height * y, width * rx, height * ry, turn, 0, Math.PI * 2); c.fill();
+        }
+        c.restore();
+      }
+      if (damage.pulse > 0.001) {
+        c.fillStyle = `rgba(70,0,0,${damage.pulse * 0.08})`;
+        c.fillRect(0, 0, width, height);
+      }
     }
 
     // Top: the map and the credits key, kept quiet. (The keys are listed under Controls in the menus, not on screen.)
@@ -386,7 +417,7 @@ export class CanvasHud {
     // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health.
     if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 340, { size: 23, color: GOLD, spacing: 3 });
     this.text('ROUND', 44, height - 280, { size: 34, weight: 500, color: INK, spacing: 4 });
-    const low = snapshot.health <= 50;
+    const low = snapshot.maxHealth > 0 && snapshot.health / snapshot.maxHealth <= 0.5;
     this.text('HP', 44, height - 48, { size: 29, weight: 500, color: INK, spacing: 2 });
     this.panel(98, height - 60, 238, 24, 8, 'rgba(0,0,0,0.65)', EDGE);
     const healthWidth = 238 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
@@ -523,6 +554,7 @@ export class CanvasHud {
         ? snapshot.feedback?.message !== this.previous!.feedback?.message
           || snapshot.feedback?.hitMarker !== this.previous!.feedback?.hitMarker
           || snapshot.feedback?.damageVignette !== this.previous!.feedback?.damageVignette
+          || snapshot.feedback?.damagePulse !== this.previous!.feedback?.damagePulse
         : snapshot[key] !== this.previous![key])) {
       this.draw(snapshot);
       this.previous = { ...snapshot, feedback: snapshot.feedback && { ...snapshot.feedback } };
