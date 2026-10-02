@@ -100,6 +100,8 @@ export interface ZombieState extends EntityBase {
   /** Where that stay began. Only the host uses these two, so they are left out of snapshots. */
   anchorX: number;
   anchorZ: number;
+  /** Whether the current swing's blow has landed (a swing is one blow, see `advanceSwing`). Only the host uses it. */
+  struck: boolean;
 }
 export interface InteractableState extends EntityBase {
   kind: 'interactable';

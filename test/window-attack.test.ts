@@ -54,11 +54,11 @@ describe('window attacks', () => {
     expect(first.engaged).toBe(true);
     expect(first.events.map(event => event.type)).toEqual(['zombieSwung']);
     expect(player.health).toBe(1000);
-    const { windupTicks, totalTicks } = swingTiming(zombie);
+    const { blowTicks, totalTicks } = swingTiming(zombie);
     const log = swipeFor(zombie, barrier, [player], totalTicks * 2 + 20);
     const blows = log.filter(event => event.type === 'zombieAttacked');
-    // The wind-up is a visible pause: the blow lands only after it, not on the first tick in reach.
-    expect(blows[0].tick).toBe(windupTicks);
+    // The blow goes live `liveFrom` of the way through the swing: not on the first tick in reach.
+    expect(blows[0].tick).toBe(blowTicks);
     expect(player.health).toBe(1000 - ZOMBIE_MELEE.damage * blows.length);
     // And the next one is a whole swing later, not the very next tick.
     expect(blows.length).toBeGreaterThanOrEqual(2);
