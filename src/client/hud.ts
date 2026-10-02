@@ -18,7 +18,7 @@ const PERK_ICONS: Readonly<Record<PerkId, { fill: string; mark: string }>> = {
 };
 import type { FeedbackSnapshot } from './feedback.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
-import { Crosshair, NukeFlash, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
+import { Crosshair, HealthBar, NukeFlash, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
 export interface HudSnapshot {
@@ -185,6 +185,7 @@ export class CanvasHud {
   private pointsEdge = { x: 1400, y: LAYOUT_HEIGHT - 178 };
   private readonly popups: PointsPopups;
   private readonly roundCounter: RoundCounter;
+  private readonly healthBar: HealthBar;
   private readonly crosshair: Crosshair;
   private readonly nukeFlash: NukeFlash;
 
@@ -211,11 +212,12 @@ export class CanvasHud {
     quad.frustumCulled = false;
     this.scene.add(quad);
     this.roundCounter = new RoundCounter(this.scene);
+    this.healthBar = new HealthBar(this.scene);
     this.popups = new PointsPopups(this.scene);
     this.crosshair = new Crosshair(this.scene);
     this.nukeFlash = new NukeFlash(this.scene);
     // The first frames draw with fallback fonts; repaint once the bundled ones are ready.
-    void loadUiFonts().then(() => { this.previous = null; });
+    void loadUiFonts().then(() => { this.previous = null; this.healthBar.invalidate(); });
   }
   setBindings(bindings: KeyBindings): void { this.bindings = bindings; }
 
@@ -386,18 +388,13 @@ export class CanvasHud {
     // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health.
     if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 340, { size: 23, color: GOLD, spacing: 3 });
     this.text('ROUND', 44, height - 280, { size: 34, weight: 500, color: INK, spacing: 4 });
-    const low = snapshot.health <= 50;
-    this.text('HP', 44, height - 48, { size: 29, weight: 500, color: INK, spacing: 2 });
-    this.panel(98, height - 60, 238, 24, 8, 'rgba(0,0,0,0.65)', EDGE);
-    const healthWidth = 238 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
+    // (The health bar and number are a layer of their own, see HealthBar: they change on every tick of a refill.)
     // Perk icons sit in a row above the round counter, in the order they were drunk.
     (snapshot.perks ? snapshot.perks.split(',') as PerkId[] : []).forEach((perk, index) => {
       const style = PERK_ICONS[perk], x = 44 + index * 60, y = height - 435;
       this.panel(x, y, 52, 52, 9, style.fill, 'rgba(255,255,255,0.35)');
       this.text(style.mark, x + 26, y + 27, { size: 23, color: '#fff7e6', align: 'center' });
     });
-    if (healthWidth > 0) this.panel(98, height - 60, healthWidth, 24, 8, low ? BLOOD : INK, null);
-    this.text(String(snapshot.health), 352, height - 48, { size: 29, color: low ? BLOOD : INK });
 
     // Bottom right: points in gold over the weapon, its ammunition and the holstered gun.
     const pointsWidth = this.text(String(snapshot.points), right, height - 190, { size: 52, color: GOLD, align: 'right' });
@@ -518,18 +515,22 @@ export class CanvasHud {
    */
   render(snapshot: HudSnapshot, now = performance.now(), aim?: { spread: number; verticalFov: number }): void {
     const resized = this.fit();
-    if (resized || !this.previous || (Object.keys(snapshot) as (keyof HudSnapshot)[])
-      .some(key => key === 'feedback'
-        ? snapshot.feedback?.message !== this.previous!.feedback?.message
-          || snapshot.feedback?.hitMarker !== this.previous!.feedback?.hitMarker
-          || snapshot.feedback?.damageVignette !== this.previous!.feedback?.damageVignette
-        : snapshot[key] !== this.previous![key])) {
+    // Health is not one of the keys that repaints the canvas (it is the HealthBar's), but being low is: it draws the vignette.
+    if (resized || !this.previous || (snapshot.health <= HealthBar.LOW) !== (this.previous.health <= HealthBar.LOW)
+      || (Object.keys(snapshot) as (keyof HudSnapshot)[])
+        .some(key => key === 'health' || key === 'maxHealth' ? false : key === 'feedback'
+          ? snapshot.feedback?.message !== this.previous!.feedback?.message
+            || snapshot.feedback?.hitMarker !== this.previous!.feedback?.hitMarker
+            || snapshot.feedback?.damageVignette !== this.previous!.feedback?.damageVignette
+          : snapshot[key] !== this.previous![key])) {
       this.draw(snapshot);
       this.previous = { ...snapshot, feedback: snapshot.feedback && { ...snapshot.feedback } };
     }
     // Overlays (pause, game over, credits) cover the HUD, so the animated pieces hide under them.
     const effects = !snapshot.paused && !snapshot.gameOver && !this.credits;
     this.roundCounter.update(snapshot.round, snapshot.roundPhase, this.layout, now, effects);
+    // The game over screen dims the HUD and the credits cover it; the pause menu sits over it, so the bar stays under that.
+    this.healthBar.update(snapshot.health, snapshot.maxHealth, this.layout, !snapshot.gameOver && !this.credits);
     this.popups.update(this.layout, now, effects);
     this.nukeFlash.update(now, effects);
     // WaW hides the hip crosshair when aiming down sights and while sprinting.
@@ -550,5 +551,6 @@ export class CanvasHud {
     if (typeof window !== 'undefined') window.removeEventListener('keydown', this.onKeyDown);
     this.material.dispose();
     this.texture.dispose();
+    this.healthBar.dispose();
   }
 }
