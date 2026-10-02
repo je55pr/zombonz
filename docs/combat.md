@@ -102,14 +102,14 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
   their feet (a wall, a closed door, a sill, a barrel: so not through a boarded window, which has a sill), and in front of the
   zombie (0.9 rad to start, 1.3 to land; it turns at up to 9 rad/s first). The blow is aimed where the player is when it lands,
   so a player who steps back out of reach in the wind-up is missed.
-- **The blow is a swipe, live from a tenth of the way in** (issue #210). It goes live 10% of the way through the swing
-  (`ZOMBIE_MELEE.liveFrom`: 6 to 12 ticks, well before the arm is drawn coming down) and stays live to the end: 90% of the
-  animation. Whoever is in reach at any point in that stretch is hit, the moment they are in it, once: a swing is one blow,
-  whoever it lands on. A player standing in reach is hit on the first live tick; one who is out of reach until then is hit the
-  moment they come in; one who is out of reach for the whole stretch is missed. (It used to go live only as the arm came down,
-  40 to 45% in, so a player who stayed out of reach until then and stepped back at the end avoided it altogether.) A blow
-  that finds the player in another zombie's grace lands when the grace ends, if they are still in reach and the swing is not
-  over (the arm does not stop and wait).
+- **The blow is a swipe, live from 40% of the way in** (issue #210). It goes live `ZOMBIE_MELEE.liveFrom` (0.4) of the way
+  through the swing, about when the arm is drawn coming down (23 to 48 ticks in, by gait and the zombie's own tempo), and stays
+  live to the end: about 60% of the animation. Whoever is in reach at any point in that stretch is hit, the moment they are in
+  it, once: a swing is one blow, whoever it lands on. A player standing in reach is hit on the first live tick; one who is out
+  of reach until then is hit the moment they come in; one who is out of reach for the whole stretch is missed. (It used to be a
+  single tick as the arm came down, so a player who waited out the animation and stepped back at the end avoided it altogether;
+  now being in reach at any point from then to the end lands it.) A blow that finds the player in another zombie's grace lands
+  when the grace ends, if they are still in reach and the swing is not over (the arm does not stop and wait).
 - **A zombie keeps coming while it swings, and reads where the player is going** (issue #210). A swing is a lunge on the move,
   not a halt: the zombie closes on the player through the wind-up and the recovery, and stops only when it touches them (it
   never pushes them along). It also starts a swing when the player, at the speed and heading they have now, and it, still
@@ -120,11 +120,11 @@ than two metres from the zombie standing outside it. Now (`src/core/zombie.ts`, 
 - **Windows.** A zombie tearing boards swipes once a board is gone, at a player inside within 1 m of the window plane and
   no farther to the side than the opening plus 0.3 m: an arm's length through the gap, not the length of the room. It stops
   tearing while it swings, a crawler cannot swipe at all, and a swing is dropped if the window is rebuilt first.
-- **Blows come one at a time.** A landed blow gives the player 18 ticks (0.3 s) of grace against every other zombie; a
-  blow that arrives in the grace waits, its arm out, until it has passed. So a crowd's blows are spaced, and someone hit
-  once can step away, shoot or knife before the second.
+- **Blows come one at a time.** A landed blow gives the player 24 ticks (0.4 s) of grace against every other zombie; a blow
+  that finds the player in the grace lands when it ends, if they are still in reach and the swing is not over. So a crowd's
+  blows are spaced, and someone hit once can step away, shoot or knife before the second.
 - **Zombies do not stand inside each other or the player, and the player cannot walk through them.** Each tick, pairs closer
-  than ZOMBIE_SPACING (0.72 m, a little over a body's 0.64 width) are pushed apart (all of it for the one free to move, when the other is mid-swing or coming
+  than ZOMBIE_SPACING (0.9 m, well over a body's 0.64 width) are pushed apart (all of it for the one free to move, when the other is mid-swing or coming
   through a window), and the walls still hold. A crowd spreads round its target. A player is stopped by a zombie's body
   (0.66 m from its middle) and slides round it; a swinging zombie holds its ground, a free one gives way a little. Zombies
   queued behind a fight are not taken for stuck. See [zombie difficulty](zombie-difficulty.md) (issue #210).
@@ -135,14 +135,14 @@ the player standing still and the zombies arriving together (`test/zombie-melee.
 
 | Zombies | Walker: first blow / down | Runner | Sprinter |
 | --- | --- | --- | --- |
-| 1 | 12 / 123 (2.0 s) | 10 / 97 (1.6 s) | 8 / 79 (1.3 s) |
-| 2 | 12 / 30 (0.5 s) | 10 / 28 (0.5 s) | 8 / 26 (0.4 s) |
-| 4 | 12 / 30 (0.5 s) | 10 / 28 (0.5 s) | 8 / 26 (0.4 s) |
-| 6 | 12 / 30 (0.5 s) | 10 / 28 (0.5 s) | 8 / 26 (0.4 s) |
+| 1 | 44 / 155 (2.6 s) | 35 / 122 (2.0 s) | 28 / 99 (1.6 s) |
+| 2 | 44 / 68 (1.1 s) | 35 / 59 (1.0 s) | 28 / 52 (0.9 s) |
+| 4 | 44 / 68 (1.1 s) | 35 / 59 (1.0 s) | 28 / 52 (0.9 s) |
+| 6 | 43 / 67 (1.1 s) | 34 / 58 (1.0 s) | 27 / 51 (0.8 s) |
 
-The first blow lands a tenth of the way into the swing, so two zombies arriving together put a player down in about half a
-second (the second blow comes one grace later, 0.3 s). Issue #131 found two arriving together near-instant death; the first
-fix made it 1.3 s, and this pass (issue #210) has taken it back to about 0.5 s on purpose, for crowds that are dangerous.
+The first blow lands 40% of the way into the swing, so two zombies arriving together put a player down in about a second
+(the second blow comes one grace later, 0.4 s). Issue #131 found two arriving together near-instant death and its first fix
+made it 1.3 s; the issue #210 pass tried 0.4 to 0.5 s (the blow live from a tenth of the way in) and settled at about 1 s.
 
 ## Dismemberment and crawlers (issues #135 and #139)
 
