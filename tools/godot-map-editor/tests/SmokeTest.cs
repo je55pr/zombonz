@@ -3,6 +3,18 @@ using Godot;
 
 public partial class SmokeTest : Node
 {
+    private static readonly string LoadStamp = Guid.NewGuid().ToString("N");
+
+    /// <summary>Changes whenever the editor loads this C# code again (ReloadCheck.gd waits on it).</summary>
+    public string AssemblyStamp() => LoadStamp;
+
+    /// <summary>After the import checks, makes the editor reload the C# code and presses the dock again (ReloadCheck.gd).</summary>
+    public static void StartReloadCheck()
+    {
+        var check = (Node)GD.Load<GDScript>("res://tests/ReloadCheck.gd").New().AsGodotObject();
+        EditorInterface.Singleton.GetBaseControl().CallDeferred(Node.MethodName.AddChild, check);
+    }
+
     public override void _Ready()
     {
         try
