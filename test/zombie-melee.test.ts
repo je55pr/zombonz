@@ -39,7 +39,7 @@ function untilDown(count: number, gait: ZombieGait, cap = 1200) {
 }
 
 describe('a zombie’s melee cadence', () => {
-  it('does not hit on the first tick in reach: the blow goes live a tenth of the way through the swing, and the next swing is a whole swing later', () => {
+  it('does not hit on the first tick in reach: the blow goes live liveFrom of the way through the swing, and the next swing is a whole swing later', () => {
     const { sim, zombies } = ring(1, 'walk');
     const [zombie] = zombies, timing = swingTiming(zombie);
     const log: Array<[number, SimulationEvent['type']]> = [];
@@ -82,7 +82,7 @@ describe('a zombie’s melee cadence', () => {
       const { blows, downedAt } = untilDown(2, gait);
       expect(blows.length, gait).toBe(2);
       expect(blows[1] - blows[0], gait).toBeGreaterThanOrEqual(ZOMBIE_MELEE.hurtGraceTicks);
-      // The first blow only lands once it is live (a tenth of the way through the swing), and the second after the grace.
+      // The first blow only lands once it is live (liveFrom of the way through the swing), and the second after the grace.
       const { windupTicks, recoveryTicks } = ZOMBIE_MELEE.swing[gait];
       expect(downedAt, gait).toBeGreaterThanOrEqual(Math.ceil((windupTicks + recoveryTicks) * ZOMBIE_MELEE.liveFrom) + ZOMBIE_MELEE.hurtGraceTicks);
       expect(downedAt, gait).toBeGreaterThan(20);
