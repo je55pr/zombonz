@@ -64,4 +64,49 @@ describe('versioned map document', () => {
     expect(validateMapDocument(document).some(error => error.startsWith('version:'))).toBe(true);
     expect(validateMapDocument(document).some(error => error.includes('duplicate ID'))).toBe(true);
   });
+
+  it('catches duplicate zombie spawns and barrier routes that runtime cannot traverse', () => {
+    const document = structuredClone(bunkerDocument);
+    Object.assign(document.gameplay.zombieSpawns[1], {
+      x: document.gameplay.zombieSpawns[0].x,
+      y: document.gameplay.zombieSpawns[0].y,
+      z: document.gameplay.zombieSpawns[0].z,
+    });
+    document.gameplay.barriers[0].approachPath = [document.gameplay.barriers[0].approachPath[0]];
+    const errors = validateMapDocument(document);
+    expect(errors).toContain('gameplay.zombieSpawns[1]: duplicate spawn within 0.05 m of gameplay.zombieSpawns[0]');
+    expect(errors).toContain('gameplay.barriers[0].approachPath: expected at least two exterior route points');
+  });
+
+  it('catches disconnected and physically blocked navigation before runtime', () => {
+    const disconnected = structuredClone(bunkerDocument);
+    disconnected.gameplay.navigation.nodes.push({
+      id: 'orphan-authoring-node',
+      position: { x: 500, y: 0, z: 500 },
+      neighbors: [],
+    });
+    expect(validateMapDocument(disconnected).some(error =>
+      error.includes('orphan-authoring-node') && error.includes('unreachable from the player-spawn navigation component'))).toBe(true);
+
+    const blocked = structuredClone(bunkerDocument);
+    blocked.gameplay.playerSpawn = { x: 0, y: 0, z: 0 };
+    blocked.gameplay.collisionBoxes = [{ min: { x: 0.8, y: 0, z: -1 }, max: { x: 1.2, y: 2, z: 1 } }];
+    blocked.gameplay.walkSurfaces = [{ minX: -2, maxX: 4, minZ: -2, maxZ: 2, startHeight: 0, endHeight: 0 }];
+    blocked.gameplay.navigation.nodes = [
+      { id: 'left', position: { x: 0, y: 0, z: 0 }, neighbors: ['right'] },
+      { id: 'right', position: { x: 2, y: 0, z: 0 }, neighbors: ['left'] },
+    ];
+    const errors = validateMapDocument(blocked);
+    expect(errors).toContain('gameplay.navigation.nodes[0].neighbors[0]: link "left" -> "right" crosses fixed collision');
+    expect(errors.some(error => error.includes('node "right" is unreachable'))).toBe(true);
+  });
+
+  it('rejects stale presentation lookup IDs instead of silently orphaning authoring metadata', () => {
+    const document = structuredClone(asylumDocument);
+    Object.assign(document.presentation.wallWeaponFacing, { 'missing-wall-gun': 0 });
+    Object.assign(document.presentation.doorStyles, { 'missing-door': { kind: 'planks', yaw: 0, width: 2 } });
+    const errors = validateMapDocument(document);
+    expect(errors).toContain('presentation.wallWeaponFacing.missing-wall-gun: unknown gameplay.wallWeapons ID "missing-wall-gun"');
+    expect(errors).toContain('presentation.doorStyles.missing-door: unknown gameplay.doors ID "missing-door"');
+  });
 });

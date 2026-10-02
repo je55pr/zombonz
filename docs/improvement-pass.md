@@ -150,6 +150,7 @@ previews so embedded inspection remains usable without mouse capture.
 ## Atmosphere follow-up
 
 The practical lamps use bounded, staggered, simulation-tick-indexed flicker.
-Presentation-only Web Audio adds a very quiet filtered wind bed and electrical
-hum after user input; both obey M mute and fade out while paused. Unit tests
-cover repeatable light values and the ambient/mute/pause lifecycle.
+Presentation-only Web Audio adds a very quiet recorded wind bed and electrical
+hum after user input; both use the music/ambience bus, obey M mute and fade out while paused. Positional SFX are handled
+by the pooled spatial audio manager rather than allocating a new routing chain for every sound. Unit tests cover
+repeatable light values, audio unlock, bus volumes, spatial falloff/pan, voice reuse and the ambient/mute/pause lifecycle.
