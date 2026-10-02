@@ -35,10 +35,11 @@ export const ZOMBIE_MELEE = {
   crawlerReach: { startRange: 0.9, strikeRange: 1.6 },
   /**
    * How far through a swing (as a share of its whole length) the blow goes live (issue #210). From then to the swing's end,
-   * being in reach lands it, once. It used to be live only from the end of the wind-up, 40 to 45% of the way in, so a player
-   * who stayed out of reach until then and stepped back at the end avoided it altogether.
+   * being in reach lands it, once. 0.4 is about when the arm is drawn coming down (the wind-up is 42 to 45% of a swing on average); lower
+   * and blows land sooner (0.1 is almost at once). It used to be a single tick there, so a player who waited out the animation
+   * and stepped back at the end avoided it altogether.
    */
-  liveFrom: 0.1,
+  liveFrom: 0.4,
   /**
    * A zombie also starts its swing early, when the player, going at the speed and heading they have now, and the zombie,
    * still coming, will be within strike range as the blow lands (issue #210): otherwise a player who runs up to a zombie
@@ -53,7 +54,7 @@ export const ZOMBIE_MELEE = {
   startArc: 0.9,
   strikeArc: 1.3,
   /** After a blow lands the player is safe from every other zombie's for this many ticks, so a group's blows come one at a time. */
-  hurtGraceTicks: 18,
+  hurtGraceTicks: 24,
 } as const;
 
 export interface SwingTiming {

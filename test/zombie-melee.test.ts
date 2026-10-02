@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GameSimulation, ZOMBIE_MELEE, ZOMBIE_MOVEMENT, addEntity, createPlayerState, createZombieState, inMeleeReach, separateZombies,
+  GameSimulation, ZOMBIE_MELEE, ZOMBIE_MOVEMENT, ZOMBIE_SPACING, addEntity, createPlayerState, createZombieState, inMeleeReach, separateZombies,
   swingTiming, tickPlayerRecovery, tickZombieMelee, type CollisionBox, type EntityId, type SimulationEvent, type ZombieGait, type ZombieState,
 } from '../src/core/index.ts';
 import { BUNKER_BARRIERS, BUNKER_PLAYER_SPAWN, BUNKER_WALK_SURFACES, greyboxCollisionBoxes } from '../src/maps/bunkerLegacy.ts';
@@ -210,7 +210,7 @@ describe('zombies keep out of each other and their target', () => {
       expect(zombies[i].position.x, `zombie ${i}`).toBeGreaterThan(2.4 + ZOMBIE_MOVEMENT.radius - 1e-6);
       for (let j = i + 1; j < zombies.length; j++) {
         const d = Math.hypot(zombies[i].position.x - zombies[j].position.x, zombies[i].position.z - zombies[j].position.z);
-        expect(d, `${i}-${j}`).toBeGreaterThan(ZOMBIE_MOVEMENT.radius * 2 * 0.85);
+        expect(d, `${i}-${j}`).toBeGreaterThan(ZOMBIE_SPACING * 0.85);
       }
     }
   });
@@ -225,7 +225,7 @@ describe('zombies keep out of each other and their target', () => {
     }
     for (let i = 0; i < zombies.length; i++) for (let j = i + 1; j < zombies.length; j++) {
       expect(Math.hypot(zombies[i].position.x - zombies[j].position.x, zombies[i].position.z - zombies[j].position.z), `${i}-${j}`)
-        .toBeGreaterThan(ZOMBIE_MOVEMENT.radius * 2 * 0.8);
+        .toBeGreaterThan(ZOMBIE_SPACING * 0.8);
     }
   });
 

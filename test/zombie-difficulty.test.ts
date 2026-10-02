@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BODY_CONTACT, PLAYER_MOVEMENT, ZOMBIE_GAIT_SPEEDS, ZOMBIE_GIVE, ZOMBIE_PACE_SPREAD, addEntity, allocateEntityId,
-  WEDGE_DEPTH, ZOMBIE_MELEE, swingTiming, updateZombiePursuit, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, tickZombieMelee, type CollisionBox, type GameSimulation, type PlayerState, type ZombieGait, type ZombieState,
+  WEDGE_DEPTH, ZOMBIE_MELEE, ZOMBIE_SPACING, swingTiming, updateZombiePursuit, blockPlayerByZombies, createPlayerState, createZombieState, separateZombies, tickZombieMelee, type CollisionBox, type GameSimulation, type PlayerState, type ZombieGait, type ZombieState,
 } from '../src/core/index.ts';
 import { frameFor, openGround, runChase, runCrowd, runRunUp } from '../src/bench/difficulty.ts';
 import { predictPlayerTick } from '../src/net/prediction.ts';
@@ -197,21 +197,21 @@ describe('a queue behind a fight', () => {
 
   it('is held, not taken for stuck, so it is never put down through the crowd', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
-    // A fighter against the player, and three more pressed in a line behind it.
-    const line = [zombie('e:2', -0.7, 5), zombie('e:3', -1.28), zombie('e:4', -1.86), zombie('e:5', -2.44)];
+    // A fighter against the player, and three more pressed in a line behind it, one spacing apart.
+    const line = [zombie('e:2', -0.7, 5), zombie('e:3', -0.7 - ZOMBIE_SPACING), zombie('e:4', -0.7 - 2 * ZOMBIE_SPACING), zombie('e:5', -0.7 - 3 * ZOMBIE_SPACING)];
     separateZombies(line, [player], [], []);
     for (const body of line) expect(body.stall, body.id).toBe(0);
   });
 
   it('is not held when nobody in the jam is fighting: a jam on a corner still recovers', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
-    const line = [zombie('e:2', -6), zombie('e:3', -6.58), zombie('e:4', -7.16)];
+    const line = [zombie('e:2', -6), zombie('e:3', -6 - ZOMBIE_SPACING), zombie('e:4', -6 - 2 * ZOMBIE_SPACING)];
     separateZombies(line, [player], [], []);
     for (const body of line) expect(body.stall, body.id).toBe(179);
   });
 });
 
-describe('the blow is a swipe: live from a tenth of the way in to the end of the swing', () => {
+describe('the blow is a swipe: live from ZOMBIE_MELEE.liveFrom of the way in to the end of the swing', () => {
   const timing = swingTiming({ id: 'e:2', gait: 'run' });
   /** The last tick of the swing, as an offset from the tick the blow goes live. */
   const last = timing.totalTicks - timing.blowTicks;
@@ -241,14 +241,15 @@ describe('the blow is a swipe: live from a tenth of the way in to the end of the
   }
   const IN = 1, OUT = 2;
 
-  it('goes live a tenth of the way in, long before the arm is drawn coming down, and stays live to the end', () => {
+  it('goes live liveFrom of the way in, and stays live to the end', () => {
+    const from = ZOMBIE_MELEE.liveFrom;
     for (const gait of ['walk', 'run', 'sprint'] as const) for (const id of ['e:2', 'e:9', 'e:31'] as const) {
-      const { windupTicks, totalTicks, blowTicks } = swingTiming({ id, gait });
-      expect(blowTicks / totalTicks, `${gait} ${id} starts`).toBeGreaterThan(0.08);
-      expect(blowTicks / totalTicks, `${gait} ${id} starts`).toBeLessThan(0.14);
-      expect(blowTicks, `${gait} ${id}`).toBeLessThan(windupTicks);
+      const { totalTicks, blowTicks } = swingTiming({ id, gait });
+      // A tick of rounding either way is all it can be off.
+      expect(Math.abs(blowTicks / totalTicks - from), `${gait} ${id} starts`).toBeLessThan(1.5 / totalTicks);
       const share = (totalTicks - blowTicks + 1) / totalTicks;
-      expect(share, `${gait} ${id} share`).toBeGreaterThan(0.85);
+      expect(share, `${gait} ${id} share`).toBeGreaterThan(1 - from - 0.04);
+      expect(blowTicks, `${gait} ${id}`).toBeLessThan(totalTicks);
     }
   });
 
@@ -435,7 +436,7 @@ describe('a zombie keeps coming while it swings', () => {
       }
     }
     // Bodies are 0.64 across and are held at 0.58 apart; none may sit on another.
-    expect(closest).toBeGreaterThan(0.45);
+    expect(closest).toBeGreaterThan(ZOMBIE_SPACING * 0.6);
   });
 });
 

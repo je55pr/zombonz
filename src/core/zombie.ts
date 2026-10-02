@@ -322,7 +322,7 @@ function advanceSwing(zombie: ZombieState, players: readonly PlayerState[], targ
     return [{ type: 'zombieSwung', zombieId: zombie.id, playerId: target.id }];
   }
   const events: Array<ZombieMeleeEvent | DamageEvent> = [];
-  // The blow is live from a tenth of the way through the swing until it has finished (issue #210): it is a swipe, not a single
+  // The blow is live from `liveFrom` of the way through the swing until it has finished (issue #210): it is a swipe, not a single
   // tick, so whoever is in reach at any point in it is hit, once. A blow that finds the player in another zombie's grace lands
   // when the grace ends, if they are still in reach and the swing is not over.
   if (!zombie.struck && zombie.attackTicks >= timing.blowTicks) {
@@ -413,11 +413,11 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
 }
 
 /**
- * How far apart zombies keep their middles, in metres: a little more than a body's width (0.64), so a swarm takes up more room
- * and does not pack into a knot. It was 0.58 (bodies overlapping a tenth); the wider it is, the wider a horde stands round its
- * target and the further it strings out behind a player.
+ * How far apart zombies keep their middles, in metres: well over a body's width (0.64), so a swarm takes up more room and
+ * does not pack into a knot. It was 0.58 (bodies overlapping a tenth); the wider it is, the wider a horde stands round its
+ * target and the further it strings out behind a player, and the longer the queue at a door.
  */
-export const ZOMBIE_SPACING = 0.72;
+export const ZOMBIE_SPACING = 0.9;
 
 /** How far apart a player's middle and a zombie's are when their bodies touch. */
 export const BODY_CONTACT = PLAYER_MOVEMENT.radius + ZOMBIE_MOVEMENT.radius;
