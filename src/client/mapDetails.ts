@@ -7,7 +7,7 @@ import type { GameMap } from '../maps/gameMap.ts';
 import type { SimulationState } from '../core/simulation.ts';
 import type { WallWeaponState } from '../core/wallWeapon.ts';
 import { weaponName } from '../core/weapon.ts';
-import { lampFlicker } from './atmosphere.ts';
+import type { LightingPipeline } from './lighting.ts';
 import { prepareWeaponModel, readyWeaponModel, type PreparedWeapon } from './weaponView.ts';
 import { BOX_RULES } from '../core/mysteryBox.ts';
 import { PERKS, type PerkId } from '../core/perks.ts';
@@ -132,8 +132,9 @@ function beamFade(): THREE.Texture {
  * says whether anything that casts a moon shadow moved (a door, a board, the box or the power lever).
  * The map's lights are sources for the shared light pool, which draws the nearest of them.
  */
-export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: LightPool):
+export function buildMapDetails(scene: THREE.Scene, map: GameMap, lighting: LightingPipeline):
   { update(state: SimulationState): boolean; ready: Promise<unknown> } {
+  const lightPool = lighting.lightPool;
   const group = new THREE.Group();
   group.name = `${map.id}-details`;
   scene.add(group);
@@ -383,12 +384,8 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
     bulb.position.set(trap.switchPosition.x, trap.switchPosition.y + 0.28, trap.switchPosition.z); group.add(bulb);
     trapViews.set(trap.id, { arcs, light, lamp, from, to });
   }
-  // Warm practical lights against cold exterior moonlight.
-  const practicalLights: LightSource[] = [];
-  for (const { x, y, z } of map.lights) {
-    const light = lightPool.add(new LightSource(0xffc38b, 11, 10, 1.6)); light.position.set(x, y, z); group.add(light);
-    practicalLights.push(light);
-  }
+  // Map-authored practical lights share the same bounded pool as perks, traps and the box.
+  map.lights.forEach((light, index) => lighting.addPractical(group, light, index));
   // Low rubble stays below the collision step height and out of navigation lanes.
   let seed = 753;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
@@ -445,11 +442,6 @@ export function buildMapDetails(scene: THREE.Scene, map: GameMap, lightPool: Lig
     let moved = false;
     if (wallGunViews.update(state.wallWeapons)) moved = true;
     if (packAPunch.update(state)) moved = true;
-    // On a map with a switch, the lamps burn low until the power comes on.
-    const lampLevel = map.powerSwitch && !state.power.on ? 0.4 : 1;
-    for (let i = 0; i < practicalLights.length; i++) {
-      practicalLights[i].intensity = 11 * lampLevel * lampFlicker(state.world.tick, i * 137 + 47);
-    }
     lever.rotation.z = state.power.on ? -2.3 : 0;
     powerLamp.color.setHex(state.power.on ? 0x30e060 : 0xc02010);
     for (const { materials, light } of perkLights) {

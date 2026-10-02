@@ -99,7 +99,7 @@ or outside the map, it returns you to where you enabled noclip. Both modes reset
 
 F3 toggles the frame profiler (`?perf` opens it automatically). It shows average and
 95th-percentile frame/CPU time, a 144 Hz budget bar for each CPU stage, shadow-update
-versus regular scene cost, draw calls, triangles, and active rigs. GPU draw time appears
+versus regular scene cost, draw calls, triangles, active rigs, and the active lighting tier with logical/real light counts and shadow resolution/refresh cap. GPU draw time appears
 when the browser supports asynchronous timer queries; it excludes browser presentation,
 so CPU and GPU times should not be added together. The panel stays dormant while hidden.
 
@@ -112,12 +112,10 @@ in the panel without changing the simulation.
 
 Rendering follows the display refresh rate, with interpolated movement and immediate
 mouse-look between deterministic 60 Hz simulation ticks. Performance defaults use
-1x pixel density and no MSAA. The moon's shadow map (1024px, 2048px on the larger Asylum) holds only the
+1x pixel density and no MSAA. Lighting defaults to the **Balanced** tier: a 1024px moon shadow (2048px on the larger Asylum), four real pooled point lights and a 15 Hz dirty-shadow refresh cap. The moon shadow holds only the
 building (ceilings, roofs and upper floors block the moon from the rooms beneath them; ground floors do not
 cast; the shadow camera is fitted to the building's corners in `src/client/shadowFit.ts`, because anything outside it counts as lit): zombies and teammates take its shadows but cast none, so it is redrawn only when a door,
-window board, the box or the power lever moves (at most 15 times a second while one is moving). A map's
-lamps, perk machines, traps and box glow share four real point lights (`src/client/lightPool.ts`), given
-to the nearest of them each frame, because every lit pixel pays for every point light in the scene.
+window board, the box or the power lever moves. Map practical lights, perk machines, traps, box glow and transient effects share the bounded pool. Development can compare `?lighting=low|balanced|high`; tiers change only expensive light/shadow budgets, not the map's fog/exposure/readability grade. See [lighting and atmosphere](docs/lighting.md).
 Runtime models may not use transmissive glass: three.js redraws the whole scene for it every frame, so
 `scripts/weapon-convert/plain-glass.mjs` turns it into plain see-through glass (a test enforces this).
 Static scenery and fallback zombie body parts

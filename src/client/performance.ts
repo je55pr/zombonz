@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { addWork, distribution, emptyWork, type Distribution, type SimulationStage, type WorkCounters } from '../core/profiling.ts';
+import type { LightingMetrics } from './lighting.ts';
 
 /** Stage times are CPU wall time, including any driver stall inside a render call. */
 export interface FrameProfile {
@@ -19,6 +20,7 @@ export interface FrameProfile {
   triangles: number;
   rigs: number;
   scale: number;
+  lighting?: Readonly<LightingMetrics>;
   /**
    * What each simulation tick of this frame took (ms), the stage the slowest of them was in, and the work all of them did.
    * Left out where the simulation was not ticked here (a client in a shared game only predicts its own player).
@@ -51,13 +53,14 @@ export interface FrameReport {
   rigs: number;
   ticks: number;
   scale: number;
+  lighting?: Readonly<LightingMetrics>;
   /** Null when no tick was timed (see FrameProfile.tickMs). */
   tick: TickReport | null;
 }
 
 const BUDGET_MS = 1000 / 144;
 /** The overlay's height in canvas pixels (its width is 640). */
-const HEIGHT = 520;
+const HEIGHT = 548;
 const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
 const percentile = (values: readonly number[], fraction: number): number => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -109,7 +112,7 @@ export class FrameProfiler {
       shadowSceneMs: shadow.length ? mean(shadow.map(item => item.sceneMs)) : null,
       regularSceneMs: regular.length ? mean(regular.map(item => item.sceneMs)) : null,
       calls: stage('calls'), triangles: stage('triangles'), rigs: samples.at(-1)!.rigs,
-      ticks: stage('ticks'), scale: samples.at(-1)!.scale, tick,
+      ticks: stage('ticks'), scale: samples.at(-1)!.scale, lighting: samples.at(-1)!.lighting, tick,
     };
     this.reset();
     return report;
@@ -266,21 +269,25 @@ export class PerformanceOverlay {
     const shadow = report.shadowSceneMs === null ? 'n/a' : report.shadowSceneMs.toFixed(2);
     const regular = report.regularSceneMs === null ? 'n/a' : report.regularSceneMs.toFixed(2);
     line(`Scene CPU: shadow frame ${shadow} ms | regular ${regular} ms`, 358, '#dbb75d');
+    if (report.lighting) {
+      const light = report.lighting;
+      line(`Lighting ${light.quality} | real ${light.shiningSources}/${light.realLights} | sources ${light.logicalSources} | shadow ${light.shadowSize}x${light.shadowSize} @ ${light.shadowRefreshHz} Hz`, 381, '#a8c8c0');
+    }
     line(`${report.calls.toFixed(0)} draws | ${Math.round(report.triangles / 1000)}k tris | ${report.rigs} rigs | ${report.ticks.toFixed(2)} ticks/f | ${report.scale.toFixed(2)}x`,
-      381, '#a8c8c0');
+      404, '#a8c8c0');
     // The simulation tick by tick: an average hides the one slow tick that is the stutter.
-    line('SIMULATION TICK (ms)', 414, '#dbb75d');
-    if (!report.tick) line('n/a (this game does not run the simulation here)', 440, '#a8c8c0');
+    line('SIMULATION TICK (ms)', 437, '#dbb75d');
+    if (!report.tick) line('n/a (this game does not run the simulation here)', 463, '#a8c8c0');
     else {
       const { ticks, slowestStage, work } = report.tick;
       const cells: Array<[string, number]> = [['avg', ticks.mean], ['p95', ticks.p95], ['p99', ticks.p99], ['max', ticks.max]];
       cells.forEach(([label, value], index) => {
         c.fillStyle = value > BUDGET_MS ? '#e66750' : '#f1e8c9';
-        c.fillText(`${label} ${value.toFixed(2)}`, 16 + index * 152, 440);
+        c.fillText(`${label} ${value.toFixed(2)}`, 16 + index * 152, 463);
       });
       const count = (value: number) => value >= 10_000 ? `${Math.round(value / 1000)}k` : value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toFixed(0);
-      line(`slowest tick was in: ${slowestStage}  (${ticks.max.toFixed(2)} ms)`, 466, '#a8c8c0');
-      line(`per tick: ${count(work.navigationQueries)} routes | ${count(work.navigationLineTests)} lines | ${count(work.navigationBoxTests + work.moveBoxTests)} walls | ${count(work.navigationSearches)} searches`, 492, '#a8c8c0');
+      line(`slowest tick was in: ${slowestStage}  (${ticks.max.toFixed(2)} ms)`, 489, '#a8c8c0');
+      line(`per tick: ${count(work.navigationQueries)} routes | ${count(work.navigationLineTests)} lines | ${count(work.navigationBoxTests + work.moveBoxTests)} walls | ${count(work.navigationSearches)} searches`, 515, '#a8c8c0');
     }
     this.texture.needsUpdate = true;
   }

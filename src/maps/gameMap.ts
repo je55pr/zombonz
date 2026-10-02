@@ -53,6 +53,20 @@ export interface MapRail { from: Vec3; to: Vec3 }
 export interface MapDecal { asset: string; x: number; y: number; z: number; width: number; height: number; yaw: number }
 /** Text painted on a wall (presentation only). */
 export interface MapLabel { text: string; x: number; y: number; z: number; yaw: number; width: number; height: number; color?: string }
+export type MapLightPower = 'always' | 'dim-until-power' | 'power-only';
+export type MapLightFlicker = 'none' | 'fluorescent';
+/** Presentation-only practical light. Bare x/y/z entries keep the legacy warm-lamp defaults. */
+export interface MapLightDefinition extends Vec3 {
+  color?: number; intensity?: number; range?: number; decay?: number; priority?: number;
+  flicker?: MapLightFlicker; power?: MapLightPower; unpoweredLevel?: number;
+}
+/** Presentation-only map grade. Missing fields preserve the original Zombonz night look. */
+export interface MapAtmosphere {
+  fogColor?: number; fogDensity?: number; exposure?: number;
+  ambientSkyColor?: number; ambientGroundColor?: number; ambientIntensity?: number;
+  moonColor?: number; moonIntensity?: number; skyIntensity?: number;
+  moonOffset?: Vec3;
+}
 /**
  * How a purchasable blocker looks: a boarded door (its width runs along the view's local z, and a label
  * faces local +x) or a pile of sofa and crate debris across a stairway.
@@ -129,8 +143,10 @@ export interface GameMap {
   props: readonly PropPlacement[];
   decals: readonly MapDecal[];
   labels: readonly MapLabel[];
-  /** Warm practical lamps. */
-  lights: readonly Vec3[];
+  /** Practical lights. Optional fields select colour/range/flicker/power behavior; bare coordinates use legacy defaults. */
+  lights: readonly MapLightDefinition[];
+  /** Fog, ambient/moon grade and exposure. Missing means the legacy global night grade. */
+  atmosphere?: MapAtmosphere;
   rubble: readonly ScatterArea[];
   /** Middle and half-size of the building, for the key light's shadow frustum and the treeline. */
   focus: { x: number; z: number; radius: number };

@@ -51,6 +51,8 @@ export class LightPool {
   }
 
   add(source: LightSource): LightSource { this.sources.push(source); return source; }
+  get capacity(): number { return this.slots.length; }
+  get sourceCount(): number { return this.sources.length; }
 
   /** The sources currently drawn, for tests and inspection. */
   shining(): LightSource[] { return this.slots.flatMap(slot => slot.source && slot.level > 0 ? [slot.source] : []); }

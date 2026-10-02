@@ -47,6 +47,75 @@ public static class MapDocument
         SetNumber(target, "z", position.Z);
     }
 
+    private static int Rgb(Color color)
+    {
+        var r = Math.Clamp((int)Math.Round(color.R * 255), 0, 255);
+        var g = Math.Clamp((int)Math.Round(color.G * 255), 0, 255);
+        var b = Math.Clamp((int)Math.Round(color.B * 255), 0, 255);
+        return (r << 16) | (g << 8) | b;
+    }
+
+    private static void SetOptionalNumber(JsonObject target, string key, double value, double legacy)
+    {
+        if (!target.ContainsKey(key) && Math.Abs(value - legacy) <= 0.0001) return;
+        if (!target.ContainsKey(key) || Math.Abs(Number(target[key], legacy) - value) > 0.0001)
+            target[key] = Math.Round(value, 4, MidpointRounding.AwayFromZero);
+    }
+
+    private static void SetOptionalText(JsonObject target, string key, string value, string legacy)
+    {
+        if (!target.ContainsKey(key) && value == legacy) return;
+        if (!target.ContainsKey(key) || Text(target[key], legacy) != value) target[key] = value;
+    }
+
+    private static void WriteLightFields(JsonObject target, ZombonzMapItem item, string defaultPower)
+    {
+        var rgb = Rgb(item.LightColor);
+        if (target.ContainsKey("color") || rgb != 0xffc38b) target["color"] = rgb;
+        SetOptionalNumber(target, "intensity", item.LightIntensity, 11);
+        SetOptionalNumber(target, "range", item.LightRange, 10);
+        SetOptionalNumber(target, "decay", item.LightDecay, 1.6);
+        SetOptionalNumber(target, "priority", item.LightPriority, 0);
+        SetOptionalText(target, "flicker", item.LightFlicker, "fluorescent");
+        SetOptionalText(target, "power", item.LightPower, defaultPower);
+        SetOptionalNumber(target, "unpoweredLevel", item.LightUnpoweredLevel, 0.4);
+    }
+
+    private static void WriteAtmosphere(JsonObject document, ZombonzMapRoot root)
+    {
+        var presentation = (JsonObject)document["presentation"]!;
+        var target = presentation["atmosphere"] as JsonObject;
+        var changed = Rgb(root.FogColor) != 0x1d2b30
+            || Math.Abs(root.FogDensity - 0.027f) > 0.0001
+            || Math.Abs(root.Exposure - 1.35f) > 0.0001
+            || Rgb(root.AmbientSkyColor) != 0xaabfc9
+            || Rgb(root.AmbientGroundColor) != 0x373026
+            || Math.Abs(root.AmbientIntensity - 1.4f) > 0.0001
+            || Rgb(root.MoonColor) != 0xb4ced7
+            || Math.Abs(root.MoonIntensity - 2.4f) > 0.0001
+            || Math.Abs(root.SkyIntensity - 0.5f) > 0.0001
+            || root.MoonOffset.DistanceTo(new Vector3(-12, 22, -16)) > 0.0001f;
+        if (target is null && !changed) return;
+        if (target is null) presentation["atmosphere"] = target = new JsonObject();
+
+        void ColorField(string key, Color value, int legacy)
+        {
+            var rgb = Rgb(value);
+            if (target.ContainsKey(key) || rgb != legacy) target[key] = rgb;
+        }
+        ColorField("fogColor", root.FogColor, 0x1d2b30);
+        SetOptionalNumber(target, "fogDensity", root.FogDensity, 0.027);
+        SetOptionalNumber(target, "exposure", root.Exposure, 1.35);
+        ColorField("ambientSkyColor", root.AmbientSkyColor, 0xaabfc9);
+        ColorField("ambientGroundColor", root.AmbientGroundColor, 0x373026);
+        SetOptionalNumber(target, "ambientIntensity", root.AmbientIntensity, 1.4);
+        ColorField("moonColor", root.MoonColor, 0xb4ced7);
+        SetOptionalNumber(target, "moonIntensity", root.MoonIntensity, 2.4);
+        SetOptionalNumber(target, "skyIntensity", root.SkyIntensity, 0.5);
+        if (target.ContainsKey("moonOffset") || root.MoonOffset.DistanceTo(new Vector3(-12, 22, -16)) > 0.0001f)
+            target["moonOffset"] = Point(root.MoonOffset);
+    }
+
     private static void SetField(JsonObject target, string key, JsonNode value, bool enabled = true)
     {
         if (enabled && target.ContainsKey(key) && !JsonNode.DeepEquals(target[key], value)) target[key] = value;
@@ -77,6 +146,12 @@ public static class MapDocument
             return;
         }
         SetPosition(target, transform.Origin);
+        if (item.Kind == "light")
+        {
+            var defaultPower = document["gameplay"]?["powerSwitch"] is JsonObject ? "dim-until-power" : "always";
+            WriteLightFields(target, item, defaultPower);
+            return;
+        }
         if (item.DataPath.StartsWith("gameplay/zombieSpawns/") && item.BarrierId.Length > 0)
             target["barrierId"] = item.BarrierId;
         var slash = item.DataPath.LastIndexOf('/');
@@ -139,9 +214,12 @@ public static class MapDocument
             "packAPunch" => new() { ["id"] = item.ObjectId, ["position"] = position, ["yaw"] = MapGameplay.QuarterYaw(item.Rotation.Y), ["cost"] = Math.Max(0, item.Cost) },
             "equipment" => new() { ["id"] = item.ObjectId, ["item"] = "bouncing-betty", ["position"] = position, ["cost"] = Math.Max(0, item.Cost) },
             "navigation" => new() { ["id"] = item.ObjectId, ["position"] = position, ["neighbors"] = new JsonArray() },
+            "lights" => position,
             _ => null
         };
         if (entry is null) return;
+        if (field == "lights")
+            WriteLightFields(entry, item, document["gameplay"]?["powerSwitch"] is JsonObject ? "dim-until-power" : "always");
         if (field == "barriers")
         {
             entry["width"] = item.Width; entry["outward"] = Point(new Basis(Vector3.Up, item.Rotation.Y) * item.Outward);
@@ -162,8 +240,8 @@ public static class MapDocument
             if (item.DoorAppearance == "debris") entry["kind"] = "debris";
         }
         if (field == "zombieSpawns" && item.BarrierId.Length > 0) entry["barrierId"] = item.BarrierId;
-        var kind = field is "greybox" or "collisionBoxes" ? "box" : field == "props" ? "prop" : "gameplay";
-        var suffix = field is "greybox" or "collisionBoxes" or "zombieSpawns" ? "" : "/position";
+        var kind = field is "greybox" or "collisionBoxes" ? "box" : field == "props" ? "prop" : field == "lights" ? "light" : "gameplay";
+        var suffix = field is "greybox" or "collisionBoxes" or "zombieSpawns" or "lights" ? "" : "/position";
         var assigned = $"{parts[1]}/{(field == "navigation" ? "navigation/nodes" : field)}/{target.Count}";
         pending.Add(new(item, assigned + suffix, kind));
         foreach (var child in item.GetChildren().OfType<ZombonzMapItem>())
@@ -175,6 +253,7 @@ public static class MapDocument
     public static void WalkItems(JsonObject document, Node node, List<Addition>? pending = null)
     {
         pending ??= new();
+        if (node is ZombonzMapRoot root) WriteAtmosphere(document, root);
         var renames = MapPreview.ItemsIn(node).Where(item => item.GameplayType == "barriers" && item.Kind != "new")
             .Select(item => (Old: Text(AtPath(document, item.DataPath[..item.DataPath.LastIndexOf('/')])?["id"]), New: item.ObjectId))
             .Where(pair => pair.Old.Length > 0 && pair.Old != pair.New).ToArray();
