@@ -29,6 +29,30 @@ describe('versioned map document', () => {
     expect(ASYLUM_MAP.scenery?.length).toBeGreaterThan(0);
   });
 
+  it('validates authored lighting and atmosphere at exact presentation paths', () => {
+    const document = structuredClone(asylumDocument);
+    const presentation = document.presentation as any;
+    presentation.lights[0].color = 0x1000000;
+    presentation.lights[0].unpoweredLevel = 1.5;
+    presentation.lights[0].flicker = 'haunted';
+    presentation.lights[1].power = 'sometimes';
+    presentation.atmosphere = {
+      fogColor: -1,
+      fogDensity: -0.1,
+      exposure: Number.NaN,
+      moonOffset: { x: 0, y: Infinity, z: 0 },
+    };
+    const errors = validateMapDocument(document);
+    expect(errors).toContain('presentation.lights[0].color: expected a 24-bit RGB integer');
+    expect(errors).toContain('presentation.lights[0].unpoweredLevel: expected 0 to 1');
+    expect(errors).toContain('presentation.lights[0].flicker: expected "none" or "fluorescent"');
+    expect(errors).toContain('presentation.lights[1].power: expected "always", "dim-until-power", or "power-only"');
+    expect(errors).toContain('presentation.atmosphere.fogColor: expected a 24-bit RGB integer');
+    expect(errors).toContain('presentation.atmosphere.fogDensity: expected a nonnegative finite number');
+    expect(errors).toContain('presentation.atmosphere.exposure: expected a nonnegative finite number');
+    expect(errors).toContain('presentation.atmosphere.moonOffset: expected a finite {x, y, z} position');
+  });
+
   it('validates Asylum trap switches and zones at their document paths', () => {
     const document = structuredClone(asylumDocument);
     document.gameplay.traps[0].switchPosition.x = Number.NaN;

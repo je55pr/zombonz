@@ -5,7 +5,7 @@ using static MapDocument;
 /// <summary>Builds editable map handles without depending on an open editor window.</summary>
 public static class MapScene
 {
-    public static readonly string[] NewObjectKinds = { "Prop", "Greybox", "Collision box", "Zombie spawn", "Barrier", "Door", "Wall weapon", "Barrel", "Jeep", "Truck", "Navigation node", "Perk machine", "Pack-a-Punch", "Equipment buy" };
+    public static readonly string[] NewObjectKinds = { "Prop", "Greybox", "Collision box", "Zombie spawn", "Barrier", "Door", "Wall weapon", "Barrel", "Jeep", "Truck", "Navigation node", "Perk machine", "Pack-a-Punch", "Equipment buy", "Light" };
 
     public static ZombonzMapRoot Build(JsonObject document, string sourceFile, bool previewAssets = true)
     {
@@ -13,6 +13,7 @@ public static class MapScene
         var root = new ZombonzMapRoot { Name = Text(metadata["id"]).Capitalize() + "Map", SourceFile = sourceFile };
         var gameplay = (JsonObject)document["gameplay"]!;
         var presentation = (JsonObject)document["presentation"]!;
+        ApplyAtmosphere(root, presentation);
         AddMarker(root, "gameplay/playerSpawn", (JsonObject)gameplay["playerSpawn"]!, "Player spawn", Colors.Green);
         AddArray(root, gameplay, "gameplay", "zombieSpawns", "", "Zombie spawn", Colors.Red);
         AddArray(root, gameplay, "gameplay", "doors", "position", "Door", Colors.Orange);
@@ -50,10 +51,55 @@ public static class MapScene
             for (var i = 0; i < boxes.Count; i++) AddBox(root, $"presentation/{field}/{i}", (JsonObject)boxes[i]!, $"{field} {i}", new Color(0.4f, 0.6f, 0.9f, 0.3f), "Geometry");
         }
         AddArray(root, presentation, "presentation", "props", "position", "Prop", new Color(0.6f, 0.45f, 0.3f));
+        var lights = Items(presentation, "lights");
+        for (var i = 0; i < lights.Count; i++) if (lights[i] is JsonObject light)
+            AddLight(root, $"presentation/lights/{i}", light, gameplay["powerSwitch"] is JsonObject);
         MapGameplay.Prepare(root, document);
         if (previewAssets)
             foreach (var warning in MapPreview.Refresh(root, document)) GD.PushWarning(warning);
         return root;
+    }
+
+    private static Color Rgb(int value) => new(
+        ((value >> 16) & 255) / 255f,
+        ((value >> 8) & 255) / 255f,
+        (value & 255) / 255f);
+
+    private static void ApplyAtmosphere(ZombonzMapRoot root, JsonObject presentation)
+    {
+        if (presentation["atmosphere"] is not JsonObject atmosphere) return;
+        root.FogColor = Rgb((int)Number(atmosphere["fogColor"], 0x1d2b30));
+        root.FogDensity = (float)Number(atmosphere["fogDensity"], 0.027);
+        root.Exposure = (float)Number(atmosphere["exposure"], 1.35);
+        root.AmbientSkyColor = Rgb((int)Number(atmosphere["ambientSkyColor"], 0xaabfc9));
+        root.AmbientGroundColor = Rgb((int)Number(atmosphere["ambientGroundColor"], 0x373026));
+        root.AmbientIntensity = (float)Number(atmosphere["ambientIntensity"], 1.4);
+        root.MoonColor = Rgb((int)Number(atmosphere["moonColor"], 0xb4ced7));
+        root.MoonIntensity = (float)Number(atmosphere["moonIntensity"], 2.4);
+        root.SkyIntensity = (float)Number(atmosphere["skyIntensity"], 0.5);
+        if (atmosphere["moonOffset"] is JsonObject offset) root.MoonOffset = Vector(offset);
+    }
+
+    private static ZombonzMapItem AddLight(ZombonzMapRoot root, string path, JsonObject light, bool hasPowerSwitch)
+    {
+        var color = Rgb((int)Number(light["color"], 0xffc38b));
+        var item = new ZombonzMapItem
+        {
+            Name = ("Light " + path.Split('/').Last()).ValidateNodeName(),
+            DataPath = path,
+            Kind = "light",
+            Position = Vector(light),
+            LightColor = color,
+            LightIntensity = (float)Number(light["intensity"], 11),
+            LightRange = (float)Number(light["range"], 10),
+            LightDecay = (float)Number(light["decay"], 1.6),
+            LightPriority = (float)Number(light["priority"]),
+            LightFlicker = Text(light["flicker"], "fluorescent"),
+            LightPower = Text(light["power"], hasPowerSwitch ? "dim-until-power" : "always"),
+            LightUnpoweredLevel = (float)Number(light["unpoweredLevel"], 0.4),
+        };
+        Attach(root, item, new SphereMesh { Radius = 0.16f, Height = 0.32f }, color, "Lighting", true);
+        return item;
     }
 
     private static Node3D Group(ZombonzMapRoot root, string name)
@@ -144,6 +190,10 @@ public static class MapScene
                 break;
             case "Greybox":
                 item = AddBox(root, "new/presentation/greybox", new JsonObject { ["center"] = Point(origin), ["size"] = Point(Vector3.One) }, "New greybox", new Color(0.4f, 0.6f, 0.9f, 0.3f), "Geometry");
+                break;
+            case "Light":
+                item = AddLight(root, "new/presentation/lights", new JsonObject { ["x"] = origin.X, ["y"] = origin.Y + 2, ["z"] = origin.Z },
+                    document["gameplay"]?["powerSwitch"] is JsonObject);
                 break;
             case "Collision box":
                 item = AddBox(root, "new/gameplay/collisionBoxes", new JsonObject { ["min"] = Point(origin - Vector3.One / 2), ["max"] = Point(origin + Vector3.One / 2) }, "New collision", new Color(1, 0.2f, 0.2f, 0.25f), "Collision");

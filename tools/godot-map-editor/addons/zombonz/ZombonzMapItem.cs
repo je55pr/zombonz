@@ -30,4 +30,14 @@ public partial class ZombonzMapItem : Node3D
     [Export] public string DoorLabel { get; set; } = "";
     [Export] public float InitialYaw { get; set; }
     [Export] public Vector3 PreviewOffset { get; set; }
+
+    [ExportGroup("Lighting")]
+    [Export] public Color LightColor { get; set; } = new(1f, 195f / 255f, 139f / 255f);
+    [Export(PropertyHint.Range, "0,100,0.1,or_greater")] public float LightIntensity { get; set; } = 11f;
+    [Export(PropertyHint.Range, "0,50,0.1,or_greater")] public float LightRange { get; set; } = 10f;
+    [Export(PropertyHint.Range, "0,4,0.1,or_greater")] public float LightDecay { get; set; } = 1.6f;
+    [Export] public float LightPriority { get; set; }
+    [Export(PropertyHint.Enum, "fluorescent,none")] public string LightFlicker { get; set; } = "fluorescent";
+    [Export(PropertyHint.Enum, "always,dim-until-power,power-only")] public string LightPower { get; set; } = "always";
+    [Export(PropertyHint.Range, "0,1,0.05")] public float LightUnpoweredLevel { get; set; } = 0.4f;
 }
