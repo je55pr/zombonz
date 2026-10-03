@@ -323,7 +323,9 @@ describe('Bouncing Betties', () => {
   });
 
   it('are not set off by players, and one that is set off sets off a barrel beside it', () => {
-    const { sim } = betty({ hazards: [barrel('b1', 0, -MINE_RULES.placeDistance - 1.2)] });
+    const { sim, player } = betty({ hazards: [barrel('b1', 0, -MINE_RULES.placeDistance - 1.2)] });
+    // The zombie that sets it off is within arm's reach of the player, who would otherwise be dead before the mine pops.
+    player.godMode = true;
     step(sim, ['placeMine']);
     run(sim, MINE_RULES.armTicks + 30);
     expect(sprung(sim)).toBe('armed');

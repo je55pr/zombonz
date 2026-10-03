@@ -2,8 +2,8 @@
 import * as THREE from 'three';
 import { buildGreybox } from './client/greybox.ts';
 import { VENDING_MODEL, buildMapDetails } from './client/mapDetails.ts';
-import { LightPool } from './client/lightPool.ts';
-import { fitShadowCamera, placeMoon } from './client/shadowFit.ts';
+import { fitShadowCamera } from './client/shadowFit.ts';
+import { LightingPipeline, lightingQualityFromSearch } from './client/lighting.ts';
 import { createZombieView, type ZombieView } from './client/zombieView.ts';
 import { BrowserInput } from './client/input.ts';
 import { ADS_LOOK_SCALE, aimedFov } from './client/aim.ts';
@@ -149,26 +149,14 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.shadowMap.autoUpdate = false;
   renderer.autoClear = false;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.35;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1d2b30);
-  scene.fog = new THREE.FogExp2(0x1d2b30, 0.027);
-
   const camera = new THREE.PerspectiveCamera(settings.fov, 1, 0.05, 80);
   camera.rotation.order = 'YXZ';
-  scene.add(new THREE.HemisphereLight(0xaabfc9, 0x373026, 1.4));
-  const keyLight = new THREE.DirectionalLight(0xb4ced7, 2.4);
-  // Aimed at the middle of the building; the shadow camera is fitted to its walls and roofs below.
+  const lightingQuality = lightingQualityFromSearch(location.search);
+  const lighting = new LightingPipeline(renderer, scene, map, lightingQuality);
+  const keyLight = lighting.moon;
   const { focus } = map;
-  placeMoon(keyLight, focus); scene.add(keyLight.target);
-  keyLight.castShadow = true;
-  // A larger building spreads the same shadow map further, so give it more texels.
-  const shadowSize = focus.radius > 24 ? 2048 : 1024;
-  keyLight.shadow.mapSize.set(shadowSize, shadowSize);
-  keyLight.shadow.bias = -0.0006;
-  scene.add(keyLight);
   const greybox = buildGreybox(map.greybox, map.prisms);
   scene.add(greybox);
   // Anything outside the shadow camera's box is lit, so it must reach every corner of every roof and wall.
@@ -176,9 +164,9 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     Object.assign(keyLight.shadow.camera, { left: -focus.radius, right: focus.radius, top: focus.radius, bottom: -focus.radius,
       far: 45 + focus.radius * 1.2 });
   }
-  // The map's lamps, perk machines, traps and box glow share a few real point lights.
-  const lightPool = new LightPool(scene);
-  const details = buildMapDetails(scene, map, lightPool);
+  // Practical lamps, perks, traps, the box and explosions share the tier's fixed real-light pool.
+  const lightPool = lighting.lightPool;
+  const details = buildMapDetails(scene, map, lighting);
   /** Whether the moon's shadow map is out of date: it is redrawn only when the building changes. */
   let shadowsDirty = true;
   batchStaticMeshes(scene);
@@ -194,7 +182,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const props = buildEnvironmentProps(scene, map.props);
     const surfaces = readEnvironmentManifest().then(manifest =>
       Promise.all([loadEnvironmentMaterials(manifest), buildEnvironmentDecals(scene, manifest, map.decals),
-        applySky(scene, manifest, keyLight).then(() => 0, error => { console.warn('Night sky unavailable', error); return 1; }),
+        applySky(scene, manifest, keyLight, lighting.atmosphere.skyIntensity).then(() => 0, error => { console.warn('Night sky unavailable', error); return 1; }),
         buildTreeline(scene, map).then(() => 0)]))
       .catch(error => { console.warn('Environment manifest unavailable', error); return [1]; });
     const [propFailures, surfaceFailures] = await Promise.all([props, surfaces]);
@@ -503,6 +491,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   function resetMatchViews(): void {
     hazardView.reset(); mineView.clear(); blastEffects.clear(); goreEffects.clear();
     previousPositions.clear();
+    injuryFovPenalty = 0;
     for (const view of skinnedViews.values()) view.dispose();
     skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
   }
@@ -579,7 +568,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       ? damagePresentation(localForInjury.health, maxPlayerHealth(localForInjury), localForInjury.downed, 0, settings.combatEffects).fovPenalty
       : 0;
     const injuryBlend = 1 - Math.exp(-3.2 * Math.min(0.1, Math.max(0, interval / 1000)));
-    injuryFovPenalty += (injuryTarget - injuryFovPenalty) * injuryBlend;
+    if (!localForInjury?.alive) injuryFovPenalty = 0;
+    else injuryFovPenalty += (injuryTarget - injuryFovPenalty) * injuryBlend;
     const effectiveBaseFov = settings.fov - injuryFovPenalty;
     // Aiming zooms the player's chosen field of view in (more for a rifle than a pistol); sprinting widens it a little.
     const targetFov = playerForCamera?.aiming ? aimedFov(effectiveBaseFov, playerForCamera.weapon.weaponId)
@@ -603,16 +593,16 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
 
     const actorsEnded = profiling ? performance.now() : 0;
     if (details.update(simulation.state)) shadowsDirty = true;
-    lightPool.update(camera, interval / 1000);
+    lighting.update(simulation.state, camera, interval / 1000);
     const detailsEnded = profiling ? performance.now() : 0;
     performanceOverlay.beginGpu();
     renderer.clear();
     renderer.info.reset();
     // The moon's shadows are the building's (actors cast none), so the shadow map is only redrawn when
-    // a door, board, the box or the lever moves, or scenery finishes loading: at most 15 times a
-    // second while something is moving (by the clock, so it still happens while paused or loading),
+    // a door, board, the box or the lever moves, or scenery finishes loading: capped by the selected
+    // lighting tier while something is moving (by the clock, so it still happens while paused or loading),
     // and not at all otherwise.
-    const shadowFrame = shadowsDirty && nowSeconds - lastShadowSeconds >= 1 / 15;
+    const shadowFrame = shadowsDirty && nowSeconds - lastShadowSeconds >= 1 / lighting.profile.shadowRefreshHz;
     if (shadowFrame) { renderer.shadowMap.needsUpdate = true; lastShadowSeconds = nowSeconds; shadowsDirty = false; }
     renderer.render(scene, camera);
     const sceneEnded = profiling ? performance.now() : 0;
@@ -647,7 +637,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       overlayMs: performance.now() - hudEnded,
       shadowFrame, ticks: simulation.state.world.tick - tickBefore,
       calls, triangles, rigs: skinnedViews.size + playerViews.size,
-      scale: renderer.getPixelRatio(),
+      scale: renderer.getPixelRatio(), lighting: lighting.metrics(),
       ...(frameTicks.ms.length ? { tickMs: frameTicks.ms, slowestStage: frameTicks.stage, work: frameTicks.work } : {}),
     });
     frameId = requestAnimationFrame(frame);
@@ -746,7 +736,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       if (net?.role === 'client') net.client.leave();
       for (const view of playerViews.values()) view.dispose();
       pause.dispose(); input.dispose(); audio.dispose(); hud.dispose(); blastEffects.clear(); goreEffects.dispose();
-      performanceOverlay.dispose(); networkOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose();
+      performanceOverlay.dispose(); networkOverlay.dispose(); powerupView.dispose(); zombieBatch.dispose(); lighting.dispose();
       for (const view of skinnedViews.values()) view.dispose();
       skinnedViews.clear(); zombieViews.clear();
       renderer.dispose();

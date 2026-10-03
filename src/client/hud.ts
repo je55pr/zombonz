@@ -17,9 +17,9 @@ const PERK_ICONS: Readonly<Record<PerkId, { fill: string; mark: string }>> = {
   'quick-revive': { fill: 'rgba(30,86,160,0.9)', mark: 'QR' },
 };
 import type { FeedbackSnapshot } from './feedback.ts';
-import { damagePresentation } from './damagePresentation.ts';
+import { DamageOverlay } from './damageOverlay.ts';
 import { loadUiFonts, TITLE_FONT, UI_FONT } from './fonts.ts';
-import { Crosshair, NukeFlash, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
+import { Crosshair, HealthBar, NukeFlash, PointsPopups, RoundCounter, type HudLayout } from './hudEffects.ts';
 import type { SimulationEvent } from '../core/simulation.ts';
 
 export interface HudSnapshot {
@@ -191,6 +191,8 @@ export class CanvasHud {
   private pointsEdge = { x: 1400, y: LAYOUT_HEIGHT - 178 };
   private readonly popups: PointsPopups;
   private readonly roundCounter: RoundCounter;
+  private readonly healthBar: HealthBar;
+  private readonly damageOverlay: DamageOverlay;
   private readonly crosshair: Crosshair;
   private readonly nukeFlash: NukeFlash;
 
@@ -217,11 +219,13 @@ export class CanvasHud {
     quad.frustumCulled = false;
     this.scene.add(quad);
     this.roundCounter = new RoundCounter(this.scene);
+    this.healthBar = new HealthBar(this.scene);
+    this.damageOverlay = new DamageOverlay(this.scene);
     this.popups = new PointsPopups(this.scene);
     this.crosshair = new Crosshair(this.scene);
     this.nukeFlash = new NukeFlash(this.scene);
     // The first frames draw with fallback fonts; repaint once the bundled ones are ready.
-    void loadUiFonts().then(() => { this.previous = null; });
+    void loadUiFonts().then(() => { this.previous = null; this.healthBar.invalidate(); });
   }
   setBindings(bindings: KeyBindings): void { this.bindings = bindings; }
 
@@ -348,38 +352,6 @@ export class CanvasHud {
     c.setTransform(scale, 0, 0, scale, 0, 0);
     const width = this.canvas.width / scale, height = LAYOUT_HEIGHT, centre = width / 2, right = width - 44;
     this.layout = { width, height, scale };
-    const damage = snapshot.spectating ? damagePresentation(snapshot.maxHealth, snapshot.maxHealth, null, 0, snapshot.combatEffects ?? 2)
-      : damagePresentation(snapshot.health, snapshot.maxHealth,
-        snapshot.bleedoutTicks == null ? null : { bleedoutTicks: snapshot.bleedoutTicks },
-        snapshot.feedback?.damagePulse ?? (snapshot.feedback?.damageVignette ? 1 : 0), snapshot.combatEffects ?? 2);
-    if (damage.injury > 0.001 || damage.pulse > 0.001) {
-      // Keep the crosshair area comparatively clean; injury gathers in the peripheral vision instead.
-      const edge = c.createRadialGradient(centre, height / 2, height * 0.2, centre, height / 2, width * 0.69);
-      edge.addColorStop(0, 'rgba(70,0,0,0)');
-      edge.addColorStop(0.58, `rgba(78,0,0,${damage.injury * 0.06 + damage.pulse * 0.04})`);
-      edge.addColorStop(1, `rgba(92,0,0,${Math.min(0.78, damage.injury * 0.58 + damage.pulse * 0.42)})`);
-      c.fillStyle = edge; c.fillRect(0, 0, width, height);
-
-      // Fixed irregular peripheral stains avoid a perfectly circular "Photoshop vignette" without animation noise.
-      if ((snapshot.combatEffects ?? 2) > 0 && damage.injury + damage.pulse > 0.18) {
-        c.save();
-        const stain = Math.min(0.5, damage.injury * 0.3 + damage.pulse * 0.22);
-        c.fillStyle = `rgba(72,0,0,${stain})`;
-        for (const [x, y, rx, ry, turn] of [
-          [0.02, 0.17, 0.15, 0.27, -0.35], [0.98, 0.28, 0.13, 0.3, 0.28],
-          [0.14, 0.98, 0.24, 0.12, 0.12], [0.84, 0.99, 0.21, 0.11, -0.16],
-          [0.48, 0.01, 0.2, 0.075, 0.04],
-        ] as const) {
-          c.beginPath(); c.ellipse(width * x, height * y, width * rx, height * ry, turn, 0, Math.PI * 2); c.fill();
-        }
-        c.restore();
-      }
-      if (damage.pulse > 0.001) {
-        c.fillStyle = `rgba(70,0,0,${damage.pulse * 0.08})`;
-        c.fillRect(0, 0, width, height);
-      }
-    }
-
     // Top: the map and the credits key, kept quiet. (The keys are listed under Controls in the menus, not on screen.)
     this.text(this.mapName.toUpperCase(), 40, 40, { size: 27, font: 'title', color: DIM });
     this.text('F2  CREDITS', 42, 72, { size: 17, weight: 500, color: FAINT, spacing: 2 });
@@ -417,18 +389,13 @@ export class CanvasHud {
     // Bottom left: the round (an animated RoundCounter quad, drawn over this canvas) above health.
     if (snapshot.roundPhase === 'intermission') this.text('INTERMISSION', 44, height - 340, { size: 23, color: GOLD, spacing: 3 });
     this.text('ROUND', 44, height - 280, { size: 34, weight: 500, color: INK, spacing: 4 });
-    const low = snapshot.maxHealth > 0 && snapshot.health / snapshot.maxHealth <= 0.5;
-    this.text('HP', 44, height - 48, { size: 29, weight: 500, color: INK, spacing: 2 });
-    this.panel(98, height - 60, 238, 24, 8, 'rgba(0,0,0,0.65)', EDGE);
-    const healthWidth = 238 * Math.max(0, Math.min(1, snapshot.health / snapshot.maxHealth));
+    // Health is painted on its own layer so refills do not repaint the main HUD.
     // Perk icons sit in a row above the round counter, in the order they were drunk.
     (snapshot.perks ? snapshot.perks.split(',') as PerkId[] : []).forEach((perk, index) => {
       const style = PERK_ICONS[perk], x = 44 + index * 60, y = height - 435;
       this.panel(x, y, 52, 52, 9, style.fill, 'rgba(255,255,255,0.35)');
       this.text(style.mark, x + 26, y + 27, { size: 23, color: '#fff7e6', align: 'center' });
     });
-    if (healthWidth > 0) this.panel(98, height - 60, healthWidth, 24, 8, low ? BLOOD : INK, null);
-    this.text(String(snapshot.health), 352, height - 48, { size: 29, color: low ? BLOOD : INK });
 
     // Bottom right: points in gold over the weapon, its ammunition and the holstered gun.
     const pointsWidth = this.text(String(snapshot.points), right, height - 190, { size: 52, color: GOLD, align: 'right' });
@@ -549,19 +516,22 @@ export class CanvasHud {
    */
   render(snapshot: HudSnapshot, now = performance.now(), aim?: { spread: number; verticalFov: number }): void {
     const resized = this.fit();
+    // Continuously changing injury and health values belong to their own layers.
     if (resized || !this.previous || (Object.keys(snapshot) as (keyof HudSnapshot)[])
-      .some(key => key === 'feedback'
-        ? snapshot.feedback?.message !== this.previous!.feedback?.message
-          || snapshot.feedback?.hitMarker !== this.previous!.feedback?.hitMarker
-          || snapshot.feedback?.damageVignette !== this.previous!.feedback?.damageVignette
-          || snapshot.feedback?.damagePulse !== this.previous!.feedback?.damagePulse
-        : snapshot[key] !== this.previous![key])) {
+      .some(key => key === 'health' || key === 'maxHealth' || key === 'bleedoutTicks' || key === 'combatEffects' ? false
+        : key === 'feedback'
+          ? snapshot.feedback?.message !== this.previous!.feedback?.message
+            || snapshot.feedback?.hitMarker !== this.previous!.feedback?.hitMarker
+          : snapshot[key] !== this.previous![key])) {
       this.draw(snapshot);
       this.previous = { ...snapshot, feedback: snapshot.feedback && { ...snapshot.feedback } };
     }
     // Overlays (pause, game over, credits) cover the HUD, so the animated pieces hide under them.
     const effects = !snapshot.paused && !snapshot.gameOver && !this.credits;
     this.roundCounter.update(snapshot.round, snapshot.roundPhase, this.layout, now, effects);
+    // The game over screen dims the HUD and the credits cover it; the pause menu sits over it, so the bar stays under that.
+    this.damageOverlay.update(snapshot, this.layout);
+    this.healthBar.update(snapshot.health, snapshot.maxHealth, this.layout, !snapshot.gameOver && !this.credits);
     this.popups.update(this.layout, now, effects);
     this.nukeFlash.update(now, effects);
     // WaW hides the hip crosshair when aiming down sights and while sprinting.
@@ -582,5 +552,7 @@ export class CanvasHud {
     if (typeof window !== 'undefined') window.removeEventListener('keydown', this.onKeyDown);
     this.material.dispose();
     this.texture.dispose();
+    this.healthBar.dispose();
+    this.damageOverlay.dispose();
   }
 }

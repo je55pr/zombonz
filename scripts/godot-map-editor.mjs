@@ -17,13 +17,18 @@ if (dotnet !== 'dotnet') {
   env[pathKey] = `${dirname(dotnet)};${env[pathKey] ?? ''}`;
 }
 
-function run(command, args, rejectGodotErrors = false) {
-  const result = spawnSync(command, args, { cwd: repository, env, encoding: 'utf8', windowsHide: true });
+// The reload check presses dock buttons with no map open; the dock reports that, and logs it as an error, by design.
+const expectedGodotErrors = ['Open a Zombonz map scene first.'];
+
+function run(command, args, rejectGodotErrors = false, timeout = undefined) {
+  const result = spawnSync(command, args, { cwd: repository, env, encoding: 'utf8', windowsHide: true, timeout });
   process.stdout.write(result.stdout ?? '');
   process.stderr.write(result.stderr ?? '');
   if (result.error) throw new Error(`Cannot run ${command}: ${result.error.message}`);
-  if (result.status !== 0 || (rejectGodotErrors && /^\s*(?:SCRIPT )?ERROR:/m.test(`${result.stdout}\n${result.stderr}`)))
-    throw new Error(`${command} failed (${result.status}).`);
+  const godotError = `${result.stdout}\n${result.stderr}`.split('\n')
+    .find(line => /^\s*(?:SCRIPT )?ERROR:/.test(line) && !expectedGodotErrors.some(text => line.includes(text)));
+  if (result.status !== 0 || (rejectGodotErrors && godotError))
+    throw new Error(`${command} failed (${result.status})${godotError ? `: ${godotError.trim()}` : '.'}`);
   return result.stdout.trim();
 }
 
@@ -33,11 +38,12 @@ if (action === 'check') {
   const godot = process.env.GODOT ?? 'godot';
   const version = run(godot, ['--version']);
   if (!/^4\.7\.\d+\.stable\.mono\./.test(version)) throw new Error(`Use Godot 4.7 .NET (tested with 4.7.2); found ${version}. Set GODOT to its executable path.`);
-  // Give the .NET editor time to finish initialization before shutting down its tool scripts.
+  // The editor quits itself once tests/ReloadCheck.gd has had it reload the C# code and pressed the dock again.
   env.ZOMBONZ_EDITOR_SMOKE_TEST = '1';
-  const editorOutput = run(godot, ['--headless', '--editor', '--path', project, '--quit-after', '10'], true);
+  const editorOutput = run(godot, ['--headless', '--editor', '--path', project], true, 10 * 60 * 1000);
   delete env.ZOMBONZ_EDITOR_SMOKE_TEST;
   if (!editorOutput.includes('C# map editor (editor):')) throw new Error('The editor plugin did not run its import checks.');
+  if (!editorOutput.includes('C# map editor (reload):')) throw new Error('The dock was not checked after a C# reload.');
   run(godot, ['--headless', '--path', project, 'res://tests/SmokeTest.tscn'], true);
 } else {
   console.log('Open tools/godot-map-editor/project.godot in Godot 4.7 .NET. The C# plugin has been built.');

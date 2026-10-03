@@ -162,6 +162,8 @@ export class PlayerView {
 
   dispose(): void {
     this.mixer?.stopAllAction();
+    this.muzzleFlash.geometry.dispose();
+    (this.muzzleFlash.material as THREE.Material).dispose();
     this.root.traverse(object => {
       if (object instanceof THREE.Sprite) {
         (object.material as THREE.SpriteMaterial).map?.dispose(); object.material.dispose();

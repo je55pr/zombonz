@@ -25,7 +25,7 @@ export interface ZombieAttackEvent {
   damage: number;
 }
 
-/** A zombie began a swing at a player: the wind-up starts, and the blow lands `swingTiming` ticks later if they are still in reach. */
+/** A zombie began a swing at a player: the blow is live from `swingTiming(...).blowTicks` on, and lands if they are in reach. */
 export interface ZombieSwingEvent {
   type: 'zombieSwung';
   zombieId: EntityId;
@@ -103,6 +103,7 @@ export function createZombieState(id: EntityId, position: Vec3, round: number, g
     attackTicks: 0,
     attackStyle: 0,
     stall: 0,
+    struck: false,
     anchorX: position.x,
     anchorZ: position.z,
     alive: true,
@@ -315,20 +316,22 @@ function advanceSwing(zombie: ZombieState, players: readonly PlayerState[], targ
   if (zombie.attackTicks === 0) {
     if (!target || zombie.attackCooldownTicks > 0 || !reach(target, 'start')) return [];
     zombie.attackTicks = 1;
+    zombie.struck = false;
     zombie.attackStyle = (zombie.attackStyle + 1) % 8;
     zombie.targetId = target.id;
     return [{ type: 'zombieSwung', zombieId: zombie.id, playerId: target.id }];
   }
   const events: Array<ZombieMeleeEvent | DamageEvent> = [];
-  if (zombie.attackTicks === timing.windupTicks) {
-    // The blow: at whoever it was after if they are still in reach, else anyone else who is.
-    const victims = players.filter(player => player.alive && !player.downed && reach(player, 'strike'))
-      .sort((a, b) => Number(b.id === zombie.targetId) - Number(a.id === zombie.targetId) || a.id.localeCompare(b.id));
-    const victim = victims[0];
-    if (victim) {
-      // Another zombie has just hit them: wait, arm out, until the moment has passed.
-      if (victim.hurtGraceTicks > 0) return events;
+  // The blow is live from `liveFrom` of the way through the swing until it has finished (issue #210): it is a swipe, not a single
+  // tick, so whoever is in reach at any point in it is hit, once. A blow that finds the player in another zombie's grace lands
+  // when the grace ends, if they are still in reach and the swing is not over.
+  if (!zombie.struck && zombie.attackTicks >= timing.blowTicks) {
+    // At whoever it was after if they are in reach, else anyone else who is.
+    const victim = players.filter(player => player.alive && !player.downed && reach(player, 'strike'))
+      .sort((a, b) => Number(b.id === zombie.targetId) - Number(a.id === zombie.targetId) || a.id.localeCompare(b.id))[0];
+    if (victim && victim.hurtGraceTicks <= 0) {
       victim.hurtGraceTicks = ZOMBIE_MELEE.hurtGraceTicks;
+      zombie.struck = true;
       events.push({ type: 'zombieAttacked', zombieId: zombie.id, playerId: victim.id, damage: ZOMBIE_MELEE.damage },
         ...damagePlayer(victim, ZOMBIE_MELEE.damage));
     }
@@ -409,6 +412,13 @@ export function tickWindowAttack(zombie: ZombieState, barrier: BarrierState,
   return { engaged: zombie.attackTicks > 0 || target !== null, events };
 }
 
+/**
+ * How far apart zombies keep their middles, in metres: well over a body's width (0.64), so a swarm takes up more room and
+ * does not pack into a knot. It was 0.58 (bodies overlapping a tenth); the wider it is, the wider a horde stands round its
+ * target and the further it strings out behind a player, and the longer the queue at a door.
+ */
+export const ZOMBIE_SPACING = 0.9;
+
 /** How far apart a player's middle and a zombie's are when their bodies touch. */
 export const BODY_CONTACT = PLAYER_MOVEMENT.radius + ZOMBIE_MOVEMENT.radius;
 /** A zombie this near its target has got to them and stops closing (a step from touching). */
@@ -487,7 +497,7 @@ function pushPlayerOut(player: PlayerState, zombies: readonly ZombieState[], box
  */
 export function separateZombies(zombies: readonly ZombieState[], players: readonly PlayerState[],
   boxes: readonly CollisionBox[], surfaces: readonly WalkSurface[], solids?: CollisionIndex): void {
-  const gap = ZOMBIE_MOVEMENT.radius * 2 * 0.9, playerGap = BODY_CONTACT;
+  const gap = ZOMBIE_SPACING, playerGap = BODY_CONTACT;
   /** Pushes a zombie, walls permitting, and says how far along the push it got. */
   const shove = (zombie: ZombieState, dx: number, dz: number): number => {
     const delta = { x: dx, y: 0, z: dz };

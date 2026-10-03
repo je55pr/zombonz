@@ -10,6 +10,8 @@ export interface HudLayout { width: number; height: number; scale: number }
 
 const GOLD = '#f2c55c';
 const RED = '#d8382b';
+const INK = '#ece4cf';
+const EDGE = 'rgba(236,228,207,0.2)';
 const ROUND_RED = new THREE.Color(0xd8382b);
 const WHITE = new THREE.Color(0xf4efe0);
 
@@ -188,6 +190,82 @@ export class RoundCounter {
     placeQuad(this.mesh, layout, x - width * (grow - 1) / 2, layout.height - top - height * (grow - 1) / 2,
       width * grow, height * grow);
     this.mesh.visible = visible;
+  }
+}
+
+/**
+ * The health bar and its number, on their own small quad. Health changes on every simulation tick while it refills (two a
+ * tick), so with the bar painted on the main HUD canvas the whole canvas was repainted and uploaded to the GPU every frame of
+ * a refill: several milliseconds a frame in a busy scene, because a full-screen texture upload stalls while the GPU is still
+ * drawing. This box is a few hundred layout units wide, so a refill uploads a few kilobytes instead.
+ */
+export class HealthBar {
+  private readonly canvas = document.createElement('canvas');
+  private readonly texture: THREE.CanvasTexture;
+  private readonly mesh: THREE.Mesh;
+  private drawn: { health: number; maxHealth: number; scale: number } | null = null;
+  /** The box in layout units: `x` from the left edge, `bottom` units up from the bottom edge. */
+  static readonly BOX = { x: 24, bottom: 78, width: 430, height: 72 };
+  /** The bar and number turn red at or below half of the player's maximum health. */
+  static readonly LOW = 0.5;
+
+  constructor(scene: THREE.Scene) {
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.texture.colorSpace = THREE.SRGBColorSpace; this.texture.generateMipmaps = false;
+    this.texture.minFilter = THREE.LinearFilter;
+    this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), overlayMaterial(this.texture));
+    this.mesh.renderOrder = 4; this.mesh.frustumCulled = false;
+    scene.add(this.mesh);
+  }
+
+  /** Forces a repaint on the next update (for when the fonts it uses have loaded). */
+  invalidate(): void { this.drawn = null; }
+
+  private text(c: CanvasRenderingContext2D, value: string, x: number, y: number, weight: number, color: string, spacing: number): void {
+    c.font = `${weight} 29px ${UI_FONT}`;
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.letterSpacing = `${spacing}px`;
+    c.shadowColor = 'rgba(0,0,0,0.85)'; c.shadowBlur = 5.8; c.shadowOffsetY = 1.45;
+    c.fillStyle = color;
+    c.fillText(value, x, y);
+    c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetY = 0; c.letterSpacing = '0px';
+  }
+
+  private panel(c: CanvasRenderingContext2D, x: number, y: number, width: number, fill: string, stroke: string | null): void {
+    c.beginPath();
+    if (c.roundRect) c.roundRect(x, y, width, 24, 8); else c.rect(x, y, width, 24);
+    c.fillStyle = fill; c.fill();
+    if (stroke) { c.strokeStyle = stroke; c.lineWidth = 1.5; c.stroke(); }
+  }
+
+  private draw(health: number, maxHealth: number, scale: number): void {
+    const { width, height } = HealthBar.BOX;
+    this.canvas.width = Math.ceil(width * scale); this.canvas.height = Math.ceil(height * scale);
+    const c = this.canvas.getContext('2d')!;
+    c.setTransform(scale, 0, 0, scale, 0, 0);
+    c.clearRect(0, 0, width, height);
+    const low = maxHealth > 0 && health / maxHealth <= HealthBar.LOW;
+    this.text(c, 'HP', 20, 30, 500, INK, 2);
+    this.panel(c, 74, 18, 238, 'rgba(0,0,0,0.65)', EDGE);
+    const filled = 238 * Math.max(0, Math.min(1, health / maxHealth));
+    if (filled > 0) this.panel(c, 74, 18, filled, low ? RED : INK, null);
+    this.text(c, String(health), 328, 30, 700, low ? RED : INK, 0);
+    this.texture.needsUpdate = true;
+    this.drawn = { health, maxHealth, scale };
+  }
+
+  update(health: number, maxHealth: number, layout: HudLayout, visible: boolean): void {
+    const drawn = this.drawn;
+    if (!drawn || drawn.health !== health || drawn.maxHealth !== maxHealth || drawn.scale !== layout.scale) this.draw(health, maxHealth, layout.scale);
+    const { x, bottom, width, height } = HealthBar.BOX;
+    placeQuad(this.mesh, layout, x, layout.height - bottom, width, height);
+    this.mesh.visible = visible;
+  }
+
+  dispose(): void {
+    this.mesh.removeFromParent();
+    this.mesh.geometry.dispose(); (this.mesh.material as THREE.Material).dispose();
+    this.texture.dispose();
   }
 }
 

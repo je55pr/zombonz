@@ -5,7 +5,7 @@ export interface FeedbackSnapshot {
   message: string | null;
   hitMarker: 'body' | 'head' | 'kill' | null;
   damageVignette: boolean;
-  /** Smooth 1 -> 0 pulse after local damage; the boolean above remains for cheap HUD invalidation/tests. */
+  /** Smooth 1 -> 0 pulse after local damage; the boolean above remains for legacy consumers. */
   damagePulse?: number;
 }
 
@@ -77,7 +77,7 @@ export class HudFeedback {
       message: tick < this.messageUntil ? this.message : null,
       hitMarker: tick < this.markerUntil ? this.marker : null,
       damageVignette: hurt > 0,
-      // Sixteen visual steps over the half-second pulse are smooth enough while avoiding a full HUD texture upload every frame.
+      // Sixteen visual steps keep the half-second pulse smooth with bounded injury-layer uploads.
       damagePulse: Math.round(hurt * hurt * 16) / 16,
     };
   }

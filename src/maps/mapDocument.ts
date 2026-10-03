@@ -15,7 +15,7 @@ export const GAMEPLAY_FIELDS = [
 export const PRESENTATION_FIELDS = [
   'greybox', 'scenery', 'prisms', 'windows', 'doorStyles', 'wallWeaponFacing',
   'fountain', 'perkMachineFacing', 'equipmentFacing', 'boxCenter', 'boxYaw',
-  'boxLocatorBeam', 'rails', 'props', 'decals', 'labels', 'lights', 'rubble',
+  'boxLocatorBeam', 'rails', 'props', 'decals', 'labels', 'lights', 'atmosphere', 'rubble',
   'focus', 'grounds', 'trees', 'previews',
 ] as const satisfies readonly (keyof GameMap)[];
 
@@ -267,7 +267,43 @@ export function validateMapDocument(value: unknown): string[] {
     size(item.size, `${path}.size`);
   });
   ids(array(presentation.props, 'presentation.props'), 'presentation.props');
-  array(presentation.lights, 'presentation.lights').forEach((light, i) => vec(light, `presentation.lights[${i}]`));
+  array(presentation.lights, 'presentation.lights').forEach((light, i) => {
+    const path = `presentation.lights[${i}]`;
+    vec(light, path);
+    if (!record(light)) return;
+    if (light.color !== undefined && (!Number.isInteger(light.color) || (light.color as number) < 0 || (light.color as number) > 0xffffff))
+      error(`${path}.color`, 'expected a 24-bit RGB integer');
+    for (const field of ['intensity', 'range', 'decay', 'priority', 'unpoweredLevel'] as const) {
+      const value = light[field];
+      if (value !== undefined && !finite(value)) error(`${path}.${field}`, 'expected a finite number');
+    }
+    if (finite(light.intensity) && light.intensity < 0) error(`${path}.intensity`, 'expected a nonnegative number');
+    if (finite(light.range) && light.range < 0) error(`${path}.range`, 'expected a nonnegative number');
+    if (finite(light.decay) && light.decay < 0) error(`${path}.decay`, 'expected a nonnegative number');
+    if (finite(light.unpoweredLevel) && (light.unpoweredLevel < 0 || light.unpoweredLevel > 1))
+      error(`${path}.unpoweredLevel`, 'expected 0 to 1');
+    if (light.flicker !== undefined && light.flicker !== 'none' && light.flicker !== 'fluorescent')
+      error(`${path}.flicker`, 'expected "none" or "fluorescent"');
+    if (light.power !== undefined && !['always', 'dim-until-power', 'power-only'].includes(light.power as string))
+      error(`${path}.power`, 'expected "always", "dim-until-power", or "power-only"');
+  });
+  if (presentation.atmosphere !== undefined) {
+    const atmosphere = presentation.atmosphere;
+    if (!record(atmosphere)) error('presentation.atmosphere', 'expected an object');
+    else {
+      for (const field of ['fogColor', 'ambientSkyColor', 'ambientGroundColor', 'moonColor'] as const) {
+        const value = atmosphere[field];
+        if (value !== undefined && (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 0xffffff))
+          error(`presentation.atmosphere.${field}`, 'expected a 24-bit RGB integer');
+      }
+      for (const field of ['fogDensity', 'exposure', 'ambientIntensity', 'moonIntensity', 'skyIntensity'] as const) {
+        const value = atmosphere[field];
+        if (value !== undefined && (!finite(value) || value < 0))
+          error(`presentation.atmosphere.${field}`, 'expected a nonnegative finite number');
+      }
+      if (atmosphere.moonOffset !== undefined) vec(atmosphere.moonOffset, 'presentation.atmosphere.moonOffset');
+    }
+  }
   array(presentation.rails, 'presentation.rails').forEach((rail, i) => {
     if (!record(rail)) { error(`presentation.rails[${i}]`, 'expected a rail'); return; }
     vec(rail.from, `presentation.rails[${i}].from`);

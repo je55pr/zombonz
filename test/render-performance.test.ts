@@ -19,6 +19,8 @@ describe('render performance contracts', () => {
       actorsMs: 1.5, detailsMs: 0.5, sceneMs: 2, weaponMs: 0.5,
       hudMs: 1, overlayMs: 0.5, shadowFrame: false,
       ticks: 6, calls: 90, triangles: 120_000, rigs: 24, scale: 1,
+      lighting: { quality: 'balanced', realLights: 4, logicalSources: 12, shiningSources: 4,
+        shadowSize: 1024, shadowRefreshHz: 15 },
     };
     expect(profiler.add({ ...frame, intervalMs: 0 })).toBeNull();
     expect(profiler.add({ ...frame, intervalMs: 6000 })).toBeNull();
@@ -33,6 +35,7 @@ describe('render performance contracts', () => {
     expect(report.shadowSceneMs).toBe(4);
     expect(report.regularSceneMs).toBe(2);
     expect(report.rigs).toBe(24);
+    expect(report.lighting).toEqual(frame.lighting);
     expect(profiler.add(frame)).toBeNull();
   });
 
