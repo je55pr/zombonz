@@ -27,6 +27,25 @@ function zombie(id: `e:${number}`, z: number) {
 }
 
 describe('hitscan weapons', () => {
+  it('emits one presentation-only world impact when an ordinary shot ends on fixed geometry', () => {
+    const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
+    player.weapon = createWeaponState('starter-pistol');
+    const wall = [{ min: { x: -1, y: 0, z: -5.1 }, max: { x: 1, y: 2, z: -5 } }];
+    const events = firePlayerWeapon(player, ray, [], wall);
+    const impacts = events.filter(event => event.type === 'weaponImpact');
+    expect(impacts).toHaveLength(1);
+    expect(impacts[0]).toMatchObject({ type: 'weaponImpact', playerId: player.id, weaponId: 'starter-pistol' });
+    if (impacts[0]?.type === 'weaponImpact') {
+      expect(impacts[0].point.z).toBeCloseTo(-4.99, 2);
+      expect(impacts[0].direction.z).toBeLessThan(-0.99);
+      expect(Math.hypot(impacts[0].direction.x, impacts[0].direction.y, impacts[0].direction.z)).toBeCloseTo(1);
+    }
+
+    const open = createPlayerState('e:3', { x: 0, y: 0, z: 0 });
+    open.weapon = createWeaponState('starter-pistol');
+    expect(firePlayerWeapon(open, ray, [], []).some(event => event.type === 'weaponImpact')).toBe(false);
+  });
+
   it('does not drop short automatic trigger presses between fixed ticks', () => {
     const player = createPlayerState('e:1', { x: 0, y: 0, z: 0 });
     player.weapon = createWeaponState('bar');

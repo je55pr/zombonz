@@ -297,6 +297,7 @@ export type HitscanTarget =
 export type WeaponEvent =
   | { type: 'weaponSwitched'; playerId: EntityId; weaponId: string }
   | { type: 'weaponFired'; playerId: EntityId; weaponId: string }
+  | { type: 'weaponImpact'; playerId: EntityId; weaponId: string; point: Vec3; direction: Vec3 }
   | { type: 'weaponReloadStarted'; playerId: EntityId; weaponId: string; reloadTicks: number }
   | { type: 'weaponReloadCompleted'; playerId: EntityId; weaponId: string; loaded: number; magazineAmmo: number; reserveAmmo: number }
   /** `part`, `point` (where the shot struck) and `direction` (which way it was going) say where and how, for the client's blood. */
@@ -623,6 +624,12 @@ export function firePlayerWeapon(
     if (!target) continue;
     events.push({ type: 'hazardHit', hazardId, kind: target.definition.kind, playerId: player.id, damage: hit.damage, position: hit.point },
       ...damageHazard(target, hit.damage, player.id));
+  }
+  if (first && first.hit.kind === 'world' && !definition.explosive) {
+    const distance = Math.max(0, first.hit.distance - 0.01), { origin, direction } = first.ray;
+    events.push({ type: 'weaponImpact', playerId: player.id, weaponId: definition.id,
+      point: { x: origin.x + direction.x * distance, y: origin.y + direction.y * distance, z: origin.z + direction.z * distance },
+      direction: { ...direction } });
   }
   if (first && definition.chain && first.hit.kind === 'zombie') {
     const struck = zombies.find(zombie => zombie.id === (first!.hit as { zombieId: EntityId }).zombieId)!;

@@ -15,9 +15,13 @@ const MAX_DETACHED_PER_FRAME = 3;
  */
 export class GoreDirector {
   private readonly velocity = new THREE.Vector3();
+  private intensity = 1;
   private readonly away = new THREE.Vector3();
 
   constructor(private readonly effects: GoreEffects, private readonly views: ReadonlyMap<EntityId, SkinnedZombieView>) {}
+
+  setIntensity(intensity: number): void { this.intensity = Math.max(0, Math.min(1, intensity)); }
+  private count(full: number, minimum = 0): number { return Math.max(minimum, Math.round(full * this.intensity)); }
 
   consume(events: readonly SimulationEvent[], world: WorldState): void {
     let detached = 0;
@@ -27,13 +31,15 @@ export class GoreDirector {
         const head = event.hitZone === 'head';
         const direction = event.direction ?? { x: 0, y: 0, z: 0 };
         // Out through the far side, and back toward the gun.
-        this.effects.spray(event.point, direction, head ? 24 : 12, head ? 4.6 : 3.4, 0.32);
-        this.effects.spray(event.point, { x: -direction.x, y: -direction.y + 0.2, z: -direction.z }, head ? 12 : 6, 2.2, 0.55);
+        this.effects.spray(event.point, direction, this.count(head ? 24 : 12, 2), head ? 4.6 : 3.4, 0.32);
+        this.effects.spray(event.point, { x: -direction.x, y: -direction.y + 0.2, z: -direction.z }, this.count(head ? 12 : 6, 1), 2.2, 0.55);
       } else if (event.type === 'zombieDismembered') {
-        detached += this.tear(event, world, MAX_DETACHED_PER_FRAME - detached);
+        const detachBudget = this.intensity >= 0.75 ? MAX_DETACHED_PER_FRAME : this.intensity >= 0.3 ? 1 : 0;
+        detached += this.tear(event, world, Math.max(0, detachBudget - detached));
       } else if (event.type === 'zombieDied') {
         const zombie = world.entities[event.zombieId];
-        if (zombie) this.effects.splat(zombie.position.x, zombie.position.y, zombie.position.z, event.method === 'head' ? 1.1 : 0.85);
+        if (zombie && this.intensity >= 0.3) this.effects.splat(zombie.position.x, zombie.position.y, zombie.position.z,
+          (event.method === 'head' ? 1.1 : 0.85) * Math.max(0.55, this.intensity));
       }
     }
   }
@@ -47,7 +53,7 @@ export class GoreDirector {
     let made = 0;
     for (const limb of event.lost) {
       const piece = made < budget ? view?.detach(limb) ?? null : null;
-      if (!piece) { this.effects.spray(event.point, event.direction, 20, 3.4, 0.6); continue; }
+      if (!piece) { this.effects.spray(event.point, event.direction, this.count(20, 2), 3.4, 0.6); continue; }
       made++;
       const at: Vec3 = { x: piece.position.x, y: piece.position.y, z: piece.position.z };
       if (blast) {
@@ -64,16 +70,16 @@ export class GoreDirector {
         this.velocity.set(direction.x * speed, 1.6 + (limb === 'head' ? 2.2 : 0.8) + Math.random(), direction.z * speed);
       }
       this.effects.throwPiece(piece, this.velocity, limb === 'head' ? 0.13 : 0.08);
-      this.effects.spray(at, { x: 0, y: 1, z: 0 }, limb === 'head' ? 42 : 26, 3.6, 0.7);
-      if (limb === 'head' || blast) this.effects.splat(at.x, floor, at.z, 0.7);
+      this.effects.spray(at, { x: 0, y: 1, z: 0 }, this.count(limb === 'head' ? 42 : 26, 3), 3.6, 0.7);
+      if ((limb === 'head' || blast) && this.intensity >= 0.3) this.effects.splat(at.x, floor, at.z, 0.7 * Math.max(0.55, this.intensity));
     }
     if (event.gutted || (blast && event.lethal)) {
       const centre = zombie ? { x: zombie.position.x, y: zombie.position.y + 1.0, z: zombie.position.z } : event.point;
-      this.effects.burst(centre, blast ? 14 : 6, blast ? 6.5 : 3.6);
-      this.effects.spray(centre, null, blast ? 50 : 28, 4, 0.5);
-      this.effects.splat(centre.x, floor, centre.z, blast ? 1.5 : 1);
+      this.effects.burst(centre, this.count(blast ? 14 : 6, 1), blast ? 6.5 : 3.6);
+      this.effects.spray(centre, null, this.count(blast ? 50 : 28, 3), 4, 0.5);
+      if (this.intensity >= 0.3) this.effects.splat(centre.x, floor, centre.z, (blast ? 1.5 : 1) * Math.max(0.55, this.intensity));
     }
-    if (event.lost.length === 0 && event.gutted) this.effects.spray(event.point, event.direction, 20, 3.4, 0.6);
+    if (event.lost.length === 0 && event.gutted) this.effects.spray(event.point, event.direction, this.count(20, 2), 3.4, 0.6);
     return made;
   }
 }

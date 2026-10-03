@@ -27,7 +27,8 @@ export class PauseMenuView {
     this.element.setAttribute('aria-label', 'Paused game');
     const rows = (Object.keys(SETTING_LIMITS) as SettingKey[]).map(key => {
       const limit = SETTING_LIMITS[key];
-      const label = key === 'fov' ? 'Field of view' : key === 'volume' ? 'Volume' : 'Mouse sensitivity';
+      const label = key === 'fov' ? 'Field of view' : key === 'volume' ? 'Volume'
+        : key === 'combatEffects' ? 'Combat effects' : 'Mouse sensitivity';
       return `<label class="pause-setting"><span>${label}</span><output data-value="${key}"></output>
         <input type="range" data-setting="${key}" min="${limit.min}" max="${limit.max}" step="${limit.step}"></label>`;
     }).join('');

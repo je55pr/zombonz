@@ -8,7 +8,7 @@ import { SoloPauseController } from '../src/client/pause.ts';
 
 describe('settings', () => {
   it('clamps, snaps and repairs stored values', () => {
-    expect(normalizeSettings({ sensitivity: 99, fov: 10, volume: 0.33 })).toEqual({ sensitivity: 3, fov: 55, volume: 0.3 });
+    expect(normalizeSettings({ sensitivity: 99, fov: 10, volume: 0.33 })).toEqual({ sensitivity: 3, fov: 55, volume: 0.3, combatEffects: 2 });
     expect(normalizeSettings({ sensitivity: 'fast', fov: Number.NaN })).toEqual(DEFAULT_SETTINGS);
     expect(normalizeSettings(null)).toEqual(DEFAULT_SETTINGS);
   });
@@ -24,8 +24,8 @@ describe('settings', () => {
   it('round-trips through storage and survives storage that throws or is missing', () => {
     const store = new Map<string, string>();
     const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => { store.set(key, value); } };
-    saveSettings({ sensitivity: 1.5, fov: 80, volume: 0.5 }, storage);
-    expect(loadSettings(storage)).toEqual({ sensitivity: 1.5, fov: 80, volume: 0.5 });
+    saveSettings({ sensitivity: 1.5, fov: 80, volume: 0.5, combatEffects: 1 }, storage);
+    expect(loadSettings(storage)).toEqual({ sensitivity: 1.5, fov: 80, volume: 0.5, combatEffects: 1 });
     const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
     expect(loadSettings(broken)).toEqual(DEFAULT_SETTINGS);
     expect(() => saveSettings(DEFAULT_SETTINGS, broken)).not.toThrow();
@@ -117,7 +117,7 @@ describe('start menu', () => {
   it('adjusts settings with left/right and clicks, saving each change', () => {
     const state = createMenuState({ ...DEFAULT_SETTINGS }, READY);
     reduceMenu(state, { type: 'activate', index: 2 });
-    expect(menuItems(state).map(item => item.id)).toEqual(['sensitivity', 'fov', 'volume', 'bindings', 'back']);
+    expect(menuItems(state).map(item => item.id)).toEqual(['sensitivity', 'fov', 'volume', 'combatEffects', 'bindings', 'back']);
     reduceMenu(state, { type: 'down' });
     expect(reduceMenu(state, { type: 'right' })).toEqual({ type: 'saveSettings', settings: { ...DEFAULT_SETTINGS, fov: 68 } });
     reduceMenu(state, { type: 'left' }); reduceMenu(state, { type: 'left' });
@@ -126,11 +126,16 @@ describe('start menu', () => {
     // Clicking a row at its maximum wraps to the minimum.
     state.settings.volume = 1;
     expect(reduceMenu(state, { type: 'activate', index: 2 })).toEqual({ type: 'saveSettings', settings: { ...state.settings, volume: 0 } });
-    reduceMenu(state, { type: 'hover', index: 3 });
-    expect(reduceMenu(state, { type: 'activate', index: 3 })).toEqual({ type: 'openBindings' });
+    state.settings.combatEffects = 2;
+    expect(reduceMenu(state, { type: 'activate', index: 3 })).toEqual({
+      type: 'saveSettings', settings: { ...state.settings, combatEffects: 0 },
+    });
+    expect(menuItems(state)[3].value).toBe('Minimal');
     reduceMenu(state, { type: 'hover', index: 4 });
+    expect(reduceMenu(state, { type: 'activate', index: 4 })).toEqual({ type: 'openBindings' });
+    reduceMenu(state, { type: 'hover', index: 5 });
     expect(reduceMenu(state, { type: 'left' })).toBeNull(); // 'left' on the Back row changes nothing
-    reduceMenu(state, { type: 'activate', index: 4 });
+    reduceMenu(state, { type: 'activate', index: 5 });
     expect(state.screen).toBe('main');
   });
 });

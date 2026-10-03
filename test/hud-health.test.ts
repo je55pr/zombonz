@@ -4,7 +4,7 @@ import { CanvasHud, type HudSnapshot } from '../src/client/hud.ts';
 
 afterEach(() => vi.unstubAllGlobals());
 
-interface Log { clears: number; texts: string[]; rects: number[][] }
+interface Log { clears: number; texts: string[]; rects: number[][]; colors: string[] }
 interface FakeCanvas { width: number; height: number; getContext: () => unknown; log: Log }
 
 /** Every canvas the HUD makes, each with its own record of what was drawn on it. */
@@ -12,7 +12,7 @@ function fakeCanvases(): FakeCanvas[] {
   const made: FakeCanvas[] = [];
   vi.stubGlobal('document', {
     createElement: () => {
-      const log: Log = { clears: 0, texts: [], rects: [] };
+      const log: Log = { clears: 0, texts: [], rects: [], colors: [] };
       const context = new Proxy({} as Record<string | symbol, unknown>, {
         get: (target, key) => {
           if (typeof key !== 'string') return undefined;
@@ -23,7 +23,7 @@ function fakeCanvases(): FakeCanvas[] {
           if (key === 'roundRect') return (...args: number[]) => { log.rects.push(args); };
           return target[key] ??= () => {};
         },
-        set: () => true,
+        set: (_target, key, value) => { if (key === 'fillStyle') log.colors.push(String(value)); return true; },
       });
       const canvas = { width: 0, height: 0, getContext: () => context, log };
       made.push(canvas);
@@ -49,7 +49,9 @@ function setup() {
   const hud = new CanvasHud(renderer as unknown as THREE.WebGLRenderer);
   const bar = () => made.find(canvas => canvas.log.texts.includes('HP'))!;
   const layer = () => (hud as unknown as { healthBar: { mesh: THREE.Mesh } }).healthBar.mesh;
-  return { hud, main: made[0], bar, layer };
+  const damage = () => made.find(canvas => canvas.width === 512)!;
+  const injuryLayer = () => (hud as unknown as { damageOverlay: { mesh: THREE.Mesh } }).damageOverlay.mesh;
+  return { hud, main: made[0], bar, layer, damage, injuryLayer };
 }
 
 /**
@@ -81,18 +83,49 @@ describe('the health bar is a layer of its own', () => {
     hud.dispose();
   });
 
-  it('repaints the main canvas once when health crosses into the low range, for the red vignette, and once coming out', () => {
+  it('keeps injury and low-health transitions off the main canvas', () => {
     const { hud, main } = setup();
     hud.render(snapshot({ health: 60 }), 0);
     const start = main.log.clears;
     for (const health of [58, 56, 54, 52]) hud.render(snapshot({ health }), 0);
     expect(main.log.clears - start).toBe(0);
     hud.render(snapshot({ health: 50 }), 0);
-    expect(main.log.clears - start).toBe(1);
+    expect(main.log.clears - start).toBe(0);
     for (const health of [48, 40, 30, 36, 44, 50]) hud.render(snapshot({ health }), 0);
-    expect(main.log.clears - start).toBe(1);
+    expect(main.log.clears - start).toBe(0);
     hud.render(snapshot({ health: 52 }), 0);
-    expect(main.log.clears - start).toBe(2);
+    expect(main.log.clears - start).toBe(0);
+    hud.dispose();
+  });
+
+  it('updates a bounded injury layer for hit pulses, bleedout and settings, and clears it when spectating', () => {
+    const { hud, main, damage, injuryLayer } = setup();
+    const hurt = snapshot({ health: 20, feedback: { message: null, hitMarker: null, damageVignette: true, damagePulse: 1 } });
+    hud.render(hurt, 0);
+    const start = main.log.clears, injuryStart = damage().log.clears;
+    expect(injuryLayer().visible).toBe(true);
+    expect(Math.max(damage().width, damage().height)).toBeLessThanOrEqual(512);
+    for (let step = 15; step >= 0; step--) hud.render({ ...hurt, feedback: { ...hurt.feedback!, damagePulse: step / 16 } }, 0);
+    expect(main.log.clears).toBe(start);
+    expect(damage().log.clears).toBe(injuryStart + 16);
+    const stable = damage().log.clears;
+    hud.render({ ...hurt, feedback: { ...hurt.feedback!, damagePulse: 0 } }, 0);
+    expect(damage().log.clears).toBe(stable);
+    hud.render({ ...hurt, health: 0, bleedoutTicks: 1800 }, 0);
+    hud.render({ ...hurt, health: 0, bleedoutTicks: 1700, combatEffects: 0 }, 0);
+    expect(main.log.clears).toBe(start);
+    hud.render({ ...hurt, spectating: 'Buddy' }, 0);
+    expect(injuryLayer().visible).toBe(false);
+    hud.dispose();
+  });
+
+  it('uses half of maximum health for the red bar, including Jugger-Nog', () => {
+    const { hud, bar } = setup();
+    hud.render(snapshot({ health: 125, maxHealth: 250 }), 0);
+    expect(bar().log.colors).toContain('#d8382b');
+    bar().log.colors.length = 0;
+    hud.render(snapshot({ health: 126, maxHealth: 250 }), 0);
+    expect(bar().log.colors).not.toContain('#d8382b');
     hud.dispose();
   });
 

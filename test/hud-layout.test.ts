@@ -68,6 +68,14 @@ describe('the gameplay HUD shows state, not controls', () => {
     expect(texts).not.toContain('AIM');
   });
 
+  it('adds irregular blood-edge shapes only to active Full/Reduced injury views', () => {
+    const ellipses = (overrides: Partial<HudSnapshot>) => draw(overrides).calls.filter(call => call.name === 'ellipse').length;
+    const healthy = ellipses({ health: 100, maxHealth: 100, combatEffects: 2 });
+    expect(ellipses({ health: 20, maxHealth: 100, combatEffects: 2 })).toBe(healthy + 5);
+    expect(ellipses({ health: 20, maxHealth: 100, combatEffects: 0 })).toBe(healthy);
+    expect(ellipses({ health: 0, maxHealth: 100, combatEffects: 2, spectating: 'Buddy' })).toBe(healthy);
+  });
+
   /** Where each grenade or mine icon is drawn: the centres they are translated to. */
   const icons = (calls: Call[]) => {
     const points: Array<{ x: number; y: number }> = [];

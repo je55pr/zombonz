@@ -6,6 +6,8 @@ export interface GameSettings {
   fov: number;
   /** Master volume, 0 to 1. */
   volume: number;
+  /** Presentation intensity: 0 minimal, 1 reduced, 2 full. */
+  combatEffects: number;
 }
 
 export type SettingKey = keyof GameSettings;
@@ -14,9 +16,10 @@ export const SETTING_LIMITS: Readonly<Record<SettingKey, { min: number; max: num
   sensitivity: { min: 0.2, max: 3, step: 0.1 },
   fov: { min: 55, max: 90, step: 1 },
   volume: { min: 0, max: 1, step: 0.1 },
+  combatEffects: { min: 0, max: 2, step: 1 },
 };
 
-export const DEFAULT_SETTINGS: Readonly<GameSettings> = { sensitivity: 1, fov: 67, volume: 0.8 };
+export const DEFAULT_SETTINGS: Readonly<GameSettings> = { sensitivity: 1, fov: 67, volume: 0.8, combatEffects: 2 };
 
 const STORAGE_KEY = 'zombonz.settings.v1';
 
@@ -34,6 +37,7 @@ export function normalizeSettings(raw: unknown): GameSettings {
     sensitivity: clampSetting('sensitivity', source.sensitivity),
     fov: clampSetting('fov', source.fov),
     volume: clampSetting('volume', source.volume),
+    combatEffects: clampSetting('combatEffects', source.combatEffects),
   };
 }
 
@@ -63,5 +67,6 @@ export function saveSettings(settings: GameSettings,
 export function formatSetting(key: SettingKey, value: number): string {
   if (key === 'fov') return `${Math.round(value)}°`;
   if (key === 'volume') return `${Math.round(value * 100)}%`;
+  if (key === 'combatEffects') return value >= 2 ? 'Full' : value >= 1 ? 'Reduced' : 'Minimal';
   return `${value.toFixed(1)}×`;
 }

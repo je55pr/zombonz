@@ -206,8 +206,8 @@ export class HealthBar {
   private drawn: { health: number; maxHealth: number; scale: number } | null = null;
   /** The box in layout units: `x` from the left edge, `bottom` units up from the bottom edge. */
   static readonly BOX = { x: 24, bottom: 78, width: 430, height: 72 };
-  /** The HUD's red low-health state: at or under this the bar and number turn red. */
-  static readonly LOW = 50;
+  /** The bar and number turn red at or below half of the player's maximum health. */
+  static readonly LOW = 0.5;
 
   constructor(scene: THREE.Scene) {
     this.texture = new THREE.CanvasTexture(this.canvas);
@@ -244,7 +244,7 @@ export class HealthBar {
     const c = this.canvas.getContext('2d')!;
     c.setTransform(scale, 0, 0, scale, 0, 0);
     c.clearRect(0, 0, width, height);
-    const low = health <= HealthBar.LOW;
+    const low = maxHealth > 0 && health / maxHealth <= HealthBar.LOW;
     this.text(c, 'HP', 20, 30, 500, INK, 2);
     this.panel(c, 74, 18, 238, 'rgba(0,0,0,0.65)', EDGE);
     const filled = 238 * Math.max(0, Math.min(1, health / maxHealth));

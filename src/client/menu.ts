@@ -63,7 +63,7 @@ export type MenuEffect = { type: 'startSolo'; map: MapId } | { type: 'saveSettin
   | { type: 'openBindings' } | { type: 'testConnection' } | null;
 
 const SETTING_LABELS: Readonly<Record<SettingKey, string>> = {
-  sensitivity: 'Mouse sensitivity', fov: 'Field of view', volume: 'Volume',
+  sensitivity: 'Mouse sensitivity', fov: 'Field of view', volume: 'Volume', combatEffects: 'Combat effects',
 };
 
 export function menuItems(state: MenuState): MenuItem[] {

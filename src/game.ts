@@ -18,6 +18,8 @@ import { interpolatePosition } from './client/interpolation.ts';
 import { selectSpectateTarget } from './client/spectate.ts';
 import { CanvasHud, buildHudSnapshot } from './client/hud.ts';
 import { HudFeedback } from './client/feedback.ts';
+import { combatEffectsScale, damagePresentation } from './client/damagePresentation.ts';
+import { maxPlayerHealth } from './core/health.ts';
 import { GameAudio } from './client/audio.ts';
 import { AUDIO_CLIPS, decodeAudioClips, decodedAudioClip } from './client/audioClips.ts';
 import { ZOMBIE_ASSET_IDS, loadModel, loadZombieAsset, zombieAssetFor, type ZombieAsset } from './client/runtimeAssets.ts';
@@ -296,6 +298,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   const hitboxView = new URLSearchParams(location.search).get('hitboxes') === '1' ? new HitboxView(scene) : null;
   const previousPositions = new Map<EntityId, Vec3>();
   let spectateTargetId: EntityId | null = null;
+  let injuryFovPenalty = 0;
   const skinnedViews = new Map<EntityId, SkinnedZombieView>();
   // Every zombie model there is: which one a zombie is drawn with is its look (`ZombieState.variant`), chosen when it spawned.
   const zombieAssets = new Map<string, ZombieAsset>();
@@ -317,6 +320,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
   // Blood, flesh and thrown limbs, and what turns the simulation's events into them.
   const goreEffects = new GoreEffects(scene, { ground: groundFromSurfaces(map.walkSurfaces) });
   const goreDirector = new GoreDirector(goreEffects, skinnedViews);
+  goreDirector.setIntensity(combatEffectsScale(settings.combatEffects));
   const grenadeView = new GrenadeView(scene, blastEffects);
 
   function zombies(): ZombieState[] {
@@ -476,11 +480,18 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     feedback.consume(events, playerId, simulation.state.world.tick);
     hud.events(events as SimulationEvent[], playerId);
     audio.consume(events as SimulationEvent[], playerId, simulation.state.world);
+    for (const [id, view] of playerViews) view.events(events, id, simulation.state.world.tick);
+    const effectsScale = combatEffectsScale(settings.combatEffects);
+    for (const event of events) if (event.type === 'weaponImpact') {
+      const seed = Math.imul(simulation.state.world.tick + 1, 0x9e3779b9) ^ Number(event.playerId.slice(2));
+      blastEffects.strike(event.point, seed, effectsScale);
+    }
     goreDirector.consume(events, simulation.state.world);
   }
   function resetMatchViews(): void {
     hazardView.reset(); mineView.clear(); blastEffects.clear(); goreEffects.clear();
     previousPositions.clear();
+    injuryFovPenalty = 0;
     for (const view of skinnedViews.values()) view.dispose();
     skinnedViews.clear(); zombieViews.clear(); zombieBatch.update([]);
   }
@@ -551,9 +562,18 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     const networkEnded = profiling ? performance.now() : 0;
     const remote = netFrame ?? { alpha, tick: simulation.state.world.tick - 1 + alpha, previous: previousPositions };
     const playerForCamera = syncCamera(remote.alpha, remote.previous);
+    // Injury subtly tightens only the local player's view. Once bled out, spectating uses a clean teammate camera.
+    const localForInjury = simulation.getPlayer(playerId);
+    const injuryTarget = localForInjury?.alive
+      ? damagePresentation(localForInjury.health, maxPlayerHealth(localForInjury), localForInjury.downed, 0, settings.combatEffects).fovPenalty
+      : 0;
+    const injuryBlend = 1 - Math.exp(-3.2 * Math.min(0.1, Math.max(0, interval / 1000)));
+    if (!localForInjury?.alive) injuryFovPenalty = 0;
+    else injuryFovPenalty += (injuryTarget - injuryFovPenalty) * injuryBlend;
+    const effectiveBaseFov = settings.fov - injuryFovPenalty;
     // Aiming zooms the player's chosen field of view in (more for a rifle than a pistol); sprinting widens it a little.
-    const targetFov = playerForCamera?.aiming ? aimedFov(settings.fov, playerForCamera.weapon.weaponId)
-      : playerForCamera?.sprinting ? settings.fov + 4 : settings.fov;
+    const targetFov = playerForCamera?.aiming ? aimedFov(effectiveBaseFov, playerForCamera.weapon.weaponId)
+      : playerForCamera?.sprinting ? effectiveBaseFov + 4 : effectiveBaseFov;
     const fovBlend = 1 - Math.exp(-12 * Math.min(0.1, Math.max(0, interval / 1000)));
     const nextFov = camera.fov + (targetFov - camera.fov) * fovBlend;
     if (Math.abs(nextFov - camera.fov) > 0.001) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
@@ -568,7 +588,8 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
     goreEffects.update(interval / 1000, camera, renderer.domElement.height);
     // A blast near enough shakes the view, dying away over a second or so.
     const shake = blastEffects.shake();
-    camera.rotation.x += shake.x; camera.rotation.y += shake.y; camera.rotation.z += shake.z;
+    const shakeScale = settings.combatEffects >= 2 ? 1 : settings.combatEffects >= 1 ? 0.3 : 0;
+    camera.rotation.x += shake.x * shakeScale; camera.rotation.y += shake.y * shakeScale; camera.rotation.z += shake.z * shakeScale;
 
     const actorsEnded = profiling ? performance.now() : 0;
     if (details.update(simulation.state)) shadowsDirty = true;
@@ -594,6 +615,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       pingMs: net?.role === 'client' && net.client.pingMs !== null ? Math.round(net.client.pingMs / 10) * 10 : null,
       canRestart: net?.role !== 'client',
       feedback: feedback.snapshot(simulation.state.world.tick),
+      combatEffects: settings.combatEffects,
       spectating: spectateTargetId ? names.get(spectateTargetId) ?? 'Player' : null,
       assetNotice: waiting ?? zombieAssetNotice ?? weaponView.notice ?? environmentNotice }, performance.now(),
       player?.alive ? { spread: currentSpread(player), verticalFov: camera.fov } : undefined);
@@ -700,6 +722,7 @@ export function startGame(canvas: HTMLCanvasElement, initialSettings: GameSettin
       settings = { ...next };
       input.setSensitivity(0.0022 * settings.sensitivity);
       audio.setVolume(settings.volume);
+      goreDirector.setIntensity(combatEffectsScale(settings.combatEffects));
     },
     updateBindings: next => { input.setBindings(next); hud.setBindings(next); },
     dispose: () => {
