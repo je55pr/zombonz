@@ -10,7 +10,19 @@ public partial class ZombonzMapPlugin : EditorPlugin
     private Label _message = null!;
     private OptionButton _addKind = null!;
     private ZombonzMapInspector? _inspector;
-    private readonly List<(CheckButton Button, Func<ZombonzMapRoot, bool> Read)> _previewToggles = new();
+
+    // The dock's signals are connected to methods by name, not to C# lambdas. Godot reloads this C# code while the editor
+    // is open (the Build button, or a rebuilt assembly) and reconnects a method by name, but cannot carry over a lambda
+    // that captured a delegate: its button then does nothing but log "delegate_handle.value is null". Statics are rebuilt
+    // with the reloaded code, so the toggles' accessors can live in a static table.
+    private static readonly (string Text, Func<ZombonzMapRoot, bool> Read, Action<ZombonzMapRoot, bool> Write)[] PreviewToggles =
+    {
+        ("Labels", root => root.ShowLabels, (root, value) => root.ShowLabels = value),
+        ("Spawn guides", root => root.ShowSpawns, (root, value) => root.ShowSpawns = value),
+        ("Entry routes", root => root.ShowRoutes, (root, value) => root.ShowRoutes = value),
+        ("Collision boxes", root => root.ShowCollision, (root, value) => root.ShowCollision = value),
+        ("Purchased wall guns", root => root.ShowPurchasedWallGuns, (root, value) => root.ShowPurchasedWallGuns = value),
+    };
 
     public override void _EnterTree()
     {
@@ -18,21 +30,23 @@ public partial class ZombonzMapPlugin : EditorPlugin
         _controls.AddChild(new Label { Text = "Versioned map authoring" });
         _sourceInput = new LineEdit { Text = "../../src/maps/data/bunker.v1.json", TooltipText = "JSON file relative to the Godot project" };
         _controls.AddChild(_sourceInput);
-        AddButton("Import map into scene", ImportMap);
-        AddButton("Refresh models and textures", RefreshPreview);
-        AddPreviewToggle("Labels", root => root.ShowLabels, (root, value) => root.ShowLabels = value);
-        AddPreviewToggle("Spawn guides", root => root.ShowSpawns, (root, value) => root.ShowSpawns = value);
-        AddPreviewToggle("Entry routes", root => root.ShowRoutes, (root, value) => root.ShowRoutes = value);
-        AddPreviewToggle("Collision boxes", root => root.ShowCollision, (root, value) => root.ShowCollision = value);
-        AddPreviewToggle("Purchased wall guns", root => root.ShowPurchasedWallGuns, (root, value) => root.ShowPurchasedWallGuns = value);
-        SceneChanged += SyncPreviewToggles;
+        AddButton("Import map into scene", MethodName.OnImportPressed);
+        AddButton("Refresh models and textures", MethodName.OnRefreshPressed);
+        for (var i = 0; i < PreviewToggles.Length; i++)
+        {
+            var toggle = new CheckButton { Name = "PreviewToggle" + i, Text = PreviewToggles[i].Text, Disabled = true,
+                TooltipText = "Editor preview only; does not change gameplay." };
+            toggle.Connect(BaseButton.SignalName.Toggled, new Callable(this, MethodName.OnPreviewToggled));
+            _controls.AddChild(toggle);
+        }
+        Connect(SignalName.SceneChanged, new Callable(this, MethodName.SyncPreviewToggles));
         _addKind = new OptionButton();
         foreach (var kind in MapScene.NewObjectKinds) _addKind.AddItem(kind);
         _controls.AddChild(_addKind);
-        AddButton("Add selected object", AddNewItem);
-        AddButton("Validate open map", ValidateOpenMap);
-        AddButton("Export open map", () => { ExportMap(); });
-        AddButton("Export and play in browser", ExportAndPlay);
+        AddButton("Add selected object", MethodName.OnAddPressed);
+        AddButton("Validate open map", MethodName.OnValidatePressed);
+        AddButton("Export open map", MethodName.OnExportPressed);
+        AddButton("Export and play in browser", MethodName.OnPlayPressed);
         _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         _controls.AddChild(_message);
         _dock = new EditorDock { Title = "Zombonz Maps", DefaultSlot = EditorDock.DockSlot.RightUl,
@@ -44,48 +58,57 @@ public partial class ZombonzMapPlugin : EditorPlugin
         // Opt-in CLI check executes imports in the same editor context as the dock buttons.
         if (OS.GetEnvironment("ZOMBONZ_EDITOR_SMOKE_TEST") == "1")
         {
-            try { SmokeTest.RunChecks(); }
-            catch (Exception error) { GD.PushError(error.ToString()); }
+            try { SmokeTest.RunChecks(); SmokeTest.StartReloadCheck(); }
+            catch (Exception error) { GD.PushError(error.ToString()); GetTree().Quit(1); }
         }
     }
 
     public override void _ExitTree()
     {
-        SceneChanged -= SyncPreviewToggles;
-        _previewToggles.Clear();
+        Disconnect(SignalName.SceneChanged, new Callable(this, MethodName.SyncPreviewToggles));
         if (_inspector is not null) { RemoveInspectorPlugin(_inspector); _inspector.Dispose(); _inspector = null; }
         if (_dock is not null) { RemoveDock(_dock); _dock.QueueFree(); _dock = null; }
     }
 
-    private void AddPreviewToggle(string text, Func<ZombonzMapRoot, bool> read, Action<ZombonzMapRoot, bool> write)
+    private CheckButton? PreviewToggle(int index) => _controls.GetNodeOrNull<CheckButton>("PreviewToggle" + index);
+
+    // Any toggle writes them all: the others already match the scene, since a scene change syncs them.
+    private void OnPreviewToggled(bool _)
     {
-        var button = new CheckButton { Text = text, Disabled = true, TooltipText = "Editor preview only; does not change gameplay." };
-        button.Toggled += value =>
-        {
-            if (EditorInterface.Singleton.GetEditedSceneRoot() is not ZombonzMapRoot root) return;
-            write(root, value); MapPreview.ApplyVisibility(root); EditorInterface.Singleton.MarkSceneAsUnsaved();
-        };
-        _controls.AddChild(button); _previewToggles.Add((button, read));
+        if (EditorInterface.Singleton.GetEditedSceneRoot() is not ZombonzMapRoot root) return;
+        for (var i = 0; i < PreviewToggles.Length; i++)
+            if (PreviewToggle(i) is { } toggle) PreviewToggles[i].Write(root, toggle.ButtonPressed);
+        MapPreview.ApplyVisibility(root); EditorInterface.Singleton.MarkSceneAsUnsaved();
     }
 
     private void SyncPreviewToggles(Node scene)
     {
-        foreach (var (button, read) in _previewToggles)
+        for (var i = 0; i < PreviewToggles.Length; i++)
         {
-            button.Disabled = scene is not ZombonzMapRoot;
-            if (scene is ZombonzMapRoot root) button.SetPressedNoSignal(read(root));
+            if (PreviewToggle(i) is not { } toggle) continue;
+            toggle.Disabled = scene is not ZombonzMapRoot;
+            if (scene is ZombonzMapRoot root) toggle.SetPressedNoSignal(PreviewToggles[i].Read(root));
         }
     }
 
-    private void AddButton(string text, Action action)
+    private void AddButton(string text, StringName handler)
     {
         var button = new Button { Text = text };
-        button.Pressed += () =>
-        {
-            try { action(); }
-            catch (Exception error) { _message.Text = error.Message; GD.PushError(error.ToString()); }
-        };
+        button.Connect(BaseButton.SignalName.Pressed, new Callable(this, handler));
         _controls.AddChild(button);
+    }
+
+    private void OnImportPressed() => Run(ImportMap);
+    private void OnRefreshPressed() => Run(RefreshPreview);
+    private void OnAddPressed() => Run(AddNewItem);
+    private void OnValidatePressed() => Run(ValidateOpenMap);
+    private void OnExportPressed() => Run(() => ExportMap());
+    private void OnPlayPressed() => Run(ExportAndPlay);
+
+    private void Run(Action action)
+    {
+        try { action(); }
+        catch (Exception error) { _message.Text = error.Message; GD.PushError(error.ToString()); }
     }
 
     public static string SourcePath(string relativePath) => System.IO.Path.GetFullPath(
